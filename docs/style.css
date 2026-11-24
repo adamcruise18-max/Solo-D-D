@@ -15,7 +15,8 @@ a { color: var(--accent); }
 #app { display: flex; height: 100vh; }
 #mapwrap { position: relative; flex: 1; min-width: 0; }
 #map { position: absolute; inset: 0; background: #1b1f24; }
-#map canvas { filter: saturate(.55) brightness(.9) contrast(1.05); }
+/* A small winter look; keep the map colors easy to see. */
+#map canvas { filter: saturate(.8); }
 .map-error { padding: 40px; color: var(--muted); }
 .map-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; z-index: 2; }
 .map-tools button { background: rgba(24,27,32,.92); }
