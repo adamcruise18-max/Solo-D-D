@@ -15,10 +15,25 @@ This is the **first playable version**: a small part of the full game.
    collect and boil water, cook hot meals, sleep.
 5. Click a dot on the map to see a real place (Safeway, Walgreens, clinics, gas stations
    and more). Click **Walk here**. Search it zone by zone, take what you can carry, and walk home.
-6. You can also search houses on your street or near any place.
-7. A stray dog comes near the house in the first days. Leave food outside on three different days.
-8. The game saves in your browser after each action. You have one life.
+6. At a place or in a house, click **Walk inside (first person)** to walk through it in 3D and
+   search it yourself (see below). The old panel buttons still work too.
+7. You can also search houses on your street or near any place.
+8. A stray dog comes near the house in the first days. Leave food outside on three different days.
+9. The game saves in your browser after each action. You have one life.
    Use **☰ Game** to export or import a backup file.
+
+### Inside a building (first person)
+
+- Computer: click the view to look with the mouse. **W A S D** or the arrow keys walk. **Shift** walks faster.
+  **E** searches the aisle or room you stand in. **T** takes all that fits. **Esc** opens the menu.
+- Phone or tablet: drag on the left half of the screen to walk, drag on the right half to look,
+  tap **USE** to search.
+- A blue ring on the floor marks a place you did not search yet. A grey ring is done.
+- Walk to the front door and press **E** to go back to the map.
+- Game time: each search costs the same time as before (for example 20 min for a supermarket aisle,
+  2× in the dark with no flashlight). Walking inside costs 1 game minute for each 60 m you walk.
+  Time does not move when you stand still or when the menu is open.
+- Big stores, hospitals and all places at night are dark. A flashlight in your pack lights the way.
 
 ## Run the game
 
@@ -48,6 +63,9 @@ This is the **first playable version**: a small part of the full game.
   water heater tank, tap water that stops, boiling, cooking.
 - Scavenging: fixed loot for each place (it never comes back), dark stores, pharmacy counters,
   locked fire stations, nearby houses.
+- First-person search inside every place and house (three.js). Each place type gets its own simple
+  floor plan: stores have rows of shelves and one aisle for each search zone; clinics, hospitals,
+  fire stations and houses have rooms off one hallway. Shelves get empty when you search them.
 - Walking with road events (debris, floods, fallen trees, dog packs, coyotes).
 - Injuries, infection, stomach bug, medicine.
 - Stray dog that joins you, with Food, Health and Bond.
@@ -60,7 +78,9 @@ offline mode.
 ## For developers
 
 - `src/` game code (ES modules). `src/engine/` has the rules and has no browser code.
-- `docs/` the playable site. `docs/game.js` is built from `src/`.
+- `docs/` the playable site. `docs/game.js` is built from `src/`. `docs/inside3d.js` (the 3D view, three.js)
+  is built from `src/ui/inside3d.js` and loads only when the player walks inside.
+- `src/engine/interior.js` makes the floor plans (no browser code, tested in `test/interior.test.js`).
 - `npm install`, then `npm run build` (bundle), `npm test` (engine tests), `npm run places` (rebuild the places file from `data/poi-15mi-97078.csv`).
 - Rule numbers come from the game rules doc. Change numbers in `src/data/` and `src/engine/`.
 

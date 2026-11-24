@@ -611,6 +611,9 @@
     if (state2.player.food < 25) lim *= 0.9;
     return Math.round(lim);
   }
+  function has(state2, id) {
+    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  }
   function hasLight(state2) {
     return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0;
   }
@@ -1480,7 +1483,7 @@
         return;
       }
       case "batteries": {
-        if (!has(state2, "flashlight")) {
+        if (!has2(state2, "flashlight")) {
           log(state2, "You need a flashlight first.");
           return;
         }
@@ -1507,7 +1510,7 @@
       default:
     }
   }
-  function has(state2, id) {
+  function has2(state2, id) {
     return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
   }
   function useMed(state2, id, bag) {
@@ -1827,7 +1830,7 @@
   function forceEntry(state2) {
     const place = getPlace(state2.location.id);
     const ps = placeState(state2, place);
-    if (has(state2, "pry_bar")) {
+    if (has2(state2, "pry_bar")) {
       ps.unlocked = true;
       log(state2, "You open the locked door with the pry bar.");
       advanceTime(state2, 5, "work");
@@ -1844,7 +1847,7 @@
     const place = getPlace(state2.location.id);
     const ps = placeState(state2, place);
     const lz2 = CATEGORIES[place.cat].lockedZone;
-    if (has(state2, "pry_bar")) {
+    if (has2(state2, "pry_bar")) {
       ps.counterOpen = true;
       log(state2, `You open the ${lz2.name} gate with the pry bar.`);
       advanceTime(state2, 5, "work");
@@ -1879,29 +1882,56 @@
     if (names.length) log(state2, `You search the ${where}. You find: ${names.join(", ")}.`, "good");
     else log(state2, `You search the ${where}. You find nothing useful.`);
   }
-  function searchZone(state2) {
+  function zonesDoneList(ps, countKey = "zonesDone", listKey = "doneList") {
+    if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_, i) => i);
+    return ps[listKey];
+  }
+  function nextZone(ps, counterIdx = -1) {
+    const done = zonesDoneList(ps);
+    for (let i = 0; i < ps.zones; i++) if (i !== counterIdx && !done.includes(i)) return i;
+    if (counterIdx >= 0 && !done.includes(counterIdx)) return counterIdx;
+    return -1;
+  }
+  function counterIndex(place, ps) {
+    return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
+  }
+  function searchZone(state2, index) {
     const place = getPlace(state2.location.id);
     const cat = CATEGORIES[place.cat];
     const ps = placeState(state2, place);
-    if (ps.zonesDone >= ps.zones) return;
+    if (!ps.unlocked) return false;
+    const cIdx = counterIndex(place, ps);
+    const done = zonesDoneList(ps);
+    const zone = index == null ? nextZone(ps, cIdx) : Number(index);
+    if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
+    const counterZone = zone === cIdx;
+    if (counterZone && !ps.counterOpen) return false;
     const env = environment(state2, "work");
-    const counterZone = cat.lockedZone && ps.zonesDone === ps.zones - 1;
     const minutes = searchMinutes(state2, cat.zoneMinutes, env.dark);
     advanceTime(state2, minutes, "work");
-    if (state2.dead) return;
+    if (state2.dead) return true;
     zoneInjuryCheck(state2);
-    const found = rollZone(state2, place.id, place.cat, ps.stock, ps.zonesDone, dogExtra(state2));
+    const found = rollZone(state2, place.id, place.cat, ps.stock, zone, dogExtra(state2));
     if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
-    ps.zonesDone += 1;
+    done.push(zone);
+    ps.zonesDone = done.length;
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-    reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} (${ps.zonesDone} of ${ps.zones})`);
+    reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
     if (place.cat === "supermarket" && ps.zonesDone === 1) {
       state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
       log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
+    state2.lastFound = found;
+    return true;
   }
   var lz = (cat) => cat.lockedZone.name;
+  var INSIDE_M_PER_MIN = 60;
+  function walkInside(state2, meters) {
+    const m = Number(meters);
+    if (!(m > 0)) return;
+    advanceTime(state2, m / INSIDE_M_PER_MIN, "work");
+  }
   function areaKey(state2) {
     return state2.location.kind === "place" ? state2.location.id : "home";
   }
@@ -1921,7 +1951,7 @@
     advanceTime(state2, 5, "walk");
     log(state2, `You walk to a house ${near}.`);
     if (chance(state2, 0.7)) {
-      if (has(state2, "pry_bar")) {
+      if (has2(state2, "pry_bar")) {
         log(state2, "The door is locked. You open it with the pry bar.");
         advanceTime(state2, 5, "work");
       } else if (chance(state2, 0.1)) {
@@ -1943,20 +1973,24 @@
     if (state2.houses[id].body) seeBody(state2, "Someone is in the bedroom. You close the door.");
     else log(state2, "The house is empty and cold. A family lived here.");
   }
-  function searchRoom(state2) {
+  function searchRoom(state2, index) {
     const loc = state2.location;
     const hs = state2.houses[loc.id];
-    if (hs.roomsDone >= HOUSE_ROOMS.length) return;
-    const room = HOUSE_ROOMS[hs.roomsDone];
+    const done = zonesDoneList(hs, "roomsDone", "doneList");
+    let room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+    if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
     const env = environment(state2, "work");
     advanceTime(state2, searchMinutes(state2, CATEGORIES.house.zoneMinutes, env.dark), "work");
-    if (state2.dead) return;
+    if (state2.dead) return true;
     zoneInjuryCheck(state2);
-    const found = rollZone(state2, loc.id, "house", CATEGORIES.house.stock, hs.roomsDone, dogExtra(state2));
-    hs.roomsDone += 1;
+    const found = rollZone(state2, loc.id, "house", CATEGORIES.house.stock, room, dogExtra(state2));
+    done.push(room);
+    hs.roomsDone = done.length;
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-    reportFound(state2, found, room);
+    reportFound(state2, found, HOUSE_ROOMS[room]);
+    state2.lastFound = found;
+    return true;
   }
   function leaveHouse(state2) {
     const parent = state2.location.parent;
@@ -2017,23 +2051,26 @@
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
       const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has(state2, "pry_bar") ? "pry bar" : "d20 DC 12" });
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar" : "d20 DC 12" });
       else if (ps.zonesDone < ps.zones) {
-        if (cat.lockedZone && ps.zonesDone === ps.zones - 1 && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has(state2, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}` });
+        if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}` });
         } else {
           const env = environment(state2, "work");
           const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
           add("search", `Search the next ${cat.zoneName}`, { note: `${ps.zonesDone}/${ps.zones} done \xB7 ${formatDuration(min)}${env.dark && !hasLight(state2) ? " (dark, no light)" : ""}` });
         }
       } else add("search", "Nothing left to search", { disabled: "You searched all of it" });
+      if (ps.unlocked) add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("house", "Search a house nearby", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
       add("go_home", "Walk home");
     }
     if (loc.kind === "house") {
       const hs = state2.houses[loc.id];
-      if (hs.roomsDone < HOUSE_ROOMS.length) add("room", `Search the ${HOUSE_ROOMS[hs.roomsDone]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
+      const nextRoom = HOUSE_ROOMS.findIndex((_, i) => !zonesDoneList(hs, "roomsDone", "doneList").includes(i));
+      if (nextRoom >= 0) add("room", `Search the ${HOUSE_ROOMS[nextRoom]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
       else add("room", "All rooms searched", { disabled: "Nothing left" });
+      add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("leave_house", "Leave the house");
     }
     add("rest", "Rest 1 hour");
@@ -2052,7 +2089,7 @@
       case "sleep":
         return sleep(state2, Number(arg) || 8);
       case "search":
-        return searchZone(state2);
+        return searchZone(state2, arg);
       case "force":
         return forceEntry(state2);
       case "counter":
@@ -2060,7 +2097,9 @@
       case "house":
         return enterNearbyHouse(state2);
       case "room":
-        return searchRoom(state2);
+        return searchRoom(state2, arg);
+      case "walk_inside":
+        return walkInside(state2, arg);
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -2075,6 +2114,177 @@
         return workOnProject(state2, arg);
       default:
         return homeAction(state2, id);
+    }
+  }
+
+  // src/engine/interior.js
+  var T = 0.2;
+  var HALL = {
+    supermarket: { len: 18, front: 6, fixture: "shelf" },
+    hardware: { len: 18, front: 5, fixture: "rack" },
+    pharmacy: { len: 9, front: 5, fixture: "shelf" },
+    outdoor: { len: 10, front: 5, fixture: "clothes" },
+    convenience: { len: 6, front: 4, fixture: "shelf" },
+    gas: { len: 5, front: 4, fixture: "shelf" }
+  };
+  var HOUSE_FURNITURE = {
+    kitchen: ["counter", "fridge", "table"],
+    "living room": ["sofa", "table", "cabinet"],
+    bedroom: ["bed", "dresser"],
+    bathroom: ["tub", "cabinet"],
+    "second bedroom": ["bed", "dresser"],
+    garage: ["rack", "bench"]
+  };
+  function buildInterior(cat, key, zones, opts = {}) {
+    const r = mulberry32(hashString(`interior:${key}`));
+    const plan = HALL[cat] ? hallPlan(cat, zones, r) : roomsPlan(cat, zones, r, opts);
+    plan.cat = cat;
+    plan.dark = !!CATEGORIES[cat]?.dark;
+    addDebris(plan, r);
+    return plan;
+  }
+  function wallBox(x1, z1, x2, z2) {
+    return { x: (x1 + x2) / 2, z: (z1 + z2) / 2, w: Math.max(T, Math.abs(x2 - x1)), d: Math.max(T, Math.abs(z2 - z1)) };
+  }
+  function outerWalls(W, D) {
+    const h = W / 2;
+    return [
+      wallBox(-h, 0, -1, 0),
+      wallBox(1, 0, h, 0),
+      // front, with door gap
+      wallBox(-h, -D, h, -D),
+      // back
+      wallBox(-h, 0, -h, -D),
+      wallBox(h, 0, h, -D)
+      // sides
+    ];
+  }
+  function hallPlan(cat, zones, r) {
+    const cfg = HALL[cat];
+    const counter = !!CATEGORIES[cat].lockedZone;
+    const aisles = counter ? zones - 1 : zones;
+    const AISLE = 2.4;
+    const SHELF = 1;
+    const W = Math.max(8, aisles * AISLE + (aisles + 1) * SHELF + 6);
+    const back = counter ? 5 : 3;
+    const D = cfg.front + cfg.len + back;
+    const plan = { kind: "hall", size: { w: W, d: D, h: cat === "convenience" || cat === "gas" ? 3 : 5 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const rowZ = -(cfg.front + cfg.len / 2);
+    const total = aisles * AISLE + (aisles + 1) * SHELF;
+    const mid = Math.floor((aisles - 1) / 2);
+    let x = -(mid * (SHELF + AISLE) + SHELF + AISLE / 2);
+    for (let i = 0; i <= aisles; i++) {
+      const cx = x + SHELF / 2;
+      const tipped = cat !== "gas" && cat !== "convenience" && r() < 0.08;
+      plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === "clothes" ? 1.5 : 2, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
+      if (i < aisles) {
+        const ax = cx + SHELF / 2 + AISLE / 2;
+        plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
+      }
+      x += SHELF + AISLE;
+    }
+    const nReg = Math.max(1, Math.min(4, Math.floor(W / 6)));
+    for (let i = 0; i < nReg; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const k = Math.floor(i / 2);
+      plan.fixtures.push({ type: "checkout", x: side * (2.6 + k * 2.6), z: -cfg.front / 2, w: 0.9, d: 2.2, h: 1, solid: true });
+    }
+    if (cat === "supermarket") {
+      plan.fixtures.push({ type: "coolers", x: 0, z: -D + 0.7, w: W - 2, d: 1, h: 2.1, solid: true });
+      for (let i = 0; i < 3; i++) plan.debris.push({ kind: "cart", x: (r() - 0.5) * (W - 3), z: -1.5 - r() * (cfg.front - 2.5), rot: r() * 6.28 });
+    }
+    if (counter) {
+      const lz2 = CATEGORIES[cat].lockedZone;
+      const cz = -D + 2.2;
+      plan.fixtures.push({ type: "rx_counter", x: 0, z: cz, w: W - 4, d: 0.9, h: 1.1, solid: true });
+      plan.fixtures.push({ type: "gate", x: 0, z: cz + 0.6, w: W - 4, d: 0.1, h: 2.6, zone: zones - 1, solid: false });
+      plan.spots.push({ zone: zones - 1, x: 0, z: cz + 1.4, label: lz2.name, counter: true });
+    }
+    plan.exit = { x: 0, z: 0.6 };
+    plan.start = { x: 0, z: -1.2, yaw: 0 };
+    plan.windows = "front";
+    return plan;
+  }
+  function roomsPlan(cat, zones, r, opts) {
+    const house = cat === "house";
+    const RW = house ? 4.2 : 4.6;
+    const RD = house ? 4.2 : 4.6;
+    const HALLW = house ? 1.6 : 2.4;
+    const rows = Math.ceil(zones / 2);
+    const ENTRY = house ? 2.2 : 3.4;
+    const W = HALLW + 2 * RW;
+    const D = ENTRY + rows * RD;
+    const plan = { kind: "rooms", size: { w: W, d: D, h: house ? 2.6 : 3 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const hx = HALLW / 2;
+    const DOOR = 1.1;
+    const names = house ? HOUSE_ROOMS : null;
+    for (let i = 0; i < zones; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const row = Math.floor(i / 2);
+      const z1 = -(ENTRY + row * RD);
+      const z2 = z1 - RD;
+      const zc = (z1 + z2) / 2;
+      const xin = side * hx;
+      const xout = side * (hx + RW);
+      plan.walls.push(wallBox(xin, z1, xin, zc + DOOR / 2), wallBox(xin, zc - DOOR / 2, xin, z2));
+      if (row === 0) plan.walls.push(wallBox(xin, z1, xout, z1));
+      plan.walls.push(wallBox(xin, z2, xout, z2));
+      const rcx = (xin + xout) / 2;
+      const name = names ? names[i] : `${CATEGORIES[cat].zoneName} ${i + 1}`;
+      plan.spots.push({ zone: i, x: xin + side * 1, z: zc, label: name, area: { x1: Math.min(xin, xout), x2: Math.max(xin, xout), z1: z2, z2: z1 } });
+      furnishRoom(plan, cat, name, i, { cx: rcx, cz: zc, side, RW, RD, xout }, r, opts);
+    }
+    if (zones % 2 === 1) {
+      const z1 = -(ENTRY + (rows - 1) * RD);
+      plan.walls.push(wallBox(hx, z1, hx, z1 - RD));
+      plan.fixtures.push({ type: "cabinet", x: hx + 0.4, z: z1 - RD / 2, w: 0.6, d: 1.2, h: 1.8, solid: true });
+    }
+    if (cat === "clinic" || cat === "hospital") plan.fixtures.push({ type: "desk", x: -hx - RW + 1.6, z: -ENTRY / 2, w: 2.4, d: 0.8, h: 1.1, solid: true });
+    if (cat === "fire") plan.fixtures.push({ type: "bench", x: hx + 1.5, z: -ENTRY / 2, w: 2.4, d: 0.5, h: 0.5, solid: true });
+    plan.exit = { x: 0, z: 0.6 };
+    plan.start = { x: 0, z: -1, yaw: 0 };
+    plan.windows = "rooms";
+    return plan;
+  }
+  function furnishRoom(plan, cat, name, zone, room, r, opts) {
+    const { cx, cz, side, RW, RD, xout } = room;
+    const wallX = xout - side * 0.55;
+    const put = (type, x, z, w, d, h, extra = {}) => plan.fixtures.push({ type, x, z, w, d, h, zone, solid: true, ...extra });
+    let items;
+    if (cat === "house") items = HOUSE_FURNITURE[name] || ["cabinet"];
+    else if (cat === "hospital") items = ["bed", "bed", "cart"];
+    else if (cat === "clinic") items = ["bed", "cabinet"];
+    else items = zone === 0 ? ["locker", "locker", "bench"] : ["bed", "locker"];
+    let slot = 0;
+    for (const it of items) {
+      const zz = cz + (slot === 0 ? RD / 4 : slot === 1 ? -RD / 4 : 0);
+      slot += 1;
+      if (it === "bed") {
+        put("bed", cx + side * 0.6, zz, 2, 1, 0.6);
+        const bodyHere = cat === "hospital" || cat === "clinic" ? r() < 0.45 : cat === "house" && opts.body && name === "bedroom" && slot === 1;
+        if (bodyHere) plan.bodies.push({ x: cx + side * 0.6, z: zz, y: 0.6, rot: 0 });
+      } else if (it === "fridge") put("fridge", wallX, cz - RD / 3, 0.8, 0.8, 1.8);
+      else if (it === "counter") put("counter", wallX, cz + RD / 6, 0.7, RD * 0.6, 0.95);
+      else if (it === "sofa") put("sofa", wallX, zz, 0.9, 2, 0.8);
+      else if (it === "tub") put("tub", wallX, zz, 0.8, 1.7, 0.6);
+      else if (it === "rack") put("rack", wallX, zz, 0.6, 2.2, 1.9);
+      else if (it === "locker") put("locker", wallX, zz, 0.5, 1.6, 1.9);
+      else if (it === "dresser") put("dresser", wallX, zz, 0.5, 1.2, 1);
+      else if (it === "cart") put("cart", cx - side * 0.6, zz, 0.6, 0.9, 1);
+      else if (it === "table") put("table", cx, zz, 1.2, 1.2, 0.75);
+      else if (it === "bench") put("bench", wallX, zz, 0.6, 2, 0.9);
+      else put("cabinet", wallX, zz, 0.6, 1, 1.4);
+    }
+  }
+  function addDebris(plan, r) {
+    const { w, d } = plan.size;
+    const n = Math.round(w * d / (plan.kind === "hall" ? 10 : 7));
+    for (let i = 0; i < n; i++) {
+      const x = (r() - 0.5) * (w - 1);
+      const z = -0.8 - r() * (d - 1.6);
+      if (Math.abs(x) < 1.2 && z > -2.5) continue;
+      const kind = r() < 0.5 ? "box" : r() < 0.6 ? "can" : "paper";
+      plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
   }
 
@@ -2972,12 +3182,151 @@
       });
     });
   }
+  var insideLoading = null;
+  function loadInside3d() {
+    if (window.LLInside3D) return Promise.resolve(window.LLInside3D);
+    if (!insideLoading) {
+      insideLoading = new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "inside3d.js";
+        s.onload = () => resolve(window.LLInside3D);
+        s.onerror = () => {
+          insideLoading = null;
+          reject(new Error("3D view did not load"));
+        };
+        document.head.appendChild(s);
+      });
+    }
+    return insideLoading;
+  }
+  function webglOk() {
+    try {
+      const c = document.createElement("canvas");
+      return !!(c.getContext("webgl2") || c.getContext("webgl"));
+    } catch (e) {
+      return false;
+    }
+  }
+  async function walkInside2() {
+    if (!state || state.dead || document.getElementById("inside")) return;
+    if (!webglOk()) {
+      alert("This browser cannot show 3D. Use the search buttons in the panel.");
+      return;
+    }
+    let api;
+    try {
+      api = await loadInside3d();
+    } catch (e) {
+      alert("The 3D view did not load. Check the connection and try again.");
+      return;
+    }
+    const loc = state.location;
+    let plan;
+    let cat;
+    let bag;
+    let zoneList;
+    let stock;
+    let counterIdx = -1;
+    let title;
+    let zoneName;
+    if (loc.kind === "place") {
+      const place = getPlace(loc.id);
+      const ps = placeState(state, place);
+      cat = CATEGORIES[place.cat];
+      plan = buildInterior(place.cat, place.id, ps.zones);
+      zoneList = () => zonesDoneList(ps);
+      stock = ps.stock;
+      counterIdx = cat.lockedZone ? ps.zones - 1 : -1;
+      title = place.name;
+      zoneName = cat.zoneName;
+    } else if (loc.kind === "house") {
+      const hs = state.houses[loc.id];
+      cat = CATEGORIES.house;
+      plan = buildInterior("house", loc.id, 6, { body: hs.body });
+      zoneList = () => zonesDoneList(hs, "roomsDone", "doneList");
+      stock = cat.stock;
+      title = loc.label;
+      zoneName = "room";
+    } else return;
+    const env = environment(state, "work");
+    const night = isNight(state.time);
+    document.body.classList.add("inside-open");
+    const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === "warn" || e.kind === "bad" || e.kind === "story").map((e) => e.text);
+    api.openInside({
+      plan,
+      title,
+      subtitle: `${cat.label} \xB7 inside`,
+      dark: env.dark,
+      night,
+      hasLight: hasLight(state),
+      stock,
+      isDone: (z) => zoneList().includes(z),
+      isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
+      isDead: () => !!state.dead,
+      getStatus: () => {
+        const p = state.player;
+        const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+        const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h` : "No flashlight";
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
+      },
+      describe: (n) => {
+        if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
+        if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>`;
+        if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
+          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+        }
+        const e = environment(state, "work");
+        const min = searchMinutes(state, cat.zoneMinutes, e.dark);
+        return `<kbd>E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? " \xB7 dark, no light" : ""}</small>`;
+      },
+      onWalk: (m) => {
+        perform(state, "action", "walk_inside", m);
+        if (state.dead) recordRun(state);
+        saveGame(state);
+      },
+      onCounter: () => {
+        const n0 = state.log.length;
+        act("action", "counter");
+        return state.log.slice(n0).map((e) => e.text).join(" ") || "The gate does not move.";
+      },
+      onSearch: (zone) => {
+        const n0 = state.log.length;
+        const t0 = state.time;
+        delete state.lastFound;
+        const wasDead = !!state.dead;
+        perform(state, "action", loc.kind === "place" ? "search" : "room", zone);
+        if (!wasDead && state.dead) recordRun(state);
+        const found = state.lastFound || {};
+        delete state.lastFound;
+        commit();
+        const items = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? ` \xD7${q}` : ""}`);
+        const label = plan.spots.find((s) => s.zone === zone)?.label || zoneName;
+        const extra = lastLines(n0).join(" ");
+        return {
+          title: `${label} \xB7 ${formatDuration(state.time - t0)}`,
+          items,
+          canTake: Object.keys(hereBag(state)).length > 0,
+          note: extra
+        };
+      },
+      onTakeAll: () => {
+        const n0 = state.log.length;
+        act("takeall");
+        return state.log.slice(n0).map((e) => e.text).join(" ") || `You put it in your pack. Bag: ${bagWeight(state.carried)} / ${carryLimit(state)} lb.`;
+      },
+      onLeave: () => {
+        document.body.classList.remove("inside-open");
+        commit();
+      }
+    });
+  }
   function bindEvents() {
     document.body.addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b || b.disabled || !state || b.closest("#modal") || b.closest(".maplibregl-popup")) return;
       if (b.dataset.act) {
         if (b.dataset.act === "sleep") return showSleep();
+        if (b.dataset.act === "walk_in") return walkInside2();
         act("action", b.dataset.act);
       } else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
       else if (b.dataset.take) act("take", b.dataset.take);

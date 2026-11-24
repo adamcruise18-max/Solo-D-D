@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Last Light: Portland - a solo survival game on the real map of the Portland area",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --format=iife --target=es2020 --outfile=docs/game.js",
+    "build": "esbuild src/main.js --bundle --format=iife --target=es2020 --outfile=docs/game.js && esbuild src/ui/inside3d.js --bundle --format=iife --target=es2020 --minify --outfile=docs/inside3d.js",
     "places": "node tools/build-places.mjs",
     "test": "node --test",
     "serve": "python3 -m http.server 8080 -d docs"
@@ -22,5 +22,8 @@
     "maplibre-gl": "^4.7.1"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "three": "^0.170.0"
+  }
 }
