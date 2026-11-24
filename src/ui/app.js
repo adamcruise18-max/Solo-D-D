@@ -10,6 +10,7 @@ import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDone
 import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
+import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -194,25 +195,51 @@ function useButtons(id, from) {
   return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join('');
 }
 
+// Auto-sort: items in groups by kind, then by name.
+const KIND_GROUPS = [
+  ['Food', ['food', 'dogfood']], ['Water', ['drink']], ['Medicine', ['med']],
+  ['Light and tools', ['tool', 'batteries']], ['Clothes', ['wear']],
+  ['Fuel and parts', ['fuel', 'part']], ['Other', ['misc', 'comfort']],
+];
+function groupOf(id) {
+  const k = ITEMS[id] ? ITEMS[id].kind : 'misc';
+  const i = KIND_GROUPS.findIndex(([, kinds]) => kinds.includes(k));
+  return i < 0 ? KIND_GROUPS.length - 1 : i;
+}
+function sortedIds(bag) {
+  return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
+}
+// Item rows with a small group header when the group changes.
+function groupedRows(ids, row) {
+  let last = -1;
+  return ids.map((id) => {
+    const g = groupOf(id);
+    const head = g !== last ? `<li class="grp">${KIND_GROUPS[g][0]}</li>` : '';
+    last = g;
+    return head + row(id);
+  }).join('');
+}
+
 function renderItems() {
   const loc = state.location;
   const here = hereBag(state);
-  const hereIds = Object.keys(here).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  const hereIds = sortedIds(here);
   const hereTitle = loc.kind === 'home' ? 'House storage' : 'Items you found here';
-  let hereHtml = hereIds.map((id) => itemRow(id, here[id], 'here',
-    (loc.kind === 'home' ? useButtons(id, 'storage') : '') + `<button data-take="${id}">Take</button>`)).join('');
+  let hereHtml = groupedRows(hereIds, (id) => itemRow(id, here[id], 'here',
+    (loc.kind === 'home' ? useButtons(id, 'storage') : '') + `<button data-take="${id}">Take</button>`));
   if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === 'home' ? 'Nothing stored.' : 'Nothing here yet. Search to find items.'}</li>`;
   const takeAll = hereIds.length && loc.kind !== 'home' ? '<button class="small" data-takeall="1">Take all that fits</button>' : '';
 
   const carried = state.carried;
-  const cIds = Object.keys(carried).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  const cIds = sortedIds(carried);
   const weight = bagWeight(carried);
   const limit = carryLimit(state);
   const over = weight > limit;
-  let cHtml = cIds.map((id) => itemRow(id, carried[id], 'carried',
-    useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`)).join('');
+  let cHtml = groupedRows(cIds, (id) => itemRow(id, carried[id], 'carried',
+    useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`));
   if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
   $('#items').innerHTML = `
+    <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
     <h3>${hereTitle} ${takeAll}</h3><ul class="items">${hereHtml}</ul>
     <h3>You carry <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
     <ul class="items">${cHtml}</ul>`;
@@ -222,13 +249,17 @@ function renderHome() {
   const h = state.home;
   const atHome = state.location.kind === 'home';
   const pct = Math.round((h.battery / h.batteryMax) * 100);
+  const pw = powerSummary(state);
+  const hrs = (x) => (x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`);
   $('#home').innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? '' : '<small>(you are away)</small>'}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}°F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : 'out'}</b>
-      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} kWh)${h.heaterOn ? ' · heater ON' : ''}</b>
+      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} of ${h.batteryMax} kWh)</b>
+      <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
+      <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW · battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on · heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
@@ -752,18 +783,18 @@ function insidePanel(name) {
   const p = state.player;
   if (name === 'inventory') {
     const c = state.carried;
-    const ids = Object.keys(c).sort((a, b) => itemName(a).localeCompare(itemName(b)));
-    const rows = ids.map((id) => {
+    const ids = sortedIds(c);
+    const rows = groupedRows(ids, (id) => {
       const it = ITEMS[id];
       const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
         .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
       return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
-    }).join('') || '<li class="empty">You carry nothing.</li>';
+    }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
     const hereIds = Object.keys(here);
     const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
       <button class="primary small" data-in="take">Take all that fits (F)</button>` : '';
-    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
+    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><p class="stock">${esc(stockLine(state))}</p><ul class="inv">${rows}</ul>${hereList}`;
   }
   if (name === 'character') {
     const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')

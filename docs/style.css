@@ -367,3 +367,8 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 .hud .h-risk { color: #2a2205; background: #e3b04b; }
 .risk-line { font-size: 12px; color: #e3b04b; margin: 4px 0; }
 .act.risky small { color: #e3b04b; }
+
+/* QoL step 3: stock line and item groups */
+.stock { margin: 0 0 8px; padding: 6px 8px; font-size: 13px; background: rgba(255, 255, 255, .04); border-left: 2px solid var(--accent, #56c2d6); }
+.stock small { color: var(--muted, #9aa4ad); font-size: 11px; }
+ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #9aa4ad); padding: 6px 0 2px; border: 0; background: none; }
