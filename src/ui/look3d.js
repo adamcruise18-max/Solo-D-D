@@ -14,7 +14,7 @@ import {
   MeshStandardMaterial, MeshBasicMaterial, SpriteMaterial, ShaderMaterial,
   CanvasTexture, RepeatWrapping, ClampToEdgeWrapping, SRGBColorSpace, NoColorSpace, LinearMipmapLinearFilter,
   DoubleSide, AdditiveBlending, ACESFilmicToneMapping, PCFSoftShadowMap, PCFShadowMap,
-  Vector3, Vector2, Vector4, Quaternion, MathUtils,
+  Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator,
 } from 'three';
 
 // ---------- small helpers ----------
@@ -195,27 +195,58 @@ function scuffs(L, n, rnd, alpha = 0.35) {
   }
 }
 
-// Brown water stains: rings with a lighter middle.
-function stains(L, n, rnd, color = '90,62,30', maxR = 0.18) {
+// Water stains: irregular blotches with a faint tide line at the edge (from noise, not circles).
+const STAIN_CACHE = {};
+function stainBlob(S, variant) {
+  const key = `${S}-${variant}`;
+  if (STAIN_CACHE[key]) return STAIN_CACHE[key];
+  const rnd = rngFrom(900 + variant * 17);
+  const f = fbm(S, S, 3, 3, 5, rnd, 0.6);
+  const c = canvas(S);
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const d = Math.hypot(x - S / 2, y - S / 2) / (S / 2);
+      const v = f[i] * 1.35 + 0.3 - d * 0.6; // > 0.5 inside the stain
+      const inside = clamp01((v - 0.5) * 14);
+      const tide = Math.exp(-(((v - 0.53) * 26) ** 2)); // thin line at the edge
+      const a = (inside * 0.3 + tide * 0.28) * clamp01((1 - d) * 3);
+      const p = i * 4;
+      img.data[p] = img.data[p + 1] = img.data[p + 2] = 255;
+      img.data[p + 3] = clamp01(a) * 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  STAIN_CACHE[key] = c;
+  return c;
+}
+function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
   const { c, rc, w, h } = L;
+  const blob = stainBlob(128, Math.floor(rnd() * 3));
+  const t = canvas(128);
+  const tg = t.getContext('2d');
+  tg.drawImage(blob, 0, 0);
+  tg.globalCompositeOperation = 'source-in';
+  tg.fillStyle = `rgb(${color})`;
+  tg.fillRect(0, 0, 128, 128);
   for (let i = 0; i < n; i++) {
     const x = rnd() * w;
     const y = rnd() * h;
     const r = (0.04 + rnd() * maxR) * Math.min(w, h);
+    const rot = rnd() * 6.3;
+    const sy = 0.6 + rnd() * 0.5;
     wrapped(w, h, x, y, r, (px, py) => {
-      const g = c.createRadialGradient(px, py, r * 0.1, px, py, r);
-      g.addColorStop(0, `rgba(${color},0.05)`);
-      g.addColorStop(0.8, `rgba(${color},0.16)`);
-      g.addColorStop(0.93, `rgba(${color},0.32)`);
-      g.addColorStop(1, `rgba(${color},0)`);
-      c.fillStyle = g;
-      c.beginPath();
-      c.ellipse(px, py, r, r * (0.7 + rnd() * 0.3), rnd() * 3, 0, 6.3);
-      c.fill();
-      rc.fillStyle = 'rgba(255,255,255,0.15)';
-      rc.beginPath();
-      rc.arc(px, py, r * 0.9, 0, 6.3);
-      rc.fill();
+      for (const ctx of [c, rc]) {
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(rot);
+        ctx.scale(1, sy);
+        ctx.globalAlpha = ctx === c ? 0.8 * strength : 0.25;
+        ctx.drawImage(ctx === c ? t : blob, -r, -r, r * 2, r * 2);
+        ctx.restore();
+      }
     });
   }
 }
@@ -252,18 +283,17 @@ function makeStoreTile(S, seed) {
     const k = ch > 0.82 ? -26 : ch < 0.12 ? 14 : 0;
     const shade = (n1[i] - 0.5) * 26 + k;
     // grime: more near the grout, more in blotches
-    const g = clamp01((grime[i] - 0.42) * 2.4) * 0.55 + clamp01(1 - edge * 18) * 0.45 * (0.6 + grime[i]);
+    const g = clamp01((grime[i] - 0.45) * 2.2) * 0.45 + clamp01(1 - edge * 30) * 0.3 * (0.5 + grime[i]);
     o[0] = c[0] + shade; o[1] = c[1] + shade; o[2] = c[2] + shade;
     const gm = Math.min(0.75, g);
     o[0] += (dirt[0] - o[0]) * gm; o[1] += (dirt[1] - o[1]) * gm; o[2] += (dirt[2] - o[2]) * gm;
-    const grout = edge < 0.008;
-    if (grout) { o[0] *= 0.45; o[1] *= 0.45; o[2] *= 0.45; }
-    o[3] = grout ? 0.2 : 0.62 + n1[i] * 0.06 - g * 0.05;
+    const grout = edge < 0.006;
+    if (grout) { o[0] *= 0.72; o[1] *= 0.72; o[2] *= 0.72; }
+    o[3] = grout ? 0.45 : 0.62 + n1[i] * 0.06 - g * 0.05;
     o[4] = 0.42 + g * 0.45 + (grout ? 0.4 : 0) + (n1[i] - 0.5) * 0.1;
   });
-  scuffs(L, 70, rnd, 0.4);
-  stains(L, 3, rnd, '70,55,35', 0.12);
-  return surfaceMaterial(L, { tile: [1.2, 1.2], normal: 3 });
+  scuffs(L, 45, rnd, 0.3);
+  return surfaceMaterial(L, { tile: [1.2, 1.2], normal: 2 });
 }
 
 function makeLinoleum(S, seed) {
@@ -307,8 +337,8 @@ function makeWood(S, seed) {
   }
   const tones = [];
   for (let i = 0; i < planks * 3; i++) tones.push(rnd());
-  const light = rgb(0x9c6d45);
-  const darkC = rgb(0x5a3a22);
+  const light = rgb(0x8f6e50);
+  const darkC = rgb(0x4f3a28);
   const c = [0, 0, 0];
   paint(L, (i, x, y, o) => {
     const p = Math.floor(x / pw);
@@ -322,13 +352,13 @@ function makeWood(S, seed) {
     const w = clamp01((wear[i] - 0.5) * 2);
     o[0] = c[0] + gr - w * 18; o[1] = c[1] + gr * 0.8 - w * 18; o[2] = c[2] + gr * 0.6 - w * 14;
     const gap = lx < 0.025 || lx > 0.975 || Math.abs(v - e1) < 0.003 || Math.abs(v - e2) < 0.003;
-    if (gap) { o[0] *= 0.3; o[1] *= 0.3; o[2] *= 0.3; }
-    o[3] = gap ? 0.1 : 0.6 + (grain2[i] - 0.5) * 0.12;
+    if (gap) { o[0] *= 0.5; o[1] *= 0.5; o[2] *= 0.5; }
+    o[3] = gap ? 0.25 : 0.6 + (grain2[i] - 0.5) * 0.12;
     o[4] = 0.5 + w * 0.35 + (grain[i] - 0.5) * 0.15 + (gap ? 0.4 : 0);
   });
   scuffs(L, 25, rnd, 0.25);
   stains(L, 2, rnd, '40,25,12', 0.1);
-  return surfaceMaterial(L, { tile: [1.2, 1.2], normal: 2.5 });
+  return surfaceMaterial(L, { tile: [1.6, 1.6], normal: 2.5 });
 }
 
 function makeCarpet(S, seed) {
@@ -434,40 +464,36 @@ function makeDrywall(S, seed, paintHex, baseHex) {
   });
   const { c, rc } = L;
   // water stains with drip trails from above
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < 2; k++) {
     const x = rnd() * W;
-    const y = H * (0.2 + rnd() * 0.45);
-    const r = W * (0.08 + rnd() * 0.12);
-    const g = c.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, 'rgba(110,80,40,0.10)');
-    g.addColorStop(0.85, 'rgba(110,78,36,0.22)');
-    g.addColorStop(0.95, 'rgba(90,60,25,0.4)');
-    g.addColorStop(1, 'rgba(90,60,25,0)');
-    c.fillStyle = g;
-    c.beginPath(); c.ellipse(x, y, r, r * 1.4, 0, 0, 6.3); c.fill();
-    for (let t = 0; t < 4; t++) {
+    const y = H * (0.35 + rnd() * 0.25);
+    const r = W * (0.1 + rnd() * 0.12);
+    for (let t = 0; t < 5; t++) {
       const dx = x + (rnd() - 0.5) * r;
-      const len = H * (0.05 + rnd() * 0.25);
+      const len = H * (0.04 + rnd() * 0.2);
       const lg = c.createLinearGradient(dx, y, dx, y + len);
-      lg.addColorStop(0, 'rgba(100,70,35,0.28)');
-      lg.addColorStop(1, 'rgba(100,70,35,0)');
+      lg.addColorStop(0, 'rgba(100,72,38,0.22)');
+      lg.addColorStop(1, 'rgba(100,72,38,0)');
       c.fillStyle = lg;
-      c.fillRect(dx, y, 1.5 + rnd() * 3, len);
+      c.fillRect(dx, y, 1 + rnd() * 2.5, len);
     }
   }
+  stains(L, 3, rnd, '105,78,40', 0.16, 0.7);
   // scuffs and black marks low on the wall
-  for (let k = 0; k < 40; k++) {
-    const x = rnd() * W;
-    const y = H - basePx - rnd() * H * 0.14;
-    c.fillStyle = `rgba(30,28,26,${0.1 + rnd() * 0.25})`;
-    c.fillRect(x, y, 2 + rnd() * W * 0.06, 1 + rnd() * 2.5);
-  }
-  // chipped paint
   for (let k = 0; k < 14; k++) {
     const x = rnd() * W;
-    const y = H * (0.5 + rnd() * 0.45);
-    const r = 1 + rnd() * 4 * (W / 512);
-    c.fillStyle = 'rgba(205,200,190,0.8)';
+    const y = H - basePx - rnd() * H * 0.12;
+    c.fillStyle = `rgba(30,28,26,${0.06 + rnd() * 0.14})`;
+    c.save(); c.translate(x, y); c.rotate((rnd() - 0.5) * 0.5);
+    c.fillRect(0, 0, 2 + rnd() * W * 0.05, 0.8 + rnd() * 1.5);
+    c.restore();
+  }
+  // chipped paint
+  for (let k = 0; k < 5; k++) {
+    const x = rnd() * W;
+    const y = H * (0.6 + rnd() * 0.35);
+    const r = 1 + rnd() * 3 * (W / 512);
+    c.fillStyle = 'rgba(160,150,135,0.7)';
     c.beginPath(); c.arc(x, y, r, 0, 6.3); c.fill();
     L.hc.fillStyle = 'rgba(0,0,0,0.6)';
     L.hc.beginPath(); L.hc.arc(x, y, r, 0, 6.3); L.hc.fill();
@@ -531,7 +557,7 @@ function makeCeilingTile(S, seed) {
   const pin = noiseField(S, S, S / 1.5, S / 1.5, rnd);
   const sag = fbm(S, S, 4, 4, 3, rnd);
   const cell = S / 4;
-  const missing = Math.floor(rnd() * 16);
+  const missing = -1; // holes are better as separate meshes (no visible repeat)
   const tones = [];
   for (let i = 0; i < 16; i++) tones.push(rnd());
   paint(L, (i, x, y, o) => {
@@ -553,7 +579,7 @@ function makeCeilingTile(S, seed) {
     o[3] = 0.6 + fis[i] * 0.2 - (pin[i] > 0.88 ? 0.2 : 0);
     o[4] = 1;
   });
-  stains(L, 5, rnd, '120,85,40', 0.14);
+  stains(L, 4, rnd, '120,85,40', 0.12, 0.8);
   return surfaceMaterial(L, { tile: [2.4, 2.4], normal: 2.5 });
 }
 
@@ -584,7 +610,7 @@ function makeBlockWall(S, seed) {
   return surfaceMaterial(L, { tile: [1.6, 1.6], normal: 3 });
 }
 
-function makePlaster(S, seed, hex = 0xb2ada2) {
+function makePlaster(S, seed, hex = 0xc4c0b6) {
   const rnd = rngFrom(seed);
   const L = layers(S, S);
   const n = fbm(S, S, 5, 5, 5, rnd, 0.55);
@@ -596,30 +622,39 @@ function makePlaster(S, seed, hex = 0xb2ada2) {
     o[3] = 0.5 + fine[i] * 0.15;
     o[4] = 0.92;
   });
-  stains(L, 3, rnd, '115,85,45', 0.16);
+  stains(L, 2, rnd, '115,85,45', 0.1, 0.35);
   return surfaceMaterial(L, { tile: [3, 3], normal: 1.2 });
 }
 
 const SURF_CACHE = {};
 
 // All the shared surface materials. quality 'low' makes smaller textures.
+// Built lazily: a surface is generated the first time it is read (a store only pays for
+// its floor, wall and ceiling). makeSurfaces(q).all() builds them all.
 export function makeSurfaces(quality = 'high') {
   if (SURF_CACHE[quality]) return SURF_CACHE[quality];
-  const S = quality === 'low' ? 256 : 512;
-  const s = {
-    storeTile: makeStoreTile(S, 11),
-    linoleum: makeLinoleum(S, 23),
-    woodFloor: makeWood(S, 37),
-    carpet: makeCarpet(quality === 'low' ? 256 : 384, 41),
-    concrete: makeConcrete(S, 53),
-    drywall: makeDrywall(quality === 'low' ? 192 : 384, 61, 0xb4b8aa, 0x3b3a37),
-    drywallWarm: makeDrywall(quality === 'low' ? 192 : 384, 67, 0xb5a588, 0xd8d2c4),
-    tileWall: makeTileWall(S, 71),
-    ceilingTile: makeCeilingTile(S, 83),
-    blockWall: makeBlockWall(S, 89),
-    plaster: makePlaster(quality === 'low' ? 256 : 384, 97),
+  const low = quality === 'low';
+  const S = low ? 256 : 512;
+  const makers = {
+    storeTile: () => makeStoreTile(S, 11),
+    linoleum: () => makeLinoleum(S, 23),
+    woodFloor: () => makeWood(S, 37),
+    carpet: () => makeCarpet(low ? 256 : 384, 41),
+    concrete: () => makeConcrete(S, 53),
+    drywall: () => makeDrywall(low ? 192 : 384, 61, 0xb4b8aa, 0x3b3a37),
+    drywallWarm: () => makeDrywall(low ? 192 : 384, 67, 0xb3a58c, 0xd2ccbe),
+    tileWall: () => makeTileWall(S, 71),
+    ceilingTile: () => makeCeilingTile(S, 83),
+    blockWall: () => makeBlockWall(S, 89),
+    plaster: () => makePlaster(low ? 256 : 384, 97),
   };
-  s.surfaceFor = surfaceFor;
+  const s = { quality, surfaceFor: (cat, part, room) => surfaceFor(cat, part, room, quality) };
+  const built = {};
+  for (const k of Object.keys(makers)) {
+    Object.defineProperty(s, k, { enumerable: true, get: () => (built[k] ||= makers[k]()) });
+  }
+  s.names = Object.keys(makers);
+  s.all = () => { for (const k of s.names) void s[k]; return s; };
   SURF_CACHE[quality] = s;
   return s;
 }
@@ -757,9 +792,9 @@ function flashCookie() {
   g.beginPath(); g.arc(r, r, r, 0, 6.3); g.fill();
   // lens imperfections
   const rnd = rngFrom(5);
-  for (let i = 0; i < 40; i++) {
-    g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.05})`;
-    g.beginPath(); g.arc(r + (rnd() - 0.5) * r, r + (rnd() - 0.5) * r, 4 + rnd() * 18, 0, 6.3); g.fill();
+  for (let i = 0; i < 24; i++) {
+    g.fillStyle = `rgba(0,0,0,${0.015 + rnd() * 0.025})`;
+    g.beginPath(); g.arc(r + (rnd() - 0.5) * r, r + (rnd() - 0.5) * r, 3 + rnd() * 10, 0, 6.3); g.fill();
   }
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
@@ -803,6 +838,33 @@ function prismTexture() {
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   TEX.prism = t;
+  return t;
+}
+
+// A soft rounded-rectangle glow (light around an opening), clear in the middle third.
+function haloTexture() {
+  if (TEX.halo) return TEX.halo;
+  const W = 128;
+  const H = 128;
+  const c = canvas(W, H);
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      // distance outside the inner rectangle (the opening), in 0..1 of the margin
+      const dx = Math.max(0, Math.abs(x / W - 0.5) - 0.24) / 0.26;
+      const dy = Math.max(0, Math.abs(y / H - 0.52) - 0.3) / 0.2;
+      const d = Math.min(1, Math.hypot(dx, dy));
+      const inner = Math.abs(x / W - 0.5) < 0.24 && Math.abs(y / H - 0.52) < 0.3;
+      const a = inner ? 0.25 : (1 - d) ** 2.2 * 0.8;
+      const p = (y * W + x) * 4;
+      img.data[p] = img.data[p + 1] = img.data[p + 2] = 255;
+      img.data[p + 3] = a * 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new CanvasTexture(c);
+  TEX.halo = t;
   return t;
 }
 
@@ -1114,7 +1176,7 @@ void main() {
   vec3 d = wp - uFlashPos;
   float dist = length(d);
   float c = dot(d / max(dist, 0.001), uFlashDir);
-  float beam = smoothstep(uFlashCos, mix(uFlashCos, 1.0, 0.6), c) * uFlashOn * 2.2 / (1.0 + dist * dist * 0.06);
+  float beam = smoothstep(uFlashCos, mix(uFlashCos, 1.0, 0.6), c) * uFlashOn * 4.0 / (1.0 + dist * dist * 0.05);
   float shaft = 0.0;
   for (int i = 0; i < 2; i++) {
     vec4 s = uShaft[i]; // x, z (door), half width, length
@@ -1129,20 +1191,22 @@ void main() {
   float depth = -mv.z;
   vLight *= smoothstep(0.25, 0.8, depth) * (1.0 - smoothstep(9.0, 14.0, depth));
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = clamp(uScale * (0.006 + seed.y * 0.008) / max(depth, 0.1), 1.0, 7.0);
+  gl_PointSize = clamp(uScale * (0.008 + seed.y * 0.01) / max(depth, 0.1), 1.5, 8.0);
 }`;
 const DUST_FRAG = `
 varying float vLight;
 void main() {
   float r = length(gl_PointCoord - 0.5);
-  float a = smoothstep(0.5, 0.0, r) * vLight;
+  float a = (1.0 - smoothstep(0.0, 0.5, r)) * vLight;
   gl_FragColor = vec4(vec3(1.0, 0.96, 0.88) * a, a);
 }`;
 
 const SHAFT_VERT = `
-varying float vT; varying float vS; varying vec3 vW; varying vec3 vN;
+attribute vec2 aSlice; // x: 1 for a cross-section slice, y: its distance along the shaft (0..1)
+varying float vT; varying float vS; varying float vR; varying vec3 vW; varying vec3 vN;
 void main() {
-  vT = uv.y; vS = uv.x;
+  vT = mix(uv.y, aSlice.y, aSlice.x); vS = uv.x;
+  vR = aSlice.x > 0.5 ? uv.y : 0.5; // second edge fade for slices
   vec4 w = modelMatrix * vec4(position, 1.0);
   vW = w.xyz;
   vN = normalize(mat3(modelMatrix) * normal);
@@ -1150,12 +1214,12 @@ void main() {
 }`;
 const SHAFT_FRAG = `
 uniform vec3 uColor; uniform float uAlpha; uniform float uTime;
-varying float vT; varying float vS; varying vec3 vW; varying vec3 vN;
+varying float vT; varying float vS; varying float vR; varying vec3 vW; varying vec3 vN;
 void main() {
   vec3 v = normalize(cameraPosition - vW);
   float face = pow(abs(dot(vN, v)), 1.4);
   float along = pow(1.0 - vT, 1.6) * smoothstep(0.0, 0.08, vT);
-  float side = smoothstep(0.0, 0.25, vS) * smoothstep(1.0, 0.75, vS);
+  float side = smoothstep(0.0, 0.3, vS) * (1.0 - smoothstep(0.7, 1.0, vS)) * smoothstep(0.0, 0.35, vR) * (1.0 - smoothstep(0.65, 1.0, vR));
   float near = smoothstep(0.4, 1.6, length(cameraPosition - vW));
   float streak = 0.75 + 0.25 * sin(vS * 23.0 + vT * 3.0 + uTime * 0.15);
   float a = uAlpha * face * along * side * near * streak;
@@ -1186,6 +1250,20 @@ function shaftGeometry(w, h, L) {
   quad([0, 0, 0], [0, h, 0], [0, fh, -L], [0, 0, -L]);
   quad([-w / 2, h * 0.5, 0], [w / 2, h * 0.5, 0], [fw / 2, fh * 0.5, -L], [-fw / 2, fh * 0.5, -L]);
   const g = new BufferGeometry();
+  const nLong = v0;
+  // cross-section slices: they face you when you look along the shaft
+  for (const t of [0.12, 0.3, 0.5, 0.7]) {
+    const sw = (w + (fw - w) * t) / 2;
+    const sh = hgt0(t);
+    quad([-sw, 0, -L * t], [sw, 0, -L * t], [sw, sh, -L * t], [-sw, sh, -L * t]);
+  }
+  function hgt0(t) { return h + (fh - h) * t; }
+  const slice = new Float32Array(v0 * 2);
+  for (let i = nLong; i < v0; i++) {
+    const t = [0.12, 0.3, 0.5, 0.7][Math.floor((i - nLong) / 4)];
+    slice[i * 2] = 1; slice[i * 2 + 1] = t;
+  }
+  g.setAttribute('aSlice', new BufferAttribute(slice, 2));
   g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
   g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
   g.setIndex(idx);
@@ -1215,16 +1293,47 @@ export function setupLook(renderer, scene, camera, opts = {}) {
 
   const bg = dark ? 0x040506 : night ? 0x05070b : 0x3a4148;
   scene.background = new Color(bg);
-  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : 0x4a525a, dark ? 0.085 : night ? 0.07 : 0.035);
+  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : 0x4a525a, dark ? (night ? 0.085 : 0.065) : night ? 0.07 : 0.035);
+
+  // A tiny environment map: a dim room with a bright doorway toward +z. Glossy floors,
+  // puddles, glass and metal reflect it instead of rendering black.
+  let envRT = null;
+  if (opts.env ?? high) try {
+    const envScene = new Scene();
+    const roomMat = new MeshBasicMaterial({ side: BackSide, vertexColors: true });
+    const roomGeo = new BoxGeometry(10, 4, 10);
+    const colors = [];
+    const pos = roomGeo.attributes.position;
+    const wallC = new Color(dim ? 0x15181c : 0x6a6e72);
+    const floorC = new Color(dim ? 0x0c0b0a : 0x40392f);
+    const ceilC = new Color(dim ? 0x0a0b0d : 0x8a8e92);
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      const c = y > 1 ? ceilC : y < -1 ? floorC : wallC;
+      colors.push(c.r, c.g, c.b);
+    }
+    roomGeo.setAttribute('color', new BufferAttribute(new Float32Array(colors), 3));
+    envScene.add(new Mesh(roomGeo, roomMat));
+    const door = new Mesh(new PlaneGeometry(2, 2.6), new MeshBasicMaterial({ color: new Color(night ? 0x2c3a52 : 0xdfe8f5).multiplyScalar(night ? 1 : 3), side: DoubleSide }));
+    door.position.set(0, -0.6, 4.9);
+    envScene.add(door);
+    const pm = new PMREMGenerator(renderer);
+    envRT = pm.fromScene(envScene, 0.02);
+    pm.dispose();
+    roomGeo.dispose(); roomMat.dispose(); door.geometry.dispose(); door.material.dispose();
+    scene.environment = envRT.texture;
+    scene.environmentIntensity = dark ? 0.35 : night ? 0.3 : 0.6;
+  } catch { envRT = null; }
 
   // Fill light: what bounces around the room. Low in the dark so the flashlight matters.
   let fill = null;
   if (opts.fill !== false) {
+    // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(0x6e7f96, 0x17130f, 0.55)
+      ? new HemisphereLight(0x7a8aa0, 0x1d1813, night ? 0.55 : 0.95)
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
-        : new HemisphereLight(0xd6dee8, 0x4a4138, 1.7);
+        : new HemisphereLight(0xd6dee8, 0x8c877e, 1.5);
     group.add(fill);
   }
 
@@ -1287,24 +1396,24 @@ export function setupLook(renderer, scene, camera, opts = {}) {
       // caged bulb on a box: red-amber, dim, steady with a small hum
       const box = new Mesh(new BoxGeometry(0.34, 0.12, 0.2), fixtureMat);
       box.position.y = -0.06;
-      const bulbMat = keep(new MeshStandardMaterial({ color: 0x2a0a04, emissive: 0xff4a1c, emissiveIntensity: 3.2, roughness: 0.3 }));
+      const bulbMat = keep(new MeshStandardMaterial({ color: 0x2a0a04, emissive: 0xff5a24, emissiveIntensity: 2.4, roughness: 0.3 }));
       const bulb = new Mesh(new SphereGeometry(0.06, 12, 8), bulbMat);
       bulb.position.y = -0.17;
       const cage = new Mesh(new CylinderGeometry(0.075, 0.075, 0.12, 8, 1, true), keep(new MeshStandardMaterial({ color: 0x222222, wireframe: true })));
       cage.position.y = -0.17;
-      const glow = new Sprite(keep(new SpriteMaterial({ map: softDot('255,90,40'), blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.9 })));
-      glow.scale.set(0.9, 0.9, 1);
+      const glow = new Sprite(keep(new SpriteMaterial({ map: softDot('255,110,50'), blending: AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 })));
+      glow.scale.set(0.7, 0.7, 1);
       glow.position.y = -0.17;
       g.add(box, bulb, cage, glow);
       let light = null;
       if (takeLight()) {
-        light = new PointLight(0xff4a22, 9, 11, 2);
+        light = new PointLight(0xff6a30, 2.4, 9, 2);
         light.position.y = -0.3;
         g.add(light);
       } else {
-        fakePool(x, 0.012, z, 0xff4a22, 2.6, 0.35);
+        fakePool(x, 0.012, z, 0xff6a30, 2.4, 0.18);
       }
-      flickers.push({ light, mats: [bulbMat], glow, base: light ? light.intensity : 0, baseE: 3.2, state, t: h * 10, seed: h });
+      flickers.push({ light, mats: [bulbMat], glow, base: light ? light.intensity : 0, baseE: 2.4, state, t: h * 10, seed: h });
     } else {
       // 2 x 4 ft troffer
       const frame = new Mesh(new BoxGeometry(0.62, 0.08, 1.22), fixtureMat);
@@ -1375,12 +1484,33 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     const mat = keep(new ShaderMaterial({
       vertexShader: SHAFT_VERT, fragmentShader: SHAFT_FRAG, transparent: true, depthWrite: false,
       blending: AdditiveBlending, side: DoubleSide,
-      uniforms: { uColor: { value: new Color(color) }, uAlpha: { value: nightLight ? 0.05 : 0.11 }, uTime: { value: 0 } },
+      uniforms: { uColor: { value: new Color(color) }, uAlpha: { value: nightLight ? 0.16 : 0.5 }, uTime: { value: 0 } },
     }));
     const shaft = new Mesh(shaftGeometry(w, hgt, L), mat);
     shaft.position.z = -0.05;
     shaft.renderOrder = 5;
     g.add(shaft);
+    // soft halo around the bright opening (fake bloom), seen from inside
+    const haloMat = keep(new MeshBasicMaterial({
+      map: haloTexture(), color: color, transparent: true, opacity: nightLight ? 0.25 : 0.55,
+      blending: AdditiveBlending, depthWrite: false, fog: false, side: DoubleSide,
+    }));
+    const halo = new Mesh(new PlaneGeometry(w + 2.2, hgt + 1.6), haloMat);
+    halo.position.set(0, hgt / 2 + 0.1, -0.12);
+    halo.renderOrder = 4;
+    g.add(halo);
+    if (o.sky !== false) {
+      // what you see through the opening: bright overcast sky and snow (not tone mapped, so it glows)
+      const skyMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x24324a : 0xe9f0f8, toneMapped: false, fog: false }));
+      const sky = new Mesh(new PlaneGeometry(w + 6, hgt + 4), skyMat);
+      sky.position.set(0, hgt / 2 + 1, 2.4);
+      sky.rotation.y = Math.PI;
+      const snowMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x3c4a60 : 0xc9d2dc, fog: false }));
+      const snowG = new Mesh(new PlaneGeometry(w + 6, 2.3), snowMat);
+      snowG.rotation.x = -Math.PI / 2;
+      snowG.position.set(0, 0.005, 1.25);
+      g.add(sky, snowG);
+    }
     group.add(g);
     shafts.push({ x, z, w, L, rotY, mat, night: nightLight });
     return { group: g, light: spot, shaft };
@@ -1461,13 +1591,13 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   const shardGeo = keep(new BufferGeometry());
   shardGeo.setAttribute('position', new BufferAttribute(new Float32Array([0, 0, 0, 0.05, 0, -0.012, 0.018, 0, 0.04]), 3));
   shardGeo.setAttribute('normal', new BufferAttribute(new Float32Array([0, 1, 0, 0, 1, 0, 0, 1, 0]), 3));
-  const shardMat = keep(new MeshStandardMaterial({ color: 0xcfe3ea, roughness: 0.03, metalness: 0.3, transparent: true, opacity: 0.6, side: DoubleSide }));
+  const shardMat = keep(new MeshStandardMaterial({ color: 0xdfeef2, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.55, side: DoubleSide, envMapIntensity: 3 }));
   function addBrokenGlass(x, z, size = 1.2) {
     const g = new Group();
     const rnd = rngFrom(Math.floor(hash2(x, z) * 1e6) + 3);
     const decal = addDecal(x, z, 'glass', size, rnd() * 6.3);
     decal.material.roughness = 0.05;
-    decal.material.metalness = 0.2;
+    decal.material.envMapIntensity = 3;
     g.add(decal);
     for (let i = 0; i < (high ? 18 : 8); i++) {
       const s = new Mesh(shardGeo, shardMat);
@@ -1539,7 +1669,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
       }
       if (f.light) f.light.intensity = f.base * k;
       for (const m of f.mats) m.emissiveIntensity = f.baseE * k;
-      if (f.glow) f.glow.material.opacity = 0.9 * k;
+      if (f.glow) f.glow.material.opacity = 0.6 * k;
     }
     // dust and shafts
     if (dusts.length) {
@@ -1575,6 +1705,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     if (flashlight) camera.remove(flashlight, flashTarget);
     group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     for (const d of disposables) d.dispose?.();
+    if (envRT) { if (scene.environment === envRT.texture) scene.environment = null; envRT.dispose(); }
   }
 
   return {

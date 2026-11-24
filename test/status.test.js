@@ -39,3 +39,22 @@ test('an open wound shows an infection risk until it is bandaged', () => {
   s.player.injuries[0].bandaged = true;
   assert.ok(!risks(s).some((r) => r.id === 'infection'));
 });
+
+test('advantage and disadvantage: 2d20 keep higher or lower, and they cancel', async () => {
+  const { newGame } = await import('../src/engine/state.js');
+  const { edges } = await import('../src/engine/checks.js');
+  const s = newGame(8);
+  s.player.energy = 80; s.player.water = 80; s.player.warmth = 80; s.player.health = 80; s.player.morale = 80;
+  s.player.injuries = [];
+  const base = odds(s, 12).pct;
+  assert.equal(base, 45);
+  const adv = odds(s, 12, [], { adv: ['tool kit'] });
+  assert.equal(adv.mode, 'adv');
+  assert.equal(adv.pct, Math.round((1 - 0.55 * 0.55) * 100)); // 70
+  assert.match(oddsText(adv), /^d20 adv\. \(tool kit\) vs DC 12 · 70%$/);
+  const dis = odds(s, 12, [], { dis: ['rain'] });
+  assert.equal(dis.pct, Math.round(0.45 * 0.45 * 100)); // 20
+  assert.equal(odds(s, 12, [], { adv: ['tool kit'], dis: ['rain'] }).mode, 'normal');
+  s.player.energy = 10;
+  assert.ok(edges(s).dis.includes('very tired'));
+});

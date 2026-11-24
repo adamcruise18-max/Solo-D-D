@@ -76,6 +76,8 @@ function hallPlan(cat, zones, r) {
     const cx = x + SHELF / 2;
     const tipped = cat !== 'gas' && cat !== 'convenience' && r() < 0.08;
     plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === 'clothes' ? 1.5 : 2.0, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
+    // Endcap display at the front end of each standing shelf row (the first thing you see).
+    if (cfg.fixture === 'shelf' && !tipped) plan.fixtures.push({ type: 'endcap', x: cx, z: rowZ + cfg.len / 2 + 0.28, w: SHELF, d: 0.55, h: 1.7, solid: true });
     if (i < aisles) {
       const ax = cx + SHELF / 2 + AISLE / 2;
       plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
