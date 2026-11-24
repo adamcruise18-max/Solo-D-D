@@ -1281,6 +1281,90 @@
     log(state2, `\u{1F3B2} ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
     return { roll, total, dc, success };
   }
+  function odds(state2, dc, extraMods = [], opts = {}) {
+    const mods = [...standardMods(state2, opts), ...extraMods];
+    if (opts.outside && isNight(state2.time)) dc += 3;
+    const sum = mods.reduce((s, m) => s + m[1], 0);
+    let ok = 0;
+    for (let roll = 1; roll <= 20; roll++) if (roll === 20 || roll !== 1 && roll + sum >= dc) ok += 1;
+    return { dc, mods, sum, pct: ok * 5 };
+  }
+  function oddsText(o) {
+    const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
+    const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
+    return `d20${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
+  }
+
+  // src/engine/status.js
+  var STAGES = {
+    food: [
+      [50, "", ""],
+      [25, "Hungry", "Below 25: wounds heal at half speed and health stops refilling."],
+      [0.01, "Very hungry", "Wounds heal at half speed. Health does not refill. Sleep rests you less."],
+      [0, "Starving", "You lose health every hour."]
+    ],
+    water: [
+      [50, "", ""],
+      [25, "Thirsty", "Below 25: \u22122 on d20 rolls and health stops refilling."],
+      [0.01, "Very thirsty", "\u22122 on d20 rolls. Wounds heal at half speed. Health does not refill."],
+      [0, "Dehydrated", "You lose 2 health every hour."]
+    ],
+    warmth: [
+      [50, "", ""],
+      [25, "Cold", "You get hungry and tired faster."],
+      [0.01, "Hypothermia", "\u22123 on d20 rolls. Health does not refill."],
+      [0, "Freezing", "You lose 5 health every hour."]
+    ],
+    energy: [
+      [50, "", ""],
+      [25, "Tired", "\u22122 on d20 rolls."],
+      [0.01, "Exhausted", "\u22122 on d20 rolls. Sleep soon."],
+      [0, "Asleep", "You fall asleep where you are."]
+    ],
+    health: [
+      [50, "", ""],
+      [25, "Hurt", "Sleep rests you less."],
+      [0.01, "Badly hurt", "\u22123 on d20 rolls. Sleep rests you less."],
+      [0, "Dead", ""]
+    ],
+    morale: [
+      [50, "", ""],
+      [25, "Low", "Sleep rests you less."],
+      [0.01, "Despair", "\u22122 on d20 rolls. Sleep rests you less."],
+      [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
+    ]
+  };
+  function statStage(key, v) {
+    const rows = STAGES[key];
+    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
+    const last = rows.length - 1;
+    return { stage: last, word: rows[last][1], effect: rows[last][2] };
+  }
+  function needWarnings(state2) {
+    const p = state2.player;
+    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
+  }
+  function risks(state2) {
+    const p = state2.player;
+    const out = [];
+    if (!p.illness.infection) {
+      const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
+      if (open.length) {
+        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
+        out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
+      }
+    }
+    const rate = warmthRate(feltTemp(state2, "rest"));
+    if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
+      const h = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
+    }
+    if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
+    if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
+    return out;
+  }
+  var RAW_WATER_SICK = 0.3;
 
   // src/engine/loot.js
   function placeState(state2, place) {
@@ -1733,7 +1817,7 @@
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state2, 5);
-        if (chance(state2, 0.3)) startStomachBug(state2);
+        if (chance(state2, RAW_WATER_SICK)) startStomachBug(state2);
         return;
       case "boil": {
         const how = useHeat(state2, 0.4);
@@ -2258,7 +2342,7 @@
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
         if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
-        add("drink_raw", "Drink water without boiling (risk)");
+        add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
       add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
@@ -2280,10 +2364,10 @@
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
       const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar" : "d20 DC 12" });
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
       else if (ps.zonesDone < ps.zones) {
         if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}` });
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
         } else {
           const env = environment(state2, "work");
           const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
@@ -3302,16 +3386,24 @@
   var $ = (sel) => document.querySelector(sel);
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
-    food: { label: "Food", words: [[50, ""], [25, "Hungry"], [0.01, "Very hungry"], [0, "Starving"]] },
-    water: { label: "Water", words: [[50, ""], [25, "Thirsty"], [0.01, "Very thirsty"], [0, "Dehydrated"]] },
-    warmth: { label: "Warmth", words: [[50, ""], [25, "Cold"], [0.01, "Hypothermia"], [0, "Freezing"]] },
-    energy: { label: "Energy", words: [[50, ""], [25, "Tired"], [0.01, "Exhausted"], [0, "Asleep"]] },
-    health: { label: "Health", words: [[50, ""], [25, "Hurt"], [0.01, "Badly hurt"], [0, "Dead"]] },
-    morale: { label: "Morale", words: [[50, ""], [25, "Low"], [0.01, "Despair"], [0, "Despair"]] }
+    food: { label: "Food" },
+    water: { label: "Water" },
+    warmth: { label: "Warmth" },
+    energy: { label: "Energy" },
+    health: { label: "Health" },
+    morale: { label: "Morale" }
   };
-  function statWord(key, v) {
-    for (const [lim, w] of STAT_INFO[key].words) if (v >= lim) return w;
-    return "";
+  function statRow(k, p, withEffect) {
+    const v = Math.round(p[k]);
+    const max = k === "energy" ? p.energyMax : 100;
+    const st = statStage(k, p[k]);
+    const cls = ["ok", "warn", "bad", "bad"][st.stage];
+    return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
+      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
+      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc(st.effect)}</span>` : ""}</div>`;
+  }
+  function riskChips() {
+    return risks(state).map((r) => ["risk", r.text]);
   }
   async function start() {
     setPlaces(window.LL_PLACES || []);
@@ -3365,14 +3457,15 @@
     const night = isNight(t);
     const w = state.weather;
     const p = state.player;
-    const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+    const low = needWarnings(state).map((n) => n.word);
+    const rk = risks(state).length;
     $("#hud").innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
-    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}`;
+    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
     $("#hud").hidden = false;
     if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
   }
@@ -3391,16 +3484,8 @@
   }
   function renderStats() {
     const p = state.player;
-    const rows = Object.keys(STAT_INFO).map((k) => {
-      const v = Math.round(p[k]);
-      const max = k === "energy" ? p.energyMax : 100;
-      const word = statWord(k, p[k]);
-      const cls = v < 25 ? "bad" : v < 50 ? "warn" : "ok";
-      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
-      <span class="sv">${v}</span><span class="sw">${word}</span></div>`;
-    }).join("");
-    const chips = [];
+    const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("");
+    const chips = riskChips();
     if (p.weak) chips.push(["warn", `Weak (Energy max ${p.energyMax})`]);
     if (p.wet) chips.push(["bad", "Wet"]);
     for (const i of p.injuries) chips.push(["bad", `${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`]);
@@ -3425,7 +3510,7 @@
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
       const note = a.disabled ? a.disabled : a.note || "";
-      return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
+      return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
     }).join("");
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
     $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
@@ -3892,7 +3977,7 @@
       isDead: () => !!state.dead,
       getStatus: () => {
         const p = state.player;
-        const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+        const low = needWarnings(state).map((n) => n.word);
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
         return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
       },
@@ -3900,11 +3985,10 @@
         if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
         }
         const e = environment(state, "work");
-        const min = searchMinutes(state, cat.zoneMinutes, e.dark);
-        return `<kbd>Hold E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? " \xB7 dark, no light" : ""}</small>`;
+        return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;
       },
       onWalk: (m) => {
         perform(state, "action", "walk_inside", m);
@@ -4004,11 +4088,7 @@
       return `<h4>Inventory \xB7 ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
     }
     if (name === "character") {
-      const rows = Object.keys(STAT_INFO).map((k) => {
-        const v = Math.round(p[k]);
-        const cls = v < 25 ? "bad" : v < 50 ? "warn" : "ok";
-        return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span><span class="bar"><i style="width:${v}%"></i></span><span class="sv">${v}</span><span class="sw">${statWord(k, p[k])}</span></div>`;
-      }).join("");
+      const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc(r.text)}</div>`).join("");
       const notes = [];
       for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`);
       if (p.illness.infection) notes.push("Infection");

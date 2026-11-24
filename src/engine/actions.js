@@ -6,7 +6,8 @@ import {
   log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
 import { advanceTime, addInjury, startStomachBug, INJURY_NAMES, environment } from './tick.js';
-import { check } from './checks.js';
+import { check, odds, oddsText } from './checks.js';
+import { RAW_WATER_SICK } from './status.js';
 import { isNight } from './world.js';
 import { placeState, rollZone } from './loot.js';
 import { travel } from './travel.js';
@@ -294,7 +295,7 @@ function homeAction(state, id) {
       addWater(state, WATER_PER_QUART);
       log(state, 'You drink a quart of water that you did not boil.', 'warn');
       advanceTime(state, 5);
-      if (chance(state, 0.3)) startStomachBug(state);
+      if (chance(state, RAW_WATER_SICK)) startStomachBug(state);
       return;
     case 'boil': {
       const how = useHeat(state, 0.4);
@@ -868,7 +869,7 @@ export function listActions(state) {
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
       if (built(state, 'filter_station')) add('filter_water', 'Filter 2 gal of water (no fuel)', { note: '10 min' });
-      add('drink_raw', 'Drink water without boiling (risk)');
+      add('drink_raw', 'Drink water without boiling', { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);
     add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
@@ -890,10 +891,10 @@ export function listActions(state) {
     const place = getPlace(loc.id);
     const cat = CATEGORIES[place.cat];
     const ps = placeState(state, place);
-    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar' : 'd20 DC 12' });
+    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, 12))} · fail: 30% sprain`, risk: !has(state, 'pry_bar') });
     else if (ps.zonesDone < ps.zones) {
       if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}` });
+        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, cat.lockedZone.dc))} · fail: 25% cut`, risk: !has(state, 'pry_bar') });
       } else {
         const env = environment(state, 'work');
         const min = searchMinutes(state, cat.zoneMinutes, env.dark);

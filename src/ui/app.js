@@ -8,6 +8,8 @@ import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
 import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
+import { odds, oddsText } from '../engine/checks.js';
+import { statStage, needWarnings, risks } from '../engine/status.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -28,17 +30,31 @@ const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const STAT_INFO = {
-  food: { label: 'Food', words: [[50, ''], [25, 'Hungry'], [0.01, 'Very hungry'], [0, 'Starving']] },
-  water: { label: 'Water', words: [[50, ''], [25, 'Thirsty'], [0.01, 'Very thirsty'], [0, 'Dehydrated']] },
-  warmth: { label: 'Warmth', words: [[50, ''], [25, 'Cold'], [0.01, 'Hypothermia'], [0, 'Freezing']] },
-  energy: { label: 'Energy', words: [[50, ''], [25, 'Tired'], [0.01, 'Exhausted'], [0, 'Asleep']] },
-  health: { label: 'Health', words: [[50, ''], [25, 'Hurt'], [0.01, 'Badly hurt'], [0, 'Dead']] },
-  morale: { label: 'Morale', words: [[50, ''], [25, 'Low'], [0.01, 'Despair'], [0, 'Despair']] },
+  food: { label: 'Food' },
+  water: { label: 'Water' },
+  warmth: { label: 'Warmth' },
+  energy: { label: 'Energy' },
+  health: { label: 'Health' },
+  morale: { label: 'Morale' },
 };
 
 function statWord(key, v) {
-  for (const [lim, w] of STAT_INFO[key].words) if (v >= lim) return w;
-  return '';
+  return statStage(key, v).word;
+}
+
+// One stat row: bar, value, stage word, and the stage effect (only past the first limit).
+function statRow(k, p, withEffect) {
+  const v = Math.round(p[k]);
+  const max = k === 'energy' ? p.energyMax : 100;
+  const st = statStage(k, p[k]);
+  const cls = ['ok', 'warn', 'bad', 'bad'][st.stage];
+  return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
+      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ''}</span>
+      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc(st.effect)}</span>` : ''}</div>`;
+}
+
+function riskChips() {
+  return risks(state).map((r) => ['risk', r.text]);
 }
 
 // ---------- start ----------
@@ -102,14 +118,15 @@ function renderHud() {
   const night = isNight(t);
   const w = state.weather;
   const p = state.player;
-  const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+  const low = needWarnings(state).map((n) => n.word);
+  const rk = risks(state).length;
   $('#hud').innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? '☾' : '☀'} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}°F</span>
-    ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}`;
+    ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? 's' : ''}</span>` : ''}`;
   $('#hud').hidden = false;
   if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
 }
@@ -130,16 +147,8 @@ function renderHeader() {
 
 function renderStats() {
   const p = state.player;
-  const rows = Object.keys(STAT_INFO).map((k) => {
-    const v = Math.round(p[k]);
-    const max = k === 'energy' ? p.energyMax : 100;
-    const word = statWord(k, p[k]);
-    const cls = v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok';
-    return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ''}</span>
-      <span class="sv">${v}</span><span class="sw">${word}</span></div>`;
-  }).join('');
-  const chips = [];
+  const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('');
+  const chips = riskChips();
   if (p.weak) chips.push(['warn', `Weak (Energy max ${p.energyMax})`]);
   if (p.wet) chips.push(['bad', 'Wet']);
   for (const i of p.injuries) chips.push(['bad', `${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`]);
@@ -165,7 +174,7 @@ function renderLocation() {
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
     const note = a.disabled ? a.disabled : a.note || '';
-    return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
+    return `<button class="act${a.risk && !a.disabled ? ' risky' : ''}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
   }).join('');
   const hint = loc.kind !== 'house' ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : '';
   $('#location').innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
@@ -640,7 +649,7 @@ async function walkInside() {
     isDead: () => !!state.dead,
     getStatus: () => {
       const p = state.player;
-      const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+      const low = needWarnings(state).map((n) => n.word);
       const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : 'No flashlight';
       return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
@@ -649,11 +658,10 @@ async function walkInside() {
       if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
       if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
       }
       const e = environment(state, 'work');
-      const min = searchMinutes(state, cat.zoneMinutes, e.dark);
-      return `<kbd>Hold E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? ' · dark, no light' : ''}</small>`;
+      return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? ' · dark, no light: 2 min an item' : ''}</small>`;
     },
     onWalk: (m) => {
       perform(state, 'action', 'walk_inside', m);
@@ -758,11 +766,8 @@ function insidePanel(name) {
     return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
   }
   if (name === 'character') {
-    const rows = Object.keys(STAT_INFO).map((k) => {
-      const v = Math.round(p[k]);
-      const cls = v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok';
-      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span><span class="bar"><i style="width:${v}%"></i></span><span class="sv">${v}</span><span class="sw">${statWord(k, p[k])}</span></div>`;
-    }).join('');
+    const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')
+      + risks(state).map((r) => `<div class="risk-line">⚠ ${esc(r.text)}</div>`).join('');
     const notes = [];
     for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`);
     if (p.illness.infection) notes.push('Infection');
