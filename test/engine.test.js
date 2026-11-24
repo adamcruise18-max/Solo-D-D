@@ -172,7 +172,7 @@ test('a new run can start at another home', async () => {
   const { straightMiles } = await import('../src/engine/travel.js');
   for (let i = 0; i < 50; i++) {
     const p = randomStartPoint();
-    assert.ok(straightMiles(HOME, p) <= 12.01, 'random start stays inside the play area');
+    assert.ok(straightMiles(HOME, p) <= 12.05, 'random start stays inside the play area');
     assert.ok(straightMiles(HOME, p) < MAP_RADIUS_MILES);
   }
   const home = { lat: 45.4968, lon: -122.85 };

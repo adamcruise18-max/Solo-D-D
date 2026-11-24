@@ -477,8 +477,8 @@
     const r = 12 * Math.sqrt(rng());
     const a = rng() * 2 * Math.PI;
     return {
-      lat: HOME.lat + r * Math.sin(a) / 69,
-      lon: HOME.lon + r * Math.cos(a) / (69 * Math.cos(HOME.lat * Math.PI / 180))
+      lat: HOME.lat + r * Math.sin(a) / 69.09,
+      lon: HOME.lon + r * Math.cos(a) / (69.09 * Math.cos(HOME.lat * Math.PI / 180))
     };
   }
   function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {

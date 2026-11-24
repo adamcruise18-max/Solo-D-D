@@ -19,8 +19,8 @@ export function randomStartPoint(rng = Math.random) {
   const r = 12 * Math.sqrt(rng()); // miles from the map center, even spread
   const a = rng() * 2 * Math.PI;
   return {
-    lat: HOME.lat + (r * Math.sin(a)) / 69.0,
-    lon: HOME.lon + (r * Math.cos(a)) / (69.0 * Math.cos((HOME.lat * Math.PI) / 180)),
+    lat: HOME.lat + (r * Math.sin(a)) / 69.09,
+    lon: HOME.lon + (r * Math.cos(a)) / (69.09 * Math.cos((HOME.lat * Math.PI) / 180)),
   };
 }
 
