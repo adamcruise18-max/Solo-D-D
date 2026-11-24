@@ -2384,7 +2384,7 @@
       if (state2.dog.stage === "visiting") {
         const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
         const night = isNight(state2.time);
-        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" });
+        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" || !anyFood(state2) && "You have no food to give" });
       }
       add("house", "Search a house on your street", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
     }
