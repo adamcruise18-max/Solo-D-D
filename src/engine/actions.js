@@ -11,6 +11,7 @@ import { isNight } from './world.js';
 import { placeState, rollZone } from './loot.js';
 import { travel } from './travel.js';
 import { getPlace } from './placesdb.js';
+import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vitals.js';
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -101,7 +102,7 @@ export function useItem(state, id, verb, from = 'carried') {
         return;
       }
       addItem(bag, id, -it.portion);
-      addFood(state, (it.cal * it.portion) / 25);
+      addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       if (it.water) addWater(state, it.water);
       log(state, `You eat: ${it.name}${it.portion < 1 ? ' (one portion)' : ''}.`);
       advanceTime(state, 15);
@@ -187,7 +188,7 @@ function useMed(state, id, bag) {
     if (p.illness.stomachH <= 0) { log(state, 'You do not need this now.'); return; }
     addItem(bag, id, -1);
     p.illness.stomachH = Math.min(p.illness.stomachH, 24);
-    addWater(state, 20);
+    addWater(state, WATER_PER_QUART / 2);
     log(state, 'You drink the rehydration salts. You feel a little better.', 'good');
     advanceTime(state, 5);
   }
@@ -265,7 +266,7 @@ function homeAction(state, id) {
   switch (id) {
     case 'drink_tank':
       h.tankGal = Math.max(0, h.tankGal - 0.25);
-      addWater(state, 40);
+      addWater(state, WATER_PER_QUART);
       log(state, 'You drain water from the water heater tank and drink a quart. It is clean.');
       advanceTime(state, 10);
       return;
@@ -290,7 +291,7 @@ function homeAction(state, id) {
       return;
     case 'drink_raw':
       h.rawGal = Math.max(0, h.rawGal - 0.25);
-      addWater(state, 40);
+      addWater(state, WATER_PER_QUART);
       log(state, 'You drink a quart of water that you did not boil.', 'warn');
       advanceTime(state, 5);
       if (chance(state, 0.3)) startStomachBug(state);
@@ -314,7 +315,7 @@ function homeAction(state, id) {
     }
     case 'drink_safe':
       h.safeGal = Math.max(0, h.safeGal - 0.25);
-      addWater(state, 40);
+      addWater(state, WATER_PER_QUART);
       log(state, 'You drink a quart of boiled water.');
       advanceTime(state, 5);
       return;
@@ -329,7 +330,7 @@ function homeAction(state, id) {
       }
       const how = useHeat(state, 0.5);
       addItem(bag, food, -it.portion);
-      addFood(state, (it.cal * it.portion) / 25);
+      addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       p.warmth = clamp(p.warmth + 10, 0, 100);
       p.morale = clamp(p.morale + 5, 0, 100);
       log(state, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, 'good');
@@ -505,8 +506,14 @@ function dogExtra(state) {
   return state.dog.stage === 'joined' && state.dog.withPlayer && state.dog.bond >= 50 ? 1 : 0;
 }
 
+// A careful search rarely hurts you. The risk is higher in the dark without a light,
+// and when you are exhausted.
 function zoneInjuryCheck(state) {
-  if (!check(state, 'Search with care (glass, falls)', 8).success) {
+  let p = SEARCH_INJURY_CHANCE;
+  if (environment(state, 'work').dark && !hasLight(state)) p *= 2;
+  if (state.player.energy < 25) p *= 1.5;
+  if (chance(state, p)) {
+    log(state, 'You slip on broken glass in the dark corner.', 'warn');
     addInjury(state, chance(state, 0.8) ? 'small_cut' : 'sprain');
   }
 }
@@ -560,6 +567,15 @@ export function enterNearbyHouse(state) {
   const r = randInt(state, 0, 999) / 1000;
   state.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
   const parent = { ...state.location, pos: { ...state.pos } };
+  // The house is 80 to 250 m away, in a random direction. The map marker moves there.
+  const ang = (randInt(state, 0, 359) * Math.PI) / 180;
+  const meters = randInt(state, 80, 250);
+  const pos = {
+    lat: parent.pos.lat + (meters * Math.sin(ang)) / 111320,
+    lon: parent.pos.lon + (meters * Math.cos(ang)) / (111320 * Math.cos((parent.pos.lat * Math.PI) / 180)),
+  };
+  state.houses[id].pos = pos;
+  state.pos = { ...pos };
   advanceTime(state, 5, 'walk');
   log(state, `You walk to a house ${near}.`);
   // Entry: 70% of doors are locked.

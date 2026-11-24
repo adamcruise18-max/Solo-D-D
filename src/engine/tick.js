@@ -2,6 +2,7 @@
 // Modes: 'rest' (awake, light activity), 'work' (searching), 'heavy' (hard work),
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
+import * as V from './vitals.js';
 import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from './world.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit } from './state.js';
 import { CATEGORIES } from '../data/places.js';
@@ -109,8 +110,9 @@ function tickStep(state, dt, mode) {
 
   // Food and water
   const cold = p.warmth < 50;
-  let foodLoss = 4 * (working ? 1.5 : 1) * (cold ? 1.3 : 1);
-  let waterLoss = 4 * (working ? 1.5 : 1) * (p.illness.stomachH > 0 ? 2 : 1);
+  const pace = working ? V.WORK_FACTOR : sleeping ? V.SLEEP_FACTOR : 1;
+  let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+  let waterLoss = V.WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
   if (felt > 90 && working) waterLoss *= 2;
   p.food = clamp(p.food - foodLoss * dt, 0, 100);
   p.water = clamp(p.water - waterLoss * dt, 0, 100);
@@ -123,15 +125,15 @@ function tickStep(state, dt, mode) {
     if (p.food < 25) gain *= 0.75;
     p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
   } else {
-    let loss = { rest: 5, work: 8, walk: 8, heavy: 12 }[mode] || 5;
+    let loss = V.ENERGY_LOSS[mode] || V.ENERGY_LOSS.rest;
     if (cold) loss *= 1.5;
     if (mode === 'walk' && bagWeight(state.carried) > carryLimit(state)) loss *= 1.5;
     p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
   }
 
   // Health loss
-  if (p.food <= 0) damage(state, 0.4 * dt, 'starvation');
-  if (p.water <= 0) damage(state, 3 * dt, 'dehydration');
+  if (p.food <= 0) damage(state, V.STARVING_DAMAGE * dt, 'starvation');
+  if (p.water <= 0) damage(state, V.DEHYDRATED_DAMAGE * dt, 'dehydration');
   if (p.warmth <= 0) damage(state, 5 * dt, 'hypothermia');
   for (const inj of p.injuries) {
     if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, 2 * dt, 'bleeding');

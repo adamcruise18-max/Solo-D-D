@@ -7,8 +7,8 @@
     snacks: { name: "Snacks (crackers, bars)", unit: "pack", weight: 0.5, kind: "food", cal: 600, portion: 0.5 },
     formula: { name: "Liquid nutrition bag", unit: "bag", weight: 1, kind: "food", cal: 250, water: 8, portion: 1 },
     dog_food: { name: "Dog food bag", unit: "bag", weight: 15, kind: "dogfood", portion: 1 / 15 },
-    water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 40, portion: 0.25 },
-    saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 40, portion: 1 },
+    water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
+    saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
     ors: { name: "Oral rehydration salts", unit: "pack", weight: 0.1, kind: "med", med: "ors", portion: 1 },
     first_aid: { name: "First aid kit", unit: "kit", weight: 1, kind: "med", med: "bandage", portion: 0.2 },
     antibiotics: { name: "Antibiotics (one course)", unit: "course", weight: 0.1, kind: "med", med: "antibiotics", portion: 1 },
@@ -480,8 +480,8 @@
       rngState: seed,
       time: START_MINUTE,
       player: {
-        food: 30,
-        water: 20,
+        food: 40,
+        water: 35,
         warmth: 60,
         energy: 40,
         health: 70,
@@ -618,6 +618,18 @@
     state2.log.push({ t: state2.time, text, kind });
     if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
   }
+
+  // src/engine/vitals.js
+  var CAL_PER_FOOD_POINT = 70;
+  var WATER_PER_QUART = 25;
+  var FOOD_LOSS_PER_HOUR = 1.5;
+  var WATER_LOSS_PER_HOUR = 2.5;
+  var WORK_FACTOR = 1.5;
+  var SLEEP_FACTOR = 0.75;
+  var ENERGY_LOSS = { rest: 3, work: 5, walk: 6, heavy: 9 };
+  var STARVING_DAMAGE = 0.2;
+  var DEHYDRATED_DAMAGE = 2;
+  var SEARCH_INJURY_CHANCE = 0.03;
 
   // src/engine/placesdb.js
   var LIST = [];
@@ -978,8 +990,9 @@
     const felt = feltTemp(state2, mode, env);
     p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
     const cold = p.warmth < 50;
-    let foodLoss = 4 * (working ? 1.5 : 1) * (cold ? 1.3 : 1);
-    let waterLoss = 4 * (working ? 1.5 : 1) * (p.illness.stomachH > 0 ? 2 : 1);
+    const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
+    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+    let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
     p.food = clamp(p.food - foodLoss * dt, 0, 100);
     p.water = clamp(p.water - waterLoss * dt, 0, 100);
@@ -990,13 +1003,13 @@
       if (p.food < 25) gain *= 0.75;
       p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
     } else {
-      let loss = { rest: 5, work: 8, walk: 8, heavy: 12 }[mode] || 5;
+      let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
       if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
       p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
     }
-    if (p.food <= 0) damage(state2, 0.4 * dt, "starvation");
-    if (p.water <= 0) damage(state2, 3 * dt, "dehydration");
+    if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
+    if (p.water <= 0) damage(state2, DEHYDRATED_DAMAGE * dt, "dehydration");
     if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
     for (const inj of p.injuries) {
       if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
@@ -1497,7 +1510,7 @@
           return;
         }
         addItem(bag, id, -it.portion);
-        addFood(state2, it.cal * it.portion / 25);
+        addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         if (it.water) addWater(state2, it.water);
         log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
         advanceTime(state2, 15);
@@ -1602,7 +1615,7 @@
       }
       addItem(bag, id, -1);
       p.illness.stomachH = Math.min(p.illness.stomachH, 24);
-      addWater(state2, 20);
+      addWater(state2, WATER_PER_QUART / 2);
       log(state2, "You drink the rehydration salts. You feel a little better.", "good");
       advanceTime(state2, 5);
     }
@@ -1675,7 +1688,7 @@
     switch (id) {
       case "drink_tank":
         h.tankGal = Math.max(0, h.tankGal - 0.25);
-        addWater(state2, 40);
+        addWater(state2, WATER_PER_QUART);
         log(state2, "You drain water from the water heater tank and drink a quart. It is clean.");
         advanceTime(state2, 10);
         return;
@@ -1701,7 +1714,7 @@
         return;
       case "drink_raw":
         h.rawGal = Math.max(0, h.rawGal - 0.25);
-        addWater(state2, 40);
+        addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state2, 5);
         if (chance(state2, 0.3)) startStomachBug(state2);
@@ -1725,7 +1738,7 @@
       }
       case "drink_safe":
         h.safeGal = Math.max(0, h.safeGal - 0.25);
-        addWater(state2, 40);
+        addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of boiled water.");
         advanceTime(state2, 5);
         return;
@@ -1743,7 +1756,7 @@
         }
         const how = useHeat(state2, 0.5);
         addItem(bag, food, -it.portion);
-        addFood(state2, it.cal * it.portion / 25);
+        addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         p.warmth = clamp2(p.warmth + 10, 0, 100);
         p.morale = clamp2(p.morale + 5, 0, 100);
         log(state2, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, "good");
@@ -1915,7 +1928,11 @@
     return state2.dog.stage === "joined" && state2.dog.withPlayer && state2.dog.bond >= 50 ? 1 : 0;
   }
   function zoneInjuryCheck(state2) {
-    if (!check(state2, "Search with care (glass, falls)", 8).success) {
+    let p = SEARCH_INJURY_CHANCE;
+    if (environment(state2, "work").dark && !hasLight(state2)) p *= 2;
+    if (state2.player.energy < 25) p *= 1.5;
+    if (chance(state2, p)) {
+      log(state2, "You slip on broken glass in the dark corner.", "warn");
       addInjury(state2, chance(state2, 0.8) ? "small_cut" : "sprain");
     }
   }
@@ -1963,6 +1980,14 @@
     const r = randInt(state2, 0, 999) / 1e3;
     state2.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
     const parent = { ...state2.location, pos: { ...state2.pos } };
+    const ang = randInt(state2, 0, 359) * Math.PI / 180;
+    const meters = randInt(state2, 80, 250);
+    const pos = {
+      lat: parent.pos.lat + meters * Math.sin(ang) / 111320,
+      lon: parent.pos.lon + meters * Math.cos(ang) / (111320 * Math.cos(parent.pos.lat * Math.PI / 180))
+    };
+    state2.houses[id].pos = pos;
+    state2.pos = { ...pos };
     advanceTime(state2, 5, "walk");
     log(state2, `You walk to a house ${near}.`);
     if (chance(state2, 0.7)) {

@@ -15,8 +15,8 @@ setPlaces([SAFEWAY, WALGREENS]);
 
 test('new game matches the start state in the rules', () => {
   const s = newGame(42);
-  assert.equal(s.player.food, 30);
-  assert.equal(s.player.water, 20);
+  assert.equal(s.player.food, 40);
+  assert.equal(s.player.water, 35);
   assert.equal(s.player.energyMax, 60);
   assert.equal(formatDate(s.time), 'Tue 24 Nov 2026');
   assert.equal(formatClock(s.time), '9:05 AM');
@@ -35,10 +35,10 @@ test('same seed gives the same game', () => {
 test('stats go down with time, and water at 0 hurts health', () => {
   const s = newGame(1);
   advanceTime(s, 60);
-  assert.ok(Math.abs(s.player.food - 26) < 0.6, `food ${s.player.food}`);
-  assert.ok(Math.abs(s.player.water - 16) < 0.6, `water ${s.player.water}`);
+  assert.ok(Math.abs(s.player.food - 38.5) < 0.3, `food ${s.player.food}`);
+  assert.ok(Math.abs(s.player.water - 32.5) < 0.3, `water ${s.player.water}`);
   const hp = s.player.health;
-  advanceTime(s, 6 * 60);
+  advanceTime(s, 14 * 60);
   assert.equal(s.player.water, 0);
   assert.ok(s.player.health < hp);
 });
@@ -112,12 +112,16 @@ test('place loot is fixed: the same seed finds the same items', () => {
 test('search a nearby house and leave it', () => {
   const s = newGame(13);
   s.player.water = 90; s.player.food = 90;
+  const home = { ...s.pos };
   perform(s, 'action', 'house');
   assert.equal(s.location.kind, 'house');
+  const m = routeMiles(home, s.pos) / 1.25 * 1609;
+  assert.ok(m >= 70 && m <= 260, `player marker moved ${m} m`);
   perform(s, 'action', 'room');
   assert.equal(Object.values(s.houses)[0].roomsDone, 1);
   perform(s, 'action', 'leave_house');
   assert.equal(s.location.kind, 'home');
+  assert.deepEqual(s.pos, home);
 });
 
 test('stray dog joins after food on three different days', () => {
@@ -143,4 +147,22 @@ test('save round trip', () => {
   const back = parseSave(JSON.stringify(s));
   assert.deepEqual(back, s);
   assert.throws(() => parseSave('{"foo":1}'));
+});
+
+test('searching is rarely dangerous, and a walk does not make you starve', () => {
+  let hurt = 0;
+  for (let seed = 100; seed < 140; seed++) {
+    const s = newGame(seed);
+    s.player.energy = 60;
+    s.carried.flashlight = 1;
+    perform(s, 'action', 'house');
+    for (let i = 0; i < 6; i++) perform(s, 'action', 'room');
+    hurt += s.player.injuries.length;
+  }
+  // 240 room searches: expect about 7 injuries, never one per search.
+  assert.ok(hurt < 25, `injuries ${hurt}`);
+  const s = newGame(7);
+  s.player.food = 80; s.player.water = 80;
+  perform(s, 'action', 'go_place', 'n1');
+  assert.ok(s.player.food > 75 && s.player.water > 75, `food ${s.player.food} water ${s.player.water}`);
 });
