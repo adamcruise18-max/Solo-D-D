@@ -9,6 +9,8 @@ import {
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
+import { makeItemModel, makeShelfFill, makeProp } from './props3d.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
@@ -196,7 +198,7 @@ export function openInside(opts) {
       const side = i % 2 ? 1 : -1;
       lk.addWallNotice(side * (1.5 + lrnd() * 1.2), 1.35 + lrnd() * 0.3, -0.13, Math.PI, kinds[Math.floor(lrnd() * kinds.length)]);
     }
-    const decals = Math.round((W * D) / (plan.cat === 'house' ? 14 : 22));
+    const decals = Math.min(28, Math.round((W * D) / (plan.cat === 'house' ? 24 : 50)));
     for (let i = 0; i < decals; i++) {
       const r = lrnd();
       const kind = r < 0.45 ? 'dirt' : r < 0.7 ? 'paper' : r < 0.82 ? 'water' : r < 0.92 ? 'leaves' : 'snow';
@@ -226,10 +228,17 @@ export function openInside(opts) {
     }
   }
 
+  // Static decor (fixtures, debris, props, covered bodies) goes here; it is merged by material
+  // after the scene is built, so hundreds of small meshes become a few draw calls.
+  const statics = new Group();
+  scene.add(statics);
   // ---------- fixtures ----------
   const matCache = {};
   const mat = (type) => (matCache[type] ||= new MeshStandardMaterial({ color: FIXTURE_COLORS[type] ?? 0x888888, roughness: 0.8, metalness: type === 'shelf' || type === 'gate' || type === 'locker' ? 0.35 : 0.05 }));
-  const shelfSlots = []; // places for products: {x,y,z,zone}
+  const shelfSlots = []; // clothes on racks: {x,y,z,zone}
+  const shelfFaces = []; // shelf faces with detailed products
+  const CULL_M = dark || opts.night ? 13 : 20;
+  const FILL_KIND = { supermarket: 'grocery', pharmacy: 'pharmacy', hardware: 'hardware', outdoor: 'outdoor', convenience: 'convenience', gas: 'convenience' }[plan.cat] || 'grocery';
   let gateMesh = null;
   for (const f of plan.fixtures) {
     if (f.type === 'gate') {
@@ -255,13 +264,20 @@ export function openInside(opts) {
           const m = new Mesh(new BoxGeometry(0.22, 0.26, 0.24), new MeshStandardMaterial({ color: PRODUCT_COLORS[i % PRODUCT_COLORS.length], roughness: 0.7 }));
           m.position.set(f.x + (i % 2 ? 1 : -1) * (0.7 + (i % 3) * 0.25), 0.12, f.z - f.d / 2 + ((i * 7) % 13) / 13 * f.d);
           m.rotation.set(0, i, i % 2 ? Math.PI / 2 : 0);
-          scene.add(m);
+          statics.add(m);
         }
       }
-      scene.add(g);
-      if (!f.tipped) {
-        // Products on both faces; each face belongs to the aisle on that side.
-        const levels = f.type === 'clothes' ? [1.25] : [0.25, 0.75, 1.25, 1.7];
+      statics.add(g);
+      if (!f.tipped && f.type !== 'clothes') {
+        // Detailed products on both faces (props3d.js): one shelf-fill group per face and aisle.
+        for (const side of [-1, 1]) {
+          const zone = side < 0 ? f.leftZone : f.rightZone;
+          if (zone == null) continue;
+          shelfFaces.push({ f, side, zone, group: null, done: null });
+        }
+      } else if (!f.tipped) {
+        // Clothes racks: simple hanging shapes.
+        const levels = [1.25];
         for (const lvl of levels) {
           for (let zz = -f.d / 2 + 0.3; zz < f.d / 2 - 0.2; zz += 0.34) {
             for (const side of [-1, 1]) {
@@ -283,14 +299,14 @@ export function openInside(opts) {
       g.add(frame, mattress);
       g.position.set(f.x, 0, f.z);
       g.rotation.y = Math.PI / 2;
-      scene.add(g);
+      statics.add(g);
       continue;
     }
     const m = new Mesh(new BoxGeometry(f.w, f.h, f.d), mat(f.type));
     m.position.set(f.x, f.h / 2, f.z);
     m.castShadow = true;
     m.receiveShadow = true;
-    scene.add(m);
+    statics.add(m);
     if (f.type === 'coolers') {
       const glass = new Mesh(new PlaneGeometry(f.w, f.h * 0.75), new MeshStandardMaterial({ color: 0x23302b, roughness: 0.2, metalness: 0.4 }));
       glass.position.set(f.x, f.h * 0.55, f.z + f.d / 2 + 0.01);
@@ -313,7 +329,23 @@ export function openInside(opts) {
     prods.setColorAt(i, col);
   });
   scene.add(prods);
+  function buildFace(face, done) {
+    if (face.group) { scene.remove(face.group); face.group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); }
+    const { f, side } = face;
+    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.85));
+    const g = makeShelfFill(FILL_KIND, f.d - 0.1, [0.12, 0.62, 1.12, 1.57], fill, hashString(`${opts.title}:${f.x}:${f.z}:${side}`));
+    g.position.set(f.x + side * 0.05, 0, f.z);
+    g.rotation.y = side > 0 ? 0 : Math.PI;
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    scene.add(g);
+    face.group = g;
+    face.done = done;
+  }
   function refreshProducts() {
+    for (const face of shelfFaces) {
+      const done = !!opts.isDone(face.zone);
+      if (face.done !== done) buildFace(face, done);
+    }
     const stock = opts.stock;
     shelfSlots.forEach((s, i) => {
       const keep = opts.isDone(s.zone) ? stock * 0.12 : stock * 0.85;
@@ -337,6 +369,10 @@ export function openInside(opts) {
   };
   for (const d of plan.debris) {
     let m;
+    const dseed = hashString(`${opts.title}:d:${d.x.toFixed(2)}:${d.z.toFixed(2)}`);
+    if (d.kind === 'box') { m = makeProp(d.s > 0.35 ? 'box_stack' : 'cardboard_box', dseed); m.position.set(d.x, 0, d.z); m.rotation.y = d.rot || 0; statics.add(m); continue; }
+    if (d.kind === 'cart') { m = makeProp(lrnd() < 0.7 ? 'shopping_cart' : 'basket', dseed); m.position.set(d.x, 0, d.z); m.rotation.set(0, d.rot || 0, 0); statics.add(m); continue; }
+    if (d.kind === 'paper') { m = makeProp('paper_scatter', dseed); m.position.set(d.x, 0, d.z); m.rotation.y = d.rot || 0; statics.add(m); continue; }
     if (d.kind === 'box') m = new Mesh(new BoxGeometry(d.s * 1.4, d.s, d.s), debrisMats.box);
     else if (d.kind === 'can') { m = new Mesh(new CylinderGeometry(0.04, 0.04, 0.12, 8), debrisMats.can); m.rotation.z = Math.PI / 2; }
     else if (d.kind === 'cart') {
@@ -354,8 +390,54 @@ export function openInside(opts) {
     else { m = new Mesh(new PlaneGeometry(0.3, 0.22), debrisMats.paper); m.rotation.x = -Math.PI / 2; }
     m.position.set(d.x, d.kind === 'paper' ? 0.01 : d.kind === 'cart' ? 0.45 : (d.s || 0.1) / 2, d.z);
     m.rotation.y = d.rot || 0;
-    scene.add(m);
+    statics.add(m);
   }
+  // ---------- story props (props3d.js) ----------
+  // Small scenes that tell what happened, with no text on real places: carts left in a hurry,
+  // a mop bucket, medical gear in clinics, boots and helmets in fire stations, lived-in houses.
+  {
+    const solid = solidBoxes(plan, { counter: true });
+    const taken = [];
+    const free = (x, z, rad) => !solid.some((b) => Math.abs(x - b.x) < b.w / 2 + rad && Math.abs(z - b.z) < b.d / 2 + rad)
+      && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad)
+      && x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad;
+    const place = (kind, nearWall = false) => {
+      const g = makeProp(kind, Math.floor(lrnd() * 1e6));
+      const rad = Math.min(1.2, (g.userData.radius || 0.3) + 0.1);
+      for (let i = 0; i < 30; i++) {
+        let x = (lrnd() - 0.5) * (W - 2 * rad);
+        if (nearWall) x = (lrnd() < 0.5 ? -1 : 1) * (W / 2 - rad - 0.05);
+        const z = -rad - lrnd() * (D - 2 * rad);
+        if (!free(x, z, rad)) continue;
+        g.position.set(x, 0, z);
+        g.rotation.y = nearWall ? (x > 0 ? -Math.PI / 2 : Math.PI / 2) + (lrnd() - 0.5) * 0.3 : lrnd() * Math.PI * 2;
+        g.traverse((o) => { if (o.isMesh) { o.castShadow = rad > 0.25; o.receiveShadow = true; } });
+        statics.add(g);
+        taken.push([x, z, rad]);
+        return g;
+      }
+      return null;
+    };
+    const SETS = {
+      supermarket: [['basket', 3], ['trash_bag', 3], ['wet_floor_sign', 1], ['mop_bucket', 1], ['pallet', 1, true], ['box_stack', 2, true], ['trash_pile', 1, true]],
+      convenience: [['trash_bag', 1], ['basket', 1], ['cardboard_box', 2]],
+      gas: [['trash_bag', 1], ['traffic_cone', 1], ['cardboard_box', 2]],
+      pharmacy: [['basket', 2], ['trash_bag', 1], ['wet_floor_sign', 1], ['box_stack', 1, true]],
+      hardware: [['pallet', 2, true], ['box_stack', 2, true], ['traffic_cone', 2], ['trash_bag', 1]],
+      outdoor: [['box_stack', 2, true], ['trash_bag', 1], ['basket', 1]],
+      clinic: [['iv_stand', 2, true], ['wheelchair', 1, true], ['office_chair', 2], ['medical_cart', 1, true], ['trash_bag', 1]],
+      hospital: [['gurney', 2, true], ['iv_stand', 3, true], ['wheelchair', 2, true], ['medical_cart', 2, true], ['office_chair', 1], ['trash_pile', 1, true]],
+      fire: [['helmet_rack', 1, true], ['hose_reel', 1, true], ['locker_row', 1, true], ['traffic_cone', 2], ['fire_extinguisher', 1, true]],
+      house: [['rug', 2], ['lamp', 1, true], ['potted_plant_dead', 1, true], ['chair', 2], ['tv', 1, true], ['bookshelf', 1, true], ['trash_bag', 1], ['cardboard_box', 1]],
+    };
+    for (const [kind, n, wall] of SETS[plan.cat] || SETS.house) for (let i = 0; i < n; i++) place(kind, !!wall);
+    // On top of fixtures: registers on checkouts, things on kitchen counters.
+    for (const f of plan.fixtures) {
+      if (f.type === 'checkout') { const g = makeProp('register', Math.floor(f.x * 100)); g.position.set(f.x, f.h, f.z - f.d / 4); g.rotation.y = Math.PI / 2; statics.add(g); }
+      if (f.type === 'counter' && plan.cat === 'house') { const g = makeProp('kitchen_counter_items', Math.floor(f.z * 100)); g.position.set(f.x, f.h, f.z); statics.add(g); }
+    }
+  }
+
   // A body under a sheet: only a covered shape. Nothing more is shown.
   const sheetMat = new MeshStandardMaterial({ color: 0xcfd3cf, roughness: 1 });
   for (const b of plan.bodies) {
@@ -368,8 +450,10 @@ export function openInside(opts) {
     g.add(torso, head);
     g.position.set(b.x, b.y || 0, b.z);
     g.rotation.y = (b.rot || 0) + Math.PI / 2;
-    scene.add(g);
+    statics.add(g);
   }
+
+  mergeStatics(statics);
 
   // ---------- items to pick up ----------
   // Each item from the engine gets a place: on a shelf face in its aisle, or on furniture / the floor in its room.
@@ -388,7 +472,8 @@ export function openInside(opts) {
       if (r() < 0.2) return { x: spot.x + (r() - 0.5) * 1.2, y: 0, z: a.z1 + 1 + r() * (a.z2 - a.z1 - 2) };
       const side = r() < 0.5 ? -1 : 1;
       const levels = [0.12, 0.62, 1.12, 1.57];
-      return { x: spot.x + side * ((a.x2 - a.x1) / 2 - 0.16), y: levels[Math.floor(r() * levels.length)], z: a.z1 + 1 + r() * (a.z2 - a.z1 - 2) };
+      // On the front edge of a shelf board (the board ends at the aisle edge).
+      return { x: spot.x + side * ((a.x2 - a.x1) / 2 + 0.06), y: levels[Math.floor(r() * levels.length)], z: a.z1 + 1 + r() * (a.z2 - a.z1 - 2) };
     }
     // Rooms: on low furniture of this room, else on the floor.
     const low = plan.fixtures.filter((f) => f.zone === it.zone && f.solid && f.h <= 1.2 && f.type !== 'tub');
@@ -410,7 +495,7 @@ export function openInside(opts) {
     for (const it of opts.items()) {
       if (itemObjs.has(it.pid)) continue;
       const p = placeFor(it);
-      const obj = itemModel(it.item, hashString(it.pid));
+      const obj = makeItemModel(it.item, hashString(it.pid));
       obj.position.set(p.x, p.y, p.z);
       obj.rotation.y = (hashString(it.pid) % 628) / 100;
       // Loot is a little brighter than the room, so the eye finds it.
@@ -440,7 +525,8 @@ export function openInside(opts) {
     const dx = o.x - from.x;
     const dy = o.y - from.y;
     const dz = o.z - from.z;
-    const END = 0.9; // stop short of the item: it may rest on top of the box
+    // Stop 0.25 m short of the item: it may rest on a box top or on a shelf board edge.
+    const END = Math.max(0, 1 - 0.25 / Math.max(0.25, Math.hypot(dx, dy, dz)));
     for (const b of solidBoxes(plan, { counter: opts.isCounterOpen() })) {
       const lo = [b.x - b.w / 2 + 0.02, 0, b.z - b.d / 2 + 0.02];
       const hi = [b.x + b.w / 2 - 0.02, (b.h || 9) - 0.02, b.z + b.d / 2 - 0.02];
@@ -1075,13 +1161,23 @@ export function openInside(opts) {
       if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps`;
     }
     lk.update(dt, camera.position);
+    // Shelf products far away are hidden (fog hides them anyway): saves draw calls and triangles.
+    for (const face of shelfFaces) {
+      if (!face.group) continue;
+      const dz = Math.max(0, Math.abs(camera.position.z - face.f.z) - face.f.d / 2);
+      const dx = camera.position.x - face.f.x;
+      // Inside the shelf rows, only the faces of the aisle you stand in can be seen: the shelves hide the rest.
+      const inRows = dz === 0;
+      face.group.visible = inRows ? dx * face.side > 0 && Math.abs(dx) < 3.2 : Math.hypot(dx, dz) < (quality === 'high' ? 11 : 8);
+    }
+    for (const o of itemObjs.values()) o.obj.visible = Math.hypot(o.x - camera.position.x, o.z - camera.position.z) < CULL_M;
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
   return { close: () => leave() };
 }
@@ -1115,6 +1211,35 @@ function itemModel(id) {
   grp.userData.height = g.h;
   grp.userData.radius = 0.15;
   return grp;
+}
+
+// Merge every mesh under root into one mesh per material (world transforms baked in).
+// Meshes that use other features (instancing, skinning, sprites) are left as they are.
+function mergeStatics(root) {
+  root.updateMatrixWorld(true);
+  const buckets = new Map();
+  const keepers = [];
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) { if (o.isLine || o.isPoints || o.isSprite || o.isInstancedMesh) keepers.push(o); return; }
+    const g = o.geometry;
+    const key = `${o.material.uuid}|${Object.keys(g.attributes).sort().join(',')}|${o.castShadow ? 1 : 0}`;
+    let b = buckets.get(key);
+    if (!b) buckets.set(key, b = { mat: o.material, cast: o.castShadow, geos: [] });
+    const c = (g.index ? g.toNonIndexed() : g.clone());
+    c.applyMatrix4(o.matrixWorld);
+    b.geos.push(c);
+  });
+  for (const k of keepers) { k.updateMatrixWorld(true); k.matrix.copy(k.matrixWorld); k.matrix.decompose(k.position, k.quaternion, k.scale); }
+  root.clear();
+  for (const k of keepers) root.add(k);
+  for (const b of buckets.values()) {
+    const geo = b.geos.length === 1 ? b.geos[0] : mergeGeometries(b.geos);
+    if (!geo) continue;
+    const m = new Mesh(geo, b.mat);
+    m.castShadow = b.cast;
+    m.receiveShadow = true;
+    root.add(m);
+  }
 }
 
 // The key list in the pause menu, made from the key table.
@@ -1155,8 +1280,14 @@ function buildShelf(f, material) {
       g.add(end);
     }
   }
-  g.position.set(f.x, 0, f.z);
-  return g;
+  // One draw call per shelf unit: merge the parts.
+  const parts = [];
+  g.children.forEach((m) => { m.updateMatrix(); const geo = m.geometry.clone(); geo.applyMatrix4(m.matrix); parts.push(geo); });
+  const merged = new Mesh(mergeGeometries(parts.map((x) => x.toNonIndexed())), material);
+  const out = new Group();
+  out.add(merged);
+  out.position.set(f.x, 0, f.z);
+  return out;
 }
 
 window.LLInside3D = { openInside };
