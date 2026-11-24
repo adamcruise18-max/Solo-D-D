@@ -214,6 +214,84 @@ test('saves: slots in memory and localStorage backends', async () => {
   assert.equal(bestBackend({ localStorage: fakeLs }).name, 'localStorage');
 });
 
+// ---------- save hardening (external review, 1.6) ----------
+function quotaBackend(limitBytes) {
+  const b = memoryBackend();
+  const size = new Map();
+  const total = () => [...size.values()].reduce((a, n) => a + n, 0);
+  const put = async (k, v) => {
+    const n = JSON.stringify(v).length;
+    if (total() - (size.get(k) || 0) + n > limitBytes) {
+      const e = new Error('The quota has been exceeded.');
+      e.name = 'QuotaExceededError';
+      throw e;
+    }
+    size.set(k, n);
+    await b.set(k, v);
+  };
+  return { ...b, name: 'quota', set: put, setMany: undefined };
+}
+
+test('saves: no space left gives a quota error and keeps the last good save', async () => {
+  const g = newGame(21);
+  const one = JSON.stringify(wrapSave(g)).length;
+  const store = createSaveStore(quotaBackend(one * 2 + 200));
+  await store.save('run', g);
+  const big = { ...g, time: g.time + 10, pad: 'x'.repeat(one * 3) };
+  await assert.rejects(store.save('run', big), (e) => e.name === 'SaveError' && e.code === 'quota');
+  const back = await store.load('run');
+  assert.equal(back.time, g.time, 'the last good save still loads');
+});
+
+test('saves: a save from a newer game is an error, never a silent fallback', async () => {
+  const backend = memoryBackend();
+  const store = createSaveStore(backend, { version: 1 });
+  const g = newGame(22);
+  await store.save('run', g);
+  await store.save('run', { ...g, version: 9 });
+  await assert.rejects(store.load('run'), /newer game/);
+});
+
+test('saves: a failed upgrade is passed up, not hidden by the older copy', async () => {
+  const backend = memoryBackend();
+  const g = newGame(23);
+  await createSaveStore(backend).save('run', { ...g, version: 1 });
+  await createSaveStore(backend).save('run', { ...g, version: 1, time: g.time + 5 });
+  const store = createSaveStore(backend, { version: 2, gameMigrations: { 2: () => { throw new Error('upgrade bug'); } } });
+  await assert.rejects(store.load('run'), /upgrade bug/);
+});
+
+test('saves: both copies broken is a "broken" error, not "no save"', async () => {
+  const backend = memoryBackend();
+  const store = createSaveStore(backend);
+  const g = newGame(24);
+  await store.save('run', g);
+  await store.save('run', { ...g, time: g.time + 5 });
+  for (const k of ['run', 'run~prev']) {
+    const raw = await backend.get(k);
+    raw.state.time = -1;
+    await backend.set(k, raw);
+  }
+  await assert.rejects(store.load('run'), (e) => e.code === 'broken' && /damaged/.test(e.message));
+  assert.equal(await store.load('never-saved'), null, 'a slot with no copies is still just empty');
+});
+
+test('saves: a tab closed during a save (copy kept, new save cut) loads the last good save', async () => {
+  const backend = memoryBackend();
+  const store = createSaveStore(backend);
+  const g = newGame(25);
+  await store.save('run', g);
+  // The tab closes after ~prev is written but while the new save is half written.
+  const half = wrapSave({ ...g, time: g.time + 60 });
+  half.sum = 'cut';
+  await backend.set('run~prev', await backend.get('run'));
+  await backend.set('run', half);
+  const back = await store.load('run');
+  assert.equal(back.time, g.time);
+  assert.equal(store.lastLoad.from, 'previous');
+  assert.match(store.lastLoad.problem, /checksum/);
+});
+
 // ---------- content ----------
 test('content: the real items, places and projects have no broken links', () => {
   assert.deepEqual(checkContent({ items: ITEMS, categories: CATEGORIES, projects: PROJECTS }), []);

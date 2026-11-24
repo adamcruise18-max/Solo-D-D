@@ -172,6 +172,21 @@ export async function askPersistentStorage(nav = globalThis.navigator) {
   try { return nav?.storage?.persist ? await nav.storage.persist() : false; } catch { return false; }
 }
 
+// ---------- errors ----------
+// Save errors carry a code, so the UI can show the right text:
+//   'quota'  the browser has no space for the save (the older copies are kept)
+//   'broken' the slot has saves, but every copy is cut or changed
+export class SaveError extends Error {
+  constructor(code, message, cause) {
+    super(message);
+    this.name = 'SaveError';
+    this.code = code;
+    if (cause) this.cause = cause;
+  }
+}
+
+const isQuota = (err) => err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014 || /quota/i.test(String(err.message)));
+
 // ---------- slots ----------
 // Safe writes: the last good save is copied to "<slot>~prev" before the new save is
 // written, and every save has a checksum. If the newest save is cut or broken, load()
@@ -187,27 +202,36 @@ export function createSaveStore(backend = bestBackend(), opts = {}) {
       let cur = null;
       try { cur = await backend.get(slot); } catch { cur = null; } // a cut copy is not a good copy
       const keepPrev = cur != null && verify(cur);
-      if (keepPrev && backend.setMany) {
-        await backend.setMany([[slot + PREV, cur], [slot, env]]); // one transaction where the backend has one
-      } else {
-        if (keepPrev) await backend.set(slot + PREV, cur);
-        await backend.set(slot, env);
+      try {
+        if (keepPrev && backend.setMany) {
+          await backend.setMany([[slot + PREV, cur], [slot, env]]); // one transaction where the backend has one
+        } else {
+          if (keepPrev) await backend.set(slot + PREV, cur);
+          await backend.set(slot, env);
+        }
+      } catch (err) {
+        if (isQuota(err)) throw new SaveError('quota', 'No space left for the save. The last good save is kept. Download a backup file.', err);
+        throw err;
       }
       return true;
     },
     async load(slot) {
       this.lastLoad = null;
+      const problems = [];
       for (const [key, from] of [[slot, 'current'], [slot + PREV, 'previous']]) {
         let data;
-        try { data = await backend.get(key); } catch (err) { this.lastLoad = { from, problem: String(err) }; continue; }
+        try { data = await backend.get(key); } catch (err) { this.lastLoad = { from, problem: String(err) }; problems.push(`${from}: ${err}`); continue; }
         if (data == null) continue;
-        if (!verify(data)) { this.lastLoad = { from, problem: 'checksum does not match' }; continue; }
+        if (!verify(data)) { this.lastLoad = { from, problem: 'checksum does not match' }; problems.push(`${from}: checksum does not match`); continue; }
         // An upgrade error (for example a save from a newer game) is not a broken file:
         // pass it up. Loading the older copy would lose progress (one life per run).
         const st = migrate(unwrapSave(data), opts);
         this.lastLoad = { from, problem: from === 'previous' ? this.lastLoad?.problem || 'newest save missing' : null };
         return st;
       }
+      // Copies exist but none can be used: say so. Returning null here would look
+      // like "no save" and the game could start a new run over the broken one.
+      if (problems.length) throw new SaveError('broken', `The save "${slot}" is damaged (${problems.join('; ')}). Load a backup file.`);
       return null;
     },
     async list() {

@@ -9,7 +9,8 @@
     "serve": "python3 -m http.server 8080 -d docs",
     "sim": "node tools/sim.mjs",
     "replay": "node tools/replay.mjs",
-    "check:browser": "node tools/browser-check.mjs"
+    "check:browser": "node tools/browser-check.mjs",
+    "bench:save": "node tools/save-bench.mjs"
   },
   "repository": {
     "type": "git",

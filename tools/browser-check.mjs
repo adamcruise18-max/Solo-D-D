@@ -71,6 +71,30 @@ try {
   check(r.listed, 'the save slot shows in the list');
   check(r.fallback, 'a broken newest save falls back to the last good save');
   check(r.gone, 'a removed slot is gone');
+
+  // Save timing with real IndexedDB (printed, not a pass/fail check).
+  const timing = await page.evaluate(async () => {
+    const C = window.LLCore;
+    const store = C.createSaveStore(C.bestBackend());
+    const out = [];
+    for (const mb of [1, 5, 10, 25]) {
+      const places = {};
+      const per = 220; // bytes per place, about
+      for (let i = 0; i < (mb * 1024 * 1024) / per; i++) places['osm-' + i] = { zones: 6, zonesDone: i % 6, taken: { ['osm-' + i + ':p0']: true }, lastVisit: 600 + i };
+      const g = { version: 1, seed: 5, time: 600, player: { food: 40 }, home: { storage: {} }, places };
+      await store.save('bench-slot', g);
+      let t = performance.now();
+      await store.save('bench-slot', { ...g, time: 610 });
+      const save = performance.now() - t;
+      t = performance.now();
+      await store.load('bench-slot');
+      const load = performance.now() - t;
+      out.push({ mb, bytes: JSON.stringify(g).length, save: Math.round(save), load: Math.round(load) });
+      await store.remove('bench-slot');
+    }
+    return out;
+  });
+  for (const x of timing) console.log(`info IndexedDB ${x.mb} MB save (2 copies) ${x.save} ms, load ${x.load} ms`);
 } catch (e) {
   check(false, `browser check stopped: ${e?.message || e}`);
 } finally {

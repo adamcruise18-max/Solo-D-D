@@ -409,3 +409,71 @@ test('streamer: random moves, random load times and failures never leak a cell',
   assert.deepEqual([...live.keys()].sort(), s.loadedKeys().sort());
   assert.ok(s.loadedKeys().length <= 30);
 });
+
+// ---------- streamer hardening (external review, 1.6) ----------
+test('streamer: rapid A to B to A while A is still loading gives one live A and frees only stale data', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  const freed = [];
+  const live = new Map();
+  let n = 0;
+  const s = createStreamer({
+    load: (k) => new Promise((r) => setTimeout(() => { const d = `${k}#${++n}`; live.set(d, true); r(d); }, k === '0,0' ? 20 : 1)),
+    unload: (k, d) => { freed.push(d); live.delete(d); },
+  });
+  const A = classify(g, ALOHA);
+  const B = classify(g, g.center('30,0'));
+  for (let i = 0; i < 5; i++) { s.update(A); s.update(B); }
+  s.update(A);
+  assert.equal(await s.idle(), true);
+  assert.equal(await s.idle(), true);
+  assert.equal(s.status('0,0'), 'loaded');
+  const a = s.get('0,0');
+  assert.ok(live.has(a), 'the shown data of A was not freed');
+  // Every load result is either shown or freed: nothing leaks.
+  assert.equal(live.size, s.loadedKeys().length);
+});
+
+test('streamer: a load that never ends times out, frees its slot, and its late result is ignored', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  let t = 0;
+  let hang = true;
+  let release;
+  const freed = [];
+  const s = createStreamer({
+    now: () => t, maxInFlight: 1, loadTimeoutMs: 1000, retryMs: 10,
+    load: (k) => (k === '0,0' && hang ? new Promise((r) => { release = r; }) : Promise.resolve(k)),
+    unload: (k, d) => freed.push(d),
+  });
+  const tiers = new Map([['0,0', 'active'], ['1,0', 'near']]);
+  s.update(tiers);
+  assert.equal(await s.idle({ timeoutMs: 50 }), false, 'idle() gives up after real time, not loop turns');
+  t = 2000; // the stuck load is past its time
+  hang = false;
+  s.update(tiers);
+  await s.idle();
+  t = 2100; // past the retry wait
+  s.update(tiers);
+  await s.idle();
+  assert.equal(s.status('0,0'), 'loaded');
+  assert.equal(s.get('0,0'), '0,0');
+  assert.equal(s.status('1,0'), 'loaded', 'the stuck load did not block the queue');
+  release('0,0#stale');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(s.get('0,0'), '0,0', 'the late result is not shown');
+  assert.deepEqual(freed, ['0,0#stale'], 'the late result is freed');
+  const r = s.report();
+  assert.equal(r.timedOut, 1);
+  assert.equal(r.late, 1);
+  assert.equal(r.loading, 0);
+});
+
+test('streamer: maxLoaded below the active ring keeps the player cell and does not loop', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  let loads = 0;
+  const s = createStreamer({ load: async (k) => { loads++; return k; }, maxLoaded: 1 });
+  const tiers = classify(g, ALOHA);
+  for (let i = 0; i < 5; i++) { s.update(tiers); await s.idle(); }
+  assert.equal(s.status('0,0'), 'loaded');
+  assert.ok(s.loadedKeys().length <= 1);
+  assert.ok(loads < 20, `loads stay bounded (got ${loads})`);
+});
