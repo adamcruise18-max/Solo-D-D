@@ -75,6 +75,8 @@ This is the **first playable version**: a small part of the full game.
 - Injuries, infection, stomach bug, medicine.
 - Stray dog that joins you, with Food, Health and Bond.
 - Autosave, one life, death screen, best runs list.
+- New run after death (or after "Give up"): wake up at home in Aloha, start at a random place,
+  or choose a spot on the map. The house at that spot is your new home.
 
 Not yet in this version (later work): real street routing, bikes and cars, the five home zones,
 roof/damp/pests, garden, hunting and fishing, more illnesses, schools, a self-hosted PMTiles map file,

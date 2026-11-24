@@ -143,7 +143,7 @@ export async function createMap(container, { places, onPlaceClick }) {
   homeEl.title = 'Home';
   homeEl.innerHTML = '<span>⌂</span>';
   homeEl.addEventListener('click', (ev) => { ev.stopPropagation(); onPlaceClick('__home', null); });
-  new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+  const homeMarker = new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
   const youEl = document.createElement('div');
   youEl.className = 'marker-you';
@@ -171,6 +171,8 @@ export async function createMap(container, { places, onPlaceClick }) {
       applySeason(state.time);
       map.getSource('places').setData(placesGeo(list, state.places));
       you.setLngLat([state.pos.lon, state.pos.lat]);
+      const h = state.homePos || HOME;
+      homeMarker.setLngLat([h.lon, h.lat]);
       youEl.classList.toggle('at-home', state.location.kind === 'home');
       homeEl.classList.toggle('here', state.location.kind === 'home');
     },

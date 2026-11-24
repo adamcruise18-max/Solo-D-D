@@ -3,7 +3,7 @@ import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES, HOUSE_ROOMS } from '../data/places.js';
 import { chance, randInt } from '../rng.js';
 import {
-  log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, formatDuration,
+  log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
 import { advanceTime, addInjury, startStomachBug, INJURY_NAMES, environment } from './tick.js';
 import { check } from './checks.js';
@@ -680,7 +680,7 @@ export function goToPlace(state, placeId) {
 }
 
 export function goHome(state) {
-  const ok = travel(state, HOME, 'home');
+  const ok = travel(state, homeOf(state), 'home');
   if (!ok) return;
   state.location = { kind: 'home' };
   log(state, 'You are home. You lock the door behind you.', 'travel');

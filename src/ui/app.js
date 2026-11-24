@@ -2,7 +2,7 @@
 import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import {
-  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, has, hasLight,
+  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight,
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
@@ -299,16 +299,16 @@ function renderLog() {
 
 // ---------- map popup ----------
 function showPlacePopup(id, lngLat) {
-  if (!state || !mapApi) return;
+  if (!state || !mapApi || picking) return;
   const maplibregl = window.maplibregl;
   if (popup) popup.remove();
   let html;
   let pos;
   if (id === '__home') {
-    pos = HOME;
+    pos = homeOf(state);
     const atHome = state.location.kind === 'home';
-    const est = estimateTrip(state, HOME);
-    html = `<h4>Home</h4><p>Your house in Aloha.</p>${atHome ? '<p><i>You are here.</i></p>'
+    const est = estimateTrip(state, pos);
+    html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
       : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
   } else {
     const p = getPlace(id);
@@ -318,7 +318,7 @@ function showPlacePopup(id, lngLat) {
     const status = !ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched: nothing left' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
     const here = state.location.kind === 'place' && state.location.id === id;
     const est = estimateTrip(state, p);
-    const fromHome = straightMiles(HOME, p).toFixed(1);
+    const fromHome = straightMiles(homeOf(state), p).toFixed(1);
     html = `<h4>${esc(p.name)}</h4><p>${cat.label} · ${fromHome} mi from home</p><p><i>${status}</i></p>
       ${here ? '<p><i>You are here.</i></p>' : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(', ')}</small>` : ''}</p>
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
@@ -405,14 +405,91 @@ function showDeath() {
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : 'none'}</b></div>
     <h3>Best runs</h3><ol>${runs}</ol>
-    <button class="primary" id="again">Start a new run</button>`, (m) => {
-    m.querySelector('#again').addEventListener('click', () => {
-      clearGame();
-      state = newGame();
-      closeModal();
-      commit(true);
+    ${startChoicesHtml()}`, bindStartChoices);
+}
+
+// ---------- start of a new run ----------
+function startChoicesHtml() {
+  return `<h3>Start a new run</h3>
+    <div class="col">
+      <button class="primary" data-start="home">Wake up at home in Aloha</button>
+      <button data-start="random">Start at a random place</button>
+      <button data-start="pick">Choose a place on the map</button>
+    </div>`;
+}
+
+function bindStartChoices(m) {
+  m.querySelectorAll('[data-start]').forEach((b) => b.addEventListener('click', () => {
+    const how = b.dataset.start;
+    if (how === 'home') return beginRun({});
+    if (how === 'random') {
+      const home = randomStartPoint();
+      return beginRun({ home, homeLabel: nearLabel(home) });
+    }
+    pickStart();
+  }));
+}
+
+function nearLabel(pos) {
+  let best = null;
+  let bestD = Infinity;
+  for (const p of allPlaces()) {
+    const d = straightMiles(pos, p);
+    if (d < bestD) { bestD = d; best = p; }
+  }
+  if (!best) return 'in a quiet street';
+  return bestD < 0.3 ? `near ${best.name}` : `${bestD.toFixed(1)} mi from ${best.name}`;
+}
+
+function beginRun(opts) {
+  clearGame();
+  state = newGame(undefined, opts);
+  closeModal();
+  commit(true);
+}
+
+let picking = false;
+function pickStart() {
+  closeModal();
+  if (!mapApi) return beginRun({ home: randomStartPoint(), homeLabel: 'in a quiet street' });
+  picking = true;
+  if (popup) popup.remove();
+  const banner = document.createElement('div');
+  banner.className = 'pick-banner';
+  banner.innerHTML = '<b>Choose your new home.</b> Click a spot on the map inside the dashed 15-mile line. <button id="pickCancel">Cancel</button>';
+  $('#mapwrap').appendChild(banner);
+  mapApi.map.getCanvas().style.cursor = 'crosshair';
+  mapApi.map.easeTo({ center: [HOME.lon, HOME.lat], zoom: 9.6, duration: 600 });
+  const finish = () => {
+    picking = false;
+    banner.remove();
+    mapApi.map.getCanvas().style.cursor = '';
+    mapApi.map.off('click', onClick);
+  };
+  const onClick = (e) => {
+    const pos = { lat: e.lngLat.lat, lon: e.lngLat.lng };
+    if (straightMiles(HOME, pos) > MAP_RADIUS_MILES) {
+      banner.querySelector('b').textContent = 'That spot is outside the play area. Click inside the dashed line.';
+      return;
+    }
+    finish();
+    const label = nearLabel(pos);
+    modal(`<h3>Start here?</h3><p>Your new home is a house ${esc(label)}.</p>
+      <div class="col"><button class="primary" id="pickYes">Wake up here</button><button id="pickAgain">Choose again</button></div>`, (m) => {
+      m.querySelector('#pickYes').addEventListener('click', () => beginRun({ home: pos, homeLabel: label }));
+      m.querySelector('#pickAgain').addEventListener('click', pickStart);
     });
+  };
+  mapApi.map.on('click', onClick);
+  banner.querySelector('#pickCancel').addEventListener('click', () => {
+    finish();
+    if (state && state.dead) showDeath();
+    else showStartChoices();
   });
+}
+
+function showStartChoices() {
+  modal(startChoicesHtml(), bindStartChoices);
 }
 
 function showMenu() {
@@ -452,7 +529,7 @@ function showMenu() {
       clearGame();
       closeModal();
       state = null;
-      showIntro();
+      showStartChoices();
     });
   });
 }

@@ -166,3 +166,27 @@ test('searching is rarely dangerous, and a walk does not make you starve', () =>
   perform(s, 'action', 'go_place', 'n1');
   assert.ok(s.player.food > 75 && s.player.water > 75, `food ${s.player.food} water ${s.player.water}`);
 });
+
+test('a new run can start at another home', async () => {
+  const { randomStartPoint, homeOf, HOME, MAP_RADIUS_MILES } = await import('../src/engine/state.js');
+  const { straightMiles } = await import('../src/engine/travel.js');
+  for (let i = 0; i < 50; i++) {
+    const p = randomStartPoint();
+    assert.ok(straightMiles(HOME, p) <= 12.05, 'random start stays inside the play area');
+    assert.ok(straightMiles(HOME, p) < MAP_RADIUS_MILES);
+  }
+  const home = { lat: 45.4968, lon: -122.85 };
+  const s = newGame(31, { home, homeLabel: 'near Safeway' });
+  assert.deepEqual(s.pos, home);
+  assert.deepEqual(homeOf(s), home);
+  assert.equal(s.location.kind, 'home');
+  assert.ok(s.log.some((e) => e.text.includes('near Safeway')));
+  s.player.water = 90; s.player.food = 90;
+  perform(s, 'action', 'go_place', 'n1');
+  perform(s, 'action', 'go_home');
+  if (!s.dead) assert.deepEqual(s.pos, home);
+  // Old saves have no homePos: home is Aloha.
+  const old = newGame(32);
+  delete old.homePos;
+  assert.deepEqual(homeOf(old), HOME);
+});

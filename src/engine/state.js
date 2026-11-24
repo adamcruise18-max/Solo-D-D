@@ -9,7 +9,23 @@ export const START_MINUTE = 9 * 60 + 5; // Day 1, 9:05 AM
 export const HOME = { lat: HOME_LAT, lon: HOME_LON };
 export const MAP_RADIUS_MILES = 15;
 
-export function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+// Where the run starts. The first run starts at home in Aloha.
+// A new run after death can start at a random spot or a spot the player picks:
+// opts.home = { lat, lon }, opts.homeLabel = short text such as "near Safeway".
+export const homeOf = (state) => state.homePos || HOME;
+
+// A random start point inside the play area (not too close to the edge).
+export function randomStartPoint(rng = Math.random) {
+  const r = 12 * Math.sqrt(rng()); // miles from the map center, even spread
+  const a = rng() * 2 * Math.PI;
+  return {
+    lat: HOME.lat + (r * Math.sin(a)) / 69.09,
+    lon: HOME.lon + (r * Math.cos(a)) / (69.09 * Math.cos((HOME.lat * Math.PI) / 180)),
+  };
+}
+
+export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
+  const homePos = opts.home ? { lat: +opts.home.lat, lon: +opts.home.lon } : { ...HOME };
   const r = mulberry32(hashString('setup' + seed));
   const state = {
     version: SAVE_VERSION,
@@ -29,7 +45,9 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
       bodySeenDay: -1,
       lastDogPlayDay: -1,
     },
-    pos: { ...HOME },
+    homePos: homePos,
+    homeLabel: opts.homeLabel || null,
+    pos: { ...homePos },
     location: { kind: 'home' },
     carried: { backpack: 1 },
     home: {
@@ -75,6 +93,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
     pendingPrompt: null,
   };
   initWeather(state);
+  if (opts.homeLabel) log(state, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, 'story');
   log(state, 'You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.', 'story');
   log(state, 'The house is cold and silent. Nobody comes when you call out.', 'story');
   log(state, 'Hint: drink, eat, and get the house warm before the first night.', 'hint');
