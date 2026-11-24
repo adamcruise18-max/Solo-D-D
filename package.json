@@ -6,7 +6,10 @@
     "build": "esbuild src/main.js --bundle --format=iife --target=es2020 --outfile=docs/game.js && esbuild src/ui/inside3d.js --bundle --format=iife --target=es2020 --minify --outfile=docs/inside3d.js",
     "places": "node tools/build-places.mjs",
     "test": "node --test",
-    "serve": "python3 -m http.server 8080 -d docs"
+    "serve": "python3 -m http.server 8080 -d docs",
+    "sim": "node tools/sim.mjs",
+    "replay": "node tools/replay.mjs",
+    "check:browser": "node tools/browser-check.mjs"
   },
   "repository": {
     "type": "git",
