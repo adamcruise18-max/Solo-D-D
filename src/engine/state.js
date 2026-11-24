@@ -50,6 +50,8 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
       safeGal: 0,
       furniture: 12,
       fridgeOpened: false,
+      projects: {}, // built home base projects (see data/projects.js)
+      work: {}, // hours of work done on started projects
     },
     places: {},
     houses: {},

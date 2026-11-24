@@ -11,6 +11,7 @@ import { isNight } from './world.js';
 import { placeState, rollZone } from './loot.js';
 import { travel } from './travel.js';
 import { getPlace } from './placesdb.js';
+import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -36,11 +37,12 @@ export function locationLabel(state) {
 }
 
 function canHeat(state, kwh) {
-  return state.home.fireHours > 0 || state.home.battery >= kwh;
+  return state.home.fireHours > 0 || built(state, 'rocket_stove') || state.home.battery >= kwh;
 }
 
 function useHeat(state, kwh) {
   if (state.home.fireHours > 0) return 'on the fire';
+  if (built(state, 'rocket_stove')) return 'on the rocket stove';
   state.home.battery -= kwh;
   return 'on the electric hot plate';
 }
@@ -176,8 +178,8 @@ function useMed(state, id, bag) {
   }
   if (it.med === 'pain') {
     addItem(bag, id, -it.portion);
-    p.painH = 6;
-    log(state, 'You take pain pills. The pain is less for 6 hours.');
+    p.painH = painPillHours(state);
+    log(state, `You take pain pills. The pain is less for ${p.painH} hours.`);
     advanceTime(state, 2);
     return;
   }
@@ -198,7 +200,9 @@ export function takeItem(state, id, qty) {
   if (!have) return;
   const w = ITEMS[id].weight;
   const maxByWeight = w > 0 ? Math.floor((freeWeight(state) / w) * 1000) / 1000 : have;
-  const n = Math.min(qty ?? have, have, maxByWeight);
+  let n = Math.min(qty ?? have, have, maxByWeight);
+  // Whole things (parts, tools, clothes) cannot be split.
+  if (['part', 'tool', 'wear'].includes(ITEMS[id].kind)) n = Math.floor(n + 1e-9);
   if (n <= 0) { log(state, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, 'warn'); return; }
   addItem(bag, id, -n);
   addItem(state.carried, id, n);
@@ -300,6 +304,14 @@ function homeAction(state, id) {
       advanceTime(state, 20);
       return;
     }
+    case 'filter_water': {
+      const g = Math.min(2, h.rawGal);
+      h.rawGal -= g;
+      h.safeGal += g;
+      log(state, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
+      advanceTime(state, 10);
+      return;
+    }
     case 'drink_safe':
       h.safeGal = Math.max(0, h.safeGal - 0.25);
       addWater(state, 40);
@@ -328,8 +340,10 @@ function homeAction(state, id) {
       const bag = (h.storage.firewood || 0) > 0 ? h.storage : state.carried;
       addItem(bag, 'firewood', -1);
       const lit = h.fireHours > 0;
-      h.fireHours += 2;
-      log(state, lit ? 'You put more wood on the fire (+2 h).' : 'You light a fire in the fireplace. One bundle burns for about 2 hours.', 'good');
+      const per = fireHoursPerBundle(state);
+      const where = built(state, 'wood_stove') ? 'wood stove' : 'fireplace';
+      h.fireHours += per;
+      log(state, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, 'good');
       advanceTime(state, lit ? 5 : 15);
       return;
     }
@@ -631,10 +645,11 @@ export function listActions(state) {
     if (h.toiletGal > 0) add('collect_toilet', 'Take water from the toilet tanks');
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
+      if (built(state, 'filter_station')) add('filter_water', 'Filter 2 gal of water (no fuel)', { note: '10 min' });
       add('drink_raw', 'Drink water without boiling (risk)');
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);
-    add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : 'Light a fire in the fireplace', { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
+    add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const food = ['dry_food', 'canned_food'].some((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
@@ -696,6 +711,7 @@ export function doAction(state, id, arg) {
     case 'go_place': return goToPlace(state, arg);
     case 'play_dog': return playWithDog(state);
     case 'dog_follow': return toggleDogFollow(state);
+    case 'build': return workOnProject(state, arg);
     default: return homeAction(state, id);
   }
 }

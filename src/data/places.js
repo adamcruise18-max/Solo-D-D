@@ -29,6 +29,7 @@ export const CATEGORIES = {
     loot: [
       { id: 'snacks', w: 30 }, { id: 'water_bottle', w: 12 }, { id: 'lighter', w: 12 },
       { id: 'batteries', w: 8 }, { id: 'propane_1lb', w: 8 }, { id: 'tarp', w: 3 },
+      { id: 'wiring', w: 4 }, { id: 'pipe_fittings', w: 3 }, { id: 'metal_bin', w: 3 },
     ],
     entryText: 'The pumps have no power. The small shop is still closed.',
   },
@@ -67,6 +68,9 @@ export const CATEGORIES = {
       { id: 'tarp', w: 15 }, { id: 'pry_bar', w: 6 }, { id: 'propane_1lb', w: 12 },
       { id: 'batteries', w: 10 }, { id: 'flashlight', w: 6 }, { id: 'gloves', w: 8 },
       { id: 'seeds', w: 8 }, { id: 'bleach', w: 5 }, { id: 'lighter', w: 6 }, { id: 'firewood', w: 4 },
+      { id: 'toolkit', w: 6 }, { id: 'scrap_wood', w: 12 }, { id: 'hardware_parts', w: 14 }, { id: 'wiring', w: 10 },
+      { id: 'pipe_fittings', w: 10 }, { id: 'plastic_sheet', w: 10 }, { id: 'insulation', w: 8 }, { id: 'metal_bin', w: 6 },
+      { id: 'rain_barrel', w: 5 }, { id: 'stove_kit', w: 2 }, { id: 'water_filter', w: 3 },
     ],
     entryText: 'Long dark aisles. The tool racks are partly empty.',
   },
@@ -76,7 +80,7 @@ export const CATEGORIES = {
     loot: [
       { id: 'water_filter', w: 10 }, { id: 'winter_coat', w: 8 }, { id: 'winter_hat', w: 10 },
       { id: 'gloves', w: 10 }, { id: 'boots', w: 8 }, { id: 'rain_jacket', w: 10 },
-      { id: 'propane_1lb', w: 8 }, { id: 'flashlight', w: 6 }, { id: 'snacks', w: 6 }, { id: 'backpack', w: 3 },
+      { id: 'propane_1lb', w: 8 }, { id: 'flashlight', w: 6 }, { id: 'snacks', w: 6 }, { id: 'backpack', w: 3 }, { id: 'plastic_sheet', w: 6 },
     ],
     entryText: 'Racks of jackets and boots. This place has good winter gear.',
   },
@@ -85,7 +89,7 @@ export const CATEGORIES = {
     zoneName: 'room', locked: true,
     loot: [
       { id: 'first_aid', w: 20 }, { id: 'n95', w: 15 }, { id: 'pry_bar', w: 6 },
-      { id: 'flashlight', w: 8 }, { id: 'batteries', w: 8 }, { id: 'water_bottle', w: 10 }, { id: 'gloves', w: 6 },
+      { id: 'flashlight', w: 8 }, { id: 'batteries', w: 8 }, { id: 'water_bottle', w: 10 }, { id: 'gloves', w: 6 }, { id: 'toolkit', w: 8 },
     ],
     entryText: 'The engine bay is empty. The crews went out on calls and did not come back.',
   },
@@ -98,6 +102,8 @@ export const CATEGORIES = {
       { id: 'first_aid', w: 4 }, { id: 'antibiotics', w: 2 }, { id: 'batteries', w: 6 },
       { id: 'winter_hat', w: 4 }, { id: 'gloves', w: 4 }, { id: 'rain_jacket', w: 3 },
       { id: 'comfort', w: 5 }, { id: 'firewood', w: 4 }, { id: 'dog_food', w: 2 }, { id: 'lighter', w: 4 },
+      { id: 'toolkit', w: 2 }, { id: 'scrap_wood', w: 3 }, { id: 'hardware_parts', w: 3 }, { id: 'wiring', w: 2 },
+      { id: 'pipe_fittings', w: 2 }, { id: 'metal_bin', w: 2 }, { id: 'rain_barrel', w: 1 }, { id: 'battery_module', w: 0.6 },
     ],
   },
 };

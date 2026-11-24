@@ -31,7 +31,19 @@
     flea_spray: { name: "Flea spray", unit: "can", weight: 1, kind: "misc" },
     seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
     lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
-    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" }
+    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" },
+    // Parts for home base projects (kind 'part': no use on their own).
+    toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
+    scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
+    hardware_parts: { name: "Nails, screws and brackets", unit: "box", weight: 1, kind: "part" },
+    wiring: { name: "Electrical wire and connectors", unit: "roll", weight: 2, kind: "part" },
+    pipe_fittings: { name: "Pipe, hose and fittings", unit: "set", weight: 2, kind: "part" },
+    plastic_sheet: { name: "Plastic sheeting", unit: "roll", weight: 3, kind: "part" },
+    insulation: { name: "Foam board insulation", unit: "pack", weight: 4, kind: "part" },
+    metal_bin: { name: "Metal can with lid", unit: "pc", weight: 8, kind: "part" },
+    rain_barrel: { name: "Rain barrel (55 gal, empty)", unit: "pc", weight: 15, kind: "part" },
+    stove_kit: { name: "Wood stove and pipe kit", unit: "kit", weight: 40, kind: "part" },
+    battery_module: { name: "Home battery module", unit: "pc", weight: 40, kind: "part" }
   };
   function itemName(id) {
     return ITEMS[id] ? ITEMS[id].name : id;
@@ -93,7 +105,10 @@
         { id: "lighter", w: 12 },
         { id: "batteries", w: 8 },
         { id: "propane_1lb", w: 8 },
-        { id: "tarp", w: 3 }
+        { id: "tarp", w: 3 },
+        { id: "wiring", w: 4 },
+        { id: "pipe_fittings", w: 3 },
+        { id: "metal_bin", w: 3 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -176,7 +191,18 @@
         { id: "seeds", w: 8 },
         { id: "bleach", w: 5 },
         { id: "lighter", w: 6 },
-        { id: "firewood", w: 4 }
+        { id: "firewood", w: 4 },
+        { id: "toolkit", w: 6 },
+        { id: "scrap_wood", w: 12 },
+        { id: "hardware_parts", w: 14 },
+        { id: "wiring", w: 10 },
+        { id: "pipe_fittings", w: 10 },
+        { id: "plastic_sheet", w: 10 },
+        { id: "insulation", w: 8 },
+        { id: "metal_bin", w: 6 },
+        { id: "rain_barrel", w: 5 },
+        { id: "stove_kit", w: 2 },
+        { id: "water_filter", w: 3 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -197,7 +223,8 @@
         { id: "propane_1lb", w: 8 },
         { id: "flashlight", w: 6 },
         { id: "snacks", w: 6 },
-        { id: "backpack", w: 3 }
+        { id: "backpack", w: 3 },
+        { id: "plastic_sheet", w: 6 }
       ],
       entryText: "Racks of jackets and boots. This place has good winter gear."
     },
@@ -216,7 +243,8 @@
         { id: "flashlight", w: 8 },
         { id: "batteries", w: 8 },
         { id: "water_bottle", w: 10 },
-        { id: "gloves", w: 6 }
+        { id: "gloves", w: 6 },
+        { id: "toolkit", w: 8 }
       ],
       entryText: "The engine bay is empty. The crews went out on calls and did not come back."
     },
@@ -243,7 +271,15 @@
         { id: "comfort", w: 5 },
         { id: "firewood", w: 4 },
         { id: "dog_food", w: 2 },
-        { id: "lighter", w: 4 }
+        { id: "lighter", w: 4 },
+        { id: "toolkit", w: 2 },
+        { id: "scrap_wood", w: 3 },
+        { id: "hardware_parts", w: 3 },
+        { id: "wiring", w: 2 },
+        { id: "pipe_fittings", w: 2 },
+        { id: "metal_bin", w: 2 },
+        { id: "rain_barrel", w: 1 },
+        { id: "battery_module", w: 0.6 }
       ]
     }
   };
@@ -495,7 +531,11 @@
         rawGal: 0,
         safeGal: 0,
         furniture: 12,
-        fridgeOpened: false
+        fridgeOpened: false,
+        projects: {},
+        // built home base projects (see data/projects.js)
+        work: {}
+        // hours of work done on started projects
       },
       places: {},
       houses: {},
@@ -589,6 +629,223 @@
   var getPlace = (id) => INDEX[id];
   var allPlaces = () => LIST;
 
+  // src/data/projects.js
+  var WINGS = {
+    power: { label: "Power", icon: "\u26A1", blurb: "Solar panels and the home battery." },
+    water: { label: "Water", icon: "\u{1F4A7}", blurb: "Collect, store and clean water." },
+    heat: { label: "Heat and shelter", icon: "\u{1F525}", blurb: "Keep the living room warm with less fuel." },
+    medical: { label: "Medical", icon: "\u271A", blurb: "Heal faster and stay healthy." },
+    food: { label: "Food", icon: "\u{1F96B}", blurb: "Cook and store food." }
+  };
+  var PROJECTS = [
+    // ---- Power ----
+    {
+      id: "led_lights",
+      wing: "power",
+      name: "LED lights on the battery",
+      effect: "Light at home after dark. Morale +3 each day.",
+      needs: { wiring: 1, hardware_parts: 1 },
+      tools: ["toolkit"],
+      hours: 2
+    },
+    {
+      id: "second_battery",
+      wing: "power",
+      name: "Second battery",
+      effect: "Battery storage 13.5 \u2192 27 kWh.",
+      needs: { battery_module: 1, wiring: 2 },
+      tools: ["toolkit"],
+      requires: ["led_lights"],
+      hours: 8
+    },
+    // ---- Water ----
+    {
+      id: "rain_barrels",
+      wing: "water",
+      name: "Rain barrel system",
+      effect: "Rain fills 2 barrels from the gutter (110 gal). Boil or filter it before you drink.",
+      needs: { rain_barrel: 2, pipe_fittings: 1 },
+      tools: [],
+      hours: 3
+    },
+    {
+      id: "filter_station",
+      wing: "water",
+      name: "Water filter station",
+      effect: "Filter 2 gal of unsafe water in 10 min, with no fire or power.",
+      needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 },
+      tools: [],
+      requires: ["rain_barrels"],
+      hours: 2
+    },
+    // ---- Heat ----
+    {
+      id: "insulate_living",
+      wing: "heat",
+      name: "Insulate the living room",
+      effect: "The house loses heat half as fast.",
+      needs: { insulation: 2, plastic_sheet: 1, hardware_parts: 1 },
+      tools: [],
+      hours: 4
+    },
+    {
+      id: "wood_stove",
+      wing: "heat",
+      name: "Wood stove",
+      effect: "Fire gives more heat (+30 \xB0F), and one bundle burns 4 h, not 2 h.",
+      needs: { stove_kit: 1, pipe_fittings: 1, hardware_parts: 2 },
+      tools: ["toolkit"],
+      requires: ["insulate_living"],
+      hours: 16
+    },
+    // ---- Medical ----
+    {
+      id: "sick_room",
+      wing: "medical",
+      name: "Clean sick room",
+      effect: "When you sleep at home, injuries heal 50% faster and you get back more Health.",
+      needs: { bleach: 1, plastic_sheet: 1, first_aid: 1 },
+      tools: [],
+      hours: 2
+    },
+    {
+      id: "med_cabinet",
+      wing: "medical",
+      name: "Locked medicine cabinet",
+      effect: "Medicine is sorted and ready: pain pills work 9 h, not 6 h.",
+      needs: { scrap_wood: 2, hardware_parts: 1 },
+      tools: ["toolkit"],
+      requires: ["sick_room"],
+      hours: 3
+    },
+    // ---- Food ----
+    {
+      id: "rocket_stove",
+      wing: "food",
+      name: "Rocket stove in the garage",
+      effect: "Cook and boil water with scrap wood: no fire in the fireplace and no battery power needed.",
+      needs: { metal_bin: 1, hardware_parts: 1, scrap_wood: 1 },
+      tools: [],
+      hours: 3
+    },
+    {
+      id: "sealed_store",
+      wing: "food",
+      name: "Sealed food store",
+      effect: "Morale +5 one time. Then Morale +2 each day while 10 or more food items are in storage.",
+      needs: { metal_bin: 3 },
+      tools: [],
+      requires: ["rocket_stove"],
+      hours: 1
+    }
+  ];
+  var PROJECT_BY_ID = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
+
+  // src/engine/base.js
+  var WORK_BLOCK_H = 2;
+  var MIN_WORK_ENERGY = 15;
+  function base(state2) {
+    const h = state2.home;
+    if (!h.projects) h.projects = {};
+    if (!h.work) h.work = {};
+    return h;
+  }
+  function built(state2, id) {
+    return !!(state2.home.projects && state2.home.projects[id]);
+  }
+  function builtCount(state2) {
+    return PROJECTS.filter((p) => built(state2, p.id)).length;
+  }
+  function haveQty(state2, id) {
+    return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
+  }
+  function projectStatus(state2, proj) {
+    const h = base(state2);
+    const started = h.work[proj.id] != null;
+    const doneH = h.work[proj.id] || 0;
+    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
+    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
+    const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
+    const partsOk = started || parts.every((x) => x.have >= x.need);
+    const toolsOk = tools.every((t) => t.have);
+    let blocked = null;
+    if (built(state2, proj.id)) blocked = "Built";
+    else if (missingReq.length) blocked = `Build first: ${missingReq.map((r) => PROJECT_BY_ID[r].name).join(", ")}`;
+    else if (!partsOk) blocked = "Missing parts";
+    else if (!toolsOk) blocked = `Needs ${tools.filter((t) => !t.have).map((t) => itemName(t.id).toLowerCase()).join(", ")}`;
+    else if (state2.location.kind !== "home") blocked = "Go home to work on it";
+    else if (state2.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
+    return {
+      built: built(state2, proj.id),
+      started,
+      doneH,
+      leftH: Math.max(0, proj.hours - doneH),
+      parts,
+      tools,
+      missingReq,
+      blocked,
+      canWork: !blocked
+    };
+  }
+  function wingSummary(state2) {
+    return Object.entries(WINGS).map(([id, w]) => {
+      const list = PROJECTS.filter((p) => p.wing === id);
+      return { id, ...w, projects: list, built: list.filter((p) => built(state2, p.id)).length };
+    });
+  }
+  function takeParts(state2, needs) {
+    for (const [id, need] of Object.entries(needs)) {
+      let left = need;
+      for (const bag of [state2.home.storage, state2.carried]) {
+        const take = Math.min(left, bag[id] || 0);
+        if (take > 0) addItem(bag, id, -take);
+        left -= take;
+      }
+    }
+  }
+  function workOnProject(state2, id) {
+    const proj = PROJECT_BY_ID[id];
+    if (!proj) return;
+    const h = base(state2);
+    const st = projectStatus(state2, proj);
+    if (!st.canWork) {
+      log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
+      return;
+    }
+    if (!st.started) {
+      takeParts(state2, proj.needs);
+      h.work[id] = 0;
+      log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
+    }
+    const hours = Math.min(WORK_BLOCK_H, st.leftH);
+    advanceTime(state2, Math.round(hours * 60), "heavy");
+    if (state2.dead) return;
+    h.work[id] += hours;
+    if (h.work[id] >= proj.hours - 1e-9) {
+      delete h.work[id];
+      h.projects[id] = true;
+      finishProject(state2, proj);
+    } else {
+      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h.work[id]) * 60)} of work left.`);
+    }
+  }
+  function finishProject(state2, proj) {
+    const h = state2.home;
+    const p = state2.player;
+    if (proj.id === "second_battery") h.batteryMax = 27;
+    let morale = 5;
+    if (proj.id === "sealed_store") morale += 5;
+    p.morale = Math.min(100, p.morale + morale);
+    log(state2, `Project done: ${proj.name}. ${proj.effect}`, "good");
+  }
+  var fireHoursPerBundle = (state2) => built(state2, "wood_stove") ? 4 : 2;
+  var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
+  var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
+  var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
+  function foodItemsStored(state2) {
+    return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
+  }
+
   // src/engine/tick.js
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
@@ -606,7 +863,7 @@
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
-      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night, air, home: true };
+      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night && !built(state2, "led_lights"), air, home: true };
     }
     let dark = night;
     if (state2.location.kind === "place") {
@@ -700,7 +957,8 @@
     for (const inj of p.injuries) {
       if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
       inj.ageH += dt;
-      const slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+      let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+      if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
       if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
@@ -728,7 +986,8 @@
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
     const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
-    if (ok) p.health += (sleeping ? 1 : 0.25) * dt;
+    const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
+    if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
     if (p.weak && p.food > 50 && p.water > 50) p.weakGoodHours += dt;
     if (env.dark && !sleeping && hasLight(state2) && (mode === "walk" || state2.location.kind !== "home")) {
@@ -749,7 +1008,7 @@
     const air = env.air;
     let heat = 0;
     if (h.fireHours > 0) {
-      heat += 20;
+      heat += fireHeat(state2);
       h.fireHours = Math.max(0, h.fireHours - dt);
       if (h.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
     }
@@ -764,13 +1023,18 @@
     }
     const passive = air + 6;
     const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05;
+    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
     h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
     const m = (state2.time % 1440 + 1440) % 1440;
     const s = sunFor(state2.time);
     if (m > s.rise && m < s.set) {
       const hours = (s.set - s.rise) / 60;
       h.battery = Math.min(h.batteryMax, h.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
     }
     if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
       h.tapWorks = false;
@@ -809,6 +1073,8 @@
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
+    if (built(state2, "led_lights")) p.morale += 3;
+    if (built(state2, "sealed_store") && foodItemsStored(state2) >= 10) p.morale += 2;
     if (state2.dog.stage === "joined") {
       p.morale += 8;
       if (state2.dog.food >= 25) state2.dog.bond += 3;
@@ -1130,10 +1396,11 @@
     return "";
   }
   function canHeat(state2, kwh) {
-    return state2.home.fireHours > 0 || state2.home.battery >= kwh;
+    return state2.home.fireHours > 0 || built(state2, "rocket_stove") || state2.home.battery >= kwh;
   }
   function useHeat(state2, kwh) {
     if (state2.home.fireHours > 0) return "on the fire";
+    if (built(state2, "rocket_stove")) return "on the rocket stove";
     state2.home.battery -= kwh;
     return "on the electric hot plate";
   }
@@ -1278,8 +1545,8 @@
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = 6;
-      log(state2, "You take pain pills. The pain is less for 6 hours.");
+      p.painH = painPillHours(state2);
+      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.`);
       advanceTime(state2, 2);
       return;
     }
@@ -1301,7 +1568,8 @@
     if (!have) return;
     const w = ITEMS[id].weight;
     const maxByWeight = w > 0 ? Math.floor(freeWeight(state2) / w * 1e3) / 1e3 : have;
-    const n = Math.min(qty ?? have, have, maxByWeight);
+    let n = Math.min(qty ?? have, have, maxByWeight);
+    if (["part", "tool", "wear"].includes(ITEMS[id].kind)) n = Math.floor(n + 1e-9);
     if (n <= 0) {
       log(state2, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, "warn");
       return;
@@ -1402,6 +1670,14 @@
         advanceTime(state2, 20);
         return;
       }
+      case "filter_water": {
+        const g = Math.min(2, h.rawGal);
+        h.rawGal -= g;
+        h.safeGal += g;
+        log(state2, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
+        advanceTime(state2, 10);
+        return;
+      }
       case "drink_safe":
         h.safeGal = Math.max(0, h.safeGal - 0.25);
         addWater(state2, 40);
@@ -1433,8 +1709,10 @@
         const bag = (h.storage.firewood || 0) > 0 ? h.storage : state2.carried;
         addItem(bag, "firewood", -1);
         const lit = h.fireHours > 0;
-        h.fireHours += 2;
-        log(state2, lit ? "You put more wood on the fire (+2 h)." : "You light a fire in the fireplace. One bundle burns for about 2 hours.", "good");
+        const per = fireHoursPerBundle(state2);
+        const where = built(state2, "wood_stove") ? "wood stove" : "fireplace";
+        h.fireHours += per;
+        log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         return;
       }
@@ -1578,9 +1856,9 @@
       log(state2, "The gate bends open.");
     } else if (chance(state2, 0.25)) addInjury(state2, "small_cut");
   }
-  function searchMinutes(state2, base, dark) {
+  function searchMinutes(state2, base2, dark) {
     const p = state2.player;
-    let m = base;
+    let m = base2;
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
@@ -1716,10 +1994,11 @@
       if (h.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
+        if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
         add("drink_raw", "Drink water without boiling (risk)");
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
-      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : "Light a fire in the fireplace", { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
       add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
       const food = ["dry_food", "canned_food"].some((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
@@ -1792,6 +2071,8 @@
         return playWithDog(state2);
       case "dog_follow":
         return toggleDogFollow(state2);
+      case "build":
+        return workOnProject(state2, arg);
       default:
         return homeAction(state2, id);
     }
@@ -1904,6 +2185,108 @@
     }
   }
 
+  // src/ui/winter-style.js
+  var COLOR_RE = /^(#[0-9a-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\))$/i;
+  function parseColor(str) {
+    if (typeof str !== "string") return null;
+    const s = str.trim().toLowerCase();
+    if (!COLOR_RE.test(s)) return null;
+    if (s[0] === "#") {
+      let h = s.slice(1);
+      if (h.length === 3 || h.length === 4) h = [...h].map((c) => c + c).join("");
+      if (h.length !== 6 && h.length !== 8) return null;
+      const n = (i) => parseInt(h.slice(i, i + 2), 16);
+      return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) / 255 : 1 };
+    }
+    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v) => parseFloat(v));
+    if (nums.length < 3 || nums.some(Number.isNaN)) return null;
+    const a = nums.length > 3 ? nums[3] : 1;
+    if (s.startsWith("rgb")) return { r: nums[0], g: nums[1], b: nums[2], a };
+    return { ...hslToRgb(nums[0], nums[1] / 100, nums[2] / 100), a };
+  }
+  function hslToRgb(h, s, l) {
+    h = (h % 360 + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(h / 60 % 2 - 1));
+    const m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+  }
+  function toCss({ r, g, b, a }) {
+    const k = (v) => Math.round(Math.max(0, Math.min(255, v)));
+    return `rgba(${k(r)},${k(g)},${k(b)},${Math.round(a * 1e3) / 1e3})`;
+  }
+  var SNOW = { r: 222, g: 231, b: 238 };
+  function coolColor(str, { desat = 0.45, toward = 0.15 } = {}) {
+    const c = parseColor(str);
+    if (!c) return str;
+    const gray = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+    const mix = (v, t) => v + (t - v) * toward;
+    return toCss({
+      r: mix(c.r + (gray - c.r) * desat, SNOW.r),
+      g: mix(c.g + (gray - c.g) * desat, SNOW.g),
+      b: mix(c.b + (gray - c.b) * desat, SNOW.b) + 4,
+      a: c.a
+    });
+  }
+  function coolValue(v) {
+    if (typeof v === "string") return coolColor(v);
+    if (Array.isArray(v)) return v.map(coolValue);
+    if (v && typeof v === "object" && Array.isArray(v.stops)) {
+      return { ...v, stops: v.stops.map(([z, c]) => [z, coolValue(c)]) };
+    }
+    return v;
+  }
+  var WINTER = [
+    ["background", { "background-color": "#eaeff3" }],
+    ["park_outline", { "line-color": "rgba(160,184,170,0.6)" }],
+    ["park", { "fill-color": "#d6e2da", "fill-outline-color": "rgba(140,170,150,0.7)" }],
+    ["landcover_wood", { "fill-color": "rgba(170,196,180,0.65)" }],
+    ["landcover_grass", { "fill-color": "#dbe5de" }],
+    ["landcover_ice", { "fill-color": "#f4f8fa" }],
+    ["landuse_residential", { "fill-color": "rgba(212,221,229,0.55)" }],
+    ["landuse_hospital", { "fill-color": "#ecdde2" }],
+    ["landuse_school", { "fill-color": "#e3e6dc" }],
+    ["water", { "fill-color": "#86aac4" }],
+    ["waterway", { "line-color": "#86aac4" }],
+    ["building-3d", { "fill-extrusion-color": "#c9d1d9" }],
+    ["building", { "fill-color": "#cdd5dc", "fill-outline-color": "rgba(150,163,176,0.8)" }]
+  ];
+  function roadPaint(id) {
+    if (!/^(road|bridge|tunnel)_/.test(id)) return null;
+    if (/rail/.test(id)) return { "line-color": "#8d99a6" };
+    if (/casing/.test(id)) return { "line-color": /motorway|trunk|primary|secondary/.test(id) ? "#8796a5" : "#b3bec8" };
+    if (/motorway/.test(id)) return { "line-color": "#e9cf96" };
+    if (/trunk_primary|secondary_tertiary|_link/.test(id)) return { "line-color": "#fbf6ea" };
+    if (/minor|service|street|path/.test(id)) return { "line-color": "#ffffff" };
+    return null;
+  }
+  function winterizeStyle(style) {
+    const out = JSON.parse(JSON.stringify(style));
+    for (const layer of out.layers || []) {
+      const paint = layer.paint || (layer.paint = {});
+      for (const key of Object.keys(paint)) {
+        if (/color/.test(key)) paint[key] = coolValue(paint[key]);
+      }
+      const fixed = WINTER.find(([prefix]) => layer.id === prefix || layer.id.startsWith(prefix + "_") || layer.id.startsWith(prefix + "-")) || (layer["source-layer"] === "water" && layer.type === "fill" ? WINTER.find(([p]) => p === "water") : null);
+      const road = roadPaint(layer.id);
+      for (const [k, v] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
+        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v;
+      }
+      if (layer.type === "raster") {
+        paint["raster-saturation"] = -0.6;
+        paint["raster-brightness-min"] = 0.25;
+      }
+      if (layer.type === "symbol") {
+        if (paint["text-color"] !== void 0 || layer.layout?.["text-field"]) {
+          paint["text-color"] = layer.id.startsWith("label_") ? "#1f2a35" : /water/.test(layer.id) ? "#3d6585" : "#4a5663";
+          paint["text-halo-color"] = "rgba(244,247,250,0.9)";
+        }
+      }
+    }
+    return out;
+  }
+
   // src/ui/map.js
   var STYLE_URLS = [
     "https://tiles.openfreemap.org/styles/liberty",
@@ -1913,7 +2296,7 @@
   var OFFLINE_STYLE = {
     version: 8,
     sources: {},
-    layers: [{ id: "bg", type: "background", paint: { "background-color": "#1b1f24" } }]
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
   };
   async function pickStyle() {
     for (const url of STYLE_URLS) {
@@ -1922,7 +2305,7 @@
         const timer = setTimeout(() => ctl.abort(), 5e3);
         const res = await fetch(url, { signal: ctl.signal });
         clearTimeout(timer);
-        if (res.ok) return { style: await res.json(), online: true };
+        if (res.ok) return { style: winterizeStyle(await res.json()), online: true };
       } catch {
       }
     }
@@ -1963,22 +2346,41 @@
     await ready;
     map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
     map.addLayer({
+      id: "edge-glow",
+      type: "line",
+      source: "edge",
+      paint: { "line-color": "#a3263b", "line-width": 8, "line-blur": 6, "line-opacity": 0.18 }
+    });
+    map.addLayer({
       id: "edge",
       type: "line",
       source: "edge",
-      paint: { "line-color": "#e0b85a", "line-width": 2, "line-dasharray": [3, 3], "line-opacity": 0.7 }
+      paint: { "line-color": "#a3263b", "line-width": 2, "line-dasharray": [4, 3], "line-opacity": 0.8 }
     });
     map.addSource("places", { type: "geojson", data: placesGeo(places, {}) });
+    map.addLayer({
+      id: "places-ring",
+      type: "circle",
+      source: "places",
+      filter: ["==", ["get", "status"], 0],
+      paint: {
+        "circle-color": "rgba(0,0,0,0)",
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 13, 9, 16, 15],
+        "circle-stroke-color": colorExpr,
+        "circle-stroke-width": 1.2,
+        "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12.5, 0.55]
+      }
+    });
     map.addLayer({
       id: "places",
       type: "circle",
       source: "places",
       paint: {
-        "circle-color": colorExpr,
+        "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
-        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#555", "#111"],
-        "circle-stroke-width": 1,
-        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.3, ["==", ["get", "status"], 1], 0.65, 1]
+        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#6b7682", "#16202a"],
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6],
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, ["==", ["get", "status"], 1], 0.8, 1]
       }
     });
     map.on("click", "places", (e) => {
@@ -1994,7 +2396,7 @@
     const homeEl = document.createElement("div");
     homeEl.className = "marker-home";
     homeEl.title = "Home";
-    homeEl.textContent = "\u2302";
+    homeEl.innerHTML = "<span>\u2302</span>";
     homeEl.addEventListener("click", (ev) => {
       ev.stopPropagation();
       onPlaceClick("__home", null);
@@ -2003,6 +2405,7 @@
     const youEl = document.createElement("div");
     youEl.className = "marker-you";
     youEl.title = "You";
+    youEl.innerHTML = "<i></i>";
     const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
     return {
       map,
@@ -2033,10 +2436,132 @@
     };
   }
 
+  // src/ui/fx.js
+  var FX_KEY = "lastlight.fx";
+  function fxEnabled() {
+    try {
+      const v = localStorage.getItem(FX_KEY);
+      if (v !== null) return v === "1";
+    } catch {
+    }
+    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  }
+  function setFxEnabled(on) {
+    try {
+      localStorage.setItem(FX_KEY, on ? "1" : "0");
+    } catch {
+    }
+  }
+  function createFx(wrap) {
+    const layer = document.createElement("div");
+    layer.className = "fx";
+    layer.innerHTML = '<div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    wrap.appendChild(layer);
+    const canvas = layer.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    let kind = "none";
+    let strength = 0;
+    let wind = 0;
+    let parts = [];
+    let raf = 0;
+    let enabled = fxEnabled();
+    function resize() {
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, r.width * dpr);
+      canvas.height = Math.max(1, r.height * dpr);
+      canvas.style.width = `${r.width}px`;
+      canvas.style.height = `${r.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function spawn(w, h, anywhere) {
+      const snow = kind === "snow";
+      return {
+        x: Math.random() * (w + 200) - 100,
+        y: anywhere ? Math.random() * h : -10,
+        r: snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
+        v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
+        p: Math.random() * Math.PI * 2
+      };
+    }
+    function frame() {
+      raf = 0;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      if (!enabled || kind === "none" || document.hidden) return;
+      const want = Math.round((kind === "snow" ? 160 : 220) * strength * Math.min(1, w * h / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w, h, true));
+      if (parts.length > want) parts.length = want;
+      const drift = wind / 12;
+      if (kind === "snow") {
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowColor = "rgba(80,110,140,0.55)";
+        ctx.shadowBlur = 2;
+        for (const s of parts) {
+          s.p += 0.02;
+          s.y += s.v;
+          s.x += Math.sin(s.p) * 0.4 + drift;
+          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.strokeStyle = "rgba(60,90,120,0.38)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const s of parts) {
+          s.y += s.v;
+          s.x += drift * 3;
+          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
+        }
+        ctx.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    function run() {
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+    new ResizeObserver(resize).observe(wrap);
+    resize();
+    document.addEventListener("visibilitychange", run);
+    return {
+      // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
+      update({ weather, night, windMph }) {
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : "none";
+        if (nextKind !== kind) parts = [];
+        kind = nextKind;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : 0;
+        wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
+        layer.classList.toggle("is-night", !!night);
+        layer.classList.toggle("is-fog", weather === "fog");
+        layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
+        layer.classList.toggle("off", !enabled);
+        run();
+      },
+      setEnabled(on) {
+        enabled = on;
+        setFxEnabled(on);
+        layer.classList.toggle("off", !on);
+        if (!on) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        run();
+      },
+      get enabled() {
+        return enabled;
+      }
+    };
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
   var popup = null;
+  var fx = null;
+  var openWings = /* @__PURE__ */ new Set();
   var $ = (sel) => document.querySelector(sel);
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
@@ -2055,10 +2580,17 @@
     setPlaces(window.LL_PLACES || []);
     state = loadGame();
     bindEvents();
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i style="background:transparent;border:2px dashed #e0b85a"></i>15-mile edge</span>';
+    fx = createFx($("#mapwrap"));
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="edge"></i>15-mile edge</span>';
     try {
       mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
       window.__llMap = mapApi.map;
+      const showCoords = () => {
+        const c = mapApi.map.getCenter();
+        $("#coords").textContent = `${Math.abs(c.lat).toFixed(4)}\xB0${c.lat >= 0 ? "N" : "S"}  ${Math.abs(c.lng).toFixed(4)}\xB0${c.lng >= 0 ? "E" : "W"}  \xB7  Z${mapApi.map.getZoom().toFixed(1)}`;
+      };
+      mapApi.map.on("move", showCoords);
+      showCoords();
     } catch (e) {
       console.error(e);
       $("#map").innerHTML = '<div class="map-error">The map could not load. You can still play from the panel.</div>';
@@ -2088,7 +2620,23 @@
     renderHome();
     renderDog();
     renderLog();
+    renderHud();
     if (mapApi) mapApi.update(state, allPlaces());
+  }
+  function renderHud() {
+    const t = state.time;
+    const night = isNight(t);
+    const w = state.weather;
+    const p = state.player;
+    const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+    $("#hud").innerHTML = `
+    <span class="h-day">DAY ${dayIndex(t) + 1}</span>
+    <span class="h-time">${formatClock(t)}</span>
+    <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
+    <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
+    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}`;
+    $("#hud").hidden = false;
+    if (fx) fx.update({ weather: w.type, night, windMph: w.wind });
   }
   function renderHeader() {
     const t = state.time;
@@ -2098,6 +2646,7 @@
     const w = state.weather;
     const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
     $("#clock").innerHTML = `
+    <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
@@ -2125,7 +2674,7 @@
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
     const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
     chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
-    $("#stats").innerHTML = rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
   }
   function renderLocation() {
     const loc = state.location;
@@ -2141,7 +2690,7 @@
       return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
     }).join("");
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
-    $("#location").innerHTML = `<h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
+    $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
   }
   function qtyText(q) {
     return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
@@ -2189,7 +2738,8 @@
     const atHome = state.location.kind === "home";
     const pct = Math.round(h.battery / h.batteryMax * 100);
     $("#home").innerHTML = `
-    <h3>Home ${atHome ? "" : "<small>(you are away)</small>"}</h3>
+    <div class="eyebrow">Home base</div>
+    <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}\xB0F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : "out"}</b>
@@ -2198,7 +2748,52 @@
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
       <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
-    </div>`;
+    </div>
+    ${renderBase()}`;
+  }
+  function renderBase() {
+    const done = builtCount(state);
+    const wings = wingSummary(state).map((w) => {
+      const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
+      const cards = w.projects.map(projectCard).join("");
+      return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? "open" : ""}>
+      <summary><span class="wi">${w.icon}</span><span class="wn">${esc(w.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc(w.blurb)}</p>${cards}</details>`;
+    }).join("");
+    const need = {};
+    for (const p of PROJECTS) {
+      const st = projectStatus(state, p);
+      if (st.built || st.started || st.missingReq.length) continue;
+      for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
+      for (const t of st.tools) if (!t.have) need[t.id] = 1;
+    }
+    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} \xD7${q}</span>`).join("");
+    return `<div class="base">
+    <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
+    <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
+    ${wings}
+    ${list ? `<p class="sub">Look for these parts (hardware stores, houses, gas stations):</p><div class="chips">${list}</div>` : ""}
+  </div>`;
+  }
+  function projectCard(p) {
+    const st = projectStatus(state, p);
+    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
+    const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc(itemName(t.id))}</span>`).join("");
+    let foot;
+    if (st.built) foot = '<span class="built">\u2713 Built</span>';
+    else {
+      const block = Math.min(WORK_BLOCK_H, st.leftH);
+      const label = st.started ? `Work ${block} h (${st.leftH} h left)` : `Start project (${p.hours} h total)`;
+      foot = `${st.started ? `<div class="basebar small"><i style="width:${st.doneH / p.hours * 100}%"></i></div>` : ""}
+      <button class="small" data-build="${p.id}" ${st.canWork ? "" : "disabled"}>${label}</button>
+      ${st.blocked ? `<small class="why">${esc(st.blocked)}</small>` : ""}`;
+    }
+    return `<div class="proj ${st.built ? "is-built" : ""}">
+    <div class="pn">${esc(p.name)}</div>
+    <div class="pe">${esc(p.effect)}</div>
+    ${st.built ? "" : `<div class="chips">${parts}${tools}</div>`}
+    <div class="pf">${foot}</div>
+  </div>`;
   }
   function renderDog() {
     const d = state.dog;
@@ -2338,6 +2933,7 @@
     modal(`<h3>Game</h3>
     <p class="hint">The game saves in this browser after each action.</p>
     <div class="col">
+      <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? "checked" : ""}> Weather effects on the map (snow, rain, fog, night)</label>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
@@ -2345,6 +2941,9 @@
     </div>
     <p class="hint">Map data \xA9 OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
       m.querySelector("#cancel").addEventListener("click", closeModal);
+      m.querySelector("#fxToggle").addEventListener("change", (e) => {
+        if (fx) fx.setEnabled(e.target.checked);
+      });
       m.querySelector("#exp").addEventListener("click", () => {
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
         const a = document.createElement("a");
@@ -2384,9 +2983,16 @@
       else if (b.dataset.take) act("take", b.dataset.take);
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);
+      else if (b.dataset.build) act("action", "build", b.dataset.build);
       else if (b.id === "menuBtn") showMenu();
       else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
+    document.body.addEventListener("toggle", (e) => {
+      const w = e.target.dataset && e.target.dataset.wing;
+      if (!w) return;
+      if (e.target.open) openWings.add(w);
+      else openWings.delete(w);
+    }, true);
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });

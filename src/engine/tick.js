@@ -6,6 +6,7 @@ import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from '
 import { dayIndex, log, hasLight, bagWeight, carryLimit } from './state.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
+import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -26,7 +27,7 @@ export function environment(state, mode, t = state.time) {
     return { outside: true, temp: air, wind: state.weather.wind, precip: !!weatherInfo(state).wetAfter, dark: night, air };
   }
   if (state.location.kind === 'home') {
-    return { outside: false, temp: state.home.indoorTemp, wind: 0, precip: false, dark: night, air, home: true };
+    return { outside: false, temp: state.home.indoorTemp, wind: 0, precip: false, dark: night && !built(state, 'led_lights'), air, home: true };
   }
   let dark = night;
   if (state.location.kind === 'place') {
@@ -134,7 +135,8 @@ function tickStep(state, dt, mode) {
   for (const inj of p.injuries) {
     if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, 2 * dt, 'bleeding');
     inj.ageH += dt;
-    const slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+    let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+    if (sleeping && state.location.kind === 'home' && built(state, 'sick_room')) slow *= 1.5;
     inj.healH -= dt * slow;
     if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
       inj.infectRolled = true;
@@ -165,7 +167,8 @@ function tickStep(state, dt, mode) {
 
   // Health refill
   const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
-  if (ok) p.health += (sleeping ? 1 : 0.25) * dt;
+  const sickRoom = sleeping && state.location.kind === 'home' && built(state, 'sick_room');
+  if (ok) p.health += (sleeping ? (sickRoom ? 1.5 : 1) : 0.25) * dt;
   p.health = Math.min(100, p.health);
 
   // Weak status progress
@@ -193,7 +196,7 @@ function homeStep(state, dt, env) {
   const air = env.air;
   let heat = 0;
   if (h.fireHours > 0) {
-    heat += 20;
+    heat += fireHeat(state);
     h.fireHours = Math.max(0, h.fireHours - dt);
     if (h.fireHours === 0 && state.location.kind === 'home') log(state, 'The fire in the fireplace burns out.');
   }
@@ -208,7 +211,7 @@ function homeStep(state, dt, env) {
   }
   const passive = air + 6;
   const target = Math.min(75, passive + heat);
-  const rate = heat > 0 ? 0.25 : 0.05;
+  const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state);
   h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
 
   // Solar charge in daylight
@@ -217,6 +220,13 @@ function homeStep(state, dt, env) {
   if (m > s.rise && m < s.set) {
     const hours = (s.set - s.rise) / 60;
     h.battery = Math.min(h.batteryMax, h.battery + (solarToday(state) / hours) * dt);
+  }
+
+  // Rain barrels fill from the gutter (rain water is unsafe until boiled or filtered)
+  if (built(state, 'rain_barrels') && h.rawGal < 110) {
+    const t = state.weather.type;
+    const perH = t === 'heavy_rain' ? 5 : t === 'rain' || t === 'windstorm' ? 2 : 0;
+    if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
   }
 
   // City water stops on a hard freeze or on a random day
@@ -263,6 +273,8 @@ function dailyRollover(state, day) {
   p.morale -= 2;
   if (p.food < 50) p.morale -= 5;
   if (state.location.kind === 'home' && state.home.indoorTemp < 50) p.morale -= 5;
+  if (built(state, 'led_lights')) p.morale += 3;
+  if (built(state, 'sealed_store') && foodItemsStored(state) >= 10) p.morale += 2;
   if (state.dog.stage === 'joined') {
     p.morale += 8;
     if (state.dog.food >= 25) state.dog.bond += 3;

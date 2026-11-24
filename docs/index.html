@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Last Light: Portland</title>
   <meta name="description" content="A solo survival game on the real map of the Portland area. You are the last person alive.">
+  <meta name="theme-color" content="#0d1218">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -12,6 +16,8 @@
   <div id="app">
     <main id="mapwrap">
       <div id="map"></div>
+      <div class="hud" id="hud" hidden></div>
+      <div class="coords" id="coords"></div>
       <div class="map-tools">
         <button id="centerBtn" title="Show where you are">◎ Me</button>
         <button id="menuBtn" title="Save, backup, new run">☰ Game</button>
@@ -19,6 +25,7 @@
       <div class="legend" id="legend"></div>
     </main>
     <aside id="panel">
+      <div class="brand"><b>Last Light</b><span>Portland, OR</span></div>
       <header id="clock"></header>
       <section id="stats"></section>
       <section id="location"></section>
