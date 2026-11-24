@@ -16,6 +16,7 @@ import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns } from '.
 import { createMap } from './map.js';
 import { createFx } from './fx.js';
 import { PROJECTS } from '../data/projects.js';
+import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H } from '../engine/base.js';
 
 let state = null;
@@ -105,11 +106,12 @@ function renderHud() {
   $('#hud').innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
+    <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? '☾' : '☀'} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}°F</span>
     ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}`;
   $('#hud').hidden = false;
-  if (fx) fx.update({ weather: w.type, night, windMph: w.wind });
+  if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
 }
 
 function renderHeader() {
@@ -123,7 +125,7 @@ function renderHeader() {
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} · <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
 }
 
 function renderStats() {

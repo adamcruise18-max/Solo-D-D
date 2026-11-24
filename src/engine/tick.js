@@ -6,6 +6,7 @@ import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from '
 import { dayIndex, log, hasLight, bagWeight, carryLimit } from './state.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
+import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -265,6 +266,7 @@ function dogStep(state, dt, sleeping) {
 function dailyRollover(state, day) {
   const p = state.player;
   rollWeather(state, day);
+  seasonDaily(state, day);
   log(state, `A new day. Weather: ${weatherInfo(state).label}, high ${Math.round(state.weather.high)}°F, low ${Math.round(state.weather.low)}°F.`, 'day');
   if (state.weather.type === 'snow') log(state, `Snow: ${state.weather.snowInches} inches. Walking is slow today.`, 'warn');
   if (state.weather.type === 'windstorm') log(state, `Windstorm. Wind ${state.weather.wind} mph. Stay inside if you can.`, 'warn');

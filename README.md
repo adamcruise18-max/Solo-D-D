@@ -52,6 +52,11 @@ This is the **first playable version**: a small part of the full game.
   The map stays light and in color. Snow, rain, fog and a night tint show on the map
   (turn them off in **☰ Game**). The look takes ideas from modern "city after a disaster" games,
   but all art and layout are our own.
+- Seasons and overgrowth: the game starts in winter. The seasons change with the calendar, and the map
+  gets greener and wilder each month (parks, lawns and side streets). The journal notes each new season
+  and how the city changes each month. Fall wind blows leaves across the map.
+- Street details when you zoom in: abandoned cars, debris, barricades, trash bags, quarantine signs and
+  medical tents near real places, and bushes and young trees that appear as time passes. Click one to read about it.
 - Home base projects: 10 projects in 5 wings (Power, Water, Heat and shelter, Medical, Food).
   Find parts in the city (hardware stores, houses, gas stations), bring them home, and work on a
   project in blocks of up to 2 hours. Each project has one clear effect, for example a second battery,
