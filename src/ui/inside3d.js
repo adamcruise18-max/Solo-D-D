@@ -868,7 +868,8 @@ export function openInside(opts) {
     if (!k) return;
     if (k.action === 'crouch' && crouchHeld) { crouchHeld = false; if (stance === 'crouch') stance = 'stand'; showStance(); }
     if ((k.action === 'interact' || k.action === 'context') && eDown) {
-      const short = performance.now() - eDown < 300;
+      // Let go before the bar is full: a tap (take one). Slow frames do not turn a tap into nothing.
+      const short = !!hold || performance.now() - eDown < 300;
       eDown = 0;
       if (hold) cancelHold();
       if (short && !paused && !panel) { if (k.action === 'interact') interact(); else context(); }
@@ -928,9 +929,9 @@ export function openInside(opts) {
   // USE button: tap to take the item you look at (or doors), hold to take all in reach.
   const useBtn = $('.in-use');
   useBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); eDown = performance.now(); startHold(); });
-  const useUp = () => {
+  const useUp = (e) => {
     if (!eDown) return;
-    const short = performance.now() - eDown < 300;
+    const short = e && e.type === 'pointerup' && (!!hold || performance.now() - eDown < 300);
     eDown = 0;
     if (hold) cancelHold();
     if (short) {
