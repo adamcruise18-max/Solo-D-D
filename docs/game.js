@@ -2331,6 +2331,24 @@
       log(state2, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
     }
   }
+  var CONTAINER_MINUTES = 1;
+  function openContainer(state2, cid) {
+    const ctx = zoneCtx(state2);
+    if (!ctx || typeof cid !== "string" || !/^c\d+$/.test(cid)) return false;
+    const h = ctx.holder;
+    h.opened || (h.opened = []);
+    if (h.opened.includes(cid)) return false;
+    const env = environment(state2, "work");
+    advanceTime(state2, CONTAINER_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
+    if (state2.dead) return true;
+    h.opened.push(cid);
+    log(state2, "You open it and look inside.");
+    return true;
+  }
+  function openedContainers(state2) {
+    const ctx = zoneCtx(state2);
+    return ctx ? (ctx.holder.opened || []).slice() : [];
+  }
   function searchZone(state2, index) {
     const ctx = zoneCtx(state2);
     if (!ctx || ctx.house) return false;
@@ -2594,6 +2612,8 @@
         return pickUp(state2, arg);
       case "see_zone":
         return seeZone(state2, Number(arg));
+      case "open_container":
+        return openContainer(state2, String(arg));
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -4274,6 +4294,14 @@
       onSeeZone: (zone) => {
         perform(state, "action", "see_zone", zone);
         saveGame(state);
+      },
+      isOpened: (cid) => openedContainers(state).includes(cid),
+      onOpenContainer: (cid) => {
+        perform(state, "action", "open_container", cid);
+        if (state.dead) recordRun(state);
+        saveGame(state);
+        render();
+        return !state.dead && openedContainers(state).includes(cid);
       },
       describeItem: (it, near, touch) => {
         const def = ITEMS[it.item];

@@ -6,7 +6,7 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems } from '../engine/actions.js';
+import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
@@ -720,6 +720,14 @@ async function walkInside() {
       return { ok, name: it ? itemName(it.item) : '', msg: msgs };
     },
     onSeeZone: (zone) => { perform(state, 'action', 'see_zone', zone); saveGame(state); },
+    isOpened: (cid) => openedContainers(state).includes(cid),
+    onOpenContainer: (cid) => {
+      perform(state, 'action', 'open_container', cid);
+      if (state.dead) recordRun(state);
+      saveGame(state);
+      render();
+      return !state.dead && openedContainers(state).includes(cid);
+    },
     describeItem: (it, near, touch) => {
       const def = ITEMS[it.item];
       const need = projectNeeds()[it.item];

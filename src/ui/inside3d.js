@@ -491,10 +491,58 @@ export function openInside(opts) {
     }
     return { x: spot.x, y: 0, z: spot.z };
   }
+  // ---------- closed boxes (timed reveal) ----------
+  // About 3 in 10 items of a zone are inside a closed box. Which ones is fixed by the item id,
+  // so the same box always holds the same items. The save keeps only which boxes are open.
+  const REVEAL_MS = 1500;
+  const containers = new Map(); // cid -> { cid, zone, obj, x, y, z, r, opened }
+  const inBox = (it) => it.zone !== counterZone() && hashString(`${it.pid}:box`) % 10 < 3;
+  function counterZone() { const sp = plan.spots.find((p) => p.counter); return sp ? sp.zone : -1; }
+  function placeContainer(zone) {
+    const r = mulberry32(hashString(`box:${zone}:${opts.title}`));
+    const spot = plan.spots.find((p) => p.zone === zone);
+    const a = spot && spot.area;
+    if (!a) return null;
+    const boxes = solidNow();
+    for (let i = 0; i < 16; i++) {
+      const x = plan.kind === 'hall' ? spot.x + (r() - 0.5) * Math.max(0.2, a.x2 - a.x1 - 1.4) : a.x1 + 0.5 + r() * (a.x2 - a.x1 - 1);
+      const z = a.z1 + 0.8 + r() * (a.z2 - a.z1 - 1.6);
+      if (!boxes.some((b) => Math.abs(x - b.x) < b.w / 2 + 0.3 && Math.abs(z - b.z) < b.d / 2 + 0.3)) return { x, z, rot: r() * Math.PI };
+    }
+    return null;
+  }
+  function ensureContainer(zone) {
+    const cid = `c${zone}`;
+    if (containers.has(cid)) return containers.get(cid);
+    const p = placeContainer(zone);
+    if (!p) { containers.set(cid, null); return null; }
+    const obj = makeProp('cardboard_box', hashString(`${cid}:${opts.title}`));
+    obj.position.set(p.x, 0, p.z);
+    obj.rotation.y = p.rot;
+    scene.add(obj);
+    const h = obj.userData.height || 0.35;
+    const c = { cid, zone, obj, x: p.x, y: h / 2, z: p.z, r: obj.userData.radius || 0.3, opened: opts.isOpened(cid), container: true };
+    if (c.opened) openLook(c);
+    containers.set(cid, c);
+    return c;
+  }
+  // An open box: the lid flaps fold back (shown as a lower, tilted box).
+  function openLook(c) { c.obj.scale.y = 0.85; c.obj.rotation.z = 0.06; }
+
   function addItems() {
     for (const it of opts.items()) {
       if (itemObjs.has(it.pid)) continue;
-      const p = placeFor(it);
+      let p = null;
+      if (inBox(it)) {
+        const c = ensureContainer(it.zone);
+        if (c && !c.opened) continue; // still in the closed box
+        if (c) {
+          // Out of the box, on the floor next to it.
+          const k = hashString(it.pid) % 360;
+          p = { x: c.x + Math.cos(k) * (c.r + 0.15), y: 0, z: c.z + Math.sin(k) * (c.r + 0.15) };
+        }
+      }
+      p = p || placeFor(it);
       const obj = makeItemModel(it.item, hashString(it.pid));
       obj.position.set(p.x, p.y, p.z);
       obj.rotation.y = (hashString(it.pid) % 628) / 100;
@@ -559,7 +607,9 @@ export function openInside(opts) {
   // The item nearest to the centre of the view, inside reach.
   function lookTarget(from, dir) {
     let best = null;
-    for (const { o, d } of itemsInReach(from)) {
+    const closed = [...containers.values()].filter((c) => c && !c.opened)
+      .map((c) => ({ o: c, d: Math.hypot(c.x - from.x, c.y - from.y, c.z - from.z) })).filter((x) => x.d <= REACH && !blocked(from, x.o));
+    for (const { o, d } of [...itemsInReach(from), ...closed]) {
       const vx = o.x - from.x;
       const vy = o.y - from.y;
       const vz = o.z - from.z;
@@ -709,6 +759,7 @@ export function openInside(opts) {
 
   function pickOne(o) {
     if (!o) return false;
+    if (o.container) { revealBox(o); return false; }
     flushWalk();
     const res = opts.onPickUp(o.it.pid);
     if (res.ok) {
@@ -740,8 +791,39 @@ export function openInside(opts) {
   }
 
   // Hold E or F: take everything within reach (a short bar first).
+  // Open a closed box: a short bar, then the items inside show up next to it.
+  function revealBox(c) {
+    if (busy || paused || closed || hold || c.opened) return;
+    busy = true;
+    const bar = $('.in-bar');
+    const fill = bar.querySelector('i');
+    bar.hidden = false;
+    fill.style.width = '0%';
+    toast('Opening the box…', REVEAL_MS);
+    const t0 = performance.now();
+    const step = () => {
+      if (closed) return;
+      const k = Math.min(1, (performance.now() - t0) / REVEAL_MS);
+      fill.style.width = `${k * 100}%`;
+      if (k < 1) { requestAnimationFrame(step); return; }
+      bar.hidden = true;
+      busy = false;
+      flushWalk();
+      if (!opts.onOpenContainer(c.cid)) return;
+      c.opened = true;
+      openLook(c);
+      const before = itemObjs.size;
+      addItems();
+      const n = itemObjs.size - before;
+      toast(n ? `Inside: ${n} item${n > 1 ? 's' : ''}.` : 'It is empty.', 1800);
+      lastKey = '';
+      afterGameStep();
+    };
+    step();
+  }
   function startHold() {
     if (busy || paused || closed || hold) return false;
+    if (target && target.container) return false;
     const near = itemsInReach(camera.position);
     if (!near.length) return false;
     const bar = $('.in-bar');
@@ -946,6 +1028,8 @@ export function openInside(opts) {
     }
     if (e.repeat) return;
     if (k.action === 'interact' || k.action === 'context') {
+      // A closed box opens on the key press (the bar is the wait).
+      if (target && target.container && !paused && !panel) { revealBox(target); return; }
       eDown = performance.now();
       // Hold E or F: take everything in reach after a short bar.
       startHold();
@@ -1021,7 +1105,7 @@ export function openInside(opts) {
   });
   // USE button: tap to take the item you look at (or doors), hold to take all in reach.
   const useBtn = $('.in-use');
-  useBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); eDown = performance.now(); startHold(); });
+  useBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); if (target && target.container) { revealBox(target); return; } eDown = performance.now(); startHold(); });
   const useUp = (e) => {
     if (!eDown) return;
     const short = e && e.type === 'pointerup' && (!!hold || performance.now() - eDown < 300);
@@ -1136,7 +1220,7 @@ export function openInside(opts) {
     // Walking through an aisle or room: tell the game (an empty zone then counts as done).
     if (n && n.type === 'search' && n.dist === 0 && !seenZones.has(n.zone)) { seenZones.add(n.zone); opts.onSeeZone(n.zone); status(); }
     if (n && n.type === 'search' && !(n.counter && !opts.isCounterOpen())) n = null;
-    const key = (t ? `i:${t.it.pid}` : '') + (n ? `${n.type}:${n.zone}` : '');
+    const key = (t ? `i:${t.container ? t.cid : t.it.pid}` : '') + (n ? `${n.type}:${n.zone}` : '');
     if (current === undefined || key !== lastKey || frame.n++ % 20 === 0) {
       current = n;
       target = t;
@@ -1145,7 +1229,9 @@ export function openInside(opts) {
       const more = itemsInReach(camera.position).length;
       if (t) {
         p.hidden = false;
-        p.innerHTML = opts.describeItem(t.it, more, touch);
+        p.innerHTML = t.container
+          ? `<kbd>${touch ? 'USE' : 'E'}</kbd> Open the box <small>look inside · 1 min</small>`
+          : opts.describeItem(t.it, more, touch);
         hiBox.visible = true;
         const b = new Box3().setFromObject(t.obj);
         b.getSize(hiSize); b.getCenter(hiCenter);
@@ -1177,7 +1263,7 @@ export function openInside(opts) {
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
   return { close: () => leave() };
 }

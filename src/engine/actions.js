@@ -685,6 +685,27 @@ export function seeZone(state, zone) {
   }
 }
 
+// Closed boxes and drawers (QoL: timed reveal). The 3D view decides which items are inside
+// a container; the save keeps only which containers are open (a compact change record).
+export const CONTAINER_MINUTES = 1;
+export function openContainer(state, cid) {
+  const ctx = zoneCtx(state);
+  if (!ctx || typeof cid !== 'string' || !/^c\d+$/.test(cid)) return false;
+  const h = ctx.holder;
+  h.opened ||= [];
+  if (h.opened.includes(cid)) return false;
+  const env = environment(state, 'work');
+  advanceTime(state, CONTAINER_MINUTES * (env.dark && !hasLight(state) ? 2 : 1), 'work');
+  if (state.dead) return true;
+  h.opened.push(cid);
+  log(state, 'You open it and look inside.');
+  return true;
+}
+export function openedContainers(state) {
+  const ctx = zoneCtx(state);
+  return ctx ? (ctx.holder.opened || []).slice() : [];
+}
+
 // Panel search: take every item left in one zone (they go to "found here"). With no index, the next zone.
 export function searchZone(state, index) {
   const ctx = zoneCtx(state);
@@ -957,6 +978,7 @@ export function doAction(state, id, arg) {
     case 'flashlight': return toggleFlashlight(state);
     case 'pickup': return pickUp(state, arg);
     case 'see_zone': return seeZone(state, Number(arg));
+    case 'open_container': return openContainer(state, String(arg));
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
