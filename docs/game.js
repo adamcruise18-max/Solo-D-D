@@ -1904,6 +1904,108 @@
     }
   }
 
+  // src/ui/winter-style.js
+  var COLOR_RE = /^(#[0-9a-f]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\))$/i;
+  function parseColor(str) {
+    if (typeof str !== "string") return null;
+    const s = str.trim().toLowerCase();
+    if (!COLOR_RE.test(s)) return null;
+    if (s[0] === "#") {
+      let h = s.slice(1);
+      if (h.length === 3 || h.length === 4) h = [...h].map((c) => c + c).join("");
+      if (h.length !== 6 && h.length !== 8) return null;
+      const n = (i) => parseInt(h.slice(i, i + 2), 16);
+      return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) / 255 : 1 };
+    }
+    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v) => parseFloat(v));
+    if (nums.length < 3 || nums.some(Number.isNaN)) return null;
+    const a = nums.length > 3 ? nums[3] : 1;
+    if (s.startsWith("rgb")) return { r: nums[0], g: nums[1], b: nums[2], a };
+    return { ...hslToRgb(nums[0], nums[1] / 100, nums[2] / 100), a };
+  }
+  function hslToRgb(h, s, l) {
+    h = (h % 360 + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(h / 60 % 2 - 1));
+    const m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+  }
+  function toCss({ r, g, b, a }) {
+    const k = (v) => Math.round(Math.max(0, Math.min(255, v)));
+    return `rgba(${k(r)},${k(g)},${k(b)},${Math.round(a * 1e3) / 1e3})`;
+  }
+  var SNOW = { r: 222, g: 231, b: 238 };
+  function coolColor(str, { desat = 0.45, toward = 0.15 } = {}) {
+    const c = parseColor(str);
+    if (!c) return str;
+    const gray = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
+    const mix = (v, t) => v + (t - v) * toward;
+    return toCss({
+      r: mix(c.r + (gray - c.r) * desat, SNOW.r),
+      g: mix(c.g + (gray - c.g) * desat, SNOW.g),
+      b: mix(c.b + (gray - c.b) * desat, SNOW.b) + 4,
+      a: c.a
+    });
+  }
+  function coolValue(v) {
+    if (typeof v === "string") return coolColor(v);
+    if (Array.isArray(v)) return v.map(coolValue);
+    if (v && typeof v === "object" && Array.isArray(v.stops)) {
+      return { ...v, stops: v.stops.map(([z, c]) => [z, coolValue(c)]) };
+    }
+    return v;
+  }
+  var WINTER = [
+    ["background", { "background-color": "#eaeff3" }],
+    ["park_outline", { "line-color": "rgba(160,184,170,0.6)" }],
+    ["park", { "fill-color": "#d6e2da", "fill-outline-color": "rgba(140,170,150,0.7)" }],
+    ["landcover_wood", { "fill-color": "rgba(170,196,180,0.65)" }],
+    ["landcover_grass", { "fill-color": "#dbe5de" }],
+    ["landcover_ice", { "fill-color": "#f4f8fa" }],
+    ["landuse_residential", { "fill-color": "rgba(212,221,229,0.55)" }],
+    ["landuse_hospital", { "fill-color": "#ecdde2" }],
+    ["landuse_school", { "fill-color": "#e3e6dc" }],
+    ["water", { "fill-color": "#86aac4" }],
+    ["waterway", { "line-color": "#86aac4" }],
+    ["building-3d", { "fill-extrusion-color": "#c9d1d9" }],
+    ["building", { "fill-color": "#cdd5dc", "fill-outline-color": "rgba(150,163,176,0.8)" }]
+  ];
+  function roadPaint(id) {
+    if (!/^(road|bridge|tunnel)_/.test(id)) return null;
+    if (/rail/.test(id)) return { "line-color": "#8d99a6" };
+    if (/casing/.test(id)) return { "line-color": /motorway|trunk|primary|secondary/.test(id) ? "#8796a5" : "#b3bec8" };
+    if (/motorway/.test(id)) return { "line-color": "#e9cf96" };
+    if (/trunk_primary|secondary_tertiary|_link/.test(id)) return { "line-color": "#fbf6ea" };
+    if (/minor|service|street|path/.test(id)) return { "line-color": "#ffffff" };
+    return null;
+  }
+  function winterizeStyle(style) {
+    const out = JSON.parse(JSON.stringify(style));
+    for (const layer of out.layers || []) {
+      const paint = layer.paint || (layer.paint = {});
+      for (const key of Object.keys(paint)) {
+        if (/color/.test(key)) paint[key] = coolValue(paint[key]);
+      }
+      const fixed = WINTER.find(([prefix]) => layer.id === prefix || layer.id.startsWith(prefix + "_") || layer.id.startsWith(prefix + "-")) || (layer["source-layer"] === "water" && layer.type === "fill" ? WINTER.find(([p]) => p === "water") : null);
+      const road = roadPaint(layer.id);
+      for (const [k, v] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
+        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v;
+      }
+      if (layer.type === "raster") {
+        paint["raster-saturation"] = -0.6;
+        paint["raster-brightness-min"] = 0.25;
+      }
+      if (layer.type === "symbol") {
+        if (paint["text-color"] !== void 0 || layer.layout?.["text-field"]) {
+          paint["text-color"] = layer.id.startsWith("label_") ? "#1f2a35" : /water/.test(layer.id) ? "#3d6585" : "#4a5663";
+          paint["text-halo-color"] = "rgba(244,247,250,0.9)";
+        }
+      }
+    }
+    return out;
+  }
+
   // src/ui/map.js
   var STYLE_URLS = [
     "https://tiles.openfreemap.org/styles/liberty",
@@ -1913,7 +2015,7 @@
   var OFFLINE_STYLE = {
     version: 8,
     sources: {},
-    layers: [{ id: "bg", type: "background", paint: { "background-color": "#1b1f24" } }]
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
   };
   async function pickStyle() {
     for (const url of STYLE_URLS) {
@@ -1922,7 +2024,7 @@
         const timer = setTimeout(() => ctl.abort(), 5e3);
         const res = await fetch(url, { signal: ctl.signal });
         clearTimeout(timer);
-        if (res.ok) return { style: await res.json(), online: true };
+        if (res.ok) return { style: winterizeStyle(await res.json()), online: true };
       } catch {
       }
     }
@@ -1963,22 +2065,41 @@
     await ready;
     map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
     map.addLayer({
+      id: "edge-glow",
+      type: "line",
+      source: "edge",
+      paint: { "line-color": "#a3263b", "line-width": 8, "line-blur": 6, "line-opacity": 0.18 }
+    });
+    map.addLayer({
       id: "edge",
       type: "line",
       source: "edge",
-      paint: { "line-color": "#e0b85a", "line-width": 2, "line-dasharray": [3, 3], "line-opacity": 0.7 }
+      paint: { "line-color": "#a3263b", "line-width": 2, "line-dasharray": [4, 3], "line-opacity": 0.8 }
     });
     map.addSource("places", { type: "geojson", data: placesGeo(places, {}) });
+    map.addLayer({
+      id: "places-ring",
+      type: "circle",
+      source: "places",
+      filter: ["==", ["get", "status"], 0],
+      paint: {
+        "circle-color": "rgba(0,0,0,0)",
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 13, 9, 16, 15],
+        "circle-stroke-color": colorExpr,
+        "circle-stroke-width": 1.2,
+        "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12.5, 0.55]
+      }
+    });
     map.addLayer({
       id: "places",
       type: "circle",
       source: "places",
       paint: {
-        "circle-color": colorExpr,
+        "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
-        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#555", "#111"],
-        "circle-stroke-width": 1,
-        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.3, ["==", ["get", "status"], 1], 0.65, 1]
+        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#6b7682", "#16202a"],
+        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6],
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, ["==", ["get", "status"], 1], 0.8, 1]
       }
     });
     map.on("click", "places", (e) => {
@@ -1994,7 +2115,7 @@
     const homeEl = document.createElement("div");
     homeEl.className = "marker-home";
     homeEl.title = "Home";
-    homeEl.textContent = "\u2302";
+    homeEl.innerHTML = "<span>\u2302</span>";
     homeEl.addEventListener("click", (ev) => {
       ev.stopPropagation();
       onPlaceClick("__home", null);
@@ -2003,6 +2124,7 @@
     const youEl = document.createElement("div");
     youEl.className = "marker-you";
     youEl.title = "You";
+    youEl.innerHTML = "<i></i>";
     const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
     return {
       map,
@@ -2033,10 +2155,131 @@
     };
   }
 
+  // src/ui/fx.js
+  var FX_KEY = "lastlight.fx";
+  function fxEnabled() {
+    try {
+      const v = localStorage.getItem(FX_KEY);
+      if (v !== null) return v === "1";
+    } catch {
+    }
+    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  }
+  function setFxEnabled(on) {
+    try {
+      localStorage.setItem(FX_KEY, on ? "1" : "0");
+    } catch {
+    }
+  }
+  function createFx(wrap) {
+    const layer = document.createElement("div");
+    layer.className = "fx";
+    layer.innerHTML = '<div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    wrap.appendChild(layer);
+    const canvas = layer.querySelector("canvas");
+    const ctx = canvas.getContext("2d");
+    let kind = "none";
+    let strength = 0;
+    let wind = 0;
+    let parts = [];
+    let raf = 0;
+    let enabled = fxEnabled();
+    function resize() {
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.max(1, r.width * dpr);
+      canvas.height = Math.max(1, r.height * dpr);
+      canvas.style.width = `${r.width}px`;
+      canvas.style.height = `${r.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function spawn(w, h, anywhere) {
+      const snow = kind === "snow";
+      return {
+        x: Math.random() * (w + 200) - 100,
+        y: anywhere ? Math.random() * h : -10,
+        r: snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
+        v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
+        p: Math.random() * Math.PI * 2
+      };
+    }
+    function frame() {
+      raf = 0;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      if (!enabled || kind === "none" || document.hidden) return;
+      const want = Math.round((kind === "snow" ? 160 : 220) * strength * Math.min(1, w * h / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w, h, true));
+      if (parts.length > want) parts.length = want;
+      const drift = wind / 12;
+      if (kind === "snow") {
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowColor = "rgba(80,110,140,0.55)";
+        ctx.shadowBlur = 2;
+        for (const s of parts) {
+          s.p += 0.02;
+          s.y += s.v;
+          s.x += Math.sin(s.p) * 0.4 + drift;
+          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      } else {
+        ctx.strokeStyle = "rgba(60,90,120,0.38)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const s of parts) {
+          s.y += s.v;
+          s.x += drift * 3;
+          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
+        }
+        ctx.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    function run() {
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+    new ResizeObserver(resize).observe(wrap);
+    resize();
+    document.addEventListener("visibilitychange", run);
+    return {
+      // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
+      update({ weather, night, windMph }) {
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : "none";
+        if (nextKind !== kind) parts = [];
+        kind = nextKind;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : 0;
+        wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
+        layer.classList.toggle("is-night", !!night);
+        layer.classList.toggle("is-fog", weather === "fog");
+        layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
+        layer.classList.toggle("off", !enabled);
+        run();
+      },
+      setEnabled(on) {
+        enabled = on;
+        setFxEnabled(on);
+        layer.classList.toggle("off", !on);
+        if (!on) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        run();
+      },
+      get enabled() {
+        return enabled;
+      }
+    };
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
   var popup = null;
+  var fx = null;
   var $ = (sel) => document.querySelector(sel);
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
@@ -2055,10 +2298,17 @@
     setPlaces(window.LL_PLACES || []);
     state = loadGame();
     bindEvents();
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i style="background:transparent;border:2px dashed #e0b85a"></i>15-mile edge</span>';
+    fx = createFx($("#mapwrap"));
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="edge"></i>15-mile edge</span>';
     try {
       mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
       window.__llMap = mapApi.map;
+      const showCoords = () => {
+        const c = mapApi.map.getCenter();
+        $("#coords").textContent = `${Math.abs(c.lat).toFixed(4)}\xB0${c.lat >= 0 ? "N" : "S"}  ${Math.abs(c.lng).toFixed(4)}\xB0${c.lng >= 0 ? "E" : "W"}  \xB7  Z${mapApi.map.getZoom().toFixed(1)}`;
+      };
+      mapApi.map.on("move", showCoords);
+      showCoords();
     } catch (e) {
       console.error(e);
       $("#map").innerHTML = '<div class="map-error">The map could not load. You can still play from the panel.</div>';
@@ -2088,7 +2338,23 @@
     renderHome();
     renderDog();
     renderLog();
+    renderHud();
     if (mapApi) mapApi.update(state, allPlaces());
+  }
+  function renderHud() {
+    const t = state.time;
+    const night = isNight(t);
+    const w = state.weather;
+    const p = state.player;
+    const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+    $("#hud").innerHTML = `
+    <span class="h-day">DAY ${dayIndex(t) + 1}</span>
+    <span class="h-time">${formatClock(t)}</span>
+    <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
+    <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
+    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}`;
+    $("#hud").hidden = false;
+    if (fx) fx.update({ weather: w.type, night, windMph: w.wind });
   }
   function renderHeader() {
     const t = state.time;
@@ -2098,6 +2364,7 @@
     const w = state.weather;
     const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
     $("#clock").innerHTML = `
+    <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
@@ -2125,7 +2392,7 @@
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
     const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
     chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
-    $("#stats").innerHTML = rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
   }
   function renderLocation() {
     const loc = state.location;
@@ -2141,7 +2408,7 @@
       return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
     }).join("");
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
-    $("#location").innerHTML = `<h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
+    $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
   }
   function qtyText(q) {
     return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
@@ -2338,6 +2605,7 @@
     modal(`<h3>Game</h3>
     <p class="hint">The game saves in this browser after each action.</p>
     <div class="col">
+      <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? "checked" : ""}> Weather effects on the map (snow, rain, fog, night)</label>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
@@ -2345,6 +2613,9 @@
     </div>
     <p class="hint">Map data \xA9 OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
       m.querySelector("#cancel").addEventListener("click", closeModal);
+      m.querySelector("#fxToggle").addEventListener("change", (e) => {
+        if (fx) fx.setEnabled(e.target.checked);
+      });
       m.querySelector("#exp").addEventListener("click", () => {
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
         const a = document.createElement("a");

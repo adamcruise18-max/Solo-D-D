@@ -13,10 +13,12 @@ import { perform } from '../engine/game.js';
 import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
 import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns } from '../engine/save.js';
 import { createMap } from './map.js';
+import { createFx } from './fx.js';
 
 let state = null;
 let mapApi = null;
 let popup = null;
+let fx = null;
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -39,12 +41,19 @@ export async function start() {
   setPlaces(window.LL_PLACES || []);
   state = loadGame();
   bindEvents();
+  fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
-    + '<span><i style="background:transparent;border:2px dashed #e0b85a"></i>15-mile edge</span>';
+    + '<span><i class="edge"></i>15-mile edge</span>';
   try {
     mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
     window.__llMap = mapApi.map; // for tests
+    const showCoords = () => {
+      const c = mapApi.map.getCenter();
+      $('#coords').textContent = `${Math.abs(c.lat).toFixed(4)}°${c.lat >= 0 ? 'N' : 'S'}  ${Math.abs(c.lng).toFixed(4)}°${c.lng >= 0 ? 'E' : 'W'}  ·  Z${mapApi.map.getZoom().toFixed(1)}`;
+    };
+    mapApi.map.on('move', showCoords);
+    showCoords();
   } catch (e) {
     console.error(e);
     $('#map').innerHTML = '<div class="map-error">The map could not load. You can still play from the panel.</div>';
@@ -78,7 +87,25 @@ function render() {
   renderHome();
   renderDog();
   renderLog();
+  renderHud();
   if (mapApi) mapApi.update(state, allPlaces());
+}
+
+// The small readout at the top of the map: day, time, weather, temperature.
+function renderHud() {
+  const t = state.time;
+  const night = isNight(t);
+  const w = state.weather;
+  const p = state.player;
+  const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+  $('#hud').innerHTML = `
+    <span class="h-day">DAY ${dayIndex(t) + 1}</span>
+    <span class="h-time">${formatClock(t)}</span>
+    <span class="h-wx">${night ? '☾' : '☀'} ${esc(weatherInfo(state).label)}</span>
+    <span class="h-temp">${Math.round(airTemp(state, t))}°F</span>
+    ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}`;
+  $('#hud').hidden = false;
+  if (fx) fx.update({ weather: w.type, night, windMph: w.wind });
 }
 
 function renderHeader() {
@@ -89,6 +116,7 @@ function renderHeader() {
   const w = state.weather;
   const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
   $('#clock').innerHTML = `
+    <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} · <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
@@ -117,7 +145,7 @@ function renderStats() {
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
   const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
   chips.push(['', `Wearing: ${worn.length ? worn.join(', ') : 'normal clothes'}`]);
-  $('#stats').innerHTML = rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>`;
+  $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>`;
 }
 
 function renderLocation() {
@@ -134,7 +162,7 @@ function renderLocation() {
     return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
   }).join('');
   const hint = loc.kind !== 'house' ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : '';
-  $('#location').innerHTML = `<h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
+  $('#location').innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
 }
 
 function qtyText(q) {
@@ -335,6 +363,7 @@ function showMenu() {
   modal(`<h3>Game</h3>
     <p class="hint">The game saves in this browser after each action.</p>
     <div class="col">
+      <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? 'checked' : ''}> Weather effects on the map (snow, rain, fog, night)</label>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
@@ -342,6 +371,7 @@ function showMenu() {
     </div>
     <p class="hint">Map data © OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
     m.querySelector('#cancel').addEventListener('click', closeModal);
+    m.querySelector('#fxToggle').addEventListener('change', (e) => { if (fx) fx.setEnabled(e.target.checked); });
     m.querySelector('#exp').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
       const a = document.createElement('a');

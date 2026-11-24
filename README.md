@@ -32,6 +32,11 @@ This is the **first playable version**: a small part of the full game.
 
 - Real map (MapLibre GL + OpenFreeMap tiles) with 1,453 real places from OpenStreetMap
   in a 15-mile circle around ZIP 97078. The circle edge is shown on the map.
+- Winter tactical look: dark glass panels with thin lines and corner marks, a readout at the top
+  of the map (day, time, weather, temperature, warnings), and a light, snowy map palette.
+  The map stays light and in color. Snow, rain, fog and a night tint show on the map
+  (turn them off in **☰ Game**). The look takes ideas from modern "city after a disaster" games,
+  but all art and layout are our own.
 - Turn-based clock, real sunrise and sunset for Aloha, daily weather from Portland averages.
 - Player stats and their effects, from the game rules doc. "Weak" status after the coma.
 - Visible d20 risk checks (D&D style) for doors, searches and road events.

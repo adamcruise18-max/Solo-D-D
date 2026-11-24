@@ -2,6 +2,7 @@
 // If the tile server cannot be reached, the game still works on a plain map.
 import { CATEGORIES } from '../data/places.js';
 import { HOME, MAP_RADIUS_MILES } from '../engine/state.js';
+import { winterizeStyle } from './winter-style.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -14,7 +15,7 @@ const STYLE_URLS = [
 const OFFLINE_STYLE = {
   version: 8,
   sources: {},
-  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#1b1f24' } }],
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#dfe6ec' } }],
 };
 
 async function pickStyle() {
@@ -24,7 +25,7 @@ async function pickStyle() {
       const timer = setTimeout(() => ctl.abort(), 5000);
       const res = await fetch(url, { signal: ctl.signal });
       clearTimeout(timer);
-      if (res.ok) return { style: await res.json(), online: true };
+      if (res.ok) return { style: winterizeStyle(await res.json()), online: true };
     } catch { /* try next */ }
   }
   return { style: OFFLINE_STYLE, online: false };
@@ -71,18 +72,34 @@ export async function createMap(container, { places, onPlaceClick }) {
 
   map.addSource('edge', { type: 'geojson', data: circlePolygon(HOME, MAP_RADIUS_MILES) });
   map.addLayer({
+    id: 'edge-glow', type: 'line', source: 'edge',
+    paint: { 'line-color': '#a3263b', 'line-width': 8, 'line-blur': 6, 'line-opacity': 0.18 },
+  });
+  map.addLayer({
     id: 'edge', type: 'line', source: 'edge',
-    paint: { 'line-color': '#e0b85a', 'line-width': 2, 'line-dasharray': [3, 3], 'line-opacity': 0.7 },
+    paint: { 'line-color': '#a3263b', 'line-width': 2, 'line-dasharray': [4, 3], 'line-opacity': 0.8 },
   });
   map.addSource('places', { type: 'geojson', data: placesGeo(places, {}) });
+  // A soft ring under places you have not searched yet, like a scan contact.
+  map.addLayer({
+    id: 'places-ring', type: 'circle', source: 'places',
+    filter: ['==', ['get', 'status'], 0],
+    paint: {
+      'circle-color': 'rgba(0,0,0,0)',
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 4, 13, 9, 16, 15],
+      'circle-stroke-color': colorExpr,
+      'circle-stroke-width': 1.2,
+      'circle-stroke-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0, 12.5, 0.55],
+    },
+  });
   map.addLayer({
     id: 'places', type: 'circle', source: 'places',
     paint: {
-      'circle-color': colorExpr,
+      'circle-color': ['case', ['==', ['get', 'status'], 2], '#9aa5b1', colorExpr],
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 13, 5, 16, 9],
-      'circle-stroke-color': ['case', ['==', ['get', 'status'], 2], '#555', '#111'],
-      'circle-stroke-width': 1,
-      'circle-opacity': ['case', ['==', ['get', 'status'], 2], 0.3, ['==', ['get', 'status'], 1], 0.65, 1],
+      'circle-stroke-color': ['case', ['==', ['get', 'status'], 2], '#6b7682', '#16202a'],
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 14, 1.6],
+      'circle-opacity': ['case', ['==', ['get', 'status'], 2], 0.55, ['==', ['get', 'status'], 1], 0.8, 1],
     },
   });
   map.on('click', 'places', (e) => {
@@ -95,13 +112,14 @@ export async function createMap(container, { places, onPlaceClick }) {
   const homeEl = document.createElement('div');
   homeEl.className = 'marker-home';
   homeEl.title = 'Home';
-  homeEl.textContent = '⌂';
+  homeEl.innerHTML = '<span>⌂</span>';
   homeEl.addEventListener('click', (ev) => { ev.stopPropagation(); onPlaceClick('__home', null); });
   new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
   const youEl = document.createElement('div');
   youEl.className = 'marker-you';
   youEl.title = 'You';
+  youEl.innerHTML = '<i></i>';
   const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
   return {
