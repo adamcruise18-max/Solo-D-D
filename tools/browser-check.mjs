@@ -3,7 +3,7 @@
 //   npm run check:browser
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -71,7 +71,18 @@ try {
   check(r.listed, 'the save slot shows in the list');
   check(r.fallback, 'a broken newest save falls back to the last good save');
   check(r.gone, 'a removed slot is gone');
+} catch (e) {
+  check(false, `browser check stopped: ${e?.message || e}`);
 } finally {
+  // On a failure, keep a screenshot and the page errors for the CI artifact.
+  if (failed) {
+    try {
+      const dir = fileURLToPath(new URL('../artifacts/', import.meta.url));
+      await mkdir(dir, { recursive: true });
+      await page.screenshot({ path: join(dir, 'browser-check.png'), fullPage: true });
+      await writeFile(join(dir, 'browser-check-errors.txt'), errors.join('\n') + '\n');
+    } catch { /* the screenshot is a help only */ }
+  }
   await browser.close();
   server.close();
 }

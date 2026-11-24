@@ -1,0 +1,62 @@
+# Checks for every pull request and every push to main.
+# The golden replay may change only in a pull request that says which rule
+# change is meant and why (see ENGINE.md, "Replay").
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Golden replay
+        run: npm run replay
+
+      - name: Production build
+        run: |
+          npm run build
+          git diff --stat -- docs/game.js docs/inside3d.js
+          if ! git diff --quiet -- docs/game.js docs/inside3d.js; then
+            echo "::warning::docs/game.js or docs/inside3d.js differ from a fresh build. Run npm run build and commit the result."
+          fi
+
+      - name: Install browser for the browser check
+        run: |
+          npm install --no-save playwright@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: Browser check
+        run: npm run check:browser
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-failure
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
