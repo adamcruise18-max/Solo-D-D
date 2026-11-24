@@ -50,7 +50,7 @@ export function feltTemp(state, mode, env = environment(state, mode)) {
   return felt;
 }
 
-function warmthRate(felt) {
+export function warmthRate(felt) {
   if (felt >= 70) return 10;
   if (felt >= 55) return 3;
   if (felt >= 40) return -3;

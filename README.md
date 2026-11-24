@@ -16,7 +16,8 @@ This is the **first playable version**: a small part of the full game.
 5. Click a dot on the map to see a real place (Safeway, Walgreens, clinics, gas stations
    and more). Click **Walk here**. Search it zone by zone, take what you can carry, and walk home.
 6. At a place or in a house, click **Walk inside (first person)** to walk through it in 3D and
-   search it yourself (see below). The old panel buttons still work too.
+   pick up items one by one from the shelves, counters and floor (see below).
+   The old panel buttons still work: they search a whole zone at once.
 7. You can also search houses on your street or near any place.
 8. A stray dog comes near the house in the first days. Leave food outside on three different days.
 9. The game saves in your browser after each action. You have one life.
@@ -26,18 +27,36 @@ This is the **first playable version**: a small part of the full game.
 
 - Computer: click the view to look with the mouse. Press **Esc** to see the full key list.
   The main keys: **W A S D** walk, **Space** jump, **Shift** sprint, **Ctrl** crouch, **Z** stand / crouch / prone,
-  **Caps Lock** slow walk, **E** use a door or gate, **hold E** search, **F** take all that fits, **L** flashlight,
+  **Caps Lock** slow walk, **E** take the item you look at (also doors and gates), **hold E** take all items in reach,
+  **F** take the item, or items found before, **L** flashlight,
   **Tab** inventory, **C** character, **M** floor plan, **J** journal, **5** medicine, **7** eat or drink,
   **9** new batteries, **F5** save, **F9** load. Right mouse looks closer. Middle mouse marks a spot.
   Weapon keys (left mouse, R, 1–4, G, V, Q and others) show "not yet in the game".
 - Phone or tablet: drag on the left half of the screen to walk, drag on the right half to look,
-  hold **USE** to search, tap **USE** for doors. Buttons on the right: jump, crouch, light, bag, map.
-- A blue ring on the floor marks a place you did not search yet. A grey ring is done.
+  tap **USE** to take the item you look at (or for doors), hold **USE** to take all items in reach.
+  Buttons on the right: jump, crouch, light, bag, map.
+- Items lie on the shelves, on counters, on furniture and on the floor. Look at one: a box shows around it,
+  and a prompt shows its name, its weight and if a home project needs it. "Pack too full" means it does not fit.
+- The floor plan (**M**) shows which zones are done. A zone is done when you take all its items,
+  or when you walk into it and it is empty.
 - Walk to the front door and press **E** to go back to the map.
-- Game time: each search costs the same time as before (for example 20 min for a supermarket aisle,
-  2× in the dark with no flashlight). Walking inside costs 1 game minute for each 60 m you walk.
+- Game time: each item you pick up costs 1 game minute (2 in the dark with no flashlight).
+  A panel search of a whole zone costs the same time as before (for example 20 min for a supermarket aisle). Walking inside costs 1 game minute for each 60 m you walk.
   Time does not move when you stand still or when the menu is open.
 - Big stores, hospitals and all places at night are dark. A flashlight in your pack lights the way.
+
+### Easier to read
+
+- Vitals: each need has 4 stages. Past the first limit, the panel says what the stage does
+  (for example "Thirsty: below 25, −2 on d20 rolls"). The top bar shows only the needs that are past a limit.
+- Yellow risk warnings come before an illness: infection risk of an open wound, time until hypothermia,
+  low water or food.
+- Risky buttons show the d20 roll before you choose: the modifiers, the DC and your chance (for example
+  "d20 −2 tired vs DC 12 · 35%").
+- The item panel shows how many days of food and water you have (carried and stored at home) and sorts items in groups.
+- The home panel shows solar power in, power out and how long the battery lasts with the heater on.
+- The map marks places you visited but did not search fully (amber ring) and places with nothing left (grey).
+- The journal writes itself: one short entry for each day (where you went, what you took, what happened).
 
 ## Run the game
 

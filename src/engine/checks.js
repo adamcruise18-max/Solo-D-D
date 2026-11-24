@@ -29,3 +29,22 @@ export function check(state, label, dc, extraMods = [], opts = {}) {
   log(state, `🎲 ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} → ${success ? 'SUCCESS' : 'FAIL'}${note}`, success ? 'roll-ok' : 'roll-fail');
   return { roll, total, dc, success };
 }
+
+// The chance to pass a check, before you roll (QoL: show the odds first).
+// Same rules as check(): natural 1 fails, natural 20 passes.
+export function odds(state, dc, extraMods = [], opts = {}) {
+  const mods = [...standardMods(state, opts), ...extraMods];
+  if (opts.outside && isNight(state.time)) dc += 3;
+  const sum = mods.reduce((s, m) => s + m[1], 0);
+  let ok = 0;
+  for (let roll = 1; roll <= 20; roll++) if (roll === 20 || (roll !== 1 && roll + sum >= dc)) ok += 1;
+  return { dc, mods, sum, pct: ok * 5 };
+}
+
+// Short text for a button: "d20 −3 injured vs DC 12 · 45%". At most 3 modifiers, biggest first.
+export function oddsText(o) {
+  const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? '+' : '−'}${Math.abs(v)} ${n}`).join('');
+  const more = top.length > 3 ? ` (+${top.length - 3} more)` : '';
+  return `d20${shown}${more} vs DC ${o.dc} · ${o.pct}%`;
+}

@@ -5,9 +5,10 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, FogExp2, HemisphereLight, AmbientLight, PointLight, SpotLight,
   Object3D, Mesh, InstancedMesh, BoxGeometry, PlaneGeometry, RingGeometry, CylinderGeometry, SphereGeometry,
   MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide,
-  Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2,
+  Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
-import { collide, nearestSpot } from '../engine/interior.js';
+import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { hashString, mulberry32 } from '../rng.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
 } from './controls.js';
@@ -89,7 +90,7 @@ export function openInside(opts) {
     <div class="in-stance" hidden></div>
     <div class="in-debug" hidden></div>
     <div class="in-panel corners" hidden></div>
-    <div class="in-help">WASD: walk · Space: jump · Shift: sprint · Ctrl: crouch · <b>Hold E</b>: search · F: take · L: light · Tab: bag · M: map · <b>Esc</b>: all keys</div>
+    <div class="in-help">WASD: walk · Space: jump · Shift: sprint · Ctrl: crouch · <b>E</b>: take · Hold E: take all near · L: light · Tab: bag · M: map · <b>Esc</b>: all keys</div>
     <div class="in-touch">
       <div class="in-stick"><i></i></div>
       <button class="in-use" type="button">USE</button>
@@ -363,23 +364,120 @@ export function openInside(opts) {
     scene.add(g);
   }
 
-  // ---------- spot markers ----------
-  const ringGeo = new RingGeometry(0.32, 0.4, 32);
-  const markers = plan.spots.map((s) => {
-    const m = new Mesh(ringGeo, new MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.7, side: DoubleSide, fog: false }));
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(s.x, 0.02, s.z);
-    scene.add(m);
-    return { s, m };
-  });
-  function refreshMarkers() {
-    for (const { s, m } of markers) {
-      const done = opts.isDone(s.zone);
-      m.material.color.setHex(done ? 0x55606a : ACCENT);
-      m.material.opacity = done ? 0.35 : 0.75;
+  // ---------- items to pick up ----------
+  // Each item from the engine gets a place: on a shelf face in its aisle, or on furniture / the floor in its room.
+  const itemObjs = new Map(); // pid -> { it, obj, x, y, z }
+  const solidNow = () => solidBoxes(plan, { counter: true });
+  function placeFor(it) {
+    const r = mulberry32(hashString(`place:${it.pid}:${opts.title}`));
+    const spot = plan.spots.find((p) => p.zone === it.zone);
+    if (!spot) return { x: 0, y: 0, z: -1 };
+    if (spot.counter) {
+      const c = plan.fixtures.find((f) => f.type === 'rx_counter');
+      return { x: c.x + (r() - 0.5) * (c.w - 1), y: c.h, z: c.z + (r() - 0.5) * 0.4 };
+    }
+    const a = spot.area;
+    if (plan.kind === 'hall') {
+      if (r() < 0.2) return { x: spot.x + (r() - 0.5) * 1.2, y: 0, z: a.z1 + 1 + r() * (a.z2 - a.z1 - 2) };
+      const side = r() < 0.5 ? -1 : 1;
+      const levels = [0.12, 0.62, 1.12, 1.57];
+      return { x: spot.x + side * ((a.x2 - a.x1) / 2 - 0.16), y: levels[Math.floor(r() * levels.length)], z: a.z1 + 1 + r() * (a.z2 - a.z1 - 2) };
+    }
+    // Rooms: on low furniture of this room, else on the floor.
+    const low = plan.fixtures.filter((f) => f.zone === it.zone && f.solid && f.h <= 1.2 && f.type !== 'tub');
+    if (low.length && r() < 0.7) {
+      const f = low[Math.floor(r() * low.length)];
+      const w = f.type === 'bed' ? f.d : f.w;
+      const d = f.type === 'bed' ? f.w : f.d;
+      return { x: f.x + (r() - 0.5) * Math.max(0, w - 0.4), y: f.h + (f.type === 'bed' ? 0.15 : 0), z: f.z + (r() - 0.5) * Math.max(0, d - 0.4) };
+    }
+    const boxes = solidNow();
+    for (let i = 0; i < 12; i++) {
+      const x = a.x1 + 0.5 + r() * (a.x2 - a.x1 - 1);
+      const z = a.z1 + 0.5 + r() * (a.z2 - a.z1 - 1);
+      if (!boxes.some((b) => Math.abs(x - b.x) < b.w / 2 + 0.2 && Math.abs(z - b.z) < b.d / 2 + 0.2)) return { x, y: 0, z };
+    }
+    return { x: spot.x, y: 0, z: spot.z };
+  }
+  function addItems() {
+    for (const it of opts.items()) {
+      if (itemObjs.has(it.pid)) continue;
+      const p = placeFor(it);
+      const obj = itemModel(it.item, hashString(it.pid));
+      obj.position.set(p.x, p.y, p.z);
+      obj.rotation.y = (hashString(it.pid) % 628) / 100;
+      // Loot is a little brighter than the room, so the eye finds it.
+      obj.traverse((m) => { if (m.isMesh && m.material && m.material.emissive) { m.material = m.material.clone(); m.material.emissive.setHex(0x222222); } });
+      scene.add(obj);
+      const h = obj.userData.height || 0.2;
+      itemObjs.set(it.pid, { it, obj, x: p.x, y: p.y + h / 2, z: p.z, r: obj.userData.radius || 0.15 });
     }
   }
-  refreshMarkers();
+  addItems();
+  function removeItem(pid) {
+    const o = itemObjs.get(pid);
+    if (!o) return;
+    scene.remove(o.obj);
+    itemObjs.delete(pid);
+  }
+  // Thin box around the item you look at.
+  const hiMat = new LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9, depthTest: false });
+  const hiBox = new LineSegments(new EdgesGeometry(new BoxGeometry(1, 1, 1)), hiMat);
+  hiBox.renderOrder = 10;
+  hiBox.visible = false;
+  scene.add(hiBox);
+  const REACH = 2.3;
+  // True when a wall, shelf, counter or closed gate is between the eye and the item.
+  // Segment against each box (slab test). Walls have no height: they go to the ceiling.
+  function blocked(from, o) {
+    const dx = o.x - from.x;
+    const dy = o.y - from.y;
+    const dz = o.z - from.z;
+    const END = 0.9; // stop short of the item: it may rest on top of the box
+    for (const b of solidBoxes(plan, { counter: opts.isCounterOpen() })) {
+      const lo = [b.x - b.w / 2 + 0.02, 0, b.z - b.d / 2 + 0.02];
+      const hi = [b.x + b.w / 2 - 0.02, (b.h || 9) - 0.02, b.z + b.d / 2 - 0.02];
+      const p0 = [from.x, from.y, from.z];
+      const v = [dx, dy, dz];
+      let t0 = 0;
+      let t1 = END;
+      let hit = true;
+      for (let k = 0; k < 3 && hit; k++) {
+        if (Math.abs(v[k]) < 1e-9) { if (p0[k] < lo[k] || p0[k] > hi[k]) hit = false; continue; }
+        let a = (lo[k] - p0[k]) / v[k];
+        let c = (hi[k] - p0[k]) / v[k];
+        if (a > c) [a, c] = [c, a];
+        t0 = Math.max(t0, a);
+        t1 = Math.min(t1, c);
+        if (t0 > t1) hit = false;
+      }
+      if (hit) return true;
+    }
+    return false;
+  }
+  function itemsInReach(from) {
+    const out = [];
+    for (const o of itemObjs.values()) {
+      const d = Math.hypot(o.x - from.x, o.y - from.y, o.z - from.z);
+      if (d <= REACH && !blocked(from, o)) out.push({ o, d });
+    }
+    return out.sort((a, b) => a.d - b.d);
+  }
+  // The item nearest to the centre of the view, inside reach.
+  function lookTarget(from, dir) {
+    let best = null;
+    for (const { o, d } of itemsInReach(from)) {
+      const vx = o.x - from.x;
+      const vy = o.y - from.y;
+      const vz = o.z - from.z;
+      const cos = (vx * dir.x + vy * dir.y + vz * dir.z) / Math.max(1e-6, d);
+      const ang = Math.acos(Math.min(1, cos));
+      const allow = Math.atan2(o.r + 0.12, d); // easier to hit when near
+      if (ang > Math.max(allow, 0.09)) continue;
+      if (!best || ang < best.ang) best = { o, ang, d };
+    }
+    return best ? best.o : null;
+  }
 
   // ---------- player ----------
   const pos = { x: plan.start.x, z: plan.start.z };
@@ -510,14 +608,34 @@ export function openInside(opts) {
     walked = 0;
   }
 
-  // Tap E: doors and gates. On a search spot, E must be held.
+  let target = null; // item you look at
+  let lastKey = '';
+  const seenZones = new Set();
+  const hiSize = new Vector3();
+  const hiCenter = new Vector3();
+
+  function pickOne(o) {
+    if (!o) return false;
+    flushWalk();
+    const res = opts.onPickUp(o.it.pid);
+    if (res.ok) {
+      removeItem(o.it.pid);
+      toast(`Taken: ${res.name}`, 1400);
+    } else if (res.msg) toast(res.msg, 2400);
+    refreshProducts();
+    afterGameStep();
+    refreshPanel();
+    return res.ok;
+  }
+
+  // Tap E: take the item you look at; else doors and gates.
   function interact() {
-    if (busy || paused || closed || !current) return;
+    if (busy || paused || closed) return;
+    if (target) { pickOne(target); return; }
+    if (!current) { toast('Look at an item to take it.', 1400); return; }
     if (current.type === 'exit') { leave(); return; }
-    const s = current;
-    if (opts.isDone(s.zone)) { toast(`You already searched the ${s.label}.`); return; }
-    if (s.counter && !opts.isCounterOpen()) { openGate(); return; }
-    toast(`Hold E to search the ${s.label}.`, 1600);
+    if (current.counter && !opts.isCounterOpen()) { openGate(); return; }
+    toast('Look at an item to take it.', 1400);
   }
 
   function openGate() {
@@ -528,27 +646,24 @@ export function openInside(opts) {
     afterGameStep();
   }
 
-  function canSearchHere() {
-    return current && current.type === 'search' && !opts.isDone(current.zone) && !(current.counter && !opts.isCounterOpen());
-  }
-
+  // Hold E or F: take everything within reach (a short bar first).
   function startHold() {
-    if (busy || paused || closed || hold || !canSearchHere()) return false;
-    const s = current;
+    if (busy || paused || closed || hold) return false;
+    const near = itemsInReach(camera.position);
+    if (!near.length) return false;
     const bar = $('.in-bar');
     const fill = bar.querySelector('i');
     bar.hidden = false;
     fill.style.width = '0%';
-    hold = { t0: performance.now(), spot: s };
+    hold = { t0: performance.now(), n: near.length };
     const step = () => {
       if (!hold) return;
       const k = Math.min(1, (performance.now() - hold.t0) / HOLD_SEARCH_MS);
       fill.style.width = `${k * 100}%`;
       if (k < 1) { hold.raf = requestAnimationFrame(step); return; }
-      const spot = hold.spot;
       hold = null;
       bar.hidden = true;
-      doSearch(spot);
+      takeAllInReach();
     };
     step();
     return true;
@@ -560,15 +675,22 @@ export function openInside(opts) {
     $('.in-bar').hidden = true;
   }
 
-  function doSearch(s) {
+  function takeAllInReach() {
     busy = true;
     flushWalk();
-    const res = opts.onSearch(s.zone);
+    let n = 0;
+    let stop = '';
+    for (const { o } of itemsInReach(camera.position)) {
+      const res = opts.onPickUp(o.it.pid);
+      if (!res.ok) { stop = res.msg || ''; if (opts.isDead()) break; continue; }
+      removeItem(o.it.pid);
+      n += 1;
+    }
     busy = false;
+    toast(n ? `You take ${n} item${n > 1 ? 's' : ''}.${stop ? ' ' + stop : ''}` : stop || 'Nothing to take.', 2600);
     refreshProducts();
-    refreshMarkers();
-    if (res) showFound(res);
     afterGameStep();
+    refreshPanel();
   }
 
   function takeAll() {
@@ -582,6 +704,7 @@ export function openInside(opts) {
   // F: the one thing that makes sense here.
   function context() {
     if (foundOpen() && $('[data-in="take"]')) { takeAll(); return; }
+    if (target) { pickOne(target); return; }
     if (opts.hasLoot()) { takeAll(); return; }
     if (current && current.type === 'exit') { leave(); return; }
     if (current && current.counter && !opts.isCounterOpen()) { openGate(); return; }
@@ -729,9 +852,9 @@ export function openInside(opts) {
       return;
     }
     if (e.repeat) return;
-    if (k.action === 'interact') {
+    if (k.action === 'interact' || k.action === 'context') {
       eDown = performance.now();
-      // Hold E on a search spot: start the search bar now.
+      // Hold E or F: take everything in reach after a short bar.
       startHold();
       return;
     }
@@ -744,11 +867,12 @@ export function openInside(opts) {
     const k = keyFor(e.code);
     if (!k) return;
     if (k.action === 'crouch' && crouchHeld) { crouchHeld = false; if (stance === 'crouch') stance = 'stand'; showStance(); }
-    if (k.action === 'interact' && eDown) {
-      const short = performance.now() - eDown < 300;
+    if ((k.action === 'interact' || k.action === 'context') && eDown) {
+      // Let go before the bar is full: a tap (take one). Slow frames do not turn a tap into nothing.
+      const short = !!hold || performance.now() - eDown < 300;
       eDown = 0;
-      if (hold) { if (short) toast(`Hold E to search the ${hold.spot.label}.`, 1600); cancelHold(); return; }
-      if (short && !paused && !panel) interact();
+      if (hold) cancelHold();
+      if (short && !paused && !panel) { if (k.action === 'interact') interact(); else context(); }
     }
   }
   function onBlur() { keys.clear(); cancelHold(); }
@@ -802,14 +926,14 @@ export function openInside(opts) {
     else if (what === 'close') showFound(null);
     else if (what === 'closepanel') closePanel();
   });
-  // USE button: tap for doors, hold to search.
+  // USE button: tap to take the item you look at (or doors), hold to take all in reach.
   const useBtn = $('.in-use');
   useBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); eDown = performance.now(); startHold(); });
-  const useUp = () => {
+  const useUp = (e) => {
     if (!eDown) return;
-    const short = performance.now() - eDown < 300;
+    const short = e && e.type === 'pointerup' && (!!hold || performance.now() - eDown < 300);
     eDown = 0;
-    if (hold) { if (short) toast('Hold USE to search.', 1600); cancelHold(); return; }
+    if (hold) cancelHold();
     if (short) {
       if (foundOpen() && $('[data-in="take"]')) takeAll();
       else interact();
@@ -913,18 +1037,34 @@ export function openInside(opts) {
     camera.rotation.order = 'YXZ';
     camera.rotation.set(pitch, yaw, 0);
     camera.getWorldDirection(fwd);
-    // What can the player use now?
-    const n = nearestSpot(plan, pos.x, pos.z, yaw);
-    const key = n ? `${n.type}:${n.zone}` : '';
-    if (current === undefined || key !== (current ? `${current.type}:${current.zone}` : '') || frame.n++ % 20 === 0) {
+    // What can the player use now? An item in view first, then the door or the gate.
+    const t = paused || panel ? null : lookTarget(camera.position, fwd);
+    let n = nearestSpot(plan, pos.x, pos.z, yaw);
+    // Walking through an aisle or room: tell the game (an empty zone then counts as done).
+    if (n && n.type === 'search' && n.dist === 0 && !seenZones.has(n.zone)) { seenZones.add(n.zone); opts.onSeeZone(n.zone); status(); }
+    if (n && n.type === 'search' && !(n.counter && !opts.isCounterOpen())) n = null;
+    const key = (t ? `i:${t.it.pid}` : '') + (n ? `${n.type}:${n.zone}` : '');
+    if (current === undefined || key !== lastKey || frame.n++ % 20 === 0) {
       current = n;
+      target = t;
+      lastKey = key;
       const p = $('.in-prompt');
-      if (!n) p.hidden = true;
-      else {
+      const more = itemsInReach(camera.position).length;
+      if (t) {
         p.hidden = false;
-        p.innerHTML = opts.describe(n);
+        p.innerHTML = opts.describeItem(t.it, more, touch);
+        hiBox.visible = true;
+        const b = new Box3().setFromObject(t.obj);
+        b.getSize(hiSize); b.getCenter(hiCenter);
+        hiBox.scale.set(hiSize.x + 0.04, hiSize.y + 0.04, hiSize.z + 0.04);
+        hiBox.position.copy(hiCenter);
+        $('.in-cross').classList.add('on');
+      } else {
+        hiBox.visible = false;
+        $('.in-cross').classList.remove('on');
+        if (!n) p.hidden = true;
+        else { p.hidden = false; p.innerHTML = opts.describe(n); }
       }
-      if (hold && (!n || n.zone !== hold.spot.zone || n.type !== 'search')) cancelHold();
       if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps`;
     }
     renderer.render(scene, camera);
@@ -933,9 +1073,40 @@ export function openInside(opts) {
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
 
   return { close: () => leave() };
+}
+
+// Simple item shapes (used until the detailed models load). Size in meters, origin at the bottom.
+const SIMPLE = {
+  can: ['canned_food', 'canned_fruit', 'propane_1lb', 'flea_spray', 'soda'],
+  jug: ['water_bottle', 'bleach', 'sports_drink'],
+  bag: ['dry_food', 'dog_food', 'snacks', 'chips', 'trash_bags'],
+  long: ['pry_bar', 'scrap_wood', 'rope'],
+  soft: ['winter_coat', 'rain_jacket', 'blanket', 'sleeping_bag', 'tarp', 'plastic_sheet', 'backpack'],
+};
+const simpleCache = new Map();
+function itemModel(id) {
+  const kind = Object.keys(SIMPLE).find((k) => SIMPLE[k].includes(id)) || 'box';
+  let g = simpleCache.get(kind);
+  if (!g) {
+    const m = new MeshStandardMaterial({ color: { can: 0xb8bcc0, jug: 0xdfe6ea, bag: 0xc2913f, long: 0x8a5a33, soft: 0x4f5e6e, box: 0xc8b48a }[kind], roughness: 0.6, metalness: kind === 'can' ? 0.6 : 0 });
+    const geo = {
+      can: new CylinderGeometry(0.04, 0.04, 0.11, 14), jug: new BoxGeometry(0.15, 0.27, 0.15), bag: new BoxGeometry(0.25, 0.3, 0.1),
+      long: new BoxGeometry(0.7, 0.05, 0.06), soft: new BoxGeometry(0.45, 0.12, 0.35), box: new BoxGeometry(0.16, 0.12, 0.12),
+    }[kind];
+    geo.computeBoundingBox();
+    g = { geo, m, h: geo.boundingBox.max.y - geo.boundingBox.min.y };
+    simpleCache.set(kind, g);
+  }
+  const mesh = new Mesh(g.geo, g.m);
+  mesh.position.y = g.h / 2;
+  const grp = new Group();
+  grp.add(mesh);
+  grp.userData.height = g.h;
+  grp.userData.radius = 0.15;
+  return grp;
 }
 
 // The key list in the pause menu, made from the key table.

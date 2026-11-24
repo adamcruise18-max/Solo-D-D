@@ -633,6 +633,34 @@
   function log(state2, text, kind = "info") {
     state2.log.push({ t: state2.time, text, kind });
     if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
+    journalNote(state2, text, kind);
+  }
+  function journalNote(state2, text, kind) {
+    if (!state2.journal) state2.journal = [];
+    const day = dayIndex(state2.time);
+    let d = state2.journal[state2.journal.length - 1];
+    if (!d || d.day !== day) {
+      d = { day, places: [], taken: 0, searched: 0, events: [] };
+      state2.journal.push(d);
+    }
+    const arrive = /^You arrive at (.+)\.$/.exec(text);
+    if (arrive) {
+      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      return;
+    }
+    if (/^You walk to a house/.test(text)) {
+      if (!d.places.includes("a house")) d.places.push("a house");
+      return;
+    }
+    if (/^You take: /.test(text)) {
+      d.taken += 1;
+      return;
+    }
+    if (/^You search the /.test(text)) {
+      d.searched = (d.searched || 0) + 1;
+      return;
+    }
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
   }
 
   // src/engine/vitals.js
@@ -1281,6 +1309,90 @@
     log(state2, `\u{1F3B2} ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
     return { roll, total, dc, success };
   }
+  function odds(state2, dc, extraMods = [], opts = {}) {
+    const mods = [...standardMods(state2, opts), ...extraMods];
+    if (opts.outside && isNight(state2.time)) dc += 3;
+    const sum = mods.reduce((s, m) => s + m[1], 0);
+    let ok = 0;
+    for (let roll = 1; roll <= 20; roll++) if (roll === 20 || roll !== 1 && roll + sum >= dc) ok += 1;
+    return { dc, mods, sum, pct: ok * 5 };
+  }
+  function oddsText(o) {
+    const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
+    const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
+    return `d20${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
+  }
+
+  // src/engine/status.js
+  var STAGES = {
+    food: [
+      [50, "", ""],
+      [25, "Hungry", "Below 25: wounds heal at half speed and health stops refilling."],
+      [0.01, "Very hungry", "Wounds heal at half speed. Health does not refill. Sleep rests you less."],
+      [0, "Starving", "You lose health every hour."]
+    ],
+    water: [
+      [50, "", ""],
+      [25, "Thirsty", "Below 25: \u22122 on d20 rolls and health stops refilling."],
+      [0.01, "Very thirsty", "\u22122 on d20 rolls. Wounds heal at half speed. Health does not refill."],
+      [0, "Dehydrated", "You lose 2 health every hour."]
+    ],
+    warmth: [
+      [50, "", ""],
+      [25, "Cold", "You get hungry and tired faster."],
+      [0.01, "Hypothermia", "\u22123 on d20 rolls. Health does not refill."],
+      [0, "Freezing", "You lose 5 health every hour."]
+    ],
+    energy: [
+      [50, "", ""],
+      [25, "Tired", "\u22122 on d20 rolls."],
+      [0.01, "Exhausted", "\u22122 on d20 rolls. Sleep soon."],
+      [0, "Asleep", "You fall asleep where you are."]
+    ],
+    health: [
+      [50, "", ""],
+      [25, "Hurt", "Sleep rests you less."],
+      [0.01, "Badly hurt", "\u22123 on d20 rolls. Sleep rests you less."],
+      [0, "Dead", ""]
+    ],
+    morale: [
+      [50, "", ""],
+      [25, "Low", "Sleep rests you less."],
+      [0.01, "Despair", "\u22122 on d20 rolls. Sleep rests you less."],
+      [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
+    ]
+  };
+  function statStage(key, v) {
+    const rows = STAGES[key];
+    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
+    const last = rows.length - 1;
+    return { stage: last, word: rows[last][1], effect: rows[last][2] };
+  }
+  function needWarnings(state2) {
+    const p = state2.player;
+    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
+  }
+  function risks(state2) {
+    const p = state2.player;
+    const out = [];
+    if (!p.illness.infection) {
+      const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
+      if (open.length) {
+        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
+        out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
+      }
+    }
+    const rate = warmthRate(feltTemp(state2, "rest"));
+    if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
+      const h = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
+    }
+    if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
+    if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
+    return out;
+  }
+  var RAW_WATER_SICK = 0.3;
 
   // src/engine/loot.js
   function placeState(state2, place) {
@@ -1733,7 +1845,7 @@
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state2, 5);
-        if (chance(state2, 0.3)) startStomachBug(state2);
+        if (chance(state2, RAW_WATER_SICK)) startStomachBug(state2);
         return;
       case "boil": {
         const how = useHeat(state2, 0.4);
@@ -1970,33 +2082,135 @@
   function counterIndex(place, ps) {
     return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
   }
+  function zoneCtx(state2) {
+    const loc = state2.location;
+    if (loc.kind === "place") {
+      const place = getPlace(loc.id);
+      const ps = placeState(state2, place);
+      return { holder: ps, key: place.id, catId: place.cat, stock: ps.stock, zones: ps.zones, counterIdx: counterIndex(place, ps), house: false, place };
+    }
+    if (loc.kind === "house") {
+      const hs = state2.houses[loc.id];
+      return { holder: hs, key: loc.id, catId: "house", stock: CATEGORIES.house.stock, zones: HOUSE_ROOMS.length, counterIdx: -1, house: true };
+    }
+    return null;
+  }
+  function doneListOf(ctx) {
+    return ctx.house ? zonesDoneList(ctx.holder, "roomsDone", "doneList") : zonesDoneList(ctx.holder);
+  }
+  function markZoneDone(ctx, zone) {
+    const done = doneListOf(ctx);
+    if (done.includes(zone)) return;
+    done.push(zone);
+    if (ctx.house) ctx.holder.roomsDone = done.length;
+    else ctx.holder.zonesDone = done.length;
+  }
+  function zoneItemList(state2, ctx, zone) {
+    const h = ctx.holder;
+    if (!h.zoneItems) h.zoneItems = {};
+    if (!h.taken) h.taken = [];
+    if (!h.zoneItems[zone]) {
+      const found = rollZone(state2, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state2));
+      if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
+      const list = [];
+      for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
+      h.zoneItems[zone] = list;
+    }
+    return h.zoneItems[zone];
+  }
+  function buildingItems(state2) {
+    const ctx = zoneCtx(state2);
+    if (!ctx) return [];
+    const done = doneListOf(ctx);
+    const out = [];
+    for (let z = 0; z < ctx.zones; z++) {
+      if (done.includes(z) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z])) continue;
+      for (const it of zoneItemList(state2, ctx, z)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z });
+    }
+    return out;
+  }
+  function zoneLeft(ctx, zone) {
+    const list = ctx.holder.zoneItems && ctx.holder.zoneItems[zone] || [];
+    return list.filter((it) => !ctx.holder.taken.includes(it.pid));
+  }
+  function touchZone(state2, ctx, zone) {
+    const h = ctx.holder;
+    if (!h.touched) h.touched = [];
+    if (h.touched.includes(zone)) return;
+    h.touched.push(zone);
+    zoneInjuryCheck(state2);
+    if (ctx.catId === "supermarket" && h.touched.length === 1) {
+      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
+      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
+    }
+  }
+  var PICKUP_MINUTES = 1;
+  function pickUp(state2, pid) {
+    const ctx = zoneCtx(state2);
+    if (!ctx) return false;
+    const zone = Number(String(pid).slice(1).split("i")[0]);
+    if (ctx.place && !ctx.holder.unlocked) return false;
+    if (zone === ctx.counterIdx && !ctx.holder.counterOpen) {
+      log(state2, "It is behind the locked counter gate. Open the gate first.", "warn");
+      return false;
+    }
+    const it = zoneItemList(state2, ctx, zone).find((x) => x.pid === pid);
+    if (!it || ctx.holder.taken.includes(pid)) return false;
+    const w = ITEMS[it.item].weight;
+    if (w > freeWeight(state2) + 1e-9) {
+      log(state2, `Your pack is too full to take the ${itemName(it.item).toLowerCase()} (${w} lb).`, "warn");
+      return false;
+    }
+    const env = environment(state2, "work");
+    advanceTime(state2, PICKUP_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
+    if (state2.dead) return true;
+    touchZone(state2, ctx, zone);
+    ctx.holder.taken.push(pid);
+    addItem(state2.carried, it.item, 1);
+    log(state2, `You take: ${itemName(it.item)}.`);
+    if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
+      markZoneDone(ctx, zone);
+      state2.stats.zonesSearched += 1;
+    }
+    return true;
+  }
+  function seeZone(state2, zone) {
+    const ctx = zoneCtx(state2);
+    if (!ctx || doneListOf(ctx).includes(zone)) return;
+    if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return;
+    zoneItemList(state2, ctx, zone);
+    if (!zoneLeft(ctx, zone).length) {
+      markZoneDone(ctx, zone);
+      state2.stats.zonesSearched += 1;
+      log(state2, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
+    }
+  }
   function searchZone(state2, index) {
-    const place = getPlace(state2.location.id);
+    const ctx = zoneCtx(state2);
+    if (!ctx || ctx.house) return false;
+    const { holder: ps, place } = ctx;
     const cat = CATEGORIES[place.cat];
-    const ps = placeState(state2, place);
     if (!ps.unlocked) return false;
-    const cIdx = counterIndex(place, ps);
+    const cIdx = ctx.counterIdx;
     const done = zonesDoneList(ps);
     const zone = index == null ? nextZone(ps, cIdx) : Number(index);
     if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
     const counterZone = zone === cIdx;
     if (counterZone && !ps.counterOpen) return false;
     const env = environment(state2, "work");
-    const minutes = searchMinutes(state2, cat.zoneMinutes, env.dark);
-    advanceTime(state2, minutes, "work");
+    advanceTime(state2, searchMinutes(state2, cat.zoneMinutes, env.dark), "work");
     if (state2.dead) return true;
-    zoneInjuryCheck(state2);
-    const found = rollZone(state2, place.id, place.cat, ps.stock, zone, dogExtra(state2));
-    if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
-    done.push(zone);
-    ps.zonesDone = done.length;
+    zoneItemList(state2, ctx, zone);
+    touchZone(state2, ctx, zone);
+    const found = {};
+    for (const it of zoneLeft(ctx, zone)) {
+      ps.taken.push(it.pid);
+      found[it.item] = (found[it.item] || 0) + 1;
+    }
+    markZoneDone(ctx, zone);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
     reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
-    if (place.cat === "supermarket" && ps.zonesDone === 1) {
-      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
-      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
-    }
     state2.lastFound = found;
     return true;
   }
@@ -2096,18 +2310,23 @@
     else log(state2, "The house is empty and cold. A family lived here.");
   }
   function searchRoom(state2, index) {
-    const loc = state2.location;
-    const hs = state2.houses[loc.id];
-    const done = zonesDoneList(hs, "roomsDone", "doneList");
-    let room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+    const ctx = zoneCtx(state2);
+    if (!ctx || !ctx.house) return false;
+    const hs = ctx.holder;
+    const done = doneListOf(ctx);
+    const room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
     if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
     const env = environment(state2, "work");
     advanceTime(state2, searchMinutes(state2, CATEGORIES.house.zoneMinutes, env.dark), "work");
     if (state2.dead) return true;
-    zoneInjuryCheck(state2);
-    const found = rollZone(state2, loc.id, "house", CATEGORIES.house.stock, room, dogExtra(state2));
-    done.push(room);
-    hs.roomsDone = done.length;
+    zoneItemList(state2, ctx, room);
+    touchZone(state2, ctx, room);
+    const found = {};
+    for (const it of zoneLeft(ctx, room)) {
+      hs.taken.push(it.pid);
+      found[it.item] = (found[it.item] || 0) + 1;
+    }
+    markZoneDone(ctx, room);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
     reportFound(state2, found, HOUSE_ROOMS[room]);
@@ -2151,7 +2370,7 @@
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
         if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
-        add("drink_raw", "Drink water without boiling (risk)");
+        add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
       add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
@@ -2165,7 +2384,7 @@
       if (state2.dog.stage === "visiting") {
         const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
         const night = isNight(state2.time);
-        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" });
+        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" || !anyFood(state2) && "You have no food to give" });
       }
       add("house", "Search a house on your street", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
     }
@@ -2173,10 +2392,10 @@
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
       const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar" : "d20 DC 12" });
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
       else if (ps.zonesDone < ps.zones) {
         if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}` });
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
         } else {
           const env = environment(state2, "work");
           const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
@@ -2224,6 +2443,10 @@
         return walkInside(state2, arg);
       case "flashlight":
         return toggleFlashlight(state2);
+      case "pickup":
+        return pickUp(state2, arg);
+      case "see_zone":
+        return seeZone(state2, Number(arg));
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -2410,6 +2633,48 @@
       const kind = r() < 0.5 ? "box" : r() < 0.6 ? "can" : "paper";
       plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
+  }
+
+  // src/engine/stock.js
+  var QUARTS_PER_GAL = 4;
+  var HEATER_KW = 1.5;
+  function addBag(bag, totals) {
+    for (const [id, q] of Object.entries(bag || {})) {
+      const it = ITEMS[id];
+      if (!it || q <= 0) continue;
+      if (it.kind === "food" && it.cal) totals.cal += it.cal * q;
+      if (it.water) totals.water += it.water * (q / (it.portion || 1));
+    }
+  }
+  function stockSummary(state2) {
+    const t = { cal: 0, water: 0 };
+    addBag(state2.carried, t);
+    addBag(state2.home.storage, t);
+    const h = state2.home;
+    t.water += (h.tankGal + h.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
+    const foodDayPts = FOOD_LOSS_PER_HOUR * 24;
+    const waterDayPts = WATER_LOSS_PER_HOUR * 24;
+    return {
+      foodDays: t.cal / CAL_PER_FOOD_POINT / foodDayPts,
+      waterDays: t.water / waterDayPts,
+      rawGal: h.rawGal
+    };
+  }
+  function stockLine(state2) {
+    const s = stockSummary(state2);
+    const d = (x) => x < 1 ? `${Math.round(x * 24)} h` : `${x < 10 ? x.toFixed(1) : Math.round(x)} days`;
+    return `Food: ${d(s.foodDays)} \xB7 Water: ${d(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
+  }
+  function powerSummary(state2) {
+    const h = state2.home;
+    const inToday = solarToday(state2);
+    const outKw = h.heaterOn ? HEATER_KW : 0;
+    return {
+      inToday,
+      outKw,
+      hoursLeft: outKw > 0 ? h.battery / outKw : null,
+      heaterHoursFull: h.battery / HEATER_KW
+    };
   }
 
   // src/engine/game.js
@@ -2971,9 +3236,18 @@
       paint: {
         "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
-        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#6b7682", "#16202a"],
-        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6],
-        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, ["==", ["get", "status"], 1], 0.8, 1]
+        // Your marks: amber ring = partly searched, grey = searched.
+        "circle-stroke-color": ["match", ["get", "status"], 2, "#6b7682", 1, "#e3b04b", "#16202a"],
+        "circle-stroke-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          9,
+          ["case", ["==", ["get", "status"], 1], 1.6, 0.8],
+          14,
+          ["case", ["==", ["get", "status"], 1], 3, 1.6]
+        ],
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, 1]
       }
     });
     map.on("click", "places", (e) => {
@@ -3191,23 +3465,31 @@
   var $ = (sel) => document.querySelector(sel);
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
-    food: { label: "Food", words: [[50, ""], [25, "Hungry"], [0.01, "Very hungry"], [0, "Starving"]] },
-    water: { label: "Water", words: [[50, ""], [25, "Thirsty"], [0.01, "Very thirsty"], [0, "Dehydrated"]] },
-    warmth: { label: "Warmth", words: [[50, ""], [25, "Cold"], [0.01, "Hypothermia"], [0, "Freezing"]] },
-    energy: { label: "Energy", words: [[50, ""], [25, "Tired"], [0.01, "Exhausted"], [0, "Asleep"]] },
-    health: { label: "Health", words: [[50, ""], [25, "Hurt"], [0.01, "Badly hurt"], [0, "Dead"]] },
-    morale: { label: "Morale", words: [[50, ""], [25, "Low"], [0.01, "Despair"], [0, "Despair"]] }
+    food: { label: "Food" },
+    water: { label: "Water" },
+    warmth: { label: "Warmth" },
+    energy: { label: "Energy" },
+    health: { label: "Health" },
+    morale: { label: "Morale" }
   };
-  function statWord(key, v) {
-    for (const [lim, w] of STAT_INFO[key].words) if (v >= lim) return w;
-    return "";
+  function statRow(k, p, withEffect) {
+    const v = Math.round(p[k]);
+    const max = k === "energy" ? p.energyMax : 100;
+    const st = statStage(k, p[k]);
+    const cls = ["ok", "warn", "bad", "bad"][st.stage];
+    return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
+      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
+      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc(st.effect)}</span>` : ""}</div>`;
+  }
+  function riskChips() {
+    return risks(state).map((r) => ["risk", r.text]);
   }
   async function start() {
     setPlaces(window.LL_PLACES || []);
     state = loadGame();
     bindEvents();
     fx = createFx($("#mapwrap"));
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="edge"></i>15-mile edge</span>';
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span><span><i class="edge"></i>15-mile edge</span>';
     try {
       mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
       window.__llMap = mapApi.map;
@@ -3254,14 +3536,15 @@
     const night = isNight(t);
     const w = state.weather;
     const p = state.player;
-    const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+    const low = needWarnings(state).map((n) => n.word);
+    const rk = risks(state).length;
     $("#hud").innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
-    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}`;
+    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
     $("#hud").hidden = false;
     if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
   }
@@ -3280,16 +3563,8 @@
   }
   function renderStats() {
     const p = state.player;
-    const rows = Object.keys(STAT_INFO).map((k) => {
-      const v = Math.round(p[k]);
-      const max = k === "energy" ? p.energyMax : 100;
-      const word = statWord(k, p[k]);
-      const cls = v < 25 ? "bad" : v < 50 ? "warn" : "ok";
-      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
-      <span class="sv">${v}</span><span class="sw">${word}</span></div>`;
-    }).join("");
-    const chips = [];
+    const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("");
+    const chips = riskChips();
     if (p.weak) chips.push(["warn", `Weak (Energy max ${p.energyMax})`]);
     if (p.wet) chips.push(["bad", "Wet"]);
     for (const i of p.injuries) chips.push(["bad", `${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`]);
@@ -3314,7 +3589,7 @@
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
       const note = a.disabled ? a.disabled : a.note || "";
-      return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
+      return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
     }).join("");
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
     $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
@@ -3330,32 +3605,59 @@
   function useButtons(id, from) {
     return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
   }
+  var KIND_GROUPS = [
+    ["Food", ["food", "dogfood"]],
+    ["Water", ["drink"]],
+    ["Medicine", ["med"]],
+    ["Light and tools", ["tool", "batteries"]],
+    ["Clothes", ["wear"]],
+    ["Fuel and parts", ["fuel", "part"]],
+    ["Other", ["misc", "comfort"]]
+  ];
+  function groupOf(id) {
+    const k = ITEMS[id] ? ITEMS[id].kind : "misc";
+    const i = KIND_GROUPS.findIndex(([, kinds]) => kinds.includes(k));
+    return i < 0 ? KIND_GROUPS.length - 1 : i;
+  }
+  function sortedIds(bag) {
+    return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
+  }
+  function groupedRows(ids, row) {
+    let last = -1;
+    return ids.map((id) => {
+      const g = groupOf(id);
+      const head = g !== last ? `<li class="grp">${KIND_GROUPS[g][0]}</li>` : "";
+      last = g;
+      return head + row(id);
+    }).join("");
+  }
   function renderItems() {
     const loc = state.location;
     const here = hereBag(state);
-    const hereIds = Object.keys(here).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+    const hereIds = sortedIds(here);
     const hereTitle = loc.kind === "home" ? "House storage" : "Items you found here";
-    let hereHtml = hereIds.map((id) => itemRow(
+    let hereHtml = groupedRows(hereIds, (id) => itemRow(
       id,
       here[id],
       "here",
       (loc.kind === "home" ? useButtons(id, "storage") : "") + `<button data-take="${id}">Take</button>`
-    )).join("");
+    ));
     if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === "home" ? "Nothing stored." : "Nothing here yet. Search to find items."}</li>`;
     const takeAll2 = hereIds.length && loc.kind !== "home" ? '<button class="small" data-takeall="1">Take all that fits</button>' : "";
     const carried = state.carried;
-    const cIds = Object.keys(carried).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+    const cIds = sortedIds(carried);
     const weight = bagWeight(carried);
     const limit = carryLimit(state);
     const over = weight > limit;
-    let cHtml = cIds.map((id) => itemRow(
+    let cHtml = groupedRows(cIds, (id) => itemRow(
       id,
       carried[id],
       "carried",
       useButtons(id, "carried") + `<button data-drop="${id}">${loc.kind === "home" ? "Store" : "Drop"}</button>`
-    )).join("");
+    ));
     if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
     $("#items").innerHTML = `
+    <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
     <h3>${hereTitle} ${takeAll2}</h3><ul class="items">${hereHtml}</ul>
     <h3>You carry <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
     <ul class="items">${cHtml}</ul>`;
@@ -3364,13 +3666,17 @@
     const h = state.home;
     const atHome = state.location.kind === "home";
     const pct = Math.round(h.battery / h.batteryMax * 100);
+    const pw = powerSummary(state);
+    const hrs = (x) => x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`;
     $("#home").innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}\xB0F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : "out"}</b>
-      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} kWh)${h.heaterOn ? " \xB7 heater ON" : ""}</b>
+      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} of ${h.batteryMax} kWh)</b>
+      <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
+      <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
@@ -3439,7 +3745,7 @@
   }
   function renderLog() {
     const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
-    $("#log").innerHTML = `<h3>Journal</h3><ul>${items}</ul>`;
+    $("#log").innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
   }
   function showPlacePopup(id, lngLat) {
     if (!state || !mapApi || picking) return;
@@ -3781,7 +4087,7 @@
       isDead: () => !!state.dead,
       getStatus: () => {
         const p = state.player;
-        const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+        const low = needWarnings(state).map((n) => n.word);
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
         return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
       },
@@ -3789,11 +4095,10 @@
         if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
         }
         const e = environment(state, "work");
-        const min = searchMinutes(state, cat.zoneMinutes, e.dark);
-        return `<kbd>Hold E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? " \xB7 dark, no light" : ""}</small>`;
+        return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;
       },
       onWalk: (m) => {
         perform(state, "action", "walk_inside", m);
@@ -3804,6 +4109,29 @@
         const n0 = state.log.length;
         act("action", "counter");
         return state.log.slice(n0).map((e) => e.text).join(" ") || "The gate does not move.";
+      },
+      items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
+      onPickUp: (pid) => {
+        const n0 = state.log.length;
+        const it = buildingItems(state).find((x) => x.pid === pid);
+        const wasDead = !!state.dead;
+        perform(state, "action", "pickup", pid);
+        if (!wasDead && state.dead) recordRun(state);
+        const ok = !buildingItems(state).some((x) => x.pid === pid);
+        saveGame(state);
+        render();
+        const msgs = state.log.slice(n0).filter((e) => e.kind !== "info" || !ok).map((e) => e.text).join(" ");
+        return { ok, name: it ? itemName(it.item) : "", msg: msgs };
+      },
+      onSeeZone: (zone) => {
+        perform(state, "action", "see_zone", zone);
+        saveGame(state);
+      },
+      describeItem: (it, near, touch) => {
+        const def = ITEMS[it.item];
+        const need = projectNeeds()[it.item];
+        const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
+        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -3843,28 +4171,47 @@
       }
     });
   }
+  function projectNeeds() {
+    const out = {};
+    for (const p of PROJECTS) {
+      const st = projectStatus(state, p);
+      if (st.built || st.started || st.missingReq.length) continue;
+      for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+      for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
+    }
+    return out;
+  }
+  function journalHtml(maxDays) {
+    const days = (state.journal || []).slice(-maxDays).reverse();
+    if (!days.length) return '<p class="hint">Nothing yet.</p>';
+    return days.map((d) => {
+      const parts = [];
+      if (d.places.length) parts.push(`You went to ${d.places.join(", ")}.`);
+      if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? "s" : ""}.`);
+      if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? "s" : ""}.`);
+      if (!parts.length && !d.events.length) parts.push("You stayed close to home.");
+      const ev = d.events.map((t) => `<li>${esc(t)}</li>`).join("");
+      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc(formatDate(d.day * 1440))}</b><p>${esc(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
+    }).join("");
+  }
   function insidePanel(name) {
     const p = state.player;
     if (name === "inventory") {
       const c = state.carried;
-      const ids = Object.keys(c).sort((a, b) => itemName(a).localeCompare(itemName(b)));
-      const rows = ids.map((id) => {
+      const ids = sortedIds(c);
+      const rows = groupedRows(ids, (id) => {
         const it = ITEMS[id];
         const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join("");
         return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
-      }).join("") || '<li class="empty">You carry nothing.</li>';
+      }) || '<li class="empty">You carry nothing.</li>';
       const here = hereBag(state);
       const hereIds = Object.keys(here);
       const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join("")}</ul>
       <button class="primary small" data-in="take">Take all that fits (F)</button>` : "";
-      return `<h4>Inventory \xB7 ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
+      return `<h4>Inventory \xB7 ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><p class="stock">${esc(stockLine(state))}</p><ul class="inv">${rows}</ul>${hereList}`;
     }
     if (name === "character") {
-      const rows = Object.keys(STAT_INFO).map((k) => {
-        const v = Math.round(p[k]);
-        const cls = v < 25 ? "bad" : v < 50 ? "warn" : "ok";
-        return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span><span class="bar"><i style="width:${v}%"></i></span><span class="sv">${v}</span><span class="sw">${statWord(k, p[k])}</span></div>`;
-      }).join("");
+      const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc(r.text)}</div>`).join("");
       const notes = [];
       for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`);
       if (p.illness.infection) notes.push("Infection");
@@ -3876,8 +4223,8 @@
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(", ") : "normal clothes")} \xB7 Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F</p>`;
     }
     if (name === "journal") {
-      const items = state.log.slice(-14).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
-      return `<h4>Journal</h4><ul class="jr">${items}</ul>`;
+      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+      return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
     }
     if (name === "objectives") {
       return "<h4>Objectives</h4><p>There is nobody to save and nothing to find. Stay alive: eat, drink, keep warm, and get home before night.</p>";

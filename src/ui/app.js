@@ -6,8 +6,11 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice } from '../engine/actions.js';
+import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
+import { odds, oddsText } from '../engine/checks.js';
+import { statStage, needWarnings, risks } from '../engine/status.js';
+import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -28,17 +31,31 @@ const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 const STAT_INFO = {
-  food: { label: 'Food', words: [[50, ''], [25, 'Hungry'], [0.01, 'Very hungry'], [0, 'Starving']] },
-  water: { label: 'Water', words: [[50, ''], [25, 'Thirsty'], [0.01, 'Very thirsty'], [0, 'Dehydrated']] },
-  warmth: { label: 'Warmth', words: [[50, ''], [25, 'Cold'], [0.01, 'Hypothermia'], [0, 'Freezing']] },
-  energy: { label: 'Energy', words: [[50, ''], [25, 'Tired'], [0.01, 'Exhausted'], [0, 'Asleep']] },
-  health: { label: 'Health', words: [[50, ''], [25, 'Hurt'], [0.01, 'Badly hurt'], [0, 'Dead']] },
-  morale: { label: 'Morale', words: [[50, ''], [25, 'Low'], [0.01, 'Despair'], [0, 'Despair']] },
+  food: { label: 'Food' },
+  water: { label: 'Water' },
+  warmth: { label: 'Warmth' },
+  energy: { label: 'Energy' },
+  health: { label: 'Health' },
+  morale: { label: 'Morale' },
 };
 
 function statWord(key, v) {
-  for (const [lim, w] of STAT_INFO[key].words) if (v >= lim) return w;
-  return '';
+  return statStage(key, v).word;
+}
+
+// One stat row: bar, value, stage word, and the stage effect (only past the first limit).
+function statRow(k, p, withEffect) {
+  const v = Math.round(p[k]);
+  const max = k === 'energy' ? p.energyMax : 100;
+  const st = statStage(k, p[k]);
+  const cls = ['ok', 'warn', 'bad', 'bad'][st.stage];
+  return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
+      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ''}</span>
+      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc(st.effect)}</span>` : ''}</div>`;
+}
+
+function riskChips() {
+  return risks(state).map((r) => ['risk', r.text]);
 }
 
 // ---------- start ----------
@@ -49,6 +66,7 @@ export async function start() {
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
+    + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
     mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
@@ -102,14 +120,15 @@ function renderHud() {
   const night = isNight(t);
   const w = state.weather;
   const p = state.player;
-  const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+  const low = needWarnings(state).map((n) => n.word);
+  const rk = risks(state).length;
   $('#hud').innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? '☾' : '☀'} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}°F</span>
-    ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}`;
+    ${low.length ? `<span class="h-alert">⚠ ${esc(low.join(' · '))}</span>` : ''}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? 's' : ''}</span>` : ''}`;
   $('#hud').hidden = false;
   if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
 }
@@ -130,16 +149,8 @@ function renderHeader() {
 
 function renderStats() {
   const p = state.player;
-  const rows = Object.keys(STAT_INFO).map((k) => {
-    const v = Math.round(p[k]);
-    const max = k === 'energy' ? p.energyMax : 100;
-    const word = statWord(k, p[k]);
-    const cls = v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok';
-    return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ''}</span>
-      <span class="sv">${v}</span><span class="sw">${word}</span></div>`;
-  }).join('');
-  const chips = [];
+  const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('');
+  const chips = riskChips();
   if (p.weak) chips.push(['warn', `Weak (Energy max ${p.energyMax})`]);
   if (p.wet) chips.push(['bad', 'Wet']);
   for (const i of p.injuries) chips.push(['bad', `${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`]);
@@ -165,7 +176,7 @@ function renderLocation() {
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
     const note = a.disabled ? a.disabled : a.note || '';
-    return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
+    return `<button class="act${a.risk && !a.disabled ? ' risky' : ''}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
   }).join('');
   const hint = loc.kind !== 'house' ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : '';
   $('#location').innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
@@ -185,25 +196,51 @@ function useButtons(id, from) {
   return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join('');
 }
 
+// Auto-sort: items in groups by kind, then by name.
+const KIND_GROUPS = [
+  ['Food', ['food', 'dogfood']], ['Water', ['drink']], ['Medicine', ['med']],
+  ['Light and tools', ['tool', 'batteries']], ['Clothes', ['wear']],
+  ['Fuel and parts', ['fuel', 'part']], ['Other', ['misc', 'comfort']],
+];
+function groupOf(id) {
+  const k = ITEMS[id] ? ITEMS[id].kind : 'misc';
+  const i = KIND_GROUPS.findIndex(([, kinds]) => kinds.includes(k));
+  return i < 0 ? KIND_GROUPS.length - 1 : i;
+}
+function sortedIds(bag) {
+  return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
+}
+// Item rows with a small group header when the group changes.
+function groupedRows(ids, row) {
+  let last = -1;
+  return ids.map((id) => {
+    const g = groupOf(id);
+    const head = g !== last ? `<li class="grp">${KIND_GROUPS[g][0]}</li>` : '';
+    last = g;
+    return head + row(id);
+  }).join('');
+}
+
 function renderItems() {
   const loc = state.location;
   const here = hereBag(state);
-  const hereIds = Object.keys(here).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  const hereIds = sortedIds(here);
   const hereTitle = loc.kind === 'home' ? 'House storage' : 'Items you found here';
-  let hereHtml = hereIds.map((id) => itemRow(id, here[id], 'here',
-    (loc.kind === 'home' ? useButtons(id, 'storage') : '') + `<button data-take="${id}">Take</button>`)).join('');
+  let hereHtml = groupedRows(hereIds, (id) => itemRow(id, here[id], 'here',
+    (loc.kind === 'home' ? useButtons(id, 'storage') : '') + `<button data-take="${id}">Take</button>`));
   if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === 'home' ? 'Nothing stored.' : 'Nothing here yet. Search to find items.'}</li>`;
   const takeAll = hereIds.length && loc.kind !== 'home' ? '<button class="small" data-takeall="1">Take all that fits</button>' : '';
 
   const carried = state.carried;
-  const cIds = Object.keys(carried).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  const cIds = sortedIds(carried);
   const weight = bagWeight(carried);
   const limit = carryLimit(state);
   const over = weight > limit;
-  let cHtml = cIds.map((id) => itemRow(id, carried[id], 'carried',
-    useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`)).join('');
+  let cHtml = groupedRows(cIds, (id) => itemRow(id, carried[id], 'carried',
+    useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`));
   if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
   $('#items').innerHTML = `
+    <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
     <h3>${hereTitle} ${takeAll}</h3><ul class="items">${hereHtml}</ul>
     <h3>You carry <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
     <ul class="items">${cHtml}</ul>`;
@@ -213,13 +250,17 @@ function renderHome() {
   const h = state.home;
   const atHome = state.location.kind === 'home';
   const pct = Math.round((h.battery / h.batteryMax) * 100);
+  const pw = powerSummary(state);
+  const hrs = (x) => (x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`);
   $('#home').innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? '' : '<small>(you are away)</small>'}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}°F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : 'out'}</b>
-      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} kWh)${h.heaterOn ? ' · heater ON' : ''}</b>
+      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} of ${h.batteryMax} kWh)</b>
+      <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
+      <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW · battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on · heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
@@ -294,7 +335,7 @@ function renderDog() {
 
 function renderLog() {
   const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
-  $('#log').innerHTML = `<h3>Journal</h3><ul>${items}</ul>`;
+  $('#log').innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
 }
 
 // ---------- map popup ----------
@@ -640,7 +681,7 @@ async function walkInside() {
     isDead: () => !!state.dead,
     getStatus: () => {
       const p = state.player;
-      const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+      const low = needWarnings(state).map((n) => n.word);
       const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : 'No flashlight';
       return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
@@ -649,11 +690,10 @@ async function walkInside() {
       if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
       if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
       }
       const e = environment(state, 'work');
-      const min = searchMinutes(state, cat.zoneMinutes, e.dark);
-      return `<kbd>Hold E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? ' · dark, no light' : ''}</small>`;
+      return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? ' · dark, no light: 2 min an item' : ''}</small>`;
     },
     onWalk: (m) => {
       perform(state, 'action', 'walk_inside', m);
@@ -664,6 +704,28 @@ async function walkInside() {
       const n0 = state.log.length;
       act('action', 'counter');
       return state.log.slice(n0).map((e) => e.text).join(' ') || 'The gate does not move.';
+    },
+    items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
+    onPickUp: (pid) => {
+      const n0 = state.log.length;
+      const it = buildingItems(state).find((x) => x.pid === pid);
+      const wasDead = !!state.dead;
+      perform(state, 'action', 'pickup', pid);
+      if (!wasDead && state.dead) recordRun(state);
+      const ok = !buildingItems(state).some((x) => x.pid === pid);
+      saveGame(state);
+      render();
+      const msgs = state.log.slice(n0).filter((e) => e.kind !== 'info' || !ok).map((e) => e.text).join(' ');
+      return { ok, name: it ? itemName(it.item) : '', msg: msgs };
+    },
+    onSeeZone: (zone) => { perform(state, 'action', 'see_zone', zone); saveGame(state); },
+    describeItem: (it, near, touch) => {
+      const def = ITEMS[it.item];
+      const need = projectNeeds()[it.item];
+      const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
+      return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
+        + (need ? `<span class="need">Needed: ${esc(need)}</span>` : '')
+        + (near > 1 ? `<small class="more">Hold ${touch ? 'USE' : 'E'}: take all ${near} in reach</small>` : '');
     },
     onSearch: (zone) => {
       const n0 = state.log.length;
@@ -705,30 +767,54 @@ async function walkInside() {
   });
 }
 
+// Parts that unbuilt home projects still need: item id -> "Rain barrels 1/2".
+function projectNeeds() {
+  const out = {};
+  for (const p of PROJECTS) {
+    const st = projectStatus(state, p);
+    if (st.built || st.started || st.missingReq.length) continue;
+    for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+    for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
+  }
+  return out;
+}
+
+// The journal writes itself: one entry per day, newest first.
+function journalHtml(maxDays) {
+  const days = (state.journal || []).slice(-maxDays).reverse();
+  if (!days.length) return '<p class="hint">Nothing yet.</p>';
+  return days.map((d) => {
+    const parts = [];
+    if (d.places.length) parts.push(`You went to ${d.places.join(', ')}.`);
+    if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? 's' : ''}.`);
+    if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? 's' : ''}.`);
+    if (!parts.length && !d.events.length) parts.push('You stayed close to home.');
+    const ev = d.events.map((t) => `<li>${esc(t)}</li>`).join('');
+    return `<div class="jday"><b>Day ${d.day + 1} · ${esc(formatDate(d.day * 1440))}</b><p>${esc(parts.join(' '))}</p>${ev ? `<ul>${ev}</ul>` : ''}</div>`;
+  }).join('');
+}
+
 // Panels inside the 3D view (Tab, C, J, O).
 function insidePanel(name) {
   const p = state.player;
   if (name === 'inventory') {
     const c = state.carried;
-    const ids = Object.keys(c).sort((a, b) => itemName(a).localeCompare(itemName(b)));
-    const rows = ids.map((id) => {
+    const ids = sortedIds(c);
+    const rows = groupedRows(ids, (id) => {
       const it = ITEMS[id];
       const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
         .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
       return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
-    }).join('') || '<li class="empty">You carry nothing.</li>';
+    }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
     const hereIds = Object.keys(here);
     const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
       <button class="primary small" data-in="take">Take all that fits (F)</button>` : '';
-    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
+    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><p class="stock">${esc(stockLine(state))}</p><ul class="inv">${rows}</ul>${hereList}`;
   }
   if (name === 'character') {
-    const rows = Object.keys(STAT_INFO).map((k) => {
-      const v = Math.round(p[k]);
-      const cls = v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok';
-      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span><span class="bar"><i style="width:${v}%"></i></span><span class="sv">${v}</span><span class="sw">${statWord(k, p[k])}</span></div>`;
-    }).join('');
+    const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')
+      + risks(state).map((r) => `<div class="risk-line">⚠ ${esc(r.text)}</div>`).join('');
     const notes = [];
     for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`);
     if (p.illness.infection) notes.push('Infection');
@@ -740,8 +826,8 @@ function insidePanel(name) {
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(', ') : 'normal clothes')} · Feels like ${Math.round(feltTemp(state, 'rest'))}°F</p>`;
   }
   if (name === 'journal') {
-    const items = state.log.slice(-14).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
-    return `<h4>Journal</h4><ul class="jr">${items}</ul>`;
+    const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
+    return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
   }
   if (name === 'objectives') {
     return '<h4>Objectives</h4><p>There is nobody to save and nothing to find. Stay alive: eat, drink, keep warm, and get home before night.</p>';

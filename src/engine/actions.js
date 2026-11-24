@@ -6,7 +6,8 @@ import {
   log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
 import { advanceTime, addInjury, startStomachBug, INJURY_NAMES, environment } from './tick.js';
-import { check } from './checks.js';
+import { check, odds, oddsText } from './checks.js';
+import { RAW_WATER_SICK } from './status.js';
 import { isNight } from './world.js';
 import { placeState, rollZone } from './loot.js';
 import { travel } from './travel.js';
@@ -294,7 +295,7 @@ function homeAction(state, id) {
       addWater(state, WATER_PER_QUART);
       log(state, 'You drink a quart of water that you did not boil.', 'warn');
       advanceTime(state, 5);
-      if (chance(state, 0.3)) startStomachBug(state);
+      if (chance(state, RAW_WATER_SICK)) startStomachBug(state);
       return;
     case 'boil': {
       const how = useHeat(state, 0.4);
@@ -543,34 +544,154 @@ export function counterIndex(place, ps) {
   return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
 }
 
-// Search one zone. With no index, search the next zone (panel button).
+// ---------- items placed in a building ----------
+// Each zone (aisle, room) has a fixed list of single items. The 3D view shows them on shelves and
+// furniture, and the player picks them up one by one. The panel "search" takes all items of a zone at once.
+// holder: the place state or the house state.
+function zoneCtx(state) {
+  const loc = state.location;
+  if (loc.kind === 'place') {
+    const place = getPlace(loc.id);
+    const ps = placeState(state, place);
+    return { holder: ps, key: place.id, catId: place.cat, stock: ps.stock, zones: ps.zones, counterIdx: counterIndex(place, ps), house: false, place };
+  }
+  if (loc.kind === 'house') {
+    const hs = state.houses[loc.id];
+    return { holder: hs, key: loc.id, catId: 'house', stock: CATEGORIES.house.stock, zones: HOUSE_ROOMS.length, counterIdx: -1, house: true };
+  }
+  return null;
+}
+
+function doneListOf(ctx) {
+  return ctx.house ? zonesDoneList(ctx.holder, 'roomsDone', 'doneList') : zonesDoneList(ctx.holder);
+}
+
+function markZoneDone(ctx, zone) {
+  const done = doneListOf(ctx);
+  if (done.includes(zone)) return;
+  done.push(zone);
+  if (ctx.house) ctx.holder.roomsDone = done.length; else ctx.holder.zonesDone = done.length;
+}
+
+// The items in one zone. Made once (first time it is needed) and then kept in the save.
+function zoneItemList(state, ctx, zone) {
+  const h = ctx.holder;
+  if (!h.zoneItems) h.zoneItems = {};
+  if (!h.taken) h.taken = [];
+  if (!h.zoneItems[zone]) {
+    const found = rollZone(state, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state));
+    if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
+    const list = [];
+    for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
+    h.zoneItems[zone] = list;
+  }
+  return h.zoneItems[zone];
+}
+
+// All items of the building, for the 3D view. Zones already searched from the panel have none left.
+export function buildingItems(state) {
+  const ctx = zoneCtx(state);
+  if (!ctx) return [];
+  const done = doneListOf(ctx);
+  const out = [];
+  for (let z = 0; z < ctx.zones; z++) {
+    if (done.includes(z) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z])) continue; // searched in an old save
+    for (const it of zoneItemList(state, ctx, z)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z });
+  }
+  return out;
+}
+
+function zoneLeft(ctx, zone) {
+  const list = (ctx.holder.zoneItems && ctx.holder.zoneItems[zone]) || [];
+  return list.filter((it) => !ctx.holder.taken.includes(it.pid));
+}
+
+// First time the player touches a zone: the small risk of a cut, and the rotten food message.
+function touchZone(state, ctx, zone) {
+  const h = ctx.holder;
+  if (!h.touched) h.touched = [];
+  if (h.touched.includes(zone)) return;
+  h.touched.push(zone);
+  zoneInjuryCheck(state);
+  if (ctx.catId === 'supermarket' && h.touched.length === 1) {
+    state.player.morale = clamp(state.player.morale - 3, 0, 100);
+    log(state, 'The fresh food section is black and rotten. Rats run under the shelves.', 'warn');
+  }
+}
+
+export const PICKUP_MINUTES = 1;
+
+// Pick up one item in the 3D view. Returns true when the item is now in the pack.
+export function pickUp(state, pid) {
+  const ctx = zoneCtx(state);
+  if (!ctx) return false;
+  const zone = Number(String(pid).slice(1).split('i')[0]);
+  if (ctx.place && !ctx.holder.unlocked) return false; // same rule as searchZone
+  if (zone === ctx.counterIdx && !ctx.holder.counterOpen) {
+    log(state, 'It is behind the locked counter gate. Open the gate first.', 'warn');
+    return false;
+  }
+  const it = zoneItemList(state, ctx, zone).find((x) => x.pid === pid);
+  if (!it || ctx.holder.taken.includes(pid)) return false;
+  const w = ITEMS[it.item].weight;
+  if (w > freeWeight(state) + 1e-9) {
+    log(state, `Your pack is too full to take the ${itemName(it.item).toLowerCase()} (${w} lb).`, 'warn');
+    return false;
+  }
+  const env = environment(state, 'work');
+  advanceTime(state, PICKUP_MINUTES * (env.dark && !hasLight(state) ? 2 : 1), 'work');
+  if (state.dead) return true;
+  touchZone(state, ctx, zone);
+  ctx.holder.taken.push(pid);
+  addItem(state.carried, it.item, 1);
+  log(state, `You take: ${itemName(it.item)}.`);
+  if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
+    markZoneDone(ctx, zone);
+    state.stats.zonesSearched += 1;
+  }
+  return true;
+}
+
+// The player walked through a zone in the 3D view. A zone with nothing left counts as done (no time cost).
+export function seeZone(state, zone) {
+  const ctx = zoneCtx(state);
+  if (!ctx || doneListOf(ctx).includes(zone)) return;
+  if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return;
+  zoneItemList(state, ctx, zone);
+  if (!zoneLeft(ctx, zone).length) {
+    markZoneDone(ctx, zone);
+    state.stats.zonesSearched += 1;
+    log(state, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
+  }
+}
+
+// Panel search: take every item left in one zone (they go to "found here"). With no index, the next zone.
 export function searchZone(state, index) {
-  const place = getPlace(state.location.id);
+  const ctx = zoneCtx(state);
+  if (!ctx || ctx.house) return false;
+  const { holder: ps, place } = ctx;
   const cat = CATEGORIES[place.cat];
-  const ps = placeState(state, place);
   if (!ps.unlocked) return false;
-  const cIdx = counterIndex(place, ps);
+  const cIdx = ctx.counterIdx;
   const done = zonesDoneList(ps);
   const zone = index == null ? nextZone(ps, cIdx) : Number(index);
   if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
   const counterZone = zone === cIdx;
   if (counterZone && !ps.counterOpen) return false;
   const env = environment(state, 'work');
-  const minutes = searchMinutes(state, cat.zoneMinutes, env.dark);
-  advanceTime(state, minutes, 'work');
+  advanceTime(state, searchMinutes(state, cat.zoneMinutes, env.dark), 'work');
   if (state.dead) return true;
-  zoneInjuryCheck(state);
-  const found = rollZone(state, place.id, place.cat, ps.stock, zone, dogExtra(state));
-  if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
-  done.push(zone);
-  ps.zonesDone = done.length;
+  zoneItemList(state, ctx, zone);
+  touchZone(state, ctx, zone);
+  const found = {};
+  for (const it of zoneLeft(ctx, zone)) {
+    ps.taken.push(it.pid);
+    found[it.item] = (found[it.item] || 0) + 1;
+  }
+  markZoneDone(ctx, zone);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
   reportFound(state, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
-  if (place.cat === 'supermarket' && ps.zonesDone === 1) {
-    state.player.morale = clamp(state.player.morale - 3, 0, 100);
-    log(state, 'The fresh food section is black and rotten. Rats run under the shelves.', 'warn');
-  }
   state.lastFound = found;
   return true;
 }
@@ -681,18 +802,23 @@ export function enterNearbyHouse(state) {
 }
 
 export function searchRoom(state, index) {
-  const loc = state.location;
-  const hs = state.houses[loc.id];
-  const done = zonesDoneList(hs, 'roomsDone', 'doneList');
-  let room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+  const ctx = zoneCtx(state);
+  if (!ctx || !ctx.house) return false;
+  const hs = ctx.holder;
+  const done = doneListOf(ctx);
+  const room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
   if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
   const env = environment(state, 'work');
   advanceTime(state, searchMinutes(state, CATEGORIES.house.zoneMinutes, env.dark), 'work');
   if (state.dead) return true;
-  zoneInjuryCheck(state);
-  const found = rollZone(state, loc.id, 'house', CATEGORIES.house.stock, room, dogExtra(state));
-  done.push(room);
-  hs.roomsDone = done.length;
+  zoneItemList(state, ctx, room);
+  touchZone(state, ctx, room);
+  const found = {};
+  for (const it of zoneLeft(ctx, room)) {
+    hs.taken.push(it.pid);
+    found[it.item] = (found[it.item] || 0) + 1;
+  }
+  markZoneDone(ctx, room);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
   reportFound(state, found, HOUSE_ROOMS[room]);
@@ -743,7 +869,7 @@ export function listActions(state) {
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
       if (built(state, 'filter_station')) add('filter_water', 'Filter 2 gal of water (no fuel)', { note: '10 min' });
-      add('drink_raw', 'Drink water without boiling (risk)');
+      add('drink_raw', 'Drink water without boiling', { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);
     add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
@@ -757,7 +883,7 @@ export function listActions(state) {
     if (state.dog.stage === 'visiting') {
       const fedToday = state.dog.feedDays.includes(dayIndex(state.time));
       const night = isNight(state.time);
-      add('feed_stray', 'Leave food outside for the dog', { disabled: (fedToday && 'You fed it today') || (night && 'The dog comes only in the day') });
+      add('feed_stray', 'Leave food outside for the dog', { disabled: (fedToday && 'You fed it today') || (night && 'The dog comes only in the day') || (!anyFood(state) && 'You have no food to give') });
     }
     add('house', 'Search a house on your street', { disabled: nearbyHousesLeft(state) <= 0 && 'No more houses near here' });
   }
@@ -765,10 +891,10 @@ export function listActions(state) {
     const place = getPlace(loc.id);
     const cat = CATEGORIES[place.cat];
     const ps = placeState(state, place);
-    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar' : 'd20 DC 12' });
+    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, 12))} · fail: 30% sprain`, risk: !has(state, 'pry_bar') });
     else if (ps.zonesDone < ps.zones) {
       if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}` });
+        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, cat.lockedZone.dc))} · fail: 25% cut`, risk: !has(state, 'pry_bar') });
       } else {
         const env = environment(state, 'work');
         const min = searchMinutes(state, cat.zoneMinutes, env.dark);
@@ -808,6 +934,8 @@ export function doAction(state, id, arg) {
     case 'room': return searchRoom(state, arg);
     case 'walk_inside': return walkInside(state, arg);
     case 'flashlight': return toggleFlashlight(state);
+    case 'pickup': return pickUp(state, arg);
+    case 'see_zone': return seeZone(state, Number(arg));
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);

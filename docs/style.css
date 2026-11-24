@@ -355,3 +355,28 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   #inside.is-touch .in-found { left: 12px; right: auto; width: calc(100% - 112px); }
   #inside.is-touch .in-panel { width: calc(100% - 24px); }
 }
+#inside .in-cross.on { width: 10px; height: 10px; margin: -5px; background: transparent; border: 2px solid var(--accent); }
+#inside .in-prompt .need { display: block; margin-top: 3px; color: var(--signal); font-size: 12px; letter-spacing: .08em; }
+#inside .in-prompt .more { display: block; margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+#inside .in-prompt .bad { color: var(--bad); }
+
+/* QoL step 2: stage effects, risk warnings, odds on risky buttons */
+.stat .se { grid-column: 1 / -1; font-size: 11px; color: var(--muted, #9aa4ad); margin: -2px 0 2px; }
+.stat.bad .se { color: #ffc2b8; }
+.chip.risk { color: #2a2205; background: #e3b04b; border-color: #e3b04b; font-weight: 600; }
+.hud .h-risk { color: #2a2205; background: #e3b04b; }
+.risk-line { font-size: 12px; color: #e3b04b; margin: 4px 0; }
+.act.risky small { color: #e3b04b; }
+
+/* QoL step 3: stock line and item groups */
+.stock { margin: 0 0 8px; padding: 6px 8px; font-size: 13px; background: rgba(255, 255, 255, .04); border-left: 2px solid var(--accent, #56c2d6); }
+.stock small { color: var(--muted, #9aa4ad); font-size: 11px; }
+ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #9aa4ad); padding: 6px 0 2px; border: 0; background: none; }
+
+/* QoL step 4: your marks and the journal */
+.legend i.part { background: transparent; box-shadow: 0 0 0 2px #e3b04b; }
+.legend i.done { background: #9aa5b1; opacity: .6; }
+.journal .jday, #inside .jday { margin: 0 0 8px; font-size: 12px; }
+.journal .jday b, #inside .jday b { color: var(--accent, #56c2d6); font-weight: 600; }
+.journal .jday p, #inside .jday p { margin: 2px 0; }
+.journal .jday ul, #inside .jday ul { margin: 2px 0 0 14px; padding: 0; color: var(--muted, #9aa4ad); }
