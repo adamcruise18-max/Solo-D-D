@@ -9,7 +9,7 @@ import {
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
-import { makeItemModel, makeShelfFill, makeProp } from './props3d.js';
+import { makeItemModel, makeShelfFill, makeProp, makeFixture, FIXTURE_TYPES } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import {
@@ -289,6 +289,20 @@ export function openInside(opts) {
           }
         }
       }
+      continue;
+    }
+    if (FIXTURE_TYPES.includes(f.type)) {
+      // Detailed furniture and store fixtures (props3d.js). The model fills the plan box.
+      const g = makeFixture(f.type, f.w, f.d, f.h, hashString(`${opts.title}:${f.type}:${f.x.toFixed(2)}:${f.z.toFixed(2)}`));
+      // Turn the front to the room: toward the zone's spot, else toward the door side (+z).
+      const spot = f.zone != null ? plan.spots.find((p) => p.zone === f.zone) : null;
+      const tx = spot ? spot.x - f.x : 0;
+      const tz = spot ? spot.z - f.z : 1;
+      const front = f.w >= f.d ? tz : tx;
+      g.position.set(f.x, 0, f.z);
+      if (front < 0) g.rotation.y = Math.PI;
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      statics.add(g);
       continue;
     }
     if (f.type === 'bed') {
@@ -1325,7 +1339,8 @@ function mergeStatics(root) {
   const buckets = new Map();
   const keepers = [];
   root.traverse((o) => {
-    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) { if (o.isLine || o.isPoints || o.isSprite || o.isInstancedMesh) keepers.push(o); return; }
+    // Meshes with a material list (one material per face) stay as they are.
+    if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) { if (o.isLine || o.isPoints || o.isSprite || o.isInstancedMesh || (o.isMesh && Array.isArray(o.material))) keepers.push(o); return; }
     const g = o.geometry;
     const key = `${o.material.uuid}|${Object.keys(g.attributes).sort().join(',')}|${o.castShadow ? 1 : 0}`;
     let b = buckets.get(key);
