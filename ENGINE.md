@@ -154,3 +154,18 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 | 2026-11-24 | 3D streets: decide later (Adam). Build the shared parts first; ask before 3D street work |
 | 2026-11-24 | Cells 256 m; rings 3x3 / 5x5 / 7x7 kept / 9x9 known (from the research thread) |
 | 2026-11-24 | Change records instead of copies of locations; base made again from seed + content |
+
+## Open points from the research review (PR #10)
+
+1. Item pick-ups: PR #9 saves the rolled item list of each zone plus what was taken
+   (`holder.zoneItems`, `holder.taken`). That stays the source of truth for items, because
+   the rolled list is in the save, so its ids stay valid when loot tables change.
+   `world.changes` is for other kinds (doors, containers emptied, places discovered,
+   moved or damaged objects). New record ids must be content-based (zone + item + n),
+   never a position in a list made again from content.
+2. Measure the save checksum on a late-game save with the profiler; move it to a worker
+   if it costs more than about 5 ms.
+3. When rules move onto `simDue()` tiers, test that 1 step of 10 days gives the same
+   result as 10 steps of 1 day (spoilage, growth, decay).
+4. A small diagnostics overlay (frame ms, sections, memory) behind a key, with the
+   pick-up items thread, which owns the 3D view.

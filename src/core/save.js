@@ -93,6 +93,7 @@ export function memoryBackend() {
     async set(k, v) { m.set(k, structuredCloneSafe(v)); },
     async remove(k) { m.delete(k); },
     async keys() { return [...m.keys()]; },
+    async setMany(pairs) { for (const [k, v] of pairs) m.set(k, structuredCloneSafe(v)); },
   };
 }
 
@@ -138,6 +139,8 @@ export function indexedDbBackend(idb = globalThis.indexedDB, dbName = 'lastlight
     name: 'indexedDB',
     get: (k) => tx('readonly', (s) => s.get(k)).then((v) => v ?? null),
     set: (k, v) => tx('readwrite', (s) => s.put(v, k)).then(() => undefined),
+    // Both writes in one transaction: all or nothing.
+    setMany: (pairs) => tx('readwrite', (s) => { let last = null; for (const [k, v] of pairs) last = s.put(v, k); return last; }).then(() => undefined),
     remove: (k) => tx('readwrite', (s) => s.delete(k)).then(() => undefined),
     keys: () => tx('readonly', (s) => s.getAllKeys()).then((ks) => (ks || []).map(String)),
   };
@@ -183,8 +186,13 @@ export function createSaveStore(backend = bestBackend(), opts = {}) {
       env.sum = checksum(state);
       let cur = null;
       try { cur = await backend.get(slot); } catch { cur = null; } // a cut copy is not a good copy
-      if (cur != null && verify(cur)) await backend.set(slot + PREV, cur);
-      await backend.set(slot, env);
+      const keepPrev = cur != null && verify(cur);
+      if (keepPrev && backend.setMany) {
+        await backend.setMany([[slot + PREV, cur], [slot, env]]); // one transaction where the backend has one
+      } else {
+        if (keepPrev) await backend.set(slot + PREV, cur);
+        await backend.set(slot, env);
+      }
       return true;
     },
     async load(slot) {
