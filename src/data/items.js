@@ -74,6 +74,12 @@ export const ITEMS = {
   water_tablets: { name: 'Water purification tablets', unit: 'pack', weight: 0.05, kind: 'misc', portion: 0.1 },
   vitamins: { name: 'Vitamins', unit: 'bottle', weight: 0.3, kind: 'misc' },
 
+  // Books teach a skill once (kind 'book', skill: a key of SKILLS in engine/skills.js).
+  book_first_aid: { name: 'First-aid handbook', unit: 'pc', weight: 0.8, kind: 'book', skill: 'first_aid' },
+  book_repair: { name: 'Home repair manual', unit: 'pc', weight: 1, kind: 'book', skill: 'tinkering' },
+  book_cooking: { name: 'Camp cooking book', unit: 'pc', weight: 0.8, kind: 'book', skill: 'cooking' },
+  book_survival: { name: 'Wilderness survival guide', unit: 'pc', weight: 0.8, kind: 'book', skill: 'survival' },
+
   // Parts for home base projects (kind 'part': no use on their own).
   toolkit: { name: 'Tool kit', unit: 'kit', weight: 6, kind: 'tool' },
   scrap_wood: { name: 'Lumber and plywood', unit: 'pc', weight: 6, kind: 'part' },

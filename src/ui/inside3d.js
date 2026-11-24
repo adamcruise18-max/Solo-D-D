@@ -87,6 +87,7 @@ export function openInside(opts) {
     </div>
     <div class="in-cross"></div>
     <div class="in-prompt" hidden></div>
+    <div class="in-notice" hidden></div>
     <div class="in-bar" hidden><i></i></div>
     <div class="in-found corners" hidden></div>
     <div class="in-toast" hidden></div>
@@ -495,6 +496,8 @@ export function openInside(opts) {
   // About 3 in 10 items of a zone are inside a closed box. Which ones is fixed by the item id,
   // so the same box always holds the same items. The save keeps only which boxes are open.
   const REVEAL_MS = 1500;
+  // What the player notices (scavenging skill). Read again after each game step.
+  let notice = opts.notice ? opts.notice() : { countRadius: 0, boxCount: false, lootGlow: 0 };
   const containers = new Map(); // cid -> { cid, zone, obj, x, y, z, r, opened }
   const inBox = (it) => it.zone !== counterZone() && hashString(`${it.pid}:box`) % 10 < 3;
   function counterZone() { const sp = plan.spots.find((p) => p.counter); return sp ? sp.zone : -1; }
@@ -526,6 +529,12 @@ export function openInside(opts) {
     containers.set(cid, c);
     return c;
   }
+  // Scavenging skill level 2+: you hear how many items are in a closed box.
+  function boxHint(c) {
+    if (!notice.boxCount) return 'look inside';
+    const k = opts.items().filter((it) => it.zone === c.zone && inBox(it)).length;
+    return k ? `something inside: ${k} item${k > 1 ? 's' : ''}` : 'it sounds empty';
+  }
   // An open box: the lid flaps fold back (shown as a lower, tilted box).
   function openLook(c) { c.obj.scale.y = 0.85; c.obj.rotation.z = 0.06; }
 
@@ -547,7 +556,7 @@ export function openInside(opts) {
       obj.position.set(p.x, p.y, p.z);
       obj.rotation.y = (hashString(it.pid) % 628) / 100;
       // Loot is a little brighter than the room, so the eye finds it.
-      obj.traverse((m) => { if (m.isMesh && m.material && m.material.emissive) { m.material = m.material.clone(); m.material.emissive.setHex(0x222222); } });
+      obj.traverse((m) => { if (m.isMesh && m.material && m.material.emissive) { m.material = m.material.clone(); m.material.emissive.setHex(notice.lootGlow >= 1 ? 0x4a4a4a : notice.lootGlow > 0 ? 0x363636 : 0x222222); } });
       scene.add(obj);
       const h = obj.userData.height || 0.2;
       itemObjs.set(it.pid, { it, obj, x: p.x, y: p.y + h / 2, z: p.z, r: obj.userData.radius || 0.15 });
@@ -944,6 +953,7 @@ export function openInside(opts) {
   }
 
   function afterGameStep() {
+    if (opts.notice) notice = opts.notice();
     current = undefined; // redraw the prompt
     status();
     if (opts.isDead()) close(true);
@@ -1230,7 +1240,7 @@ export function openInside(opts) {
       if (t) {
         p.hidden = false;
         p.innerHTML = t.container
-          ? `<kbd>${touch ? 'USE' : 'E'}</kbd> Open the box <small>look inside · 1 min</small>`
+          ? `<kbd>${touch ? 'USE' : 'E'}</kbd> Open the box <small>${boxHint(t)} · 1 min</small>`
           : opts.describeItem(t.it, more, touch);
         hiBox.visible = true;
         const b = new Box3().setFromObject(t.obj);
@@ -1244,6 +1254,15 @@ export function openInside(opts) {
         if (!n) p.hidden = true;
         else { p.hidden = false; p.innerHTML = opts.describe(n); }
       }
+      // Scavenging skill: you notice how many items are near you.
+      const nr = notice.countRadius;
+      const nEl = $('.in-notice');
+      if (nr > 0) {
+        let k = 0;
+        for (const o of itemObjs.values()) if (Math.hypot(o.x - camera.position.x, o.z - camera.position.z) < nr) k++;
+        nEl.hidden = k === 0;
+        nEl.textContent = `You notice ${k} item${k === 1 ? '' : 's'} near you`;
+      } else nEl.hidden = true;
       if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps  ${(1000 / Math.max(1, fps)).toFixed(1)} ms  ${renderer.info.render.calls} calls  ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris  ${renderer.info.memory.geometries} geo  ${renderer.info.memory.textures} tex  q:${quality}`;
     }
     lk.update(dt, camera.position);

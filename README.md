@@ -58,6 +58,17 @@ This is the **first playable version**: a small part of the full game.
 - The map marks places you visited but did not search fully (amber ring) and places with nothing left (grey).
 - The journal writes itself: one short entry for each day (where you went, what you took, what happened).
 
+### Skills
+
+- You learn by doing. There are 5 skills with 5 levels each: Scavenging, Tinkering, First aid, Cooking and Survival.
+  The Vitals panel and the character panel (C) show each level and the xp to the next level.
+- Scavenging: take items, search and open boxes. Searches are faster. At level 1 you notice how many items are near you;
+  at level 2 you hear how many items are in a closed box; at level 3 and 5 loot is easier to see.
+- Tinkering: force doors and gates (+1 on the d20 per level). First aid: bandaged wounds heal faster, less infection.
+  Cooking: hot meals help morale more, boiling is faster. Survival: firewood burns longer, raw water is less risky.
+- Books (first-aid handbook, home repair manual, camp cooking book, wilderness survival guide) teach a skill once.
+  Reading takes 2 hours and needs light.
+
 ## Run the game
 
 - **On the web:** after this is on `main`, turn on GitHub Pages

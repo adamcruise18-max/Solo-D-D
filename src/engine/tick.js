@@ -10,6 +10,7 @@ import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
+import { infectRiskFactor } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -353,7 +354,7 @@ const INJURY_DATA = {
 
 export function addInjury(state, type) {
   const d = INJURY_DATA[type];
-  state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk, infectRolled: false });
+  state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false });
   damage(state, d.hp, type === 'bite' ? 'an animal attack' : 'an injury');
   log(state, `Injury: ${INJURY_NAMES[type]} (Health −${d.hp}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
   if (state.player.health <= 0) die(state, type === 'bite' ? 'an animal attack' : 'an injury');

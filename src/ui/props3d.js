@@ -1598,6 +1598,90 @@ const ITEM_BUILDERS = {
 };
 delete ITEM_BUILDERS.first_aid_kit;
 
+
+// paperback guide books: cover art is a plain pictogram plus a generic title
+const BOOKS = {
+  book_first_aid: { title: ['FIRST-AID', 'HANDBOOK'], sub: 'EMERGENCY CARE AT HOME', bg: '#c4221c', band: '#f4f2ec', ink: '#f4f2ec', icon: 'cross' },
+  book_repair: { title: ['HOME REPAIR', 'MANUAL'], sub: 'FIX IT YOURSELF', bg: '#e8701c', band: '#5a5e62', ink: '#2a2c2e', icon: 'wrench' },
+  book_cooking: { title: ['CAMP', 'COOKING'], sub: 'MEALS OVER AN OPEN FIRE', bg: '#2f6a3a', band: '#efe6cf', ink: '#efe6cf', icon: 'pot' },
+  book_survival: { title: ['WILDERNESS', 'SURVIVAL GUIDE'], sub: 'SHELTER  WATER  FIRE  FOOD', bg: '#1f3a26', band: '#c9a24a', ink: '#e8d8a0', icon: 'compass' },
+};
+function bookIcon(c, kind, x, y, s, B) {
+  c.save(); c.translate(x, y);
+  if (kind === 'cross') {
+    c.fillStyle = B.band; c.beginPath(); c.arc(0, 0, s, 0, TAU); c.fill();
+    c.fillStyle = B.bg; const a = s * 0.62, t = s * 0.22; c.fillRect(-t, -a, 2 * t, 2 * a); c.fillRect(-a, -t, 2 * a, 2 * t);
+  } else if (kind === 'wrench') {
+    c.rotate(-0.7); c.fillStyle = B.ink;
+    c.fillRect(-s * 0.13, -s * 0.7, s * 0.26, s * 1.4);
+    for (const e of [-1, 1]) { c.beginPath(); c.arc(0, e * s * 0.78, s * 0.3, 0, TAU); c.fill(); }
+    c.fillStyle = B.bg; c.fillRect(-s * 0.1, -s * 1.12, s * 0.2, s * 0.36); c.beginPath(); c.arc(0, s * 0.78, s * 0.13, 0, TAU); c.fill();
+  } else if (kind === 'pot') {
+    c.fillStyle = B.ink; c.strokeStyle = B.ink; c.lineWidth = s * 0.08;
+    c.beginPath(); c.moveTo(-s * 0.7, -s * 0.15); c.lineTo(s * 0.7, -s * 0.15); c.lineTo(s * 0.6, s * 0.6); c.lineTo(-s * 0.6, s * 0.6); c.closePath(); c.fill();
+    c.fillRect(-s * 0.78, -s * 0.3, s * 1.56, s * 0.12);
+    c.beginPath(); c.arc(0, -s * 0.3, s * 0.55, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+    for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(i * s * 0.3, -s * 0.45); c.bezierCurveTo(i * s * 0.3 + s * 0.12, -s * 0.6, i * s * 0.3 - s * 0.12, -s * 0.75, i * s * 0.3, -s * 0.9); c.stroke(); }
+  } else {
+    c.strokeStyle = B.band; c.lineWidth = s * 0.06; c.beginPath(); c.arc(0, 0, s * 0.9, 0, TAU); c.stroke();
+    for (let i = 0; i < 8; i++) {
+      const L = i % 2 ? s * 0.5 : s * 0.85, wd = s * 0.14;
+      c.save(); c.rotate(i * Math.PI / 4);
+      c.fillStyle = i % 2 ? B.ink : B.band; c.beginPath(); c.moveTo(0, -L); c.lineTo(wd, 0); c.lineTo(-wd, 0); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.moveTo(0, -L); c.lineTo(wd, 0); c.lineTo(0, 0); c.closePath(); c.fill();
+      c.restore();
+    }
+    txt(c, 'N', 0, -s * 0.98, s * 0.28, { color: B.ink });
+  }
+  c.restore();
+}
+function guideBook(g, r, id) {
+  const B = BOOKS[id];
+  const font = '"DejaVu Sans", Arial, sans-serif';
+  // one atlas per title: front [0,256), back [256,512), spine [512,544) drawn upright, page edges [544,640)
+  const atlas = tmat(ctex('gbook' + id, 640, 384, (c, W, h, rr) => {
+    const w = 256;
+    noiseFill(c, 544, h, rr, B.bg, 0.06, 3000, 2);
+    c.fillStyle = B.band; c.fillRect(0, h * 0.06, w, 6); c.fillRect(0, h * 0.94 - 6, w, 6);
+    B.title.forEach((t, i) => txt(c, t, w / 2, h * 0.16 + i * 34, 28, { color: B.ink, maxW: w * 0.86, font }));
+    bookIcon(c, B.icon, w / 2, h * 0.56, 62, B);
+    txt(c, B.sub, w / 2, h * 0.86, 12, { color: B.ink, maxW: w * 0.86 });
+    c.strokeStyle = 'rgba(255,255,255,0.25)'; c.lineWidth = 2; c.beginPath(); c.moveTo(w * 0.7, h); c.lineTo(w, h * 0.82); c.stroke();
+    c.strokeStyle = 'rgba(80,60,30,0.25)'; c.lineWidth = 3; c.beginPath(); c.arc(w * (0.3 + rr() * 0.4), h * (0.3 + rr() * 0.4), 34, 0, TAU); c.stroke();
+    // back cover
+    c.fillStyle = B.band; c.fillRect(256 + w * 0.1, h * 0.12, w * 0.8, 3);
+    finePrint(c, 256 + w * 0.12, h * 0.18, w * 0.76, 12, 14, rr, B.ink);
+    c.fillStyle = '#f4f2ec'; c.fillRect(256 + w * 0.55, h * 0.8, w * 0.35, h * 0.1); barcode(c, 256 + w * 0.57, h * 0.81, w * 0.31, h * 0.08, rr);
+    // spine, title running top to bottom
+    c.save(); c.translate(528, h / 2); c.rotate(Math.PI / 2); txt(c, B.title.join(' '), 0, 6, 17, { color: B.ink, maxW: h * 0.9, font }); c.restore();
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(512, 0, 2, h); c.fillRect(542, 0, 2, h);
+    // page edges
+    c.fillStyle = '#efe6cf'; c.fillRect(544, 0, 96, h); c.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = 544; x < W; x += 2) c.fillRect(x, 0, 1, h);
+    grime(c, W, h, rr, 1.2);
+  }), 0.75);
+  const geo = cached(GEO, 'gbookgeo', () => {
+    const b = new THREE.BoxGeometry(0.15, 0.03, 0.22).translate(0, 0.015, 0);
+    const uv = b.attributes.uv, pos = b.attributes.position;
+    const U = (a) => a / 640;
+    // face order +x,-x,+y,-y,+z,-z; map each vertex by its position so orientation is explicit
+    for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k, x = pos.getX(i) / 0.15 + 0.5, y = (pos.getY(i)) / 0.03, z = pos.getZ(i) / 0.22 + 0.5;
+      let u, v;
+      if (f === 2) { u = U(x * 256); v = 1 - z; }            // front cover (top), title towards -z
+      else if (f === 3) { u = U(256 + (1 - x) * 256); v = 1 - z; } // back cover
+      else if (f === 1) { u = U(512 + y * 32); v = 1 - z; }       // spine on -x
+      else { u = U(544 + (f === 0 ? z : x) * 96); v = y; }        // page edges
+      uv.setXY(i, u, v);
+    }
+    return b;
+  });
+  const book = new THREE.Group();
+  add(book, geo, atlas);
+  if (r() < 0.35) { book.rotation.x = Math.PI / 2; book.position.set(0, 0.11, -0.015); } // standing
+  else book.rotation.y = (r() - 0.5) * 0.3;
+  g.add(book);
+}
+for (const id of Object.keys(BOOKS)) ITEM_BUILDERS[id] = (g, r) => guideBook(g, r, id);
 export const ITEM_MODEL_IDS = Object.keys(ITEM_BUILDERS);
 
 export function makeItemModel(itemId, seed = 0) {
@@ -2832,4 +2916,627 @@ export function makeProp(kind, seed = 0) {
   if (fn) fn(g, r);
   else { const b = new THREE.Group(); PROP_BUILDERS.cardboard_box(b, r); g.add(b); }
   return finish(g, kind, FLAT_PROPS.has(kind));
+}
+
+// =====================================================================
+// Fixtures: furniture and store fittings that fill a collision box exactly
+// =====================================================================
+
+// box whose UVs are in meters (textures tile once per meter), base on y = 0
+function gBoxW(w, h, d) {
+  const k = `boxw${w.toFixed(3)},${h.toFixed(3)},${d.toFixed(3)}`;
+  return cached(GEO, k, () => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    const uv = g.attributes.uv;
+    const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+    for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const n = f * 4 + i; uv.setXY(n, uv.getX(n) * dims[f][0], uv.getY(n) * dims[f][1]); }
+    g.translate(0, h / 2, 0);
+    return g;
+  });
+}
+function tex1m(key, px, draw) { return ctex('fx|' + key, px, px, draw, { repeat: [1, 1] }); }
+function dust(c, w, h, r, amt = 1) {
+  grime(c, w, h, r, amt);
+  // fine settled dust
+  for (let i = 0; i < 1500 * amt; i++) { c.fillStyle = `rgba(200,190,170,${0.04 + r() * 0.06})`; c.fillRect(r() * w, r() * h, 1.5, 1.5); }
+}
+const FX = {
+  wood(tone = '#6a4528') {
+    return mat('fxwood' + tone, { map: tex1m('wood' + tone, 512, (c, w, h, r) => {
+      c.fillStyle = tone; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 140; i++) {
+        c.strokeStyle = `rgba(${r() < 0.5 ? '30,18,8' : '255,230,200'},${0.04 + r() * 0.1})`; c.lineWidth = 1 + r() * 3;
+        const y0 = r() * h; c.beginPath(); c.moveTo(0, y0);
+        for (let x = 0; x <= w; x += 32) c.lineTo(x, y0 + Math.sin(x * 0.01 + i) * 6);
+        c.stroke();
+      }
+      dust(c, w, h, r, 1);
+    }), roughness: 0.62 });
+  },
+  fabric(color) {
+    return mat('fxfab' + color, { map: tex1m('fab' + color, 256, (c, w, h, r) => {
+      c.fillStyle = color; c.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 2) { c.fillStyle = `rgba(0,0,0,${0.05 + r() * 0.06})`; c.fillRect(0, y, w, 1); }
+      for (let x = 0; x < w; x += 2) { c.fillStyle = `rgba(255,255,255,${0.03 + r() * 0.04})`; c.fillRect(x, 0, 1, h); }
+      for (let i = 0; i < 5; i++) { const x = r() * w, y = r() * h, s = 20 + r() * 50; const gr = c.createRadialGradient(x, y, 0, x, y, s); gr.addColorStop(0, 'rgba(60,45,30,0.18)'); gr.addColorStop(1, 'rgba(60,45,30,0)'); c.fillStyle = gr; c.fillRect(x - s, y - s, s * 2, s * 2); }
+      dust(c, w, h, r, 0.8);
+    }), roughness: 0.95 });
+  },
+  sheet() {
+    return mat('fxsheet', { map: tex1m('sheet', 256, (c, w, h, r) => {
+      noiseFill(c, w, h, r, '#e4e2da', 0.05, 1500, 2);
+      c.strokeStyle = 'rgba(0,0,0,0.07)';
+      for (let i = 0; i < 25; i++) { c.lineWidth = 1 + r() * 2; c.beginPath(); c.moveTo(r() * w, r() * h); c.bezierCurveTo(r() * w, r() * h, r() * w, r() * h, r() * w, r() * h); c.stroke(); }
+      dust(c, w, h, r, 0.8);
+    }), roughness: 0.95, side: THREE.DoubleSide });
+  },
+  enamel(key = 'w', base = '#e9e8e2') {
+    return mat('fxenamel' + key, { map: tex1m('enamel' + key, 256, (c, w, h, r) => {
+      c.fillStyle = base; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 18; i++) { const x = r() * w; const g2 = c.createLinearGradient(0, 0, 0, h); g2.addColorStop(0, 'rgba(120,100,60,0)'); g2.addColorStop(1, `rgba(120,100,60,${0.05 + r() * 0.08})`); c.fillStyle = g2; c.fillRect(x, r() * h * 0.5, 2 + r() * 4, h); }
+      dust(c, w, h, r, 1);
+    }), roughness: 0.3 });
+  },
+  painted(color) {
+    return mat('fxpaint' + color, { map: tex1m('paint' + color, 256, (c, w, h, r) => {
+      noiseFill(c, w, h, r, color, 0.04, 1500, 2);
+      for (let i = 0; i < 25; i++) { c.fillStyle = 'rgba(60,50,40,0.25)'; c.beginPath(); c.ellipse(r() * w, r() * h, 1 + r() * 4, 1 + r() * 2, r() * 3, 0, TAU); c.fill(); }
+      dust(c, w, h, r, 1);
+    }), roughness: 0.55, metalness: 0.05 });
+  },
+  metal(color = '#9ea3a8', key = '') {
+    return mat('fxmetal' + color + key, { map: tex1m('metal' + color, 128, (c, w, h, r) => {
+      c.fillStyle = color; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 200; i++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'; c.fillRect(0, r() * h, w, 1); }
+      dust(c, w, h, r, 0.6);
+    }), roughness: 0.38, metalness: 0.5 });
+  },
+  dark(key = 'k', color = '#1b1c1e', rough = 0.6) {
+    return mat('fxdark' + key, { map: tex1m('dark' + key, 128, (c, w, h, r) => { noiseFill(c, w, h, r, color, 0.04, 600, 2); dust(c, w, h, r, 1.2); }), roughness: rough });
+  },
+  laminate(color = '#b8b4aa') {
+    return mat('fxlam' + color, { map: tex1m('lam' + color, 256, (c, w, h, r) => {
+      noiseFill(c, w, h, r, color, 0.06, 3000, 1.5);
+      dust(c, w, h, r, 1.2);
+    }), roughness: 0.5 });
+  },
+  counterTop(color = '#cfc8b8') {
+    return mat('fxtop' + color, { map: tex1m('top' + color, 256, (c, w, h, r) => {
+      noiseFill(c, w, h, r, color, 0.1, 5000, 2);
+      for (let i = 0; i < 300; i++) { c.fillStyle = r() < 0.5 ? 'rgba(60,50,40,0.35)' : 'rgba(255,255,255,0.3)'; c.fillRect(r() * w, r() * h, 2, 2); }
+      dust(c, w, h, r, 1.5);
+    }), roughness: 0.4 });
+  },
+  card() { return mat('fxcard', { map: tex1m('card', 256, (c, w, h, r) => { noiseFill(c, w, h, r, '#a9824f', 0.1, 2500, 2); c.fillStyle = 'rgba(200,170,110,0.7)'; c.fillRect(0, h * 0.45, w, h * 0.1); dust(c, w, h, r, 1); }), roughness: 0.9 }); },
+  glass() {
+    return mat('fxglass', { map: tex1m('glass', 256, (c, w, h, r) => {
+      c.fillStyle = '#c8d4d8'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 40; i++) { const x = r() * w, y = r() * h, s = 10 + r() * 60; const g2 = c.createRadialGradient(x, y, 0, x, y, s); g2.addColorStop(0, 'rgba(255,255,255,0.6)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g2; c.fillRect(x - s, y - s, s * 2, s * 2); }
+      for (let i = 0; i < 30; i++) { c.fillStyle = 'rgba(90,80,60,0.4)'; c.fillRect(r() * w, r() * h * 0.6 + h * 0.4, 1 + r() * 2, 10 + r() * 50); }
+    }), roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.32, depthWrite: false });
+  },
+};
+// box helper in fixture space (x0..x1, y0..y1, z0..z1)
+function bx(g, m, x0, x1, y0, y1, z0, z1, world = true) {
+  const w = Math.max(0.001, x1 - x0), h = Math.max(0.001, y1 - y0), d = Math.max(0.001, z1 - z0);
+  return add(g, world ? gBoxW(w, h, d) : gBox(w, h, d), m, (x0 + x1) / 2, y0, (z0 + z1) / 2);
+}
+function rbx(g, m, x0, x1, y0, y1, z0, z1, rad) {
+  const w = x1 - x0, h = y1 - y0, d = z1 - z0;
+  return add(g, gRBox(+w.toFixed(3), +h.toFixed(3), +d.toFixed(3), rad), m, (x0 + x1) / 2, y0, (z0 + z1) / 2);
+}
+
+// Every builder works in a canonical frame: long side along x (length L), depth D along z,
+// height H, front facing +z, everything inside x in [-L/2, L/2], z in [-D/2, D/2], y in [0, H].
+const FIXTURES = {
+  sofa(g, L, D, H, r) {
+    const F = FX.fabric(pick(r, ['#5a5f4a', '#6a4a3a', '#3e4a5a', '#7a7468', '#4a3a42']));
+    const W = FX.wood('#3a2616');
+    const legH = Math.min(0.08, H * 0.1), seatH = Math.min(0.46, H * 0.55);
+    const a = Math.min(0.2, L * 0.1), bt = Math.min(0.22, D * 0.25), armH = Math.min(H, seatH + 0.2);
+    for (const x of [-L / 2 + 0.06, L / 2 - 0.06]) for (const z of [-D / 2 + 0.06, D / 2 - 0.06]) add(g, gCyl(0.025, 0.02, legH, 8), W, x, 0, z);
+    rbx(g, F, -L / 2, L / 2, legH, seatH - 0.12, -D / 2, D / 2, 0.03);
+    rbx(g, F, -L / 2, L / 2, legH, H, -D / 2, -D / 2 + bt, 0.05);
+    for (const s of [-1, 1]) rbx(g, F, s < 0 ? -L / 2 : L / 2 - a, s < 0 ? -L / 2 + a : L / 2, legH, armH, -D / 2, D / 2, 0.06);
+    const n = L - 2 * a > 1.5 ? 3 : L - 2 * a > 0.9 ? 2 : 1;
+    const cw = (L - 2 * a) / n;
+    for (let i = 0; i < n; i++) {
+      const x0 = -L / 2 + a + i * cw + 0.006, x1 = x0 + cw - 0.012;
+      const sag = r() * 0.025;
+      rbx(g, F, x0, x1, seatH - 0.13, seatH - sag, -D / 2 + bt + 0.005, D / 2 - 0.005, 0.05);
+      const back = rbx(g, F, x0 + 0.01, x1 - 0.01, seatH - 0.02, Math.min(H - 0.02, seatH + (H - seatH) * 0.85), -D / 2 + bt, -D / 2 + bt + 0.16, 0.06);
+      back.rotation.x = -0.08 - r() * 0.08;
+    }
+    if (r() < 0.8) { // throw pillow and a blanket over the arm
+      const P = new THREE.Group();
+      add(P, gRBox(0.4, 0.38, 0.12, 0.05), texPlaidMat(r), 0, 0, 0);
+      P.position.set(-L / 2 + a + 0.25, seatH - 0.02, -D / 2 + bt + 0.15); P.rotation.set(-0.5, 0.3, 0.35);
+      g.add(P);
+    }
+  },
+  table(g, L, D, H, r) {
+    const W = FX.wood(pick(r, ['#6a4528', '#8a6440', '#4a3020']));
+    const T = FX.wood('#7a5434');
+    const top = 0.035;
+    bx(g, T, -L / 2, L / 2, H - top, H, -D / 2, D / 2);
+    const lx = L / 2 - 0.08, lz = D / 2 - 0.08;
+    for (const x of [-lx, lx]) for (const z of [-lz, lz]) bx(g, W, x - 0.03, x + 0.03, 0, H - top, z - 0.03, z + 0.03);
+    bx(g, W, -lx, lx, H - top - 0.08, H - top, -lz - 0.01, -lz + 0.01); bx(g, W, -lx, lx, H - top - 0.08, H - top, lz - 0.01, lz + 0.01);
+    bx(g, W, -lx - 0.01, -lx + 0.01, H - top - 0.08, H - top, -lz, lz); bx(g, W, lx - 0.01, lx + 0.01, H - top - 0.08, H - top, -lz, lz);
+    if (D < 0.55 || H < 0.55) return;
+    const per = Math.max(1, Math.floor((L - 0.2) / 0.6));
+    const seatY = Math.min(0.45, H - 0.22);
+    for (const s of [-1, 1]) for (let i = 0; i < per; i++) {
+      if (r() < 0.15) continue; // a chair is missing
+      const cx = -L / 2 + (i + 0.5) * (L / per) + (r() - 0.5) * 0.08;
+      const zIn = s * (D / 2 - 0.22), zBack = s * (D / 2 - 0.025);
+      const C = new THREE.Group();
+      const sw = Math.min(0.42, L / per - 0.06);
+      bx(C, W, -sw / 2, sw / 2, seatY - 0.035, seatY, -0.2, 0.2);
+      for (const x of [-sw / 2 + 0.03, sw / 2 - 0.03]) for (const z of [-0.17, 0.17]) bx(C, W, x - 0.017, x + 0.017, 0, seatY - 0.035, z - 0.017, z + 0.017);
+      for (const x of [-sw / 2 + 0.03, sw / 2 - 0.03]) bx(C, W, x - 0.017, x + 0.017, seatY, H - top - 0.012, 0.2 - 0.03, 0.2 - 0.005);
+      bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, H - top - 0.1, H - top - 0.02, 0.2 - 0.03, 0.2 - 0.008);
+      bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, seatY + 0.12, seatY + 0.16, 0.2 - 0.028, 0.2 - 0.01);
+      C.position.set(cx, 0, (zIn + zBack - s * 0.2 + s * 0.2) / 2 + s * 0.0);
+      C.position.z = zBack - s * 0.2 * 1; // chair back sits at the table edge
+      C.position.z = s > 0 ? D / 2 - 0.205 : -(D / 2 - 0.205);
+      if (s < 0) C.rotation.y = Math.PI;
+      C.rotation.y += (r() - 0.5) * 0.08;
+      g.add(C);
+    }
+  },
+  bed(g, L, D, H, r) {
+    const W = FX.wood(pick(r, ['#5a3a22', '#7a5a3a', '#3a2a1e']));
+    const S = FX.sheet();
+    const B = texPlaidMat(r, true);
+    const mTop = Math.min(0.6, H * 0.62);
+    const hb = 0.06;
+    bx(g, W, -L / 2, -L / 2 + hb, 0, H, -D / 2, D / 2);
+    const fbH = Math.min(H, mTop + 0.06);
+    bx(g, W, L / 2 - 0.05, L / 2, 0, fbH, -D / 2, D / 2);
+    for (const z of [-D / 2, D / 2 - 0.04]) bx(g, W, -L / 2 + hb, L / 2 - 0.05, 0.14, 0.32, z, z + 0.04);
+    rbx(g, S, -L / 2 + hb + 0.01, L / 2 - 0.06, 0.32, mTop, -D / 2 + 0.03, D / 2 - 0.03, 0.05);
+    // pillows
+    const np = D > 1.2 ? 2 : 1;
+    for (let i = 0; i < np; i++) {
+      const pz = np === 1 ? 0 : (i - 0.5) * D * 0.48;
+      const p = rbx(g, S, -L / 2 + hb + 0.04, -L / 2 + hb + 0.4, mTop - 0.02, mTop + 0.12, pz - Math.min(0.32, D * 0.4), pz + Math.min(0.32, D * 0.4), 0.06);
+      p.rotation.set(0, (r() - 0.5) * 0.2, (r() - 0.5) * 0.15);
+    }
+    // rumpled blanket: draped grid over the mattress, hanging down both sides
+    const x0 = -L / 2 + hb + 0.45 + r() * 0.2, x1 = L / 2 - 0.07;
+    const halfW = D / 2 - 0.02, drop = Math.min(0.22, mTop - 0.12);
+    const nx = 18, ns = 14;
+    const geo = new THREE.PlaneGeometry(1, 1, nx, ns);
+    const p = geo.attributes.position, uv = geo.attributes.uv;
+    const ph = r() * 10;
+    for (let i = 0; i < p.count; i++) {
+      const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5;
+      const x = x0 + (x1 - x0) * u;
+      const s = (v - 0.5) * 2 * (halfW + drop);
+      const wr = Math.sin(x * 9 + ph + s * 3) * 0.018 + Math.sin(x * 23 + s * 11 + ph) * 0.006;
+      let y, z;
+      if (Math.abs(s) <= halfW) { z = s; y = mTop + 0.025 + wr * (1 - Math.abs(s) / halfW * 0.5) + (u < 0.12 ? (0.12 - u) * 0.5 : 0); }
+      else { z = Math.sign(s) * (halfW + 0.01); y = mTop + 0.02 - (Math.abs(s) - halfW) + wr * 0.4; }
+      p.setXYZ(i, x, y, z);
+      uv.setXY(i, u * (x1 - x0), v * (halfW + drop) * 2);
+    }
+    geo.computeVertexNormals();
+    add(g, geo, B);
+    // folded-back edge
+    add(g, gCyl(0.03, 0.03, 2 * halfW, 8), B, x0 + 0.02, mTop + 0.03, -halfW, Math.PI / 2, 0, 0);
+  },
+  dresser(g, L, D, H, r) {
+    const W = FX.wood(pick(r, ['#6a4528', '#5a3a22', '#8a6a48']));
+    const K = FX.metal('#b8a070', 'brass');
+    bx(g, W, -L / 2, L / 2, H - 0.03, H, -D / 2, D / 2);
+    bx(g, W, -L / 2 + 0.01, L / 2 - 0.01, 0, H - 0.03, -D / 2, D / 2 - 0.02);
+    bx(g, FX.dark('dresserin', '#1a120c'), -L / 2 + 0.02, L / 2 - 0.02, 0.1, H - 0.04, D / 2 - 0.0225, D / 2 - 0.02);
+    const rows = Math.max(2, Math.round((H - 0.12) / 0.22));
+    const cols = L > 1.0 ? 2 : 1;
+    const dh = (H - 0.03 - 0.1) / rows;
+    for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+      const c2 = i === rows - 1 && cols === 2 && r() < 0.0 ? 1 : cols;
+      const cw = (L - 0.04) / c2;
+      if (j >= c2) continue;
+      const x0 = -L / 2 + 0.02 + j * cw + 0.006, x1 = x0 + cw - 0.012;
+      const y0 = 0.1 + i * dh + 0.006, y1 = y0 + dh - 0.012;
+      const out = r() < 0.15 ? 0.0 : 0; // drawers stay shut (box must stay clear)
+      bx(g, W, x0, x1, y0, y1, D / 2 - 0.022 + out, D / 2);
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      for (const hx of cw > 0.5 ? [-0.12, 0.12] : [0]) add(g, gCyl(0.012, 0.012, 0.012, 8), K, cx + hx, cy, D / 2 - 0.012, Math.PI / 2, 0, 0);
+    }
+  },
+  fridge(g, L, D, H, r) {
+    const E = FX.enamel('fridge', pick(r, ['#e9e8e2', '#d8d6cc', '#c8cacb']));
+    const K = FX.dark('fridgek', '#2a2b2d', 0.5);
+    const P = mat('fxnotes', { map: ctex('fridgenotes', 256, 256, (c, w, h, rr) => {
+      c.fillStyle = '#ece6d0'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#f2c21b'; c.fillRect(0, 0, w / 2, h / 2);
+      c.fillStyle = '#f4f4f4'; c.fillRect(w / 2, 0, w / 2, h / 2);
+      c.fillStyle = '#cfe0ef'; c.fillRect(0, h / 2, w / 2, h / 2);
+      c.fillStyle = '#f6f0e4'; c.fillRect(w / 2, h / 2, w / 2, h / 2);
+      finePrint(c, 12, 20, 100, 6, 12, rr, '#333'); finePrint(c, 140, 20, 100, 8, 10, rr, '#333');
+      // a child's crayon drawing: house and sun
+      c.strokeStyle = '#2a6fd6'; c.lineWidth = 4; c.strokeRect(30, 170, 60, 50); c.beginPath(); c.moveTo(25, 172); c.lineTo(60, 140); c.lineTo(95, 172); c.stroke();
+      c.fillStyle = '#f08a1c'; c.beginPath(); c.arc(105, 150, 12, 0, TAU); c.fill();
+      finePrint(c, 140, 150, 100, 7, 12, rr, '#223');
+      grime(c, w, h, rr, 1);
+    }), roughness: 0.9 });
+    const dz = 0.045;
+    rbx(g, E, -L / 2 + 0.005, L / 2 - 0.005, 0.0, H - 0.005, -D / 2, D / 2 - dz, 0.02);
+    bx(g, K, -L / 2 + 0.03, L / 2 - 0.03, 0, 0.09, D / 2 - dz, D / 2 - dz + 0.01);
+    const split = H * (H > 1.5 ? 0.68 : 0.62);
+    rbx(g, E, -L / 2, L / 2, 0.1, split - 0.006, D / 2 - dz + 0.002, D / 2, 0.015);
+    rbx(g, E, -L / 2, L / 2, split + 0.006, H, D / 2 - dz + 0.002, D / 2, 0.015);
+    bx(g, K, -L / 2 + 0.01, L / 2 - 0.01, split - 0.008, split + 0.008, D / 2 - dz - 0.004, D / 2 - dz + 0.004);
+    const hx = L / 2 - 0.07;
+    bx(g, K, hx - 0.015, hx + 0.015, split - 0.42 > 0.2 ? split - 0.42 : 0.2, split - 0.08, D / 2 - 0.005 - 0.0, D / 2);
+    bx(g, K, hx - 0.015, hx + 0.015, split + 0.06, Math.min(H - 0.06, split + 0.32), D / 2 - 0.005, D / 2);
+    // notes and a drawing held by magnets
+    const notes = [[-0.15, split - 0.25, 0, 0], [0.05, split - 0.45, 1, 1], [-0.12, split + 0.15, 2, 0], [-0.05, split - 0.75, 3, 1]];
+    for (const [x, y, cell, rot] of notes) {
+      if (r() < 0.25 || y < 0.2) continue;
+      const u0 = (cell % 2) / 2, v0 = 1 - (Math.floor(cell / 2) + 1) / 2;
+      const q = new THREE.PlaneGeometry(0.14, 0.18);
+      const uvq = q.attributes.uv;
+      for (let i = 0; i < uvq.count; i++) uvq.setXY(i, u0 + uvq.getX(i) * 0.5, v0 + uvq.getY(i) * 0.5);
+      add(g, q, P, Math.max(-L / 2 + 0.1, Math.min(L / 2 - 0.15, x * L / 0.75)), y, D / 2 - 0.0015, 0, 0, rot ? 0.12 : -0.06);
+      add(g, gCyl(0.008, 0.008, 0.004, 8), K, Math.max(-L / 2 + 0.1, Math.min(L / 2 - 0.15, x * L / 0.75)), y + 0.075, D / 2 - 0.004, Math.PI / 2, 0, 0);
+    }
+  },
+  counter(g, L, D, H, r) {
+    const C = FX.painted(pick(r, ['#e8e2d2', '#8a9a88', '#5a6a7a', '#d8d0c0']));
+    const T = FX.counterTop(pick(r, ['#cfc8b8', '#6a6a68', '#b8a890']));
+    const S = FX.metal('#b8bcc0', 'ss');
+    const K = mat('fxcooktop', { map: ctex('cooktop', 256, 256, (c, w, h, rr) => {
+      c.fillStyle = '#141516'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = 'rgba(200,200,200,0.35)'; c.lineWidth = 3;
+      for (const [x, y, rad] of [[64, 64, 44], [192, 64, 34], [64, 192, 34], [192, 192, 44]]) { c.beginPath(); c.arc(x, y, rad, 0, TAU); c.stroke(); c.beginPath(); c.arc(x, y, rad * 0.6, 0, TAU); c.stroke(); }
+      dust(c, w, h, rr, 1.5);
+    }), roughness: 0.25, metalness: 0.1 });
+    const top = 0.04, kick = 0.09;
+    bx(g, K, -L / 2, L / 2, 0, kick, -D / 2, D / 2 - 0.07);
+    bx(g, C, -L / 2, L / 2, kick, H - top, -D / 2, D / 2 - 0.03);
+    // which appliance
+    const hasSink = L >= 0.7 && (L >= 1.6 || r() < 0.55);
+    const hasStove = L >= 0.7 && (L >= 1.6 || !hasSink);
+    const sinkW = 0.6, stoveW = 0.62;
+    const sinkX = hasSink ? (hasStove ? -L / 2 + 0.2 + sinkW / 2 : (r() - 0.5) * (L - sinkW - 0.1)) : null;
+    const stoveX = hasStove ? (hasSink ? L / 2 - 0.15 - stoveW / 2 : (r() - 0.5) * (L - stoveW - 0.1)) : null;
+    // doors and drawers along the front
+    const segs = Math.max(1, Math.round(L / 0.5));
+    const sw = L / segs;
+    for (let i = 0; i < segs; i++) {
+      const x0 = -L / 2 + i * sw + 0.004, x1 = x0 + sw - 0.008, cx = (x0 + x1) / 2;
+      if (stoveX !== null && Math.abs(cx - stoveX) < stoveW / 2) continue;
+      bx(g, C, x0, x1, H - top - 0.17, H - top - 0.01, D / 2 - 0.03, D / 2 - 0.008);
+      bx(g, S, cx - 0.06, cx + 0.06, H - top - 0.1, H - top - 0.085, D / 2 - 0.008, D / 2);
+      bx(g, C, x0, x1, kick + 0.01, H - top - 0.19, D / 2 - 0.03, D / 2 - 0.008);
+      bx(g, S, x1 - 0.04, x1 - 0.028, H - top - 0.4, H - top - 0.26, D / 2 - 0.008, D / 2);
+    }
+    if (stoveX !== null) { // oven front
+      const x0 = stoveX - stoveW / 2, x1 = stoveX + stoveW / 2;
+      bx(g, K, x0, x1, kick, H - top, D / 2 - 0.035, D / 2 - 0.005);
+      bx(g, S, x0 + 0.1, x1 - 0.1, kick + 0.2, H - top - 0.25, D / 2 - 0.006, D / 2 - 0.003);
+      bx(g, S, x0 + 0.06, x1 - 0.06, H - top - 0.17, H - top - 0.15, D / 2 - 0.004, D / 2);
+      for (let k = 0; k < 4; k++) add(g, gCyl(0.018, 0.018, 0.02, 8), S, x0 + 0.1 + k * (stoveW - 0.2) / 3, H - top - 0.07, D / 2 - 0.02, Math.PI / 2, 0, 0);
+    }
+    // worktop with openings
+    const holes = [];
+    if (sinkX !== null) holes.push([sinkX - sinkW / 2 + 0.04, sinkX + sinkW / 2 - 0.04, 'sink']);
+    if (stoveX !== null) holes.push([stoveX - stoveW / 2, stoveX + stoveW / 2, 'stove']);
+    holes.sort((a, b) => a[0] - b[0]);
+    let xs = -L / 2;
+    const zf = D / 2 - 0.08, zb = -D / 2 + 0.1;
+    for (const [h0, h1, kind] of holes) {
+      bx(g, T, xs, h0, H - top, H, -D / 2, D / 2);
+      bx(g, T, h0, h1, H - top, H, zf, D / 2);
+      bx(g, T, h0, h1, H - top, H, -D / 2, zb);
+      if (kind === 'sink') {
+        const d0 = H - top - 0.18;
+        bx(g, S, h0, h1, d0, d0 + 0.01, zb, zf);
+        bx(g, S, h0, h0 + 0.006, d0, H, zb, zf); bx(g, S, h1 - 0.006, h1, d0, H, zb, zf);
+        bx(g, S, h0, h1, d0, H, zb, zb + 0.006); bx(g, S, h0, h1, d0, H, zf - 0.006, zf);
+        if (h1 - h0 > 0.45) bx(g, S, (h0 + h1) / 2 - 0.005, (h0 + h1) / 2 + 0.005, d0, H - 0.02, zb, zf);
+        add(g, gCyl(0.03, 0.03, 0.004, 10), K, (h0 + h1) / 2 - (h1 - h0) / 4, d0 + 0.01, (zb + zf) / 2);
+        add(g, gCyl(0.025, 0.025, 0.004, 10), S, (h0 + h1) / 2, H - 0.004, zb - 0.045);
+      } else {
+        bx(g, K, h0, h1, H - top, H, zb, zf);
+      }
+      xs = h1;
+    }
+    bx(g, T, xs, L / 2, H - top, H, -D / 2, D / 2);
+  },
+  tub(g, L, D, H, r) {
+    const E = FX.enamel('tub', '#ecebe6');
+    const R = mat('fxtubring', { map: tex1m('tubring', 256, (c, w, h, rr) => {
+      c.fillStyle = '#e4e0d4'; c.fillRect(0, 0, w, h);
+      const g2 = c.createRadialGradient(w * 0.6, h * 0.5, 10, w * 0.5, h * 0.5, w * 0.7); g2.addColorStop(0, 'rgba(150,120,70,0.35)'); g2.addColorStop(1, 'rgba(150,120,70,0.05)'); c.fillStyle = g2; c.fillRect(0, 0, w, h);
+      dust(c, w, h, rr, 2);
+    }), roughness: 0.35 });
+    const S = FX.metal('#c8ccd0', 'chrome');
+    const wt = 0.07;
+    bx(g, E, -L / 2, L / 2, 0, 0.06, -D / 2, D / 2);
+    bx(g, R, -L / 2 + wt, L / 2 - wt, 0.06, 0.07, -D / 2 + wt, D / 2 - wt);
+    rbx(g, E, -L / 2, L / 2, 0.0, H, D / 2 - wt, D / 2, 0.02);
+    rbx(g, E, -L / 2, L / 2, 0.0, H, -D / 2, -D / 2 + wt, 0.02);
+    rbx(g, E, -L / 2, -L / 2 + wt, 0.0, H, -D / 2, D / 2, 0.02);
+    rbx(g, E, L / 2 - wt * 1.6, L / 2, 0.0, H, -D / 2, D / 2, 0.02);
+    // dirty water line inside
+    bx(g, R, -L / 2 + wt, L / 2 - wt * 1.6, 0.07, 0.11, -D / 2 + wt, -D / 2 + wt + 0.002);
+    add(g, gCyl(0.025, 0.025, 0.005, 10), S, -L / 2 + wt + 0.1, 0.07, 0);
+    add(g, gCyl(0.018, 0.018, 0.12, 8), S, -L / 2 + wt, H - 0.12, 0, 0, 0, -Math.PI / 2);
+    for (const z of [-0.09, 0.09]) add(g, gCyl(0.022, 0.022, 0.03, 8), S, -L / 2 + wt, H - 0.07, z, 0, 0, -Math.PI / 2);
+  },
+  cabinet(g, L, D, H, r) {
+    const P = FX.painted(pick(r, ['#d8d4c8', '#6a7a6a', '#8a7a6a', '#b8bcc0']));
+    const S = FX.metal('#9a9ea2', 'cab');
+    bx(g, P, -L / 2, L / 2, 0, H, -D / 2, D / 2 - 0.02);
+    const nd = L > 0.55 ? 2 : 1;
+    const split = H > 1.3 ? H * 0.55 : 0;
+    for (let j = 0; j < nd; j++) for (const [y0, y1] of split ? [[0.08, split - 0.005], [split + 0.005, H - 0.04]] : [[0.08, H - 0.04]]) {
+      const x0 = -L / 2 + 0.01 + j * (L - 0.02) / nd + 0.004, x1 = x0 + (L - 0.02) / nd - 0.008;
+      bx(g, P, x0, x1, y0, y1, D / 2 - 0.02, D / 2);
+      bx(g, P, x0 + 0.05, x1 - 0.05, y0 + 0.05, y1 - 0.05, D / 2 - 0.005, D / 2 + 0.0);
+      const hx = nd === 2 ? (j === 0 ? x1 - 0.04 : x0 + 0.04) : x1 - 0.04;
+      bx(g, S, hx - 0.008, hx + 0.008, (y0 + y1) / 2 - 0.06, (y0 + y1) / 2 + 0.06, D / 2 - 0.0, D / 2);
+    }
+    bx(g, FX.dark('kickc'), -L / 2 + 0.02, L / 2 - 0.02, 0, 0.08, D / 2 - 0.05, D / 2 - 0.03);
+  },
+  checkout(g, L, D, H, r) {
+    const P = FX.laminate(pick(r, ['#8a8e92', '#b8b0a0', '#5a6a5a']));
+    const K = FX.dark('belt', '#18191b', 0.85);
+    const S = FX.metal('#b0b4b8', 'lane');
+    const ch = Math.min(0.92, H);
+    bx(g, P, -L / 2, L / 2, 0, ch - 0.05, -D / 2 + 0.02, D / 2 - 0.02);
+    bx(g, K, -L / 2 + 0.03, L / 2 - 0.03, 0, 0.06, -D / 2 + 0.02, D / 2 - 0.02);
+    const beltEnd = L / 2 - Math.min(0.8, L * 0.4);
+    bx(g, S, -L / 2, L / 2, ch - 0.05, ch - 0.03, -D / 2, D / 2);
+    bx(g, K, -L / 2 + 0.05, beltEnd, ch - 0.03, ch - 0.005, -D / 2 + 0.06, D / 2 - 0.06);
+    bx(g, S, -L / 2, beltEnd, ch - 0.03, ch, -D / 2, -D / 2 + 0.05); bx(g, S, -L / 2, beltEnd, ch - 0.03, ch, D / 2 - 0.05, D / 2);
+    add(g, gCyl(0.025, 0.025, D - 0.12, 8), S, beltEnd, ch - 0.03, -(D - 0.12) / 2, Math.PI / 2, 0, 0);
+    // scanner plate and bagging end
+    bx(g, P, beltEnd + 0.06, beltEnd + 0.36, ch - 0.03, ch - 0.02, -0.15, 0.15);
+    bx(g, S, beltEnd + 0.04, L / 2, ch - 0.03, ch - 0.01, -D / 2, D / 2);
+    // divider bar left on the belt
+    bx(g, K, -L / 2 + 0.4 + r() * (beltEnd + L / 2 - 0.8), -L / 2 + 0.42 + r() * 0.0 + 0.36, ch - 0.005, ch + Math.min(0.03, H - ch), -0.15, 0.15);
+    // terminal: keypad, card reader and screen on a short pole, kept inside the box
+    const tx = L / 2 - 0.2, tz = -D / 2 + 0.15;
+    const room = H - ch;
+    if (room > 0.12) {
+      const poleTop = Math.min(H - 0.18, ch + 0.25);
+      add(g, gCyl(0.02, 0.025, Math.max(0.02, poleTop - ch), 8), K, tx, ch, tz);
+      const sc = new THREE.Group();
+      bx(sc, K, -0.15, 0.15, 0, Math.min(0.22, H - poleTop - 0.01), -0.02, 0.02);
+      bx(sc, S, -0.13, 0.13, 0.015, Math.min(0.2, H - poleTop - 0.03), 0.02, 0.023, false);
+      sc.position.set(tx, poleTop, tz); sc.rotation.y = -0.6;
+      g.add(sc);
+    }
+    if (room > 0.04) {
+      bx(g, K, L / 2 - 0.5, L / 2 - 0.3, ch, ch + 0.035, D / 2 - 0.2, D / 2 - 0.06);
+      const cr = add(g, gBox(0.08, Math.min(0.12, room - 0.005), 0.05), K, L / 2 - 0.15, ch, D / 2 - 0.12);
+      cr.rotation.x = -0.3;
+    }
+  },
+  coolers(g, L, D, H, r) {
+    const F = FX.dark('coolerframe', '#2a2c2f', 0.45);
+    const I = mat('fxcoolerin', { color: 0x16181a, roughness: 0.7 });
+    const G = FX.glass();
+    const n = Math.max(1, Math.round(L / 0.76));
+    const dw = L / n;
+    const ft = 0.05;
+    bx(g, F, -L / 2, L / 2, 0, 0.12, -D / 2, D / 2);
+    bx(g, F, -L / 2, L / 2, H - 0.16, H, -D / 2, D / 2);
+    bx(g, F, -L / 2, L / 2, 0.12, H - 0.16, -D / 2, -D / 2 + 0.03);
+    bx(g, F, -L / 2, -L / 2 + 0.03, 0.12, H - 0.16, -D / 2, D / 2); bx(g, F, L / 2 - 0.03, L / 2, 0.12, H - 0.16, -D / 2, D / 2);
+    bx(g, I, -L / 2 + 0.03, L / 2 - 0.03, 0.12, H - 0.16, -D / 2 + 0.03, -D / 2 + 0.035);
+    const shelves = Math.max(2, Math.floor((H - 0.4) / 0.32));
+    const sy = (H - 0.28) / (shelves + 0);
+    const merger = new Merger(1);
+    const bottleTex = ctex('coolerbottles', 512, 64, (c, w, h) => {
+      const cols = ['#a8141a', '#2f8a3a', '#e8701c', '#1d4f9a', '#f2c21b', '#e9f2f6', '#4a2412', '#7fd62a'];
+      cols.forEach((cc, i) => { c.fillStyle = cc; c.fillRect(i * 64, 0, 64, h); c.fillStyle = 'rgba(255,255,255,0.8)'; c.fillRect(i * 64, h * 0.35, 64, h * 0.3); c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect(i * 64 + 10, h * 0.45, 44, 6); });
+    });
+    const bgeo = gCyl(0.035, 0.035, 0.22, 6);
+    for (let s = 0; s < shelves; s++) {
+      const y = 0.12 + s * sy;
+      bx(g, F, -L / 2 + 0.03, L / 2 - 0.03, y, y + 0.015, -D / 2 + 0.03, D / 2 - ft - 0.01);
+      for (let k = 0; k < n; k++) {
+        const x0 = -L / 2 + k * dw + 0.08;
+        for (let b = 0; b < 4; b++) {
+          if (r() > 0.55) continue;
+          const cell = Math.floor(r() * 8);
+          const rc = [cell / 8, 0, (cell + 1) / 8, 1];
+          const tipped = r() < 0.15;
+          const m = new THREE.Matrix4().compose(new THREE.Vector3(x0 + b * (dw - 0.16) / 3, y + 0.015 + (tipped ? 0.035 : 0), D / 2 - ft - 0.08 - r() * 0.1), new THREE.Quaternion().setFromEuler(new THREE.Euler(tipped ? Math.PI / 2 : 0, r() * 3, 0)), new THREE.Vector3(1, Math.min(1, (sy - 0.04) / 0.22), 1));
+          merger.add(bgeo, m, [rc, [0.01, 0.01, 0.02, 0.02], [0.01, 0.01, 0.02, 0.02]], [0]);
+        }
+      }
+    }
+    for (const mm of merger.meshes([mat('fxbottles', { map: bottleTex, roughness: 0.3 })])) g.add(mm);
+    // doors: frames, glass, handles
+    for (let k = 0; k < n; k++) {
+      const x0 = -L / 2 + k * dw, x1 = x0 + dw;
+      bx(g, F, x0, x0 + 0.04, 0.12, H - 0.16, D / 2 - ft, D / 2); bx(g, F, x1 - 0.04, x1, 0.12, H - 0.16, D / 2 - ft, D / 2);
+      bx(g, G, x0 + 0.04, x1 - 0.04, 0.12, H - 0.16, D / 2 - ft + 0.02, D / 2 - ft + 0.026);
+      const hx = k % 2 ? x0 + 0.08 : x1 - 0.08;
+      bx(g, F, hx - 0.012, hx + 0.012, H * 0.35, H * 0.65, D / 2 - 0.022, D / 2);
+    }
+  },
+  rx_counter(g, L, D, H, r) {
+    const P = FX.laminate(pick(r, ['#d8d4c8', '#8a9aa8', '#b8a890']));
+    const T = FX.counterTop('#e0dcd0');
+    const B = mat('fxbins', { map: ctex('rxbins', 512, 128, (c, w, h, rr) => {
+      const cols = ['#2a6fd6', '#c4221c', '#2f8a3a', '#f2c21b'];
+      cols.forEach((cc, i) => { c.fillStyle = cc; c.fillRect(i * 128, 0, 128, h); c.fillStyle = '#f4f2ec'; c.fillRect(i * 128 + 24, h * 0.35, 80, 30); finePrint(c, i * 128 + 30, h * 0.35 + 8, 68, 2, 8, rr, '#333'); });
+      dust(c, w, h, rr, 1.2);
+    }), roughness: 0.55 });
+    const ledge = 0.25;
+    bx(g, P, -L / 2, L / 2, 0, H - 0.03, D / 2 - ledge, D / 2 - 0.02);
+    bx(g, T, -L / 2, L / 2, H - 0.03, H, D / 2 - ledge - 0.02, D / 2);
+    const wy = Math.max(0.7, H - 0.28);
+    bx(g, P, -L / 2, L / 2, 0, wy - 0.03, -D / 2, D / 2 - ledge);
+    bx(g, T, -L / 2, L / 2, wy - 0.03, wy, -D / 2, D / 2 - ledge);
+    // pick bins on the work surface and in cubbies below
+    const binGeo = gBox(0.14, 0.09, 0.22);
+    const merger = new Merger(1);
+    const addBin = (x, y, z, ry) => { const cell = Math.floor(r() * 4); const rc = [cell / 4, 0, (cell + 1) / 4, 1]; merger.add(binGeo, new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1)), [rc, rc, rc, rc, rc, rc], [0]); };
+    const nb = Math.floor((L - 0.1) / 0.16);
+    for (let row = 0; row < 2; row++) for (let i = 0; i < nb; i++) {
+      if (r() < 0.3) continue;
+      const by = wy + row * 0.095;
+      if (by + 0.09 > H) continue;
+      addBin(-L / 2 + 0.09 + i * 0.16, by, -D / 2 + 0.13 + (row ? 0 : 0.0), (r() - 0.5) * 0.08);
+    }
+    for (let shelf = 0; shelf < 2; shelf++) {
+      const y = 0.12 + shelf * 0.3;
+      bx(g, P, -L / 2 + 0.02, L / 2 - 0.02, y - 0.015, y, -D / 2, D / 2 - ledge);
+      for (let i = 0; i < nb; i++) if (r() < 0.55) addBin(-L / 2 + 0.09 + i * 0.16, y, -D / 2 + 0.12, (r() - 0.5) * 0.1);
+    }
+    for (const mm of merger.meshes([B])) g.add(mm);
+  },
+  desk(g, L, D, H, r) {
+    const W = FX.wood(pick(r, ['#6a4528', '#9a7a5a', '#4a4a4c']));
+    const T = FX.laminate('#d8d4cc');
+    const K = FX.dark('desk', '#1d1e20', 0.45);
+    const wy = Math.min(0.75, H - 0.25);
+    const panel = 0.05;
+    bx(g, W, -L / 2, L / 2, 0, H - 0.03, D / 2 - panel, D / 2);
+    bx(g, T, -L / 2, L / 2, H - 0.03, H, D / 2 - 0.28, D / 2);
+    for (const s of [-1, 1]) bx(g, W, s < 0 ? -L / 2 : L / 2 - 0.04, s < 0 ? -L / 2 + 0.04 : L / 2, 0, wy, -D / 2, D / 2 - panel);
+    bx(g, T, -L / 2, L / 2, wy - 0.03, wy, -D / 2, D / 2 - panel);
+    // monitor, keyboard, phone, papers
+    const mx = (r() - 0.5) * (L - 0.7);
+    const mh = Math.min(0.32, H - wy - 0.02);
+    if (mh > 0.12) {
+      add(g, gBox(0.2, 0.012, 0.15), K, mx, wy, -D / 2 + 0.25);
+      add(g, gBox(0.04, mh * 0.4, 0.03), K, mx, wy, -D / 2 + 0.25);
+      const mon = new THREE.Group();
+      bx(mon, K, -0.26, 0.26, 0, mh * 0.75, -0.02, 0.02, false);
+      mon.position.set(mx, wy + mh * 0.25, -D / 2 + 0.27); mon.rotation.x = -0.05;
+      g.add(mon);
+    }
+    add(g, gBox(0.44, 0.02, 0.14), K, mx, wy, -D / 2 + 0.48 > D / 2 - panel - 0.08 ? D / 2 - panel - 0.09 : -D / 2 + 0.48, 0, (r() - 0.5) * 0.2, 0);
+    add(g, gBox(0.18, 0.05, 0.2), K, mx + 0.45 < L / 2 - 0.15 ? mx + 0.45 : mx - 0.45, wy, -D / 2 + 0.22);
+    for (let i = 0; i < 4; i++) add(g, gBox(0.216, 0.002, 0.28), T, (r() - 0.5) * (L - 0.4), wy + 0.001 + i * 0.002, (r() - 0.5) * 0.2 - 0.05, 0, r() * 3, 0);
+  },
+  bench(g, L, D, H, r) {
+    const W = FX.wood(pick(r, ['#8a6440', '#6a4a30']));
+    const M2 = FX.dark('benchleg', '#2a2c2e', 0.5);
+    const sy = Math.min(0.46, H);
+    const back = H > 0.65;
+    const sd = back ? D * 0.85 : D;
+    const ns = Math.max(2, Math.round(sd / 0.11));
+    for (let i = 0; i < ns; i++) { const z0 = D / 2 - sd + i * sd / ns + 0.008; bx(g, W, -L / 2, L / 2, sy - 0.035, sy, z0, z0 + sd / ns - 0.016); }
+    const legs = Math.max(2, Math.ceil(L / 1.2) + 1);
+    for (let i = 0; i < legs; i++) {
+      const x = -L / 2 + 0.08 + i * (L - 0.16) / (legs - 1);
+      bx(g, M2, x - 0.025, x + 0.025, 0, sy - 0.035, D / 2 - sd + 0.03, D / 2 - sd + 0.07);
+      bx(g, M2, x - 0.025, x + 0.025, 0, sy - 0.035, D / 2 - 0.07, D / 2 - 0.03);
+      bx(g, M2, x - 0.025, x + 0.025, sy - 0.08, sy - 0.035, D / 2 - sd + 0.03, D / 2 - 0.03);
+      if (back) bx(g, M2, x - 0.025, x + 0.025, 0, H - 0.02, -D / 2, -D / 2 + 0.04);
+    }
+    if (back) for (let i = 0; i < 2; i++) bx(g, W, -L / 2, L / 2, H - 0.12 - i * 0.14, H - 0.02 - i * 0.14, -D / 2 + 0.04, -D / 2 + 0.075);
+  },
+  locker(g, L, D, H, r) {
+    const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86', '#3a4a7a']);
+    const P = FX.painted(color);
+    const Dm = mat('fxlockerdoor' + color, { map: ctex('fxlockerdoor' + color, 128, 512, (c, w, h, rr) => {
+      noiseFill(c, w, h, rr, color, 0.05, 1500, 2);
+      c.fillStyle = 'rgba(0,0,0,0.55)';
+      for (const y0 of [0.05, 0.85]) for (let i = 0; i < 6; i++) c.fillRect(w * 0.25, h * y0 + i * 9, w * 0.5, 4);
+      c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(3, 3, w - 6, 2);
+      c.fillStyle = '#d8d8d4'; c.fillRect(w * 0.35, h * 0.28, w * 0.3, 16);
+      c.fillStyle = '#c8ccd0'; c.fillRect(w * 0.75, h * 0.45, 10, 46);
+      for (let i = 0; i < 6; i++) { c.fillStyle = 'rgba(110,60,30,0.5)'; c.beginPath(); c.ellipse(rr() * w, rr() * h, 1 + rr() * 4, 1 + rr() * 8, 0, 0, TAU); c.fill(); }
+      dust(c, w, h, rr, 1.5);
+    }), roughness: 0.45, metalness: 0.3 });
+    const n = Math.max(1, Math.round(L / 0.32));
+    const lw = L / n;
+    bx(g, P, -L / 2, L / 2, 0, H, -D / 2, D / 2 - 0.02);
+    bx(g, FX.dark('lockbase'), -L / 2, L / 2, 0, 0.1, D / 2 - 0.02, D / 2);
+    for (let i = 0; i < n; i++) {
+      const x0 = -L / 2 + i * lw + 0.006;
+      add(g, gBox(lw - 0.012, H - 0.12 - 0.01, 0.018), [P, P, P, P, Dm, P], x0 + (lw - 0.012) / 2, 0.11, D / 2 - 0.009);
+    }
+  },
+  rack(g, L, D, H, r) {
+    const U = FX.painted('#2a4a8a');
+    const O = FX.painted('#d8601c');
+    const Wd = FX.wood('#a8845a');
+    const C = FX.card();
+    const bays = Math.max(1, Math.round(L / 2.7));
+    const bw = L / bays;
+    for (let b = 0; b <= bays; b++) {
+      const x = -L / 2 + b * bw;
+      const xa = Math.max(-L / 2, Math.min(L / 2 - 0.08, x - 0.04));
+      for (const z of [-D / 2, D / 2 - 0.08]) bx(g, U, xa, xa + 0.08, 0, H, z, z + 0.08);
+      const span = D - 0.16, ang = Math.atan2(span, 0.6);
+      for (let k = 0; k < Math.floor((H - 0.3) / 0.6); k++) { const sg = k % 2 ? 1 : -1; add(g, gBoxW(0.03, Math.hypot(0.6, span), 0.02), U, xa + 0.04, 0.2 + k * 0.6, -sg * span / 2, sg * ang, 0, 0); }
+    }
+    const levels = Math.max(1, Math.floor((H - 0.2) / 1.2));
+    const lh = (H - 0.12) / levels;
+    for (let lv = 0; lv <= levels; lv++) {
+      const y = lv === 0 ? 0 : lv * lh;
+      if (lv > 0) for (const z of [-D / 2 + 0.005, D / 2 - 0.065]) bx(g, O, -L / 2, L / 2, y - 0.12, y, z, z + 0.06);
+      if (lv === levels) break;
+      const avail = lh - 0.18;
+      for (let b = 0; b < bays; b++) for (let p = 0; p < 2; p++) {
+        if (r() < 0.25) continue;
+        const px = -L / 2 + b * bw + (p + 0.5) * bw / 2;
+        const pw = Math.min(1.1, bw / 2 - 0.1), pd = Math.min(1.0, D - 0.1);
+        bx(g, Wd, px - pw / 2, px + pw / 2, y, y + 0.13, -pd / 2, pd / 2);
+        const fill = r();
+        if (fill < 0.2) continue;
+        const nx = 2, nz = 2;
+        const bh = Math.min(0.35, (avail - 0.13) / 2);
+        const stack = Math.max(1, Math.floor(((avail - 0.13) * fill) / bh));
+        for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) for (let s = 0; s < stack; s++) {
+          if (r() < 0.2) continue;
+          const cw = pw / nx - 0.02, cd = pd / nz - 0.02;
+          const c = bx(g, C, px - pw / 2 + i * pw / nx + 0.01, px - pw / 2 + i * pw / nx + 0.01 + cw, y + 0.13 + s * bh, y + 0.13 + (s + 1) * bh - 0.005, -pd / 2 + j * pd / nz + 0.01, -pd / 2 + j * pd / nz + 0.01 + cd);
+          c.rotation.y = (r() - 0.5) * 0.06;
+        }
+      }
+    }
+  },
+};
+function texPlaidMat(r, world = false) {
+  const p = pick(r, [['#7a1d1a', '#22304a', '#e8d8a0'], ['#2f4a2a', '#1a1a1a', '#c8a24a'], ['#4a5a7a', '#e8e8e0', '#1a2a4a'], ['#8a7a5a', '#3a2a1a', '#e8e0d0']]);
+  return mat('fxplaid' + p.join() + world, { map: texPlaid(p[0], p[1], p[2]), roughness: 0.95, side: THREE.DoubleSide });
+}
+
+export const FIXTURE_TYPES = Object.keys(FIXTURES);
+
+// Furniture / fitting that fills the box w (x) x d (z) x h (y) exactly, origin at the bottom centre.
+// The long side follows the larger of w and d. The front faces +z when w >= d, else +x
+// (userData.front). Rotate the group by PI to face the other way.
+export function makeFixture(type, w = 1, d = 0.6, h = 0.9, seed = 0) {
+  const fn = FIXTURES[type] || FIXTURES.cabinet;
+  const alongX = w >= d;
+  const L = Math.max(w, d), D = Math.min(w, d), H = h;
+  const inner = new THREE.Group();
+  fn(inner, L, D, H, rng(hashStr('fx' + type) ^ Math.imul((seed | 0) + 11, 2654435761)));
+  const holder = new THREE.Group();
+  holder.add(inner);
+  if (!alongX) inner.rotation.y = Math.PI / 2;
+  const baked = bake(holder);
+  // stay inside the collision box: clamp anything that pokes out
+  const b = new THREE.Box3().setFromObject(baked);
+  const sx = b.max.x - b.min.x > w + 1e-4 ? w / (b.max.x - b.min.x) : 1;
+  const sz = b.max.z - b.min.z > d + 1e-4 ? d / (b.max.z - b.min.z) : 1;
+  const sy = b.max.y > h + 1e-4 ? h / b.max.y : 1;
+  if (sx !== 1 || sy !== 1 || sz !== 1) {
+    baked.scale.set(sx, sy, sz);
+    baked.updateMatrixWorld(true);
+    const b2 = new THREE.Box3().setFromObject(baked);
+    baked.position.x -= Math.max(0, b2.max.x - w / 2) + Math.min(0, b2.min.x + w / 2);
+    baked.position.z -= Math.max(0, b2.max.z - d / 2) + Math.min(0, b2.min.z + d / 2);
+  }
+  const out = new THREE.Group();
+  out.add(baked);
+  out.name = 'fixture:' + type;
+  out.userData = { kind: type, w, d, h, front: alongX ? [0, 0, 1] : [1, 0, 0], height: h, radius: Math.hypot(w, d) / 2 };
+  return out;
 }
