@@ -1,0 +1,26 @@
+{
+  "name": "last-light-portland",
+  "version": "1.0.0",
+  "description": "Last Light: Portland - a solo survival game on the real map of the Portland area",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --format=iife --target=es2020 --outfile=docs/game.js",
+    "places": "node tools/build-places.mjs",
+    "test": "node --test",
+    "serve": "python3 -m http.server 8080 -d docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamcruise18-max/solo-d-d.git"
+  },
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/adamcruise18-max/solo-d-d/issues"
+  },
+  "homepage": "https://github.com/adamcruise18-max/solo-d-d#readme",
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "maplibre-gl": "^4.7.1"
+  },
+  "private": true,
+  "type": "module"
+}

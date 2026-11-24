@@ -1,0 +1,2396 @@
+(() => {
+  // src/data/items.js
+  var ITEMS = {
+    canned_food: { name: "Canned food", unit: "can", weight: 1, kind: "food", cal: 400, portion: 1 },
+    dry_food: { name: "Rice or pasta (bag)", unit: "bag", weight: 2, kind: "food", cal: 3e3, portion: 0.25, needsCooking: true },
+    peanut_butter: { name: "Peanut butter", unit: "jar", weight: 1, kind: "food", cal: 2600, portion: 0.25 },
+    snacks: { name: "Snacks (crackers, bars)", unit: "pack", weight: 0.5, kind: "food", cal: 600, portion: 0.5 },
+    formula: { name: "Liquid nutrition bag", unit: "bag", weight: 1, kind: "food", cal: 250, water: 8, portion: 1 },
+    dog_food: { name: "Dog food bag", unit: "bag", weight: 15, kind: "dogfood", portion: 1 / 15 },
+    water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 40, portion: 0.25 },
+    saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 40, portion: 1 },
+    ors: { name: "Oral rehydration salts", unit: "pack", weight: 0.1, kind: "med", med: "ors", portion: 1 },
+    first_aid: { name: "First aid kit", unit: "kit", weight: 1, kind: "med", med: "bandage", portion: 0.2 },
+    antibiotics: { name: "Antibiotics (one course)", unit: "course", weight: 0.1, kind: "med", med: "antibiotics", portion: 1 },
+    pain_pills: { name: "Pain pills", unit: "bottle", weight: 0.2, kind: "med", med: "pain", portion: 0.1 },
+    flashlight: { name: "Flashlight", unit: "pc", weight: 0.5, kind: "tool" },
+    batteries: { name: "Batteries (1 set)", unit: "set", weight: 0.2, kind: "batteries", portion: 1 },
+    pry_bar: { name: "Pry bar", unit: "pc", weight: 3, kind: "tool" },
+    backpack: { name: "Backpack", unit: "pc", weight: 1, kind: "tool" },
+    winter_coat: { name: "Winter coat", unit: "pc", weight: 3, kind: "wear", slot: "coat" },
+    winter_hat: { name: "Winter hat", unit: "pc", weight: 0.3, kind: "wear", slot: "hat" },
+    gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves" },
+    boots: { name: "Winter boots", unit: "pair", weight: 2.5, kind: "wear", slot: "boots" },
+    rain_jacket: { name: "Rain jacket", unit: "pc", weight: 1, kind: "wear", slot: "rain" },
+    firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
+    propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
+    tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
+    bleach: { name: "Unscented bleach", unit: "jug", weight: 8, kind: "misc" },
+    water_filter: { name: "Water filter (squeeze)", unit: "pc", weight: 0.3, kind: "misc" },
+    n95: { name: "N95 mask", unit: "pc", weight: 0.05, kind: "misc" },
+    flea_spray: { name: "Flea spray", unit: "can", weight: 1, kind: "misc" },
+    seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
+    lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
+    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" }
+  };
+  function itemName(id) {
+    return ITEMS[id] ? ITEMS[id].name : id;
+  }
+
+  // src/data/places.js
+  var CATEGORIES = {
+    supermarket: {
+      label: "Supermarket",
+      color: "#d9a441",
+      stock: 0.55,
+      zones: 8,
+      zoneMinutes: 20,
+      dark: true,
+      zoneName: "aisle",
+      loot: [
+        { id: "canned_food", w: 30 },
+        { id: "dry_food", w: 18 },
+        { id: "water_bottle", w: 10 },
+        { id: "peanut_butter", w: 8 },
+        { id: "snacks", w: 10 },
+        { id: "dog_food", w: 6 },
+        { id: "batteries", w: 6 },
+        { id: "bleach", w: 3 },
+        { id: "pain_pills", w: 3 },
+        { id: "flea_spray", w: 2 },
+        { id: "lighter", w: 3 },
+        { id: "comfort", w: 2 }
+      ],
+      entryText: "The doors are open. The air smells of rotten food. It is dark inside."
+    },
+    convenience: {
+      label: "Convenience store",
+      color: "#c98b3c",
+      stock: 0.5,
+      zones: 2,
+      zoneMinutes: 10,
+      zoneName: "shelf area",
+      loot: [
+        { id: "snacks", w: 30 },
+        { id: "water_bottle", w: 15 },
+        { id: "canned_food", w: 10 },
+        { id: "batteries", w: 12 },
+        { id: "lighter", w: 12 },
+        { id: "pain_pills", w: 5 }
+      ],
+      entryText: "The glass door is broken. Shelves are half empty."
+    },
+    gas: {
+      label: "Gas station",
+      color: "#9c6b3a",
+      stock: 0.6,
+      zones: 2,
+      zoneMinutes: 15,
+      zoneName: "shop area",
+      loot: [
+        { id: "snacks", w: 30 },
+        { id: "water_bottle", w: 12 },
+        { id: "lighter", w: 12 },
+        { id: "batteries", w: 8 },
+        { id: "propane_1lb", w: 8 },
+        { id: "tarp", w: 3 }
+      ],
+      entryText: "The pumps have no power. The small shop is still closed."
+    },
+    pharmacy: {
+      label: "Pharmacy",
+      color: "#5fb3a6",
+      stock: 0.4,
+      zones: 4,
+      zoneMinutes: 20,
+      dark: true,
+      zoneName: "section",
+      lockedZone: { dc: 12, name: "pharmacy counter" },
+      loot: [
+        { id: "pain_pills", w: 15 },
+        { id: "first_aid", w: 15 },
+        { id: "antibiotics", w: 8 },
+        { id: "ors", w: 10 },
+        { id: "snacks", w: 10 },
+        { id: "water_bottle", w: 6 },
+        { id: "n95", w: 8 },
+        { id: "batteries", w: 6 },
+        { id: "flea_spray", w: 3 }
+      ],
+      entryText: "The store is dark. The pharmacy counter at the back has a metal gate."
+    },
+    clinic: {
+      label: "Clinic",
+      color: "#4f9c92",
+      stock: 0.7,
+      zones: 3,
+      zoneMinutes: 20,
+      zoneName: "room",
+      bodies: true,
+      loot: [
+        { id: "first_aid", w: 20 },
+        { id: "antibiotics", w: 6 },
+        { id: "n95", w: 15 },
+        { id: "pain_pills", w: 10 },
+        { id: "saline", w: 10 },
+        { id: "ors", w: 6 }
+      ],
+      entryText: "Notices about the outbreak cover the door."
+    },
+    hospital: {
+      label: "Hospital",
+      color: "#7fd1c4",
+      stock: 0.7,
+      zones: 12,
+      zoneMinutes: 30,
+      dark: true,
+      zoneName: "ward",
+      bodies: true,
+      entryMorale: -5,
+      loot: [
+        { id: "first_aid", w: 18 },
+        { id: "antibiotics", w: 12 },
+        { id: "saline", w: 15 },
+        { id: "pain_pills", w: 12 },
+        { id: "n95", w: 12 },
+        { id: "ors", w: 8 },
+        { id: "snacks", w: 5 }
+      ],
+      entryText: "The hospital is dark and silent. Many people came here at the end."
+    },
+    hardware: {
+      label: "Hardware store",
+      color: "#8a8f99",
+      stock: 0.7,
+      zones: 8,
+      zoneMinutes: 20,
+      dark: true,
+      zoneName: "aisle",
+      loot: [
+        { id: "tarp", w: 15 },
+        { id: "pry_bar", w: 6 },
+        { id: "propane_1lb", w: 12 },
+        { id: "batteries", w: 10 },
+        { id: "flashlight", w: 6 },
+        { id: "gloves", w: 8 },
+        { id: "seeds", w: 8 },
+        { id: "bleach", w: 5 },
+        { id: "lighter", w: 6 },
+        { id: "firewood", w: 4 }
+      ],
+      entryText: "Long dark aisles. The tool racks are partly empty."
+    },
+    outdoor: {
+      label: "Outdoor store",
+      color: "#6f9a5b",
+      stock: 0.5,
+      zones: 4,
+      zoneMinutes: 20,
+      zoneName: "section",
+      loot: [
+        { id: "water_filter", w: 10 },
+        { id: "winter_coat", w: 8 },
+        { id: "winter_hat", w: 10 },
+        { id: "gloves", w: 10 },
+        { id: "boots", w: 8 },
+        { id: "rain_jacket", w: 10 },
+        { id: "propane_1lb", w: 8 },
+        { id: "flashlight", w: 6 },
+        { id: "snacks", w: 6 },
+        { id: "backpack", w: 3 }
+      ],
+      entryText: "Racks of jackets and boots. This place has good winter gear."
+    },
+    fire: {
+      label: "Fire station",
+      color: "#c0584a",
+      stock: 0.9,
+      zones: 3,
+      zoneMinutes: 20,
+      zoneName: "room",
+      locked: true,
+      loot: [
+        { id: "first_aid", w: 20 },
+        { id: "n95", w: 15 },
+        { id: "pry_bar", w: 6 },
+        { id: "flashlight", w: 8 },
+        { id: "batteries", w: 8 },
+        { id: "water_bottle", w: 10 },
+        { id: "gloves", w: 6 }
+      ],
+      entryText: "The engine bay is empty. The crews went out on calls and did not come back."
+    },
+    house: {
+      label: "House",
+      color: "#aaaaaa",
+      stock: 0.8,
+      zones: 6,
+      zoneMinutes: 10,
+      zoneName: "room",
+      loot: [
+        { id: "canned_food", w: 20 },
+        { id: "dry_food", w: 8 },
+        { id: "snacks", w: 8 },
+        { id: "peanut_butter", w: 5 },
+        { id: "water_bottle", w: 5 },
+        { id: "pain_pills", w: 6 },
+        { id: "first_aid", w: 4 },
+        { id: "antibiotics", w: 2 },
+        { id: "batteries", w: 6 },
+        { id: "winter_hat", w: 4 },
+        { id: "gloves", w: 4 },
+        { id: "rain_jacket", w: 3 },
+        { id: "comfort", w: 5 },
+        { id: "firewood", w: 4 },
+        { id: "dog_food", w: 2 },
+        { id: "lighter", w: 4 }
+      ]
+    }
+  };
+  var BIG_BRANDS = ["Costco", "WinCo", "Fred Meyer", "Walmart", "Home Depot", "Lowe's", "Target"];
+  var HOUSE_ROOMS = ["kitchen", "living room", "bedroom", "bathroom", "second bedroom", "garage"];
+
+  // src/rng.js
+  function mulberry32(a) {
+    return function next() {
+      a |= 0;
+      a = a + 1831565813 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function hashString(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function rand(state2) {
+    let a = state2.rngState | 0;
+    a = a + 1831565813 | 0;
+    state2.rngState = a;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+  function randInt(state2, min, max) {
+    return min + Math.floor(rand(state2) * (max - min + 1));
+  }
+  function chance(state2, p) {
+    return rand(state2) < p;
+  }
+  function weightedPick(rng, entries) {
+    const total = entries.reduce((s, e) => s + e.w, 0);
+    let r = rng() * total;
+    for (const e of entries) {
+      r -= e.w;
+      if (r <= 0) return e;
+    }
+    return entries[entries.length - 1];
+  }
+
+  // src/sun.js
+  var HOME_LAT = 45.4826;
+  var HOME_LON = -122.8738;
+  var RAD = Math.PI / 180;
+  var EPOCH_UTC_MS = Date.UTC(2026, 10, 24, 8, 0, 0);
+  function sunTimes(day, lat = HOME_LAT, lon = HOME_LON) {
+    const localNoonMs = EPOCH_UTC_MS + day * 864e5 + 12 * 36e5;
+    const jd = localNoonMs / 864e5 + 24405875e-1;
+    const n = Math.round(jd - 2451545 + 8e-4);
+    const jStar = n - lon / 360;
+    const M = (357.5291 + 0.98560028 * jStar) % 360;
+    const C = 1.9148 * Math.sin(M * RAD) + 0.02 * Math.sin(2 * M * RAD) + 3e-4 * Math.sin(3 * M * RAD);
+    const lambda = (M + C + 180 + 102.9372) % 360;
+    const jTransit = 2451545 + jStar + 53e-4 * Math.sin(M * RAD) - 69e-4 * Math.sin(2 * lambda * RAD);
+    const sinDec = Math.sin(lambda * RAD) * Math.sin(23.44 * RAD);
+    const cosDec = Math.cos(Math.asin(sinDec));
+    const cosW = (Math.sin(-0.833 * RAD) - Math.sin(lat * RAD) * sinDec) / (Math.cos(lat * RAD) * cosDec);
+    const w = Math.acos(Math.max(-1, Math.min(1, cosW))) / RAD;
+    const toLocalMin = (j) => ((j - 24405875e-1) * 864e5 - (EPOCH_UTC_MS + day * 864e5)) / 6e4;
+    return { rise: toLocalMin(jTransit - w / 360), set: toLocalMin(jTransit + w / 360) };
+  }
+
+  // src/data/climate.js
+  var CLIMATE = [
+    { high: 48, low: 36, rainDays: 18, solar: 5 },
+    { high: 52, low: 37, rainDays: 15, solar: 9 },
+    { high: 57, low: 40, rainDays: 17, solar: 15 },
+    { high: 62, low: 43, rainDays: 15, solar: 22 },
+    { high: 69, low: 48, rainDays: 11, solar: 27 },
+    { high: 74, low: 53, rainDays: 7, solar: 30 },
+    { high: 82, low: 57, rainDays: 2, solar: 34 },
+    { high: 82, low: 58, rainDays: 3, solar: 30 },
+    { high: 76, low: 53, rainDays: 6, solar: 22 },
+    { high: 64, low: 46, rainDays: 12, solar: 12 },
+    { high: 52, low: 40, rainDays: 18, solar: 6 },
+    { high: 47, low: 36, rainDays: 19, solar: 4 }
+  ];
+  var WEATHER_TYPES = {
+    clear: { label: "Clear", solar: 1.4 },
+    cloudy: { label: "Cloudy", solar: 0.8 },
+    fog: { label: "Fog", solar: 0.6 },
+    rain: { label: "Rain", solar: 0.5, wetAfter: 30 },
+    heavy_rain: { label: "Heavy rain", solar: 0.3, wetAfter: 10 },
+    windstorm: { label: "Windstorm", solar: 0.5, wetAfter: 30 },
+    snow: { label: "Snow", solar: 0.1, speed: 0.6 }
+  };
+
+  // src/engine/world.js
+  var dayOf = (t) => Math.floor(t / 1440);
+  function monthOfDay(day) {
+    return new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
+  }
+  function rollType(state2, month, prevType) {
+    const c = CLIMATE[month];
+    const winter = month >= 10 || month <= 2;
+    if (winter && prevType && rand(state2) < 0.6) return prevType === "windstorm" ? "rain" : prevType;
+    if (winter && rand(state2) < 0.04) return "windstorm";
+    if (rand(state2) < c.rainDays / 30) return rand(state2) < 0.2 ? "heavy_rain" : "rain";
+    const r = rand(state2);
+    return r < 0.35 ? "clear" : r < 0.85 ? "cloudy" : "fog";
+  }
+  function windFor(state2, type) {
+    if (type === "windstorm") return randInt(state2, 30, 60);
+    if (type === "rain" || type === "heavy_rain") return randInt(state2, 5, 20);
+    return randInt(state2, 0, 10);
+  }
+  function finishDay(state2, w, month) {
+    if ((w.type === "rain" || w.type === "heavy_rain") && w.low <= 32 && (month === 11 || month <= 1)) {
+      w.type = "snow";
+      w.snowInches = randInt(state2, 1, 6);
+    }
+    if (w.type === "clear") w.nextLow -= 5;
+    return w;
+  }
+  function initWeather(state2) {
+    const day = 0;
+    const month = monthOfDay(day);
+    const c = CLIMATE[month];
+    const delta = randInt(state2, -6, 6);
+    const type = rollType(state2, month, null);
+    state2.weather = finishDay(state2, {
+      day,
+      type,
+      wind: windFor(state2, type),
+      low: c.low + delta,
+      high: c.high + delta,
+      prevHigh: c.high + delta,
+      nextLow: c.low + randInt(state2, -8, 8)
+    }, month);
+  }
+  function rollWeather(state2, day) {
+    const month = monthOfDay(day);
+    const c = CLIMATE[month];
+    const old = state2.weather;
+    const type = rollType(state2, month, old.type);
+    const low = old.nextLow;
+    state2.weather = finishDay(state2, {
+      day,
+      type,
+      wind: windFor(state2, type),
+      low,
+      high: low + (c.high - c.low) + randInt(state2, -3, 3),
+      prevHigh: old.high,
+      nextLow: c.low + randInt(state2, -8, 8)
+    }, month);
+  }
+  function sunFor(t) {
+    return sunTimes(dayOf(t));
+  }
+  function isNight(t) {
+    const m = (t % 1440 + 1440) % 1440;
+    const s = sunFor(t);
+    return m < s.rise || m > s.set;
+  }
+  function airTemp(state2, t) {
+    const w = state2.weather;
+    const m = (t % 1440 + 1440) % 1440;
+    const s = sunFor(t);
+    const peak = 15 * 60;
+    const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
+    if (m < s.rise) {
+      const span2 = 1440 - peak + s.rise;
+      return ease(w.prevHigh, w.low, (m + 1440 - peak) / span2);
+    }
+    if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
+    const span = 1440 - peak + s.rise;
+    return ease(w.high, w.nextLow, (m - peak) / span);
+  }
+  function weatherInfo(state2) {
+    return WEATHER_TYPES[state2.weather.type];
+  }
+  function isBadWeather(state2) {
+    return ["heavy_rain", "windstorm", "snow"].includes(state2.weather.type);
+  }
+  function solarToday(state2) {
+    const month = monthOfDay(state2.weather.day);
+    return CLIMATE[month].solar * WEATHER_TYPES[state2.weather.type].solar;
+  }
+
+  // src/engine/state.js
+  var SAVE_VERSION = 1;
+  var START_MINUTE = 9 * 60 + 5;
+  var HOME = { lat: HOME_LAT, lon: HOME_LON };
+  var MAP_RADIUS_MILES = 15;
+  function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
+    const r = mulberry32(hashString("setup" + seed));
+    const state2 = {
+      version: SAVE_VERSION,
+      seed,
+      rngState: seed,
+      time: START_MINUTE,
+      player: {
+        food: 30,
+        water: 20,
+        warmth: 60,
+        energy: 40,
+        health: 70,
+        morale: 40,
+        energyMax: 60,
+        weak: true,
+        weakGoodHours: 0,
+        wet: false,
+        wetMinutes: 0,
+        dryMinutes: 0,
+        worn: { coat: false, hat: false, gloves: false, boots: false, rain: false },
+        injuries: [],
+        illness: { stomachH: 0, infection: null },
+        painH: 0,
+        lightHours: 10,
+        lastComfortDay: -1,
+        bodySeenDay: -1,
+        lastDogPlayDay: -1
+      },
+      pos: { ...HOME },
+      location: { kind: "home" },
+      carried: { backpack: 1 },
+      home: {
+        storage: {
+          formula: 4,
+          saline: 2,
+          first_aid: 1,
+          antibiotics: 1,
+          pain_pills: 1,
+          canned_food: 6,
+          snacks: 1,
+          dry_food: 1,
+          flashlight: 1,
+          winter_coat: 1,
+          firewood: 3
+        },
+        indoorTemp: 47,
+        fireHours: 0,
+        heaterOn: false,
+        battery: 5.4,
+        batteryMax: 13.5,
+        tapWorks: true,
+        tapStopDay: 9 + Math.floor(r() * 21),
+        // day 10 to 30
+        tankGal: 40,
+        toiletGal: 3,
+        rawGal: 0,
+        safeGal: 0,
+        furniture: 12,
+        fridgeOpened: false
+      },
+      places: {},
+      houses: {},
+      houseAreas: {},
+      dog: {
+        stage: "none",
+        arriveDay: 1 + Math.floor(r() * 4),
+        // day 2 to 5
+        revisitUsed: false,
+        revisitDay: null,
+        feedDays: [],
+        name: null,
+        food: 60,
+        water: 80,
+        health: 80,
+        bond: 30,
+        withPlayer: true,
+        warned: 0
+      },
+      weather: null,
+      stats: { miles: 0, placesSearched: 0, zonesSearched: 0, housesSearched: 0 },
+      flags: {},
+      log: [],
+      dead: null,
+      pendingPrompt: null
+    };
+    initWeather(state2);
+    log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
+    log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
+    log(state2, "Hint: drink, eat, and get the house warm before the first night.", "hint");
+    return state2;
+  }
+  var dayIndex = (t) => Math.floor(t / 1440);
+  var minuteOfDay = (t) => (t % 1440 + 1440) % 1440;
+  function formatClock(t) {
+    const m = Math.floor(minuteOfDay(t));
+    let h = Math.floor(m / 60);
+    const mm = String(m % 60).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${mm} ${ampm}`;
+  }
+  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function calendar(t) {
+    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
+  }
+  function formatDate(t) {
+    const c = calendar(t);
+    return `${DAYS[c.weekday]} ${c.date} ${MONTHS[c.month]} ${c.year}`;
+  }
+  function formatDuration(min) {
+    min = Math.round(min);
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
+  }
+  function addItem(bag, id, qty = 1) {
+    bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
+    if (bag[id] <= 1e-4) delete bag[id];
+  }
+  function bagWeight(bag) {
+    let w = 0;
+    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
+    return Math.round(w * 10) / 10;
+  }
+  function carryLimit(state2) {
+    let lim = state2.carried.backpack ? 30 : 10;
+    if (state2.player.weak) lim *= 0.5;
+    if (state2.player.food < 25) lim *= 0.9;
+    return Math.round(lim);
+  }
+  function hasLight(state2) {
+    return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0;
+  }
+  function log(state2, text, kind = "info") {
+    state2.log.push({ t: state2.time, text, kind });
+    if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
+  }
+
+  // src/engine/placesdb.js
+  var LIST = [];
+  var INDEX = {};
+  function setPlaces(list) {
+    LIST = list;
+    INDEX = Object.fromEntries(list.map((p) => [p.id, p]));
+  }
+  var getPlace = (id) => INDEX[id];
+  var allPlaces = () => LIST;
+
+  // src/engine/tick.js
+  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function clothingRating(state2) {
+    const w = state2.player.worn;
+    let r = 10;
+    if (w.coat && w.hat && w.gloves && w.boots) r = 40;
+    else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
+    if (state2.player.wet) r /= 2;
+    return r;
+  }
+  function environment(state2, mode, t = state2.time) {
+    const air = airTemp(state2, t);
+    const night = isNight(t);
+    if (mode === "walk") {
+      return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
+    }
+    if (state2.location.kind === "home") {
+      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night, air, home: true };
+    }
+    let dark = night;
+    if (state2.location.kind === "place") {
+      const p = getPlace(state2.location.id);
+      if (p && CATEGORIES[p.cat]?.dark) dark = true;
+    }
+    return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+  }
+  function feltTemp(state2, mode, env = environment(state2, mode)) {
+    let felt = env.temp + clothingRating(state2);
+    if (env.outside) felt -= env.wind / 10 * 5;
+    if (mode === "sleep") {
+      if (env.home) felt += 10;
+      const d = state2.dog;
+      if (d.stage === "joined" && d.bond >= 80) felt += 5;
+    }
+    return felt;
+  }
+  function warmthRate(felt) {
+    if (felt >= 70) return 10;
+    if (felt >= 55) return 3;
+    if (felt >= 40) return -3;
+    if (felt >= 25) return -7;
+    return -12;
+  }
+  function damage(state2, amount, cause) {
+    if (amount <= 0) return;
+    state2.player.health -= amount;
+    state2._damage = state2._damage || {};
+    state2._damage[cause] = (state2._damage[cause] || 0) + amount;
+  }
+  function advanceTime(state2, minutes, mode = "rest") {
+    let left = minutes;
+    while (left > 1e-4 && !state2.dead) {
+      const step = Math.min(10, left);
+      const before = state2.time;
+      state2.time += step;
+      left -= step;
+      const dBefore = dayIndex(before - 300);
+      const dAfter = dayIndex(state2.time - 300);
+      for (let d = dBefore + 1; d <= dAfter; d++) dailyRollover(state2, d);
+      tickStep(state2, step / 60, mode);
+    }
+  }
+  function tickStep(state2, dt, mode) {
+    const p = state2.player;
+    const env = environment(state2, mode);
+    const sleeping = mode === "sleep";
+    const working = mode === "walk" || mode === "work" || mode === "heavy";
+    const wx = weatherInfo(state2);
+    if (env.outside && wx.wetAfter && !(p.worn.rain && state2.weather.type !== "heavy_rain")) {
+      p.wetMinutes += dt * 60;
+      if (!p.wet && p.wetMinutes >= wx.wetAfter) {
+        p.wet = true;
+        log(state2, "Your clothes are wet through. Wet clothes keep only half the heat.", "warn");
+      }
+    } else if (p.wet && !env.outside && env.temp >= 55) {
+      p.dryMinutes += dt * 60;
+      if (p.dryMinutes >= 240) {
+        p.wet = false;
+        p.wetMinutes = 0;
+        p.dryMinutes = 0;
+        log(state2, "Your clothes are dry again.");
+      }
+    } else if (!env.outside) {
+      p.wetMinutes = 0;
+    }
+    const felt = feltTemp(state2, mode, env);
+    p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
+    const cold = p.warmth < 50;
+    let foodLoss = 4 * (working ? 1.5 : 1) * (cold ? 1.3 : 1);
+    let waterLoss = 4 * (working ? 1.5 : 1) * (p.illness.stomachH > 0 ? 2 : 1);
+    if (felt > 90 && working) waterLoss *= 2;
+    p.food = clamp(p.food - foodLoss * dt, 0, 100);
+    p.water = clamp(p.water - waterLoss * dt, 0, 100);
+    if (sleeping) {
+      let gain = felt >= 55 ? 10 : 6;
+      if (p.morale < 50) gain *= 0.75;
+      if (p.health < 50) gain *= 0.75;
+      if (p.food < 25) gain *= 0.75;
+      p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
+    } else {
+      let loss = { rest: 5, work: 8, walk: 8, heavy: 12 }[mode] || 5;
+      if (cold) loss *= 1.5;
+      if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
+      p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
+    }
+    if (p.food <= 0) damage(state2, 0.4 * dt, "starvation");
+    if (p.water <= 0) damage(state2, 3 * dt, "dehydration");
+    if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
+    for (const inj of p.injuries) {
+      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
+      inj.ageH += dt;
+      const slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+      inj.healH -= dt * slow;
+      if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+        inj.infectRolled = true;
+        if (chance(state2, inj.infectRisk)) startInfection(state2);
+      }
+    }
+    const healed = p.injuries.filter((i) => i.healH <= 0);
+    for (const i of healed) log(state2, `Your ${INJURY_NAMES[i.type].toLowerCase()} has healed.`, "good");
+    p.injuries = p.injuries.filter((i) => i.healH > 0);
+    const inf = p.illness.infection;
+    if (inf) {
+      inf.ageH += dt;
+      if (inf.ageH >= 48) damage(state2, 1 * dt, "infection");
+      if (inf.abxH != null) {
+        inf.abxH += dt;
+        if (inf.abxH >= 72) {
+          p.illness.infection = null;
+          log(state2, "The fever is gone. The antibiotics worked.", "good");
+        }
+      }
+    }
+    if (p.illness.stomachH > 0) {
+      p.illness.stomachH = Math.max(0, p.illness.stomachH - dt);
+      if (p.illness.stomachH === 0) log(state2, "Your stomach is better now.", "good");
+    }
+    if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
+    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+    if (ok) p.health += (sleeping ? 1 : 0.25) * dt;
+    p.health = Math.min(100, p.health);
+    if (p.weak && p.food > 50 && p.water > 50) p.weakGoodHours += dt;
+    if (env.dark && !sleeping && hasLight(state2) && (mode === "walk" || state2.location.kind !== "home")) {
+      p.lightHours = Math.max(0, p.lightHours - dt);
+      if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
+    }
+    homeStep(state2, dt, env);
+    dogStep(state2, dt, sleeping);
+    if (p.health <= 0) {
+      p.health = 0;
+      const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
+      die(state2, causes.length ? causes[0][0] : "unknown");
+    }
+    state2._damage = {};
+  }
+  function homeStep(state2, dt, env) {
+    const h = state2.home;
+    const air = env.air;
+    let heat = 0;
+    if (h.fireHours > 0) {
+      heat += 20;
+      h.fireHours = Math.max(0, h.fireHours - dt);
+      if (h.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    }
+    if (h.heaterOn) {
+      h.battery -= 1.5 * dt;
+      heat += 20;
+      if (h.battery <= 0) {
+        h.battery = 0;
+        h.heaterOn = false;
+        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      }
+    }
+    const passive = air + 6;
+    const target = Math.min(75, passive + heat);
+    const rate = heat > 0 ? 0.25 : 0.05;
+    h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    const m = (state2.time % 1440 + 1440) % 1440;
+    const s = sunFor(state2.time);
+    if (m > s.rise && m < s.set) {
+      const hours = (s.set - s.rise) / 60;
+      h.battery = Math.min(h.batteryMax, h.battery + solarToday(state2) / hours * dt);
+    }
+    if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
+      h.tapWorks = false;
+      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  function dogStep(state2, dt, sleeping) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    d.food = clamp(d.food - 4 * dt, 0, 100);
+    d.water = 80;
+    if (d.food <= 0) d.health -= 1 * dt;
+    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.health <= 50 && d.warned < 1) {
+      d.warned = 1;
+      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
+    }
+    if (d.health <= 25 && d.warned < 2) {
+      d.warned = 2;
+      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
+    }
+    if (d.health > 60) d.warned = 0;
+    if (d.health <= 0) {
+      d.health = 0;
+      d.stage = "dead";
+      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
+      state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  function dailyRollover(state2, day) {
+    const p = state2.player;
+    rollWeather(state2, day);
+    log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
+    if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
+    if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
+    p.morale -= 2;
+    if (p.food < 50) p.morale -= 5;
+    if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
+    if (state2.dog.stage === "joined") {
+      p.morale += 8;
+      if (state2.dog.food >= 25) state2.dog.bond += 3;
+      else state2.dog.bond -= 10;
+      state2.dog.bond = clamp(state2.dog.bond, 0, 100);
+    }
+    p.morale = clamp(p.morale, 0, 100);
+    if (p.weak) {
+      if (p.weakGoodHours >= 12) {
+        p.energyMax = Math.min(100, p.energyMax + 2);
+        log(state2, "Your body is a little stronger today.", "good");
+      }
+      p.weakGoodHours = 0;
+      if (p.energyMax >= 100) {
+        p.weak = false;
+        log(state2, "You are strong again. The weakness from the coma is gone.", "good");
+      }
+    }
+    for (const inj of p.injuries) {
+      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
+    }
+    dogDaily(state2, day);
+  }
+  function dogDaily(state2, day) {
+    const d = state2.dog;
+    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
+    if (d.stage === "none" && day >= d.arriveDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
+    } else if (d.stage === "visiting") {
+      const since = lastFed == null ? day - d.visitStart : day - lastFed;
+      if (since > 3) {
+        if (!d.revisitUsed) {
+          d.stage = "away";
+          d.revisitUsed = true;
+          d.revisitDay = day + randInt(state2, 5, 8);
+          log(state2, "The dog is not in the street today.");
+        } else {
+          d.stage = "gone";
+          log(state2, "The dog does not come back.");
+        }
+      }
+    } else if (d.stage === "away" && day >= d.revisitDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      d.feedDays = [];
+      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
+    }
+  }
+  var INJURY_NAMES = {
+    small_cut: "Small cut",
+    deep_cut: "Deep cut",
+    sprain: "Sprain",
+    bite: "Animal bite"
+  };
+  var INJURY_DATA = {
+    small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
+    deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
+    sprain: { hp: 5, healH: 120, infectRisk: 0 },
+    bite: { hp: 10, healH: 168, infectRisk: 0.4 }
+  };
+  function addInjury(state2, type) {
+    const d = INJURY_DATA[type];
+    state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk, infectRolled: false });
+    damage(state2, d.hp, type === "bite" ? "an animal attack" : "an injury");
+    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
+  }
+  function startInfection(state2) {
+    if (state2.player.illness.infection) return;
+    state2.player.illness.infection = { ageH: 0, abxH: null };
+    log(state2, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
+  }
+  function startStomachBug(state2) {
+    if (state2.player.illness.stomachH > 0) return;
+    state2.player.illness.stomachH = 48;
+    state2.player.energy = Math.max(0, state2.player.energy - 20);
+    log(state2, "Stomach cramps. The water was bad. You have a stomach bug.", "danger");
+  }
+  var CAUSE_TEXT = {
+    starvation: "starvation",
+    dehydration: "dehydration (no water)",
+    hypothermia: "the cold",
+    bleeding: "blood loss",
+    infection: "an infected wound",
+    "an injury": "an injury",
+    "an animal attack": "an animal attack",
+    unknown: "unknown causes"
+  };
+  function die(state2, cause) {
+    if (state2.dead) return;
+    const p = state2.player;
+    p.health = Math.max(0, p.health);
+    if (cause === "an injury" || cause === "an animal attack") {
+      if (p.water <= 0) cause = "dehydration";
+      else if (p.food <= 0) cause = "starvation";
+      else if (p.warmth <= 0) cause = "hypothermia";
+    }
+    state2.dead = {
+      cause: CAUSE_TEXT[cause] || cause,
+      time: state2.time,
+      days: dayIndex(state2.time) + 1
+    };
+    log(state2, `You died of ${state2.dead.cause}.`, "danger");
+  }
+
+  // src/engine/checks.js
+  function standardMods(state2, { outside = false } = {}) {
+    const p = state2.player;
+    const mods = [];
+    if (p.energy < 50) mods.push(["tired", -2]);
+    if (p.water < 25) mods.push(["very thirsty", -2]);
+    if (p.warmth < 25) mods.push(["hypothermia", -3]);
+    if (p.health < 25) mods.push(["badly hurt", -3]);
+    if (p.morale < 25) mods.push(["despair", -2]);
+    const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
+    if (limb && p.painH <= 0) mods.push(["injured", -3]);
+    if (outside && !isNight(state2.time)) mods.push(["daylight", 1]);
+    return mods;
+  }
+  function check(state2, label, dc, extraMods = [], opts = {}) {
+    const mods = [...standardMods(state2, opts), ...extraMods];
+    if (opts.outside && isNight(state2.time)) dc += 3;
+    const roll = randInt(state2, 1, 20);
+    const total = roll + mods.reduce((s, m) => s + m[1], 0);
+    const success = roll === 20 ? true : roll === 1 ? false : total >= dc;
+    const modText = mods.map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"} ${Math.abs(v)} (${n})`).join("");
+    const note = roll === 20 ? " natural 20!" : roll === 1 ? " natural 1!" : "";
+    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
+    return { roll, total, dc, success };
+  }
+
+  // src/engine/loot.js
+  function placeState(state2, place) {
+    let ps = state2.places[place.id];
+    if (!ps) {
+      const r = mulberry32(hashString(`${state2.seed}:${place.id}:init`));
+      const cat = CATEGORIES[place.cat];
+      const big = BIG_BRANDS.some((b) => (place.name || "").includes(b));
+      const empty = r() < 0.2;
+      ps = state2.places[place.id] = {
+        zonesDone: 0,
+        zones: cat.zones + (big ? 2 : 0),
+        stock: Math.min(0.95, cat.stock * (big ? 1.25 : 1) * (empty ? 0.15 : 1)),
+        emptyHint: empty,
+        unlocked: !cat.locked,
+        counterOpen: !cat.lockedZone,
+        leftovers: {},
+        visited: false
+      };
+    }
+    return ps;
+  }
+  function rollZone(state2, key, catId, stock, zone, extraRolls = 0) {
+    const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
+    const cat = CATEGORIES[catId];
+    const n = 2 + Math.floor(r() * 4) + extraRolls;
+    const found = {};
+    for (let i = 0; i < n; i++) {
+      if (r() >= stock) continue;
+      const e = weightedPick(r, cat.loot);
+      found[e.id] = (found[e.id] || 0) + 1;
+    }
+    return found;
+  }
+
+  // src/engine/travel.js
+  var ROUTE_FACTOR = 1.25;
+  function straightMiles(a, b) {
+    const R = 3958.8;
+    const toR = Math.PI / 180;
+    const dLat = (b.lat - a.lat) * toR;
+    const dLon = (b.lon - a.lon) * toR;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  var routeMiles = (a, b) => straightMiles(a, b) * ROUTE_FACTOR;
+  function walkSpeed(state2, t = state2.time) {
+    const p = state2.player;
+    let mph = 3;
+    const why = [];
+    const apply = (f, w) => {
+      mph *= f;
+      why.push(w);
+    };
+    if (p.weak) apply(0.7, "weak");
+    if (isNight(t) && !hasLight(state2)) apply(0.6, "dark, no light");
+    if (state2.weather.type === "snow") apply(0.6, "snow");
+    if (bagWeight(state2.carried) > carryLimit(state2)) apply(0.7, "heavy pack");
+    if (p.injuries.some((i) => i.type === "sprain")) apply(0.7, "sprain");
+    if (p.warmth < 25) apply(0.8, "hypothermia");
+    if (p.energy < 25) apply(0.7, "exhausted");
+    if (p.health < 25) apply(0.7, "badly hurt");
+    return { mph, why };
+  }
+  function estimateTrip(state2, dest) {
+    const miles = routeMiles(state2.pos, dest);
+    const { mph, why } = walkSpeed(state2);
+    const minutes = miles / mph * 60;
+    const overload = bagWeight(state2.carried) > carryLimit(state2);
+    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1);
+    return { miles, minutes, energy, mph, why };
+  }
+  function lerp(a, b, f) {
+    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+  }
+  function travel(state2, dest, destLabel) {
+    const start2 = { ...state2.pos };
+    const total = routeMiles(start2, dest);
+    log(state2, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
+    let done = 0;
+    while (done < total - 1e-6 && !state2.dead) {
+      const seg = Math.min(1, total - done);
+      const { mph } = walkSpeed(state2);
+      advanceTime(state2, seg / mph * 60, "walk");
+      done += seg;
+      state2.stats.miles += seg;
+      state2.pos = lerp(start2, dest, done / total);
+      if (seg >= 0.5 && !state2.dead) roadEvent(state2);
+      if (!state2.dead && state2.player.energy <= 0) {
+        log(state2, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
+        advanceTime(state2, 180, "sleep");
+      }
+    }
+    if (state2.dead) return false;
+    state2.pos = { ...dest };
+    const fromHome = straightMiles(HOME, dest);
+    if (fromHome > MAP_RADIUS_MILES) log(state2, "You are past the edge of the known area. There is nothing to search here.", "warn");
+    return true;
+  }
+  function dogWithPlayer(state2) {
+    return state2.dog.stage === "joined" && state2.dog.withPlayer;
+  }
+  function loseRandomItem(state2, filter = () => true) {
+    const ids = Object.keys(state2.carried).filter((id2) => id2 !== "backpack" && filter(id2));
+    if (!ids.length) return;
+    const id = ids[randInt(state2, 0, ids.length - 1)];
+    addItem(state2.carried, id, -1);
+    log(state2, `You lose: ${itemName(id)}.`, "warn");
+  }
+  function roadEvent(state2) {
+    let roll = randInt(state2, 1, 100);
+    if (isNight(state2.time)) roll += 10;
+    if (isBadWeather(state2)) roll += 10;
+    roll = Math.min(roll, 100);
+    if (roll <= 80) return;
+    const dog = dogWithPlayer(state2);
+    const warn = dog && state2.dog.bond >= 40;
+    const animalMods = [];
+    if (warn) animalMods.push(["dog warned you", 4]);
+    const out = { outside: true };
+    if (roll <= 85) {
+      log(state2, "Broken glass and debris cover the road.");
+      if (!check(state2, "Step past the debris", 8, [], out).success) addInjury(state2, "small_cut");
+    } else if (roll <= 88) {
+      log(state2, "Water floods the street ahead.");
+      const r = check(state2, "Cross the flooded street", 12, [], out);
+      if (!r.success) {
+        state2.player.wet = true;
+        log(state2, "You slip and fall in the cold water. You are wet.", "warn");
+        loseRandomItem(state2);
+      }
+    } else if (roll <= 91) {
+      log(state2, "A fallen tree and a downed line block the road.");
+      if (!check(state2, "Climb over the tree", 10, [], out).success) addInjury(state2, "sprain");
+    } else if (roll <= 95) {
+      log(state2, "A pack of loose dogs runs at you, barking.", "danger");
+      const mods = [...animalMods];
+      if (hasLight(state2) && isNight(state2.time)) mods.push(["light", 3]);
+      if (dog) mods.push([`${state2.dog.name} stands with you`, 3]);
+      if (!check(state2, "Scare off the dog pack", 13, mods, out).success) {
+        addInjury(state2, "bite");
+        if (dog) {
+          state2.dog.health -= 15;
+          log(state2, `${state2.dog.name} fights them off but is bitten (dog Health \u221215).`, "warn");
+        }
+      } else log(state2, "The pack runs away.");
+    } else if (roll <= 99) {
+      log(state2, "Coyotes follow you along the road.", "danger");
+      if (!check(state2, "Make the coyotes go away", 11, animalMods, out).success) {
+        if (chance(state2, 0.5)) addInjury(state2, "bite");
+        else {
+          log(state2, "A coyote runs off with some of your food.", "warn");
+          loseRandomItem(state2, (id) => ["canned_food", "snacks", "peanut_butter", "dry_food", "dog_food"].includes(id));
+        }
+      } else log(state2, "The coyotes go away.");
+    } else {
+      const found = rollZone(state2, `road${state2.time}`, "house", 0.9, 0, 1);
+      const names = [];
+      for (const [id, q] of Object.entries(found)) {
+        addItem(state2.carried, id, q);
+        names.push(`${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
+      }
+      log(state2, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
+    }
+  }
+  function describeTrip(state2, est) {
+    return `${est.miles.toFixed(1)} mi \xB7 about ${formatDuration(est.minutes)} \xB7 Energy \u2212${Math.round(est.energy)}`;
+  }
+
+  // src/engine/actions.js
+  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function source(state2, from) {
+    return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
+  }
+  function hereBag(state2) {
+    const loc = state2.location;
+    if (loc.kind === "home") return state2.home.storage;
+    if (loc.kind === "place") return placeState(state2, getPlace(loc.id)).leftovers;
+    if (loc.kind === "house") return state2.houses[loc.id].leftovers;
+    return {};
+  }
+  function locationLabel(state2) {
+    const loc = state2.location;
+    if (loc.kind === "home") return "Home (Aloha)";
+    if (loc.kind === "place") return getPlace(loc.id)?.name || "Unknown place";
+    if (loc.kind === "house") return loc.label;
+    return "";
+  }
+  function canHeat(state2, kwh) {
+    return state2.home.fireHours > 0 || state2.home.battery >= kwh;
+  }
+  function useHeat(state2, kwh) {
+    if (state2.home.fireHours > 0) return "on the fire";
+    state2.home.battery -= kwh;
+    return "on the electric hot plate";
+  }
+  function seeBody(state2, text) {
+    const p = state2.player;
+    const day = dayIndex(state2.time);
+    log(state2, text, "story");
+    if (p.bodySeenDay !== day) {
+      p.bodySeenDay = day;
+      p.morale = clamp2(p.morale - (day >= 30 ? 1 : 3), 0, 100);
+    }
+  }
+  function addFood(state2, points) {
+    const p = state2.player;
+    if (p.illness.stomachH > 0) points /= 2;
+    p.food = clamp2(p.food + points, 0, 100);
+  }
+  function addWater(state2, points) {
+    state2.player.water = clamp2(state2.player.water + points, 0, 100);
+  }
+  function freeWeight(state2) {
+    return carryLimit(state2) * 1.5 - bagWeight(state2.carried);
+  }
+  function itemUses(state2, id) {
+    const it = ITEMS[id];
+    if (!it) return [];
+    const uses = [];
+    if (it.kind === "food" && !it.needsCooking) uses.push({ verb: "eat", label: id === "formula" ? "Drink" : "Eat" });
+    if (it.kind === "drink") uses.push({ verb: "drink", label: "Drink" });
+    if (it.kind === "med") uses.push({ verb: "med", label: "Use" });
+    if (it.kind === "wear") uses.push({ verb: "wear", label: "Wear" });
+    if (it.kind === "batteries") uses.push({ verb: "batteries", label: "Put in flashlight" });
+    if (it.kind === "comfort") uses.push({ verb: "comfort", label: "Use" });
+    if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
+    if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
+    return uses;
+  }
+  function useItem(state2, id, verb, from = "carried") {
+    const bag = source(state2, from);
+    const it = ITEMS[id];
+    if (!bag[id] || !it) return;
+    const p = state2.player;
+    switch (verb) {
+      case "eat": {
+        if (id === "canned_food" && chance(state2, 0.05)) {
+          addItem(bag, id, -1);
+          log(state2, "This can is swollen. The food is bad. You throw it away.", "warn");
+          advanceTime(state2, 2);
+          return;
+        }
+        addItem(bag, id, -it.portion);
+        addFood(state2, it.cal * it.portion / 25);
+        if (it.water) addWater(state2, it.water);
+        log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
+        advanceTime(state2, 15);
+        return;
+      }
+      case "drink": {
+        addItem(bag, id, -it.portion);
+        addWater(state2, it.water);
+        log(state2, `You drink: ${it.name}${it.portion < 1 ? " (1 quart)" : ""}.`);
+        advanceTime(state2, 5);
+        return;
+      }
+      case "med":
+        return useMed(state2, id, bag);
+      case "wear": {
+        const slot = it.slot;
+        if (p.worn[slot]) {
+          log(state2, `You already wear a ${it.name.toLowerCase()}.`);
+          return;
+        }
+        addItem(bag, id, -1);
+        p.worn[slot] = true;
+        log(state2, `You put on the ${it.name.toLowerCase()}.`);
+        advanceTime(state2, 3);
+        return;
+      }
+      case "batteries": {
+        if (!has(state2, "flashlight")) {
+          log(state2, "You need a flashlight first.");
+          return;
+        }
+        addItem(bag, id, -1);
+        p.lightHours = 10;
+        log(state2, "You put new batteries in the flashlight (10 h of light).");
+        advanceTime(state2, 2);
+        return;
+      }
+      case "comfort": {
+        const day = dayIndex(state2.time);
+        if (p.lastComfortDay === day) {
+          log(state2, "You already did that today. It does not help again.");
+          return;
+        }
+        p.lastComfortDay = day;
+        p.morale = clamp2(p.morale + 5, 0, 100);
+        log(state2, "You read and play cards for a while. Your mind is calmer.", "good");
+        advanceTime(state2, 60);
+        return;
+      }
+      case "feeddog":
+        return feedDog(state2, id, bag);
+      default:
+    }
+  }
+  function has(state2, id) {
+    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  }
+  function useMed(state2, id, bag) {
+    const p = state2.player;
+    const it = ITEMS[id];
+    if (it.med === "bandage") {
+      const order = ["deep_cut", "bite", "small_cut", "sprain"];
+      const open = p.injuries.filter((i) => !i.bandaged).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+      if (!open.length) {
+        log(state2, "You have no wound that needs a bandage.");
+        return;
+      }
+      const inj = open[0];
+      addItem(bag, id, -it.portion);
+      inj.bandaged = true;
+      log(state2, `You clean and bandage the ${INJURY_NAMES[inj.type].toLowerCase()}.`, "good");
+      advanceTime(state2, 15);
+      return;
+    }
+    if (it.med === "antibiotics") {
+      const inf = p.illness.infection;
+      if (!inf) {
+        log(state2, "You have no infection. Keep the antibiotics for later.");
+        return;
+      }
+      if (inf.abxH != null) {
+        log(state2, "You already take a course of antibiotics.");
+        return;
+      }
+      addItem(bag, id, -1);
+      inf.abxH = 0;
+      log(state2, "You start a 3-day course of antibiotics.", "good");
+      advanceTime(state2, 2);
+      return;
+    }
+    if (it.med === "pain") {
+      addItem(bag, id, -it.portion);
+      p.painH = 6;
+      log(state2, "You take pain pills. The pain is less for 6 hours.");
+      advanceTime(state2, 2);
+      return;
+    }
+    if (it.med === "ors") {
+      if (p.illness.stomachH <= 0) {
+        log(state2, "You do not need this now.");
+        return;
+      }
+      addItem(bag, id, -1);
+      p.illness.stomachH = Math.min(p.illness.stomachH, 24);
+      addWater(state2, 20);
+      log(state2, "You drink the rehydration salts. You feel a little better.", "good");
+      advanceTime(state2, 5);
+    }
+  }
+  function takeItem(state2, id, qty) {
+    const bag = hereBag(state2);
+    const have = bag[id] || 0;
+    if (!have) return;
+    const w = ITEMS[id].weight;
+    const maxByWeight = w > 0 ? Math.floor(freeWeight(state2) / w * 1e3) / 1e3 : have;
+    const n = Math.min(qty ?? have, have, maxByWeight);
+    if (n <= 0) {
+      log(state2, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, "warn");
+      return;
+    }
+    addItem(bag, id, -n);
+    addItem(state2.carried, id, n);
+    advanceTime(state2, 1);
+  }
+  function takeAll(state2) {
+    const bag = hereBag(state2);
+    const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+    let left = false;
+    for (const id of ids) {
+      const before = bag[id];
+      const w = ITEMS[id].weight;
+      const maxN = Math.floor(freeWeight(state2) / w);
+      const n = Math.min(Math.floor(before), maxN);
+      if (n > 0) {
+        addItem(bag, id, -n);
+        addItem(state2.carried, id, n);
+      }
+      if (bag[id]) left = true;
+    }
+    if (left) log(state2, "Your pack is full. Some items stay here.", "warn");
+    advanceTime(state2, 2);
+  }
+  function dropItem(state2, id, qty) {
+    const have = state2.carried[id] || 0;
+    if (!have) return;
+    const n = Math.min(qty ?? have, have);
+    addItem(state2.carried, id, -n);
+    addItem(hereBag(state2), id, n);
+    if (state2.location.kind !== "home") log(state2, `You leave the ${itemName(id).toLowerCase()} here.`);
+    advanceTime(state2, 1);
+  }
+  function storeAll(state2) {
+    for (const [id, q] of Object.entries(state2.carried)) {
+      if (id === "backpack" || id === "flashlight") continue;
+      addItem(state2.carried, id, -q);
+      addItem(state2.home.storage, id, q);
+    }
+    log(state2, "You put your supplies away in the house.");
+    advanceTime(state2, 5);
+  }
+  function rest(state2, hours) {
+    log(state2, `You rest for ${hours} h.`);
+    advanceTime(state2, hours * 60, "rest");
+  }
+  function sleep(state2, hours) {
+    const where = state2.location.kind === "home" ? "in your bed" : "on the floor";
+    log(state2, `You sleep ${where} for ${hours} h.`);
+    advanceTime(state2, hours * 60, "sleep");
+    if (!state2.dead) log(state2, "You wake up.");
+  }
+  function homeAction(state2, id) {
+    const h = state2.home;
+    const p = state2.player;
+    switch (id) {
+      case "drink_tank":
+        h.tankGal = Math.max(0, h.tankGal - 0.25);
+        addWater(state2, 40);
+        log(state2, "You drain water from the water heater tank and drink a quart. It is clean.");
+        advanceTime(state2, 10);
+        return;
+      case "fill_jug": {
+        const fromSafe = h.safeGal >= 1;
+        if (fromSafe) h.safeGal -= 1;
+        else h.tankGal -= 1;
+        addItem(state2.carried, "water_bottle", 1);
+        log(state2, `You fill a 1-gallon jug with clean water from the ${fromSafe ? "boiled water pot" : "water heater tank"}.`);
+        advanceTime(state2, 10);
+        return;
+      }
+      case "collect_tap":
+        h.rawGal += 2;
+        log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
+        advanceTime(state2, 15);
+        return;
+      case "collect_toilet":
+        h.rawGal += h.toiletGal;
+        log(state2, `You take the water from the toilet tanks (${h.toiletGal} gal). Boil it before you drink it.`);
+        h.toiletGal = 0;
+        advanceTime(state2, 10);
+        return;
+      case "drink_raw":
+        h.rawGal = Math.max(0, h.rawGal - 0.25);
+        addWater(state2, 40);
+        log(state2, "You drink a quart of water that you did not boil.", "warn");
+        advanceTime(state2, 5);
+        if (chance(state2, 0.3)) startStomachBug(state2);
+        return;
+      case "boil": {
+        const how = useHeat(state2, 0.4);
+        const g = Math.min(1, h.rawGal);
+        h.rawGal -= g;
+        h.safeGal += g;
+        log(state2, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
+        advanceTime(state2, 20);
+        return;
+      }
+      case "drink_safe":
+        h.safeGal = Math.max(0, h.safeGal - 0.25);
+        addWater(state2, 40);
+        log(state2, "You drink a quart of boiled water.");
+        advanceTime(state2, 5);
+        return;
+      case "cook": {
+        const food = ["dry_food", "canned_food"].find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+        const bag = (h.storage[food] || 0) > 0 ? h.storage : state2.carried;
+        const it = ITEMS[food];
+        if (food === "dry_food") {
+          const water = h.safeGal >= 0.125 ? "safeGal" : h.rawGal >= 0.125 ? "rawGal" : h.tankGal >= 0.125 ? "tankGal" : null;
+          if (!water) {
+            log(state2, "You need water to cook rice or pasta.");
+            return;
+          }
+          h[water] -= 0.125;
+        }
+        const how = useHeat(state2, 0.5);
+        addItem(bag, food, -it.portion);
+        addFood(state2, it.cal * it.portion / 25);
+        p.warmth = clamp2(p.warmth + 10, 0, 100);
+        p.morale = clamp2(p.morale + 5, 0, 100);
+        log(state2, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, "good");
+        advanceTime(state2, 30);
+        return;
+      }
+      case "add_wood": {
+        const bag = (h.storage.firewood || 0) > 0 ? h.storage : state2.carried;
+        addItem(bag, "firewood", -1);
+        const lit = h.fireHours > 0;
+        h.fireHours += 2;
+        log(state2, lit ? "You put more wood on the fire (+2 h)." : "You light a fire in the fireplace. One bundle burns for about 2 hours.", "good");
+        advanceTime(state2, lit ? 5 : 15);
+        return;
+      }
+      case "break_furniture":
+        h.furniture -= 1;
+        addItem(h.storage, "firewood", 1);
+        log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
+        advanceTime(state2, 60, "heavy");
+        return;
+      case "heater":
+        h.heaterOn = !h.heaterOn;
+        log(state2, h.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
+        advanceTime(state2, 1);
+        return;
+      case "dry_clothes":
+        p.wet = false;
+        p.wetMinutes = 0;
+        p.dryMinutes = 0;
+        log(state2, "You change into dry clothes and hang the wet ones up.");
+        advanceTime(state2, 10);
+        return;
+      case "fridge":
+        h.fridgeOpened = true;
+        p.morale = clamp2(p.morale - 2, 0, 100);
+        log(state2, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
+        advanceTime(state2, 2);
+        return;
+      case "store_all":
+        return storeAll(state2);
+      case "feed_stray":
+        return feedStray(state2);
+      default:
+    }
+  }
+  function anyFood(state2) {
+    const all = { ...state2.home.storage };
+    for (const [k, v] of Object.entries(state2.carried)) all[k] = (all[k] || 0) + v;
+    return ["dog_food", "canned_food", "snacks", "peanut_butter", "formula"].find((f) => (all[f] || 0) > 0);
+  }
+  function feedStray(state2) {
+    const d = state2.dog;
+    const day = dayIndex(state2.time);
+    const food = anyFood(state2);
+    if (!food) {
+      log(state2, "You have no food to give the dog.");
+      return;
+    }
+    const bag = (state2.home.storage[food] || 0) > 0 ? state2.home.storage : state2.carried;
+    addItem(bag, food, -ITEMS[food].portion);
+    d.feedDays.push(day);
+    advanceTime(state2, 10);
+    const days = new Set(d.feedDays).size;
+    if (days >= 3) {
+      d.stage = "joined";
+      d.food = 70;
+      d.bond = 30;
+      log(state2, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
+      state2.pendingPrompt = "name_dog";
+    } else if (days === 1) {
+      log(state2, "You put food on the porch and go back inside. Later, the bowl is empty.", "story");
+    } else {
+      log(state2, "The dog eats while you watch from the door. It comes a little closer today.", "story");
+    }
+  }
+  function feedDog(state2, id, bag) {
+    const d = state2.dog;
+    const it = ITEMS[id];
+    addItem(bag, id, -it.portion);
+    const points = it.kind === "dogfood" ? 100 : it.cal * it.portion / 10;
+    d.food = clamp2(d.food + points, 0, 100);
+    d.bond = clamp2(d.bond + 1, 0, 100);
+    log(state2, `You feed ${d.name}.`);
+    advanceTime(state2, 5);
+  }
+  function nameDog(state2, name) {
+    const clean = String(name || "").replace(/[^\p{L}\p{N} '\-]/gu, "").trim().slice(0, 20) || "Dog";
+    state2.dog.name = clean;
+    state2.pendingPrompt = null;
+    log(state2, `You call the dog ${clean}. ${clean} wags once.`, "good");
+  }
+  function playWithDog(state2) {
+    const d = state2.dog;
+    const p = state2.player;
+    const day = dayIndex(state2.time);
+    if (p.lastDogPlayDay === day) {
+      log(state2, `${d.name} is resting. You already played today.`);
+      return;
+    }
+    p.lastDogPlayDay = day;
+    d.bond = clamp2(d.bond + 2, 0, 100);
+    p.morale = clamp2(p.morale + 3, 0, 100);
+    log(state2, `You play with ${d.name} for a while. For a moment, things feel normal.`, "good");
+    advanceTime(state2, 20);
+  }
+  function toggleDogFollow(state2) {
+    const d = state2.dog;
+    d.withPlayer = !d.withPlayer;
+    log(state2, d.withPlayer ? `${d.name} will come with you.` : `${d.name} will stay home and guard the house.`);
+  }
+  function enterPlace(state2, place) {
+    const ps = placeState(state2, place);
+    const cat = CATEGORIES[place.cat];
+    if (!ps.visited) {
+      ps.visited = true;
+      state2.stats.placesSearched += 1;
+      log(state2, cat.entryText, "story");
+      if (ps.emptyHint) log(state2, "Most shelves here are already empty. People took a lot in the first weeks.");
+      if (cat.entryMorale) state2.player.morale = clamp2(state2.player.morale + cat.entryMorale, 0, 100);
+    }
+    if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
+  }
+  function forceEntry(state2) {
+    const place = getPlace(state2.location.id);
+    const ps = placeState(state2, place);
+    if (has(state2, "pry_bar")) {
+      ps.unlocked = true;
+      log(state2, "You open the locked door with the pry bar.");
+      advanceTime(state2, 5, "work");
+      return;
+    }
+    state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+    advanceTime(state2, 5, "heavy");
+    if (check(state2, "Kick open the locked door", 12).success) {
+      ps.unlocked = true;
+      log(state2, "The door breaks open.");
+    } else if (chance(state2, 0.3)) addInjury(state2, "sprain");
+  }
+  function openCounter(state2) {
+    const place = getPlace(state2.location.id);
+    const ps = placeState(state2, place);
+    const lz2 = CATEGORIES[place.cat].lockedZone;
+    if (has(state2, "pry_bar")) {
+      ps.counterOpen = true;
+      log(state2, `You open the ${lz2.name} gate with the pry bar.`);
+      advanceTime(state2, 5, "work");
+      return;
+    }
+    advanceTime(state2, 10, "heavy");
+    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc).success) {
+      ps.counterOpen = true;
+      log(state2, "The gate bends open.");
+    } else if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+  }
+  function searchMinutes(state2, base, dark) {
+    const p = state2.player;
+    let m = base;
+    if (dark && !hasLight(state2)) m *= 2;
+    if (p.water < 25) m *= 1.25;
+    if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
+    const extra = Math.max(0, bagWeight(state2.carried) - 10);
+    m *= 1 + Math.floor(extra / 10) * 0.1;
+    return m;
+  }
+  function dogExtra(state2) {
+    return state2.dog.stage === "joined" && state2.dog.withPlayer && state2.dog.bond >= 50 ? 1 : 0;
+  }
+  function zoneInjuryCheck(state2) {
+    if (!check(state2, "Search with care (glass, falls)", 8).success) {
+      addInjury(state2, chance(state2, 0.8) ? "small_cut" : "sprain");
+    }
+  }
+  function reportFound(state2, found, where) {
+    const names = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
+    if (names.length) log(state2, `You search the ${where}. You find: ${names.join(", ")}.`, "good");
+    else log(state2, `You search the ${where}. You find nothing useful.`);
+  }
+  function searchZone(state2) {
+    const place = getPlace(state2.location.id);
+    const cat = CATEGORIES[place.cat];
+    const ps = placeState(state2, place);
+    if (ps.zonesDone >= ps.zones) return;
+    const env = environment(state2, "work");
+    const counterZone = cat.lockedZone && ps.zonesDone === ps.zones - 1;
+    const minutes = searchMinutes(state2, cat.zoneMinutes, env.dark);
+    advanceTime(state2, minutes, "work");
+    if (state2.dead) return;
+    zoneInjuryCheck(state2);
+    const found = rollZone(state2, place.id, place.cat, ps.stock, ps.zonesDone, dogExtra(state2));
+    if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
+    ps.zonesDone += 1;
+    state2.stats.zonesSearched += 1;
+    for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
+    reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} (${ps.zonesDone} of ${ps.zones})`);
+    if (place.cat === "supermarket" && ps.zonesDone === 1) {
+      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
+      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
+    }
+  }
+  var lz = (cat) => cat.lockedZone.name;
+  function areaKey(state2) {
+    return state2.location.kind === "place" ? state2.location.id : "home";
+  }
+  function nearbyHousesLeft(state2) {
+    return 12 - (state2.houseAreas[areaKey(state2)] || 0);
+  }
+  function enterNearbyHouse(state2) {
+    const key = areaKey(state2);
+    const n = (state2.houseAreas[key] || 0) + 1;
+    state2.houseAreas[key] = n;
+    const id = `${key}#${n}`;
+    const near = key === "home" ? "on your street" : `near ${getPlace(key)?.name || "here"}`;
+    const label = `House ${n} ${near}`;
+    const r = randInt(state2, 0, 999) / 1e3;
+    state2.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
+    const parent = { ...state2.location, pos: { ...state2.pos } };
+    advanceTime(state2, 5, "walk");
+    log(state2, `You walk to a house ${near}.`);
+    if (chance(state2, 0.7)) {
+      if (has(state2, "pry_bar")) {
+        log(state2, "The door is locked. You open it with the pry bar.");
+        advanceTime(state2, 5, "work");
+      } else if (chance(state2, 0.1)) {
+        log(state2, "The door is locked, but you find a spare key under a flower pot.");
+        advanceTime(state2, 2);
+      } else {
+        state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+        if (!check(state2, "Kick open the locked door", 12).success) {
+          log(state2, "The door holds. You break a window and climb in.");
+          if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+        }
+        advanceTime(state2, 5, "heavy");
+      }
+    } else {
+      log(state2, "The door is not locked.");
+    }
+    state2.stats.housesSearched += 1;
+    state2.location = { kind: "house", id, label, parent };
+    if (state2.houses[id].body) seeBody(state2, "Someone is in the bedroom. You close the door.");
+    else log(state2, "The house is empty and cold. A family lived here.");
+  }
+  function searchRoom(state2) {
+    const loc = state2.location;
+    const hs = state2.houses[loc.id];
+    if (hs.roomsDone >= HOUSE_ROOMS.length) return;
+    const room = HOUSE_ROOMS[hs.roomsDone];
+    const env = environment(state2, "work");
+    advanceTime(state2, searchMinutes(state2, CATEGORIES.house.zoneMinutes, env.dark), "work");
+    if (state2.dead) return;
+    zoneInjuryCheck(state2);
+    const found = rollZone(state2, loc.id, "house", CATEGORIES.house.stock, hs.roomsDone, dogExtra(state2));
+    hs.roomsDone += 1;
+    state2.stats.zonesSearched += 1;
+    for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
+    reportFound(state2, found, room);
+  }
+  function leaveHouse(state2) {
+    const parent = state2.location.parent;
+    state2.location = { kind: parent.kind, ...parent.id ? { id: parent.id } : {} };
+    state2.pos = { ...parent.pos };
+    log(state2, "You walk back.");
+    advanceTime(state2, 5, "walk");
+  }
+  function goToPlace(state2, placeId) {
+    const place = getPlace(placeId);
+    if (!place) return;
+    const ok = travel(state2, place, place.name);
+    if (!ok) return;
+    state2.location = { kind: "place", id: placeId };
+    log(state2, `You arrive at ${place.name}.`, "travel");
+    enterPlace(state2, place);
+  }
+  function goHome(state2) {
+    const ok = travel(state2, HOME, "home");
+    if (!ok) return;
+    state2.location = { kind: "home" };
+    log(state2, "You are home. You lock the door behind you.", "travel");
+  }
+  function listActions(state2) {
+    const loc = state2.location;
+    const p = state2.player;
+    const h = state2.home;
+    const acts = [];
+    const add = (id, label, opts = {}) => acts.push({ id, label, ...opts });
+    if (loc.kind === "home") {
+      add("drink_tank", "Drink from the water heater tank", { disabled: h.tankGal < 0.25 && "The tank is empty", note: `${h.tankGal.toFixed(1)} gal left` });
+      if (h.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h.safeGal.toFixed(1)} gal` });
+      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h.safeGal < 1 && h.tankGal < 1 && "No clean water" });
+      if (h.tapWorks) add("collect_tap", "Collect tap water (2 gal, unsafe)");
+      if (h.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
+      if (h.rawGal > 0) {
+        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
+        add("drink_raw", "Drink water without boiling (risk)");
+      }
+      const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
+      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : "Light a fire in the fireplace", { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
+      add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
+      const food = ["dry_food", "canned_food"].some((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+      add("cook", "Cook a hot meal", { disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
+      if (p.wet) add("dry_clothes", "Change into dry clothes");
+      if (!h.fridgeOpened) add("fridge", "Open the fridge");
+      if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
+      if (state2.dog.stage === "visiting") {
+        const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
+        const night = isNight(state2.time);
+        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" });
+      }
+      add("house", "Search a house on your street", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
+    }
+    if (loc.kind === "place") {
+      const place = getPlace(loc.id);
+      const cat = CATEGORIES[place.cat];
+      const ps = placeState(state2, place);
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has(state2, "pry_bar") ? "pry bar" : "d20 DC 12" });
+      else if (ps.zonesDone < ps.zones) {
+        if (cat.lockedZone && ps.zonesDone === ps.zones - 1 && !ps.counterOpen) {
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has(state2, "pry_bar") ? "pry bar" : `d20 DC ${cat.lockedZone.dc}` });
+        } else {
+          const env = environment(state2, "work");
+          const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
+          add("search", `Search the next ${cat.zoneName}`, { note: `${ps.zonesDone}/${ps.zones} done \xB7 ${formatDuration(min)}${env.dark && !hasLight(state2) ? " (dark, no light)" : ""}` });
+        }
+      } else add("search", "Nothing left to search", { disabled: "You searched all of it" });
+      add("house", "Search a house nearby", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
+      add("go_home", "Walk home");
+    }
+    if (loc.kind === "house") {
+      const hs = state2.houses[loc.id];
+      if (hs.roomsDone < HOUSE_ROOMS.length) add("room", `Search the ${HOUSE_ROOMS[hs.roomsDone]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
+      else add("room", "All rooms searched", { disabled: "Nothing left" });
+      add("leave_house", "Leave the house");
+    }
+    add("rest", "Rest 1 hour");
+    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : "Sleep here on the floor\u2026");
+    if (state2.dog.stage === "joined") {
+      add("play_dog", `Play with ${state2.dog.name}`);
+      if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
+    }
+    return acts;
+  }
+  function doAction(state2, id, arg) {
+    if (state2.dead) return;
+    switch (id) {
+      case "rest":
+        return rest(state2, 1);
+      case "sleep":
+        return sleep(state2, Number(arg) || 8);
+      case "search":
+        return searchZone(state2);
+      case "force":
+        return forceEntry(state2);
+      case "counter":
+        return openCounter(state2);
+      case "house":
+        return enterNearbyHouse(state2);
+      case "room":
+        return searchRoom(state2);
+      case "leave_house":
+        return leaveHouse(state2);
+      case "go_home":
+        return goHome(state2);
+      case "go_place":
+        return goToPlace(state2, arg);
+      case "play_dog":
+        return playWithDog(state2);
+      case "dog_follow":
+        return toggleDogFollow(state2);
+      default:
+        return homeAction(state2, id);
+    }
+  }
+
+  // src/engine/game.js
+  function perform(state2, kind, a, b, c) {
+    if (state2.dead) return;
+    switch (kind) {
+      case "action":
+        doAction(state2, a, b);
+        break;
+      case "use":
+        useItem(state2, a, b, c);
+        break;
+      case "take":
+        takeItem(state2, a, b);
+        break;
+      case "takeall":
+        takeAll(state2);
+        break;
+      case "drop":
+        dropItem(state2, a, b);
+        break;
+      case "namedog":
+        nameDog(state2, a);
+        break;
+      default:
+    }
+    afterAction(state2);
+  }
+  function afterAction(state2) {
+    const p = state2.player;
+    if (!state2.dead && p.energy <= 0) {
+      log(state2, "You are too tired to stay awake. You fall asleep where you are.", "warn");
+      advanceTime(state2, 240, "sleep");
+    }
+  }
+
+  // src/engine/save.js
+  var KEY = "lastlight.save.v1";
+  var RUNS_KEY = "lastlight.runs.v1";
+  function store() {
+    try {
+      return globalThis.localStorage || null;
+    } catch {
+      return null;
+    }
+  }
+  function saveGame(state2) {
+    const s = store();
+    if (!s) return false;
+    try {
+      s.setItem(KEY, JSON.stringify(state2));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  function loadGame() {
+    const s = store();
+    if (!s) return null;
+    try {
+      const raw = s.getItem(KEY);
+      if (!raw) return null;
+      return parseSave(raw);
+    } catch {
+      return null;
+    }
+  }
+  function parseSave(raw) {
+    const st = JSON.parse(raw);
+    if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
+    return st;
+  }
+  function clearGame() {
+    const s = store();
+    if (s) try {
+      s.removeItem(KEY);
+    } catch {
+    }
+  }
+  function recordRun(state2) {
+    const s = store();
+    if (!s || !state2.dead) return [];
+    let runs = [];
+    try {
+      runs = JSON.parse(s.getItem(RUNS_KEY) || "[]");
+    } catch {
+      runs = [];
+    }
+    if (!runs.some((r) => r.seed === state2.seed && r.time === state2.dead.time)) {
+      runs.push({ seed: state2.seed, time: state2.dead.time, days: state2.dead.days, cause: state2.dead.cause, miles: Math.round(state2.stats.miles * 10) / 10, dog: state2.dog.name });
+      runs.sort((a, b) => b.days - a.days);
+      runs = runs.slice(0, 10);
+      try {
+        s.setItem(RUNS_KEY, JSON.stringify(runs));
+      } catch {
+      }
+    }
+    return runs;
+  }
+  function bestRuns() {
+    const s = store();
+    if (!s) return [];
+    try {
+      return JSON.parse(s.getItem(RUNS_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  // src/ui/map.js
+  var STYLE_URLS = [
+    "https://tiles.openfreemap.org/styles/dark",
+    "https://tiles.openfreemap.org/styles/positron"
+  ];
+  var OFFLINE_STYLE = {
+    version: 8,
+    sources: {},
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#1b1f24" } }]
+  };
+  async function pickStyle() {
+    for (const url of STYLE_URLS) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 5e3);
+        const res = await fetch(url, { signal: ctl.signal });
+        clearTimeout(timer);
+        if (res.ok) return { style: await res.json(), online: true };
+      } catch {
+      }
+    }
+    return { style: OFFLINE_STYLE, online: false };
+  }
+  function circlePolygon(center, miles, n = 128) {
+    const coords = [];
+    const latR = miles / 69;
+    const lonR = miles / (69 * Math.cos(center.lat * Math.PI / 180));
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * 2 * Math.PI;
+      coords.push([center.lon + lonR * Math.cos(a), center.lat + latR * Math.sin(a)]);
+    }
+    return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
+  }
+  async function createMap(container, { places, onPlaceClick }) {
+    const maplibregl = window.maplibregl;
+    const { style, online } = await pickStyle();
+    const map = new maplibregl.Map({
+      container,
+      style,
+      center: [HOME.lon, HOME.lat],
+      zoom: 12.5,
+      minZoom: 9,
+      maxZoom: 18,
+      maxBounds: [[HOME.lon - 0.75, HOME.lat - 0.5], [HOME.lon + 0.75, HOME.lat + 0.5]],
+      attributionControl: false
+    });
+    map.addControl(new maplibregl.AttributionControl({
+      compact: false,
+      customAttribution: online ? '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' : 'Places \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (map tiles offline)'
+    }));
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    const colorExpr = ["match", ["get", "cat"]];
+    for (const [id, c] of Object.entries(CATEGORIES)) if (id !== "house") colorExpr.push(id, c.color);
+    colorExpr.push("#999");
+    const ready = new Promise((resolve) => map.on("load", resolve));
+    await ready;
+    map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
+    map.addLayer({
+      id: "edge",
+      type: "line",
+      source: "edge",
+      paint: { "line-color": "#e0b85a", "line-width": 2, "line-dasharray": [3, 3], "line-opacity": 0.7 }
+    });
+    map.addSource("places", { type: "geojson", data: placesGeo(places, {}) });
+    map.addLayer({
+      id: "places",
+      type: "circle",
+      source: "places",
+      paint: {
+        "circle-color": colorExpr,
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
+        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#555", "#111"],
+        "circle-stroke-width": 1,
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.3, ["==", ["get", "status"], 1], 0.65, 1]
+      }
+    });
+    map.on("click", "places", (e) => {
+      const f = e.features && e.features[0];
+      if (f) onPlaceClick(f.properties.id, e.lngLat);
+    });
+    map.on("mouseenter", "places", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "places", () => {
+      map.getCanvas().style.cursor = "";
+    });
+    const homeEl = document.createElement("div");
+    homeEl.className = "marker-home";
+    homeEl.title = "Home";
+    homeEl.textContent = "\u2302";
+    homeEl.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onPlaceClick("__home", null);
+    });
+    new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    const youEl = document.createElement("div");
+    youEl.className = "marker-you";
+    youEl.title = "You";
+    const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    return {
+      map,
+      online,
+      update(state2, list) {
+        map.getSource("places").setData(placesGeo(list, state2.places));
+        you.setLngLat([state2.pos.lon, state2.pos.lat]);
+        youEl.classList.toggle("at-home", state2.location.kind === "home");
+        homeEl.classList.toggle("here", state2.location.kind === "home");
+      },
+      flyTo(pos) {
+        map.easeTo({ center: [pos.lon, pos.lat], duration: 800 });
+      }
+    };
+  }
+  function placesGeo(list, placeStates) {
+    return {
+      type: "FeatureCollection",
+      features: list.map((p) => {
+        const ps = placeStates[p.id];
+        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+        return {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+          properties: { id: p.id, cat: p.cat, status }
+        };
+      })
+    };
+  }
+
+  // src/ui/app.js
+  var state = null;
+  var mapApi = null;
+  var popup = null;
+  var $ = (sel) => document.querySelector(sel);
+  var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var STAT_INFO = {
+    food: { label: "Food", words: [[50, ""], [25, "Hungry"], [0.01, "Very hungry"], [0, "Starving"]] },
+    water: { label: "Water", words: [[50, ""], [25, "Thirsty"], [0.01, "Very thirsty"], [0, "Dehydrated"]] },
+    warmth: { label: "Warmth", words: [[50, ""], [25, "Cold"], [0.01, "Hypothermia"], [0, "Freezing"]] },
+    energy: { label: "Energy", words: [[50, ""], [25, "Tired"], [0.01, "Exhausted"], [0, "Asleep"]] },
+    health: { label: "Health", words: [[50, ""], [25, "Hurt"], [0.01, "Badly hurt"], [0, "Dead"]] },
+    morale: { label: "Morale", words: [[50, ""], [25, "Low"], [0.01, "Despair"], [0, "Despair"]] }
+  };
+  function statWord(key, v) {
+    for (const [lim, w] of STAT_INFO[key].words) if (v >= lim) return w;
+    return "";
+  }
+  async function start() {
+    setPlaces(window.LL_PLACES || []);
+    state = loadGame();
+    bindEvents();
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i style="background:transparent;border:2px dashed #e0b85a"></i>15-mile edge</span>';
+    try {
+      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
+      window.__llMap = mapApi.map;
+    } catch (e) {
+      console.error(e);
+      $("#map").innerHTML = '<div class="map-error">The map could not load. You can still play from the panel.</div>';
+    }
+    if (!state) showIntro();
+    else render();
+  }
+  function commit(focus) {
+    saveGame(state);
+    render();
+    if (focus && mapApi) mapApi.flyTo(state.pos);
+    if (state.dead) showDeath();
+    else if (state.pendingPrompt === "name_dog") showNameDog();
+  }
+  function act(kind, a, b, c) {
+    const wasDead = !!state.dead;
+    perform(state, kind, a, b, c);
+    if (!wasDead && state.dead) recordRun(state);
+    commit();
+  }
+  function render() {
+    if (!state) return;
+    renderHeader();
+    renderStats();
+    renderLocation();
+    renderItems();
+    renderHome();
+    renderDog();
+    renderLog();
+    if (mapApi) mapApi.update(state, allPlaces());
+  }
+  function renderHeader() {
+    const t = state.time;
+    const sun = sunFor(t);
+    const night = isNight(t);
+    const air = Math.round(airTemp(state, t));
+    const w = state.weather;
+    const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
+    $("#clock").innerHTML = `
+    <div class="day">Day ${dayIndex(t) + 1}</div>
+    <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
+    <div class="wx">${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
+  }
+  function renderStats() {
+    const p = state.player;
+    const rows = Object.keys(STAT_INFO).map((k) => {
+      const v = Math.round(p[k]);
+      const max = k === "energy" ? p.energyMax : 100;
+      const word = statWord(k, p[k]);
+      const cls = v < 25 ? "bad" : v < 50 ? "warn" : "ok";
+      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
+      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
+      <span class="sv">${v}</span><span class="sw">${word}</span></div>`;
+    }).join("");
+    const chips = [];
+    if (p.weak) chips.push(["warn", `Weak (Energy max ${p.energyMax})`]);
+    if (p.wet) chips.push(["bad", "Wet"]);
+    for (const i of p.injuries) chips.push(["bad", `${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`]);
+    if (p.illness.infection) chips.push(["bad", `Infection${p.illness.infection.abxH != null ? " (on antibiotics)" : ""}`]);
+    if (p.illness.stomachH > 0) chips.push(["bad", "Stomach bug"]);
+    if (p.painH > 0) chips.push(["ok", "Pain pills"]);
+    const felt = Math.round(feltTemp(state, "rest"));
+    chips.push(["", `Feels like ${felt}\xB0F`]);
+    if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
+    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
+    chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
+    $("#stats").innerHTML = rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
+  }
+  function renderLocation() {
+    const loc = state.location;
+    let sub = "";
+    if (loc.kind === "place") {
+      const p = getPlace(loc.id);
+      sub = CATEGORIES[p.cat].label;
+    } else if (loc.kind === "home") sub = "Your house. One story, a fireplace, solar panels and a home battery.";
+    else sub = "A house. Search it room by room.";
+    const acts = listActions(state).map((a) => {
+      const dis = a.disabled ? "disabled" : "";
+      const note = a.disabled ? a.disabled : a.note || "";
+      return `<button class="act" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
+    }).join("");
+    const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
+    $("#location").innerHTML = `<h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
+  }
+  function qtyText(q) {
+    return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
+  }
+  function itemRow(id, q, from, buttons) {
+    const it = ITEMS[id];
+    const w = Math.round(it.weight * q * 10) / 10;
+    return `<li><span class="in">${esc(it.name)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
+  }
+  function useButtons(id, from) {
+    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
+  }
+  function renderItems() {
+    const loc = state.location;
+    const here = hereBag(state);
+    const hereIds = Object.keys(here).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+    const hereTitle = loc.kind === "home" ? "House storage" : "Items you found here";
+    let hereHtml = hereIds.map((id) => itemRow(
+      id,
+      here[id],
+      "here",
+      (loc.kind === "home" ? useButtons(id, "storage") : "") + `<button data-take="${id}">Take</button>`
+    )).join("");
+    if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === "home" ? "Nothing stored." : "Nothing here yet. Search to find items."}</li>`;
+    const takeAll2 = hereIds.length && loc.kind !== "home" ? '<button class="small" data-takeall="1">Take all that fits</button>' : "";
+    const carried = state.carried;
+    const cIds = Object.keys(carried).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+    const weight = bagWeight(carried);
+    const limit = carryLimit(state);
+    const over = weight > limit;
+    let cHtml = cIds.map((id) => itemRow(
+      id,
+      carried[id],
+      "carried",
+      useButtons(id, "carried") + `<button data-drop="${id}">${loc.kind === "home" ? "Store" : "Drop"}</button>`
+    )).join("");
+    if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
+    $("#items").innerHTML = `
+    <h3>${hereTitle} ${takeAll2}</h3><ul class="items">${hereHtml}</ul>
+    <h3>You carry <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
+    <ul class="items">${cHtml}</ul>`;
+  }
+  function renderHome() {
+    const h = state.home;
+    const atHome = state.location.kind === "home";
+    const pct = Math.round(h.battery / h.batteryMax * 100);
+    $("#home").innerHTML = `
+    <h3>Home ${atHome ? "" : "<small>(you are away)</small>"}</h3>
+    <div class="grid">
+      <span>Inside temp</span><b>${Math.round(h.indoorTemp)}\xB0F</b>
+      <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : "out"}</b>
+      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} kWh)${h.heaterOn ? " \xB7 heater ON" : ""}</b>
+      <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
+      <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
+      <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
+    </div>`;
+  }
+  function renderDog() {
+    const d = state.dog;
+    let html = "";
+    if (d.stage === "joined") {
+      const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
+      html = `<h3>${esc(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
+      <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
+    } else if (d.stage === "visiting") {
+      html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
+    } else if (d.stage === "dead") {
+      html = `<h3>${esc(d.name || "The dog")}</h3><p class="hint">Gone.</p>`;
+    }
+    $("#dog").innerHTML = html;
+    $("#dog").hidden = !html;
+  }
+  function renderLog() {
+    const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+    $("#log").innerHTML = `<h3>Journal</h3><ul>${items}</ul>`;
+  }
+  function showPlacePopup(id, lngLat) {
+    if (!state || !mapApi) return;
+    const maplibregl = window.maplibregl;
+    if (popup) popup.remove();
+    let html;
+    let pos;
+    if (id === "__home") {
+      pos = HOME;
+      const atHome = state.location.kind === "home";
+      const est = estimateTrip(state, HOME);
+      html = `<h4>Home</h4><p>Your house in Aloha.</p>${atHome ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
+    } else {
+      const p = getPlace(id);
+      pos = p;
+      const cat = CATEGORIES[p.cat];
+      const ps = state.places[p.id];
+      const status = !ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched: nothing left" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
+      const here = state.location.kind === "place" && state.location.id === id;
+      const est = estimateTrip(state, p);
+      const fromHome = straightMiles(HOME, p).toFixed(1);
+      html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
+      ${here ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(", ")}</small>` : ""}</p>
+      <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
+    }
+    popup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px" }).setLngLat(lngLat || [pos.lon, pos.lat]).setHTML(html).addTo(mapApi.map);
+    const el = popup.getElement();
+    el.querySelector("[data-goplace]")?.addEventListener("click", (e) => {
+      popup.remove();
+      travelTo(e.currentTarget.dataset.goplace);
+    });
+    el.querySelector("[data-gohome]")?.addEventListener("click", () => {
+      popup.remove();
+      travelTo("__home");
+    });
+  }
+  function travelTo(id) {
+    if (state.dead) return;
+    if (state.location.kind === "house") perform(state, "action", "leave_house");
+    if (id === "__home") perform(state, "action", "go_home");
+    else perform(state, "action", "go_place", id);
+    if (state.dead) recordRun(state);
+    commit(true);
+  }
+  function modal(html, onBind) {
+    const m = $("#modal");
+    m.innerHTML = `<div class="box">${html}</div>`;
+    m.hidden = false;
+    onBind && onBind(m);
+  }
+  function closeModal() {
+    $("#modal").hidden = true;
+    $("#modal").innerHTML = "";
+  }
+  function showIntro() {
+    modal(`<h2>Last Light: Portland</h2>
+    <p>Late November 2026. Three months ago, a plague went through the world. Everyone died.</p>
+    <p>You were in a coma in your own home in Aloha, Oregon. A machine fed you. Now its bags are empty, and you wake up.</p>
+    <p>You are the last person alive. There is nobody to save and nobody to find. You must stay alive as long as you can.</p>
+    <h3>How to play</h3>
+    <ul>
+      <li>Each action costs game time. Time stops when you read or look at the map.</li>
+      <li>Watch Food, Water, Warmth, Energy, Health and Morale. If Health gets to 0, you die.</li>
+      <li>Tap a dot on the map to walk to a real store, pharmacy, clinic or other place. Search it, take what you can carry, and walk home.</li>
+      <li>Keep the house warm with the fireplace. Boil water before you drink it.</li>
+      <li>The game saves after each action. You have one life.</li>
+    </ul>
+    <button class="primary" id="startBtn">Wake up</button>`, (m) => {
+      m.querySelector("#startBtn").addEventListener("click", () => {
+        state = newGame();
+        closeModal();
+        commit(true);
+      });
+    });
+  }
+  function showSleep() {
+    const opts = [1, 2, 4, 6, 8, 10].map((h) => `<button data-hours="${h}">${h} h</button>`).join("");
+    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+      m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
+        closeModal();
+        act("action", "sleep", Number(b.dataset.hours));
+      }));
+      m.querySelector("#cancel").addEventListener("click", closeModal);
+    });
+  }
+  function showNameDog() {
+    modal(`<h3>The dog stays with you</h3><p>What do you call the dog?</p><input id="dogName" maxlength="20" placeholder="Name" autocomplete="off"><button class="primary" id="okName">OK</button>`, (m) => {
+      const input = m.querySelector("#dogName");
+      input.focus();
+      const ok = () => {
+        closeModal();
+        act("namedog", input.value);
+      };
+      m.querySelector("#okName").addEventListener("click", ok);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") ok();
+      });
+    });
+  }
+  function showDeath() {
+    const d = state.dead;
+    const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc(r.cause)}${r.dog ? ` \xB7 with ${esc(r.dog)}` : ""}</li>`).join("");
+    modal(`<h2>You died</h2>
+    <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc(d.cause)}.</p>
+    <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
+    <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : "none"}</b></div>
+    <h3>Best runs</h3><ol>${runs}</ol>
+    <button class="primary" id="again">Start a new run</button>`, (m) => {
+      m.querySelector("#again").addEventListener("click", () => {
+        clearGame();
+        state = newGame();
+        closeModal();
+        commit(true);
+      });
+    });
+  }
+  function showMenu() {
+    modal(`<h3>Game</h3>
+    <p class="hint">The game saves in this browser after each action.</p>
+    <div class="col">
+      <button id="exp">Export a backup file</button>
+      <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
+      <button id="newrun" class="danger">Give up and start a new run</button>
+      <button class="link" id="cancel">Close</button>
+    </div>
+    <p class="hint">Map data \xA9 OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
+      m.querySelector("#cancel").addEventListener("click", closeModal);
+      m.querySelector("#exp").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `last-light-day${dayIndex(state.time) + 1}.json`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
+      });
+      m.querySelector("#imp").addEventListener("change", async (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        try {
+          state = parseSave(await f.text());
+          closeModal();
+          commit(true);
+        } catch (err) {
+          alert("This file is not a Last Light save.");
+        }
+      });
+      m.querySelector("#newrun").addEventListener("click", () => {
+        if (!confirm("Start a new run? This run ends now.")) return;
+        clearGame();
+        closeModal();
+        state = null;
+        showIntro();
+      });
+    });
+  }
+  function bindEvents() {
+    document.body.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled || !state || b.closest("#modal") || b.closest(".maplibregl-popup")) return;
+      if (b.dataset.act) {
+        if (b.dataset.act === "sleep") return showSleep();
+        act("action", b.dataset.act);
+      } else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
+      else if (b.dataset.take) act("take", b.dataset.take);
+      else if (b.dataset.takeall) act("takeall");
+      else if (b.dataset.drop) act("drop", b.dataset.drop);
+      else if (b.id === "menuBtn") showMenu();
+      else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
+    });
+    window.addEventListener("beforeunload", () => {
+      if (state) saveGame(state);
+    });
+  }
+
+  // src/main.js
+  start();
+})();
