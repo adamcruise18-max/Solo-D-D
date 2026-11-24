@@ -625,7 +625,11 @@ export function pickUp(state, pid) {
   const ctx = zoneCtx(state);
   if (!ctx) return false;
   const zone = Number(String(pid).slice(1).split('i')[0]);
-  if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return false;
+  if (ctx.place && !ctx.holder.unlocked) return false; // same rule as searchZone
+  if (zone === ctx.counterIdx && !ctx.holder.counterOpen) {
+    log(state, 'It is behind the locked counter gate. Open the gate first.', 'warn');
+    return false;
+  }
   const it = zoneItemList(state, ctx, zone).find((x) => x.pid === pid);
   if (!it || ctx.holder.taken.includes(pid)) return false;
   const w = ITEMS[it.item].weight;

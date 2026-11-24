@@ -427,11 +427,39 @@ export function openInside(opts) {
   hiBox.visible = false;
   scene.add(hiBox);
   const REACH = 2.3;
+  // True when a wall, shelf, counter or closed gate is between the eye and the item.
+  // Segment against each box (slab test). Walls have no height: they go to the ceiling.
+  function blocked(from, o) {
+    const dx = o.x - from.x;
+    const dy = o.y - from.y;
+    const dz = o.z - from.z;
+    const END = 0.9; // stop short of the item: it may rest on top of the box
+    for (const b of solidBoxes(plan, { counter: opts.isCounterOpen() })) {
+      const lo = [b.x - b.w / 2 + 0.02, 0, b.z - b.d / 2 + 0.02];
+      const hi = [b.x + b.w / 2 - 0.02, (b.h || 9) - 0.02, b.z + b.d / 2 - 0.02];
+      const p0 = [from.x, from.y, from.z];
+      const v = [dx, dy, dz];
+      let t0 = 0;
+      let t1 = END;
+      let hit = true;
+      for (let k = 0; k < 3 && hit; k++) {
+        if (Math.abs(v[k]) < 1e-9) { if (p0[k] < lo[k] || p0[k] > hi[k]) hit = false; continue; }
+        let a = (lo[k] - p0[k]) / v[k];
+        let c = (hi[k] - p0[k]) / v[k];
+        if (a > c) [a, c] = [c, a];
+        t0 = Math.max(t0, a);
+        t1 = Math.min(t1, c);
+        if (t0 > t1) hit = false;
+      }
+      if (hit) return true;
+    }
+    return false;
+  }
   function itemsInReach(from) {
     const out = [];
     for (const o of itemObjs.values()) {
       const d = Math.hypot(o.x - from.x, o.y - from.y, o.z - from.z);
-      if (d <= REACH) out.push({ o, d });
+      if (d <= REACH && !blocked(from, o)) out.push({ o, d });
     }
     return out.sort((a, b) => a.d - b.d);
   }
@@ -1044,7 +1072,7 @@ export function openInside(opts) {
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
 
   return { close: () => leave() };
 }
