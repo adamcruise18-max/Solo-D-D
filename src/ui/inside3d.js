@@ -8,6 +8,7 @@ import {
   Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
 import { hashString, mulberry32 } from '../rng.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
@@ -132,76 +133,79 @@ export function openInside(opts) {
   scene.background = new Color(bg);
   scene.fog = new FogExp2(bg, 0.035);
 
-  // Light
-  let darkAmb = null;
-  let darkHemi = null;
-  if (dark) {
-    darkAmb = new AmbientLight(0x8fa4b8, 0.28);
-    darkHemi = new HemisphereLight(0xb8c8d8, 0x202020, 0.25);
-    scene.add(darkAmb, darkHemi);
-  } else {
-    scene.add(new HemisphereLight(0xdfe8f0, 0x3a3630, 1.3));
-    scene.add(new AmbientLight(0xffffff, 0.25));
-  }
-  // Grey daylight from the open door
-  const doorLight = new PointLight(opts.night ? 0x6b7d99 : 0xe8f0ff, opts.night ? 4 : 18, 14, 1.6);
-  doorLight.position.set(0, 2.2, -0.6);
-  scene.add(doorLight);
-  let flash = null;
-  if (opts.hasFlashlight()) {
-    flash = new SpotLight(0xfff3dd, 38, 24, 0.5, 0.45, 1.4);
-    flash.position.set(0.15, -0.15, 0);
-    camera.add(flash);
-    const tgt = new Object3D();
-    tgt.position.set(0, -0.25, -3);
-    camera.add(tgt);
-    flash.target = tgt;
-  }
-  // The flashlight beam follows the game: on, off, or empty batteries.
+  // Light, tone, fog, flashlight and room effects come from look3d.js.
+  const quality = pickQuality();
+  const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight() });
+  const flash = lk.flashlight; // null without a flashlight
+  const lrnd = mulberry32(hashString(`look:${opts.title}`));
+  // The flashlight beam follows the game: on, off, or weak batteries.
   function applyLight() {
-    const on = !!flash && opts.isLightOn();
-    if (flash) flash.visible = on;
-    if (dark) {
-      darkAmb.intensity = on ? 0.08 : 0.28;
-      darkHemi.intensity = on ? 0.12 : 0.25;
-      scene.fog.density = on ? 0.07 : 0.11;
-    }
+    if (!flash) return;
+    flash.setOn(opts.isLightOn());
+    if (opts.lightHours) flash.setPower(Math.min(1, opts.lightHours() / 2));
   }
   applyLight();
 
   // ---------- building ----------
-  const floorKind = plan.cat === 'house' ? 'house' : plan.kind;
-  const fcfg = FLOORS[floorKind];
-  const floorTex = noiseTexture(fcfg.base, 26, Math.max(W, D) / 2, fcfg.lines);
-  const floor = new Mesh(new PlaneGeometry(W, D), new MeshStandardMaterial({ map: floorTex, roughness: 0.92 }));
+  const surf = (part) => surfaceFor(plan.cat, part, null, quality);
+  const floor = new Mesh(new PlaneGeometry(W, D), surf('floor'));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0, -D / 2);
-  scene.add(floor);
-  const ceil = new Mesh(new PlaneGeometry(W, D), new MeshStandardMaterial({ color: 0x8b8f93, roughness: 1 }));
+  floor.receiveShadow = true;
+  scene.add(worldUV(floor));
+  const ceil = new Mesh(new PlaneGeometry(W, D), surf('ceiling'));
   ceil.rotation.x = Math.PI / 2;
   ceil.position.set(0, H, -D / 2);
-  scene.add(ceil);
-  // Ceiling lamps (dead)
-  const lampMat = new MeshStandardMaterial({ color: 0xc9ccd0, roughness: 0.6 });
-  for (let z = -3; z > -D + 1; z -= 5) {
-    for (let x = -W / 2 + 3; x < W / 2 - 1; x += 6) {
-      const l = new Mesh(new BoxGeometry(1.2, 0.06, 0.3), lampMat);
-      l.position.set(x, H - 0.04, z);
-      scene.add(l);
-    }
+  scene.add(worldUV(ceil));
+  // Ceiling lamps: most are dead; some flicker; dark buildings have an emergency light or two.
+  // Lights are added now (not during play): a new light makes three.js rebuild its shaders.
+  {
+    const spots = [];
+    for (let z = -3; z > -D + 1; z -= 5) for (let x = -W / 2 + 3; x < W / 2 - 1; x += 6) spots.push([x, z]);
+    if (plan.cat === 'house' || plan.kind !== 'hall') spots.splice(0, spots.length, ...spots.filter((_, i) => i % 2 === 0));
+    let emergency = dark ? 1 + Math.floor(lrnd() * 2) : 0;
+    spots.forEach(([x, z], i) => {
+      const r = lrnd();
+      const state = emergency > 0 && r < 0.18 ? (emergency--, 'emergency') : plan.cat !== 'house' && r > 0.86 ? 'flicker' : 'dead';
+      lk.addCeilingLight(x, H, z, state);
+      if (i === spots.length - 1 && emergency > 0) lk.addCeilingLight(x, H, z - 1.5, 'emergency');
+    });
   }
 
-  const wallTex = noiseTexture(plan.cat === 'house' ? '#b9b2a4' : '#a9b0b3', 18, 2, 0);
-  const wallMat = new MeshStandardMaterial({ map: wallTex, roughness: 0.95 });
+  const wallMat = surf('wall');
   for (const b of plan.walls) {
     const m = new Mesh(new BoxGeometry(b.w, H, b.d), wallMat);
     m.position.set(b.x, H / 2, b.z);
-    scene.add(m);
+    m.receiveShadow = true;
+    scene.add(worldUV(m));
   }
+  lk.addRoomShade(-W / 2, W / 2, -D, 0);
   // Wall above the door
   const lintel = new Mesh(new BoxGeometry(2, H - 2.2, 0.2), wallMat);
   lintel.position.set(0, 2.2 + (H - 2.2) / 2, 0);
-  scene.add(lintel);
+  scene.add(worldUV(lintel));
+  // Daylight (or night) through the open door, a shaft, dust in the air.
+  lk.addDoorLight(0, 0, !!opts.night, { width: 1.8, height: 2.2 });
+  if (plan.cat !== 'house') lk.addExitSign(0, Math.min(H - 0.25, 2.55), -0.14, Math.PI);
+  lk.addDust({ minX: -W / 2 + 0.3, maxX: W / 2 - 0.3, minY: 0.1, maxY: H - 0.2, minZ: -D + 0.3, maxZ: -0.3 });
+  // Notices by the door (no brands, no real names), dirt and paper on the floor.
+  {
+    const kinds = plan.cat === 'house' ? ['note', 'evac'] : plan.cat === 'clinic' || plan.cat === 'hospital' ? ['quarantine', 'mask', 'staff'] : ['closed', 'mask', 'quarantine', 'poster'];
+    const n = plan.cat === 'house' ? 1 : 2;
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 ? 1 : -1;
+      lk.addWallNotice(side * (1.5 + lrnd() * 1.2), 1.35 + lrnd() * 0.3, -0.13, Math.PI, kinds[Math.floor(lrnd() * kinds.length)]);
+    }
+    const decals = Math.round((W * D) / (plan.cat === 'house' ? 14 : 22));
+    for (let i = 0; i < decals; i++) {
+      const r = lrnd();
+      const kind = r < 0.45 ? 'dirt' : r < 0.7 ? 'paper' : r < 0.82 ? 'water' : r < 0.92 ? 'leaves' : 'snow';
+      const x = (lrnd() - 0.5) * (W - 1);
+      const z = -0.5 - lrnd() * (kind === 'snow' || kind === 'leaves' ? 4 : D - 1);
+      lk.addDecal(x, z, kind, 0.6 + lrnd() * 1.4, lrnd() * Math.PI);
+    }
+    if (plan.windows === 'front' && lrnd() < 0.7) lk.addBrokenGlass((lrnd() < 0.5 ? -1 : 1) * (3 + lrnd() * (W / 2 - 5)), -0.8, 1.3);
+  }
   // Outside, seen through the door: snow and grey sky
   const outside = new Mesh(new PlaneGeometry(6, 4), new MeshBasicMaterial({ color: opts.night ? 0x1a2433 : 0xdfe6ec }));
   outside.position.set(0, 2, 2.5);
@@ -243,6 +247,7 @@ export function openInside(opts) {
     }
     if (f.type === 'shelf' || f.type === 'rack' || f.type === 'clothes') {
       const g = buildShelf(f, mat(f.type));
+      g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       if (f.tipped) {
         // A shelf that leans on its neighbor. Its goods are on the floor.
         g.rotation.z = 0.16 * (f.x > 0 ? 1 : -1);
@@ -283,6 +288,8 @@ export function openInside(opts) {
     }
     const m = new Mesh(new BoxGeometry(f.w, f.h, f.d), mat(f.type));
     m.position.set(f.x, f.h / 2, f.z);
+    m.castShadow = true;
+    m.receiveShadow = true;
     scene.add(m);
     if (f.type === 'coolers') {
       const glass = new Mesh(new PlaneGeometry(f.w, f.h * 0.75), new MeshStandardMaterial({ color: 0x23302b, roughness: 0.2, metalness: 0.4 }));
@@ -1066,13 +1073,14 @@ export function openInside(opts) {
       }
       if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps`;
     }
+    lk.update(dt, camera.position);
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
   return { close: () => leave() };
 }

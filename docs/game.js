@@ -7,12 +7,22 @@
     snacks: { name: "Snacks (crackers, bars)", unit: "pack", weight: 0.5, kind: "food", cal: 600, portion: 0.5 },
     formula: { name: "Liquid nutrition bag", unit: "bag", weight: 1, kind: "food", cal: 250, water: 8, portion: 1 },
     dog_food: { name: "Dog food bag", unit: "bag", weight: 15, kind: "dogfood", portion: 1 / 15 },
+    energy_bar: { name: "Energy bar", unit: "bar", weight: 0.15, kind: "food", cal: 250, portion: 1 },
+    canned_fruit: { name: "Canned fruit", unit: "can", weight: 1, kind: "food", cal: 300, water: 6, portion: 1 },
+    instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
+    chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
+    jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
+    oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
     ors: { name: "Oral rehydration salts", unit: "pack", weight: 0.1, kind: "med", med: "ors", portion: 1 },
+    soda: { name: "Soda (2 liter)", unit: "bottle", weight: 4.6, kind: "drink", water: 25, portion: 0.5 },
+    sports_drink: { name: "Sports drink", unit: "bottle", weight: 1.8, kind: "drink", water: 20, portion: 1 },
     first_aid: { name: "First aid kit", unit: "kit", weight: 1, kind: "med", med: "bandage", portion: 0.2 },
     antibiotics: { name: "Antibiotics (one course)", unit: "course", weight: 0.1, kind: "med", med: "antibiotics", portion: 1 },
     pain_pills: { name: "Pain pills", unit: "bottle", weight: 0.2, kind: "med", med: "pain", portion: 0.1 },
+    bandages: { name: "Bandages and gauze", unit: "box", weight: 0.3, kind: "med", med: "bandage", portion: 0.25 },
+    ibuprofen: { name: "Ibuprofen", unit: "bottle", weight: 0.2, kind: "med", med: "pain", portion: 0.1 },
     flashlight: { name: "Flashlight", unit: "pc", weight: 0.5, kind: "tool" },
     batteries: { name: "Batteries (1 set)", unit: "set", weight: 0.2, kind: "batteries", portion: 1 },
     pry_bar: { name: "Pry bar", unit: "pc", weight: 3, kind: "tool" },
@@ -32,6 +42,27 @@
     seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
     lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
     comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" },
+    radio: { name: "Hand-crank radio", unit: "pc", weight: 1.2, kind: "comfort" },
+    // Supplies with no use of their own yet (more uses come with crafting and home projects).
+    candles: { name: "Candles", unit: "box", weight: 0.8, kind: "misc" },
+    matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
+    duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
+    rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
+    multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
+    can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
+    cooking_pot: { name: "Cooking pot", unit: "pc", weight: 2, kind: "misc" },
+    blanket: { name: "Wool blanket", unit: "pc", weight: 3, kind: "misc" },
+    sleeping_bag: { name: "Sleeping bag (winter)", unit: "pc", weight: 4, kind: "misc" },
+    hand_warmers: { name: "Hand warmers", unit: "pair", weight: 0.1, kind: "misc" },
+    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "misc" },
+    trash_bags: { name: "Trash bags (box)", unit: "box", weight: 1, kind: "misc" },
+    paper_map: { name: "Paper map of Portland", unit: "pc", weight: 0.2, kind: "misc" },
+    toilet_paper: { name: "Toilet paper", unit: "roll", weight: 0.3, kind: "misc" },
+    soap: { name: "Bar of soap", unit: "bar", weight: 0.25, kind: "misc" },
+    toothpaste: { name: "Toothpaste", unit: "tube", weight: 0.25, kind: "misc" },
+    water_tablets: { name: "Water purification tablets", unit: "pack", weight: 0.05, kind: "misc" },
+    vitamins: { name: "Vitamins", unit: "bottle", weight: 0.3, kind: "misc" },
     // Parts for home base projects (kind 'part': no use on their own).
     toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
     scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
@@ -71,7 +102,22 @@
         { id: "pain_pills", w: 3 },
         { id: "flea_spray", w: 2 },
         { id: "lighter", w: 3 },
-        { id: "comfort", w: 2 }
+        { id: "comfort", w: 2 },
+        { id: "canned_fruit", w: 8 },
+        { id: "instant_noodles", w: 8 },
+        { id: "chips", w: 5 },
+        { id: "oatmeal", w: 5 },
+        { id: "soda", w: 4 },
+        { id: "sports_drink", w: 4 },
+        { id: "candles", w: 2 },
+        { id: "matches", w: 2 },
+        { id: "trash_bags", w: 2 },
+        { id: "toilet_paper", w: 3 },
+        { id: "soap", w: 2 },
+        { id: "toothpaste", w: 2 },
+        { id: "can_opener", w: 1 },
+        { id: "cooking_pot", w: 1 },
+        { id: "vitamins", w: 1 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
     },
@@ -88,7 +134,16 @@
         { id: "canned_food", w: 10 },
         { id: "batteries", w: 12 },
         { id: "lighter", w: 12 },
-        { id: "pain_pills", w: 5 }
+        { id: "pain_pills", w: 5 },
+        { id: "energy_bar", w: 10 },
+        { id: "jerky", w: 8 },
+        { id: "chips", w: 10 },
+        { id: "soda", w: 8 },
+        { id: "sports_drink", w: 6 },
+        { id: "instant_noodles", w: 5 },
+        { id: "matches", w: 3 },
+        { id: "ibuprofen", w: 3 },
+        { id: "hand_warmers", w: 2 }
       ],
       entryText: "The glass door is broken. Shelves are half empty."
     },
@@ -108,7 +163,15 @@
         { id: "tarp", w: 3 },
         { id: "wiring", w: 4 },
         { id: "pipe_fittings", w: 3 },
-        { id: "metal_bin", w: 3 }
+        { id: "metal_bin", w: 3 },
+        { id: "energy_bar", w: 8 },
+        { id: "jerky", w: 8 },
+        { id: "chips", w: 8 },
+        { id: "soda", w: 6 },
+        { id: "sports_drink", w: 5 },
+        { id: "duct_tape", w: 3 },
+        { id: "paper_map", w: 4 },
+        { id: "hand_warmers", w: 2 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -130,7 +193,17 @@
         { id: "water_bottle", w: 6 },
         { id: "n95", w: 8 },
         { id: "batteries", w: 6 },
-        { id: "flea_spray", w: 3 }
+        { id: "flea_spray", w: 3 },
+        { id: "bandages", w: 12 },
+        { id: "ibuprofen", w: 10 },
+        { id: "vitamins", w: 5 },
+        { id: "sports_drink", w: 4 },
+        { id: "energy_bar", w: 4 },
+        { id: "soap", w: 3 },
+        { id: "toothpaste", w: 3 },
+        { id: "toilet_paper", w: 3 },
+        { id: "water_tablets", w: 2 },
+        { id: "hand_warmers", w: 2 }
       ],
       entryText: "The store is dark. The pharmacy counter at the back has a metal gate."
     },
@@ -148,7 +221,10 @@
         { id: "n95", w: 15 },
         { id: "pain_pills", w: 10 },
         { id: "saline", w: 10 },
-        { id: "ors", w: 6 }
+        { id: "ors", w: 6 },
+        { id: "bandages", w: 15 },
+        { id: "ibuprofen", w: 6 },
+        { id: "soap", w: 3 }
       ],
       entryText: "Notices about the outbreak cover the door."
     },
@@ -169,7 +245,11 @@
         { id: "pain_pills", w: 12 },
         { id: "n95", w: 12 },
         { id: "ors", w: 8 },
-        { id: "snacks", w: 5 }
+        { id: "snacks", w: 5 },
+        { id: "bandages", w: 15 },
+        { id: "ibuprofen", w: 6 },
+        { id: "blanket", w: 4 },
+        { id: "sports_drink", w: 3 }
       ],
       entryText: "The hospital is dark and silent. Many people came here at the end."
     },
@@ -202,7 +282,15 @@
         { id: "metal_bin", w: 6 },
         { id: "rain_barrel", w: 5 },
         { id: "stove_kit", w: 2 },
-        { id: "water_filter", w: 3 }
+        { id: "water_filter", w: 3 },
+        { id: "duct_tape", w: 10 },
+        { id: "rope", w: 6 },
+        { id: "multitool", w: 3 },
+        { id: "knife", w: 3 },
+        { id: "candles", w: 3 },
+        { id: "matches", w: 3 },
+        { id: "trash_bags", w: 5 },
+        { id: "radio", w: 2 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -224,7 +312,20 @@
         { id: "flashlight", w: 6 },
         { id: "snacks", w: 6 },
         { id: "backpack", w: 3 },
-        { id: "plastic_sheet", w: 6 }
+        { id: "plastic_sheet", w: 6 },
+        { id: "sleeping_bag", w: 6 },
+        { id: "wool_socks", w: 8 },
+        { id: "hand_warmers", w: 8 },
+        { id: "rope", w: 6 },
+        { id: "knife", w: 5 },
+        { id: "multitool", w: 4 },
+        { id: "cooking_pot", w: 4 },
+        { id: "water_tablets", w: 6 },
+        { id: "energy_bar", w: 6 },
+        { id: "jerky", w: 5 },
+        { id: "paper_map", w: 3 },
+        { id: "radio", w: 3 },
+        { id: "matches", w: 4 }
       ],
       entryText: "Racks of jackets and boots. This place has good winter gear."
     },
@@ -244,7 +345,12 @@
         { id: "batteries", w: 8 },
         { id: "water_bottle", w: 10 },
         { id: "gloves", w: 6 },
-        { id: "toolkit", w: 8 }
+        { id: "toolkit", w: 8 },
+        { id: "bandages", w: 12 },
+        { id: "blanket", w: 6 },
+        { id: "rope", w: 6 },
+        { id: "radio", w: 3 },
+        { id: "energy_bar", w: 6 }
       ],
       entryText: "The engine bay is empty. The crews went out on calls and did not come back."
     },
@@ -279,7 +385,26 @@
         { id: "pipe_fittings", w: 2 },
         { id: "metal_bin", w: 2 },
         { id: "rain_barrel", w: 1 },
-        { id: "battery_module", w: 0.6 }
+        { id: "battery_module", w: 0.6 },
+        { id: "canned_fruit", w: 5 },
+        { id: "instant_noodles", w: 4 },
+        { id: "oatmeal", w: 3 },
+        { id: "chips", w: 3 },
+        { id: "soda", w: 3 },
+        { id: "bandages", w: 3 },
+        { id: "ibuprofen", w: 3 },
+        { id: "candles", w: 4 },
+        { id: "matches", w: 3 },
+        { id: "blanket", w: 4 },
+        { id: "wool_socks", w: 3 },
+        { id: "toilet_paper", w: 4 },
+        { id: "soap", w: 3 },
+        { id: "toothpaste", w: 2 },
+        { id: "can_opener", w: 2 },
+        { id: "cooking_pot", w: 2 },
+        { id: "duct_tape", w: 2 },
+        { id: "knife", w: 1 },
+        { id: "radio", w: 1 }
       ]
     }
   };
@@ -1684,7 +1809,7 @@
         }
         p.lastComfortDay = day;
         p.morale = clamp2(p.morale + 5, 0, 100);
-        log(state2, "You read and play cards for a while. Your mind is calmer.", "good");
+        log(state2, id === "radio" ? "You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps." : "You read and play cards for a while. Your mind is calmer.", "good");
         advanceTime(state2, 60);
         return;
       }
@@ -4054,6 +4179,7 @@
       stock,
       hasFlashlight: () => (state.carried.flashlight || 0) > 0,
       isLightOn: () => hasLight(state),
+      lightHours: () => state.player.lightHours,
       toggleLight: () => {
         const n0 = state.log.length;
         act("action", "flashlight");

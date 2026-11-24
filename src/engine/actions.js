@@ -140,7 +140,9 @@ export function useItem(state, id, verb, from = 'carried') {
       if (p.lastComfortDay === day) { log(state, 'You already did that today. It does not help again.'); return; }
       p.lastComfortDay = day;
       p.morale = clamp(p.morale + 5, 0, 100);
-      log(state, 'You read and play cards for a while. Your mind is calmer.', 'good');
+      log(state, id === 'radio'
+        ? 'You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps.'
+        : 'You read and play cards for a while. Your mind is calmer.', 'good');
       advanceTime(state, 60);
       return;
     }

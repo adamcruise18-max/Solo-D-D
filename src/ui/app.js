@@ -651,6 +651,7 @@ async function walkInside() {
     stock,
     hasFlashlight: () => (state.carried.flashlight || 0) > 0,
     isLightOn: () => hasLight(state),
+    lightHours: () => state.player.lightHours,
     toggleLight: () => {
       const n0 = state.log.length;
       act('action', 'flashlight');
