@@ -2,7 +2,9 @@
 // If the tile server cannot be reached, the game still works on a plain map.
 import { CATEGORIES } from '../data/places.js';
 import { HOME, MAP_RADIUS_MILES } from '../engine/state.js';
-import { winterizeStyle } from './winter-style.js';
+import { winterizeStyle, seasonPaint } from './winter-style.js';
+import { detailFeatures, addDetailIcons, DETAIL_INFO } from './details.js';
+import { seasonOf, overgrowth } from '../engine/season.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -70,6 +72,33 @@ export async function createMap(container, { places, onPlaceClick }) {
   const ready = new Promise((resolve) => map.on('load', resolve));
   await ready;
 
+  // Street details (cars, barricades, signs, overgrowth). Shown when you zoom in.
+  addDetailIcons(map);
+  map.addSource('details', { type: 'geojson', data: detailFeatures(places, HOME) });
+  map.addLayer({
+    id: 'details', type: 'symbol', source: 'details', minzoom: 14,
+    filter: ['<=', ['get', 'g'], 0.08],
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 14, 0.75, 16, 1.1, 18, 1.8],
+      'icon-rotate': ['match', ['get', 'type'], ['car', 'debris', 'trash', 'barricade', 'bush'], ['get', 'rot'], 0],
+      'icon-rotation-alignment': 'map',
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
+  });
+  let detailPopup = null;
+  map.on('click', 'details', (e) => {
+    const f = e.features && e.features[0];
+    if (!f || map.queryRenderedFeatures(e.point, { layers: ['places'] }).length) return;
+    const info = DETAIL_INFO[f.properties.type];
+    if (detailPopup) detailPopup.remove();
+    detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
+      .setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
+  });
+  map.on('mouseenter', 'details', () => { map.getCanvas().style.cursor = 'help'; });
+  map.on('mouseleave', 'details', () => { map.getCanvas().style.cursor = ''; });
+
   map.addSource('edge', { type: 'geojson', data: circlePolygon(HOME, MAP_RADIUS_MILES) });
   map.addLayer({
     id: 'edge-glow', type: 'line', source: 'edge',
@@ -122,10 +151,24 @@ export async function createMap(container, { places, onPlaceClick }) {
   youEl.innerHTML = '<i></i>';
   const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
+  let seasonKey = '';
+  function applySeason(t) {
+    const season = seasonOf(t);
+    const growth = Math.round(overgrowth(t) * 20) / 20;
+    const key = `${season}:${growth}`;
+    if (key === seasonKey) return;
+    seasonKey = key;
+    for (const [id, prop, color] of seasonPaint(season, growth)) {
+      if (map.getLayer(id)) map.setPaintProperty(id, prop, color);
+    }
+    map.setFilter('details', ['<=', ['get', 'g'], growth]);
+  }
+
   return {
     map,
     online,
     update(state, list) {
+      applySeason(state.time);
       map.getSource('places').setData(placesGeo(list, state.places));
       you.setLngLat([state.pos.lon, state.pos.lat]);
       youEl.classList.toggle('at-home', state.location.kind === 'home');

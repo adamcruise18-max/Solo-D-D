@@ -1,4 +1,6 @@
-// Winter look for the map: a cold, snowy, easy-to-read palette.
+// Season look for the map. The base is a cold, light, easy-to-read palette (winterizeStyle).
+// seasonPaint() then sets the colors of land, parks, woods and side streets for the season
+// and for how overgrown the city is.
 // It changes the colors of the downloaded OpenFreeMap style. It does not
 // make the map dark: the map must stay light and in color (see PR #2).
 
@@ -119,6 +121,55 @@ export function winterizeStyle(style) {
         paint['text-halo-color'] = 'rgba(244,247,250,0.9)';
       }
     }
+  }
+  return out;
+}
+
+// ---- seasons and overgrowth ----
+function mix(a, b, f) {
+  const x = parseColor(a);
+  const y = parseColor(b);
+  return toCss({ r: x.r + (y.r - x.r) * f, g: x.g + (y.g - x.g) * f, b: x.b + (y.b - x.b) * f, a: x.a + (y.a - x.a) * f });
+}
+
+// Colors for each season: [background, park, grass, wood, residential, minor road]
+const SEASON_COLORS = {
+  winter: ['#eaeff3', '#d6e2da', '#dbe5de', 'rgba(170,196,180,0.65)', 'rgba(212,221,229,0.55)', '#ffffff'],
+  spring: ['#edf0e8', '#c8dfbc', '#d0e4c3', 'rgba(132,184,128,0.7)', 'rgba(214,226,206,0.55)', '#ffffff'],
+  summer: ['#eceee2', '#b2d39c', '#bfdba8', 'rgba(104,166,96,0.75)', 'rgba(204,222,188,0.6)', '#fdfdf7'],
+  fall: ['#efede5', '#d4d6a6', '#dcdcb4', 'rgba(196,158,96,0.7)', 'rgba(222,220,200,0.55)', '#fffdf6'],
+};
+// Fully overgrown: a lot more green on land, and side streets with grass on them.
+const WILD = ['#e3ead8', '#9cc884', '#a9d08f', 'rgba(84,150,80,0.8)', 'rgba(176,206,150,0.65)', '#e6eedb'];
+const WILD_WINTER = ['#e6ece4', '#c3d6c2', '#c9dbc8', 'rgba(130,170,140,0.75)', 'rgba(196,212,200,0.6)', '#eef2ec'];
+
+// Returns [[layerIdPrefix, paintProperty, color], ...]. growth: 0 (now) to 1 (wild).
+export function seasonPaint(season, growth) {
+  const base = SEASON_COLORS[season] || SEASON_COLORS.winter;
+  const wild = season === 'winter' ? WILD_WINTER : WILD;
+  const g = Math.max(0, Math.min(1, growth)) * (season === 'winter' ? 0.6 : 0.85);
+  const c = base.map((col, i) => mix(col, wild[i], g));
+  return [
+    ['background', 'background-color', c[0]],
+    ['park', 'fill-color', c[1]],
+    ['landcover_grass', 'fill-color', c[2]],
+    ['landuse_pitch', 'fill-color', c[2]],
+    ['landuse_cemetery', 'fill-color', c[2]],
+    ['landcover_wood', 'fill-color', c[3]],
+    ['landuse_residential', 'fill-color', c[4]],
+    ['road_minor', 'line-color', c[5]],
+    ['road_service_track', 'line-color', c[5]],
+    ['road_path_pedestrian', 'line-color', c[5]],
+    ['tunnel_minor', 'line-color', c[5]],
+  ];
+}
+
+// Change a whole style (for tests and for the first load).
+export function applySeasonToStyle(style, season, growth) {
+  const out = JSON.parse(JSON.stringify(style));
+  for (const [id, prop, color] of seasonPaint(season, growth)) {
+    const layer = out.layers.find((l) => l.id === id);
+    if (layer) (layer.paint || (layer.paint = {}))[prop] = color;
   }
   return out;
 }
