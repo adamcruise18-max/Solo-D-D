@@ -2,7 +2,7 @@
 // A level makes a task easier or faster, and it changes what you notice.
 // State: state.skills = { xp: { scavenging: 12, ... }, books: ['book_repair', ...] }.
 // Old saves have no state.skills: skillsOf() makes it on first use.
-import { log } from './state.js';
+import { log, dayIndex } from './state.js';
 
 export const SKILLS = {
   scavenging: {
@@ -63,9 +63,18 @@ export function skillLevel(state, key) {
 }
 
 // Gain XP. Logs a line when the level goes up. Returns the new level.
-export function practice(state, key, amount = 1) {
+// No grinding: after DAILY_FULL uses of one skill in a day, practice gives half xp.
+export const DAILY_FULL = 20;
+export function practice(state, key, amount = 1, { book = false } = {}) {
   if (!SKILLS[key] || !(amount > 0)) return skillLevel(state, key);
   const s = skillsOf(state);
+  if (!book) {
+    const day = dayIndex(state.time);
+    if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
+    const n = (s.today.uses[key] || 0) + 1;
+    s.today.uses[key] = n;
+    if (n > DAILY_FULL) amount /= 2;
+  }
   const before = levelFor(s.xp[key] || 0);
   s.xp[key] = (s.xp[key] || 0) + amount;
   const after = levelFor(s.xp[key]);

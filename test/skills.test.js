@@ -8,7 +8,7 @@ import { setPlaces } from '../src/engine/placesdb.js';
 import { ITEMS } from '../src/data/items.js';
 import { CATEGORIES } from '../src/data/places.js';
 import {
-  SKILLS, LEVEL_XP, BOOK_XP, levelFor, skillLevel, practice, skillProgress, forceBonus, noticeOf, hasRead,
+  DAILY_FULL, SKILLS, LEVEL_XP, BOOK_XP, levelFor, skillLevel, practice, skillProgress, forceBonus, noticeOf, hasRead,
 } from '../src/engine/skills.js';
 
 test('levels follow the xp table, max 5', () => {
@@ -104,4 +104,15 @@ test('cooking and fire give xp at home; a skilled fire burns longer', () => {
   const h1 = s2.home.fireHours;
   perform(s2, 'action', 'add_wood');
   assert.ok(s2.home.fireHours - h1 > plain, `${s2.home.fireHours - h1} > ${plain}`);
+});
+
+test('repeating one skill all day gives half xp after the daily limit', () => {
+  const s = newGame(3);
+  for (let i = 0; i < DAILY_FULL; i++) practice(s, 'cooking', 1);
+  assert.equal(s.skills.xp.cooking, DAILY_FULL);
+  practice(s, 'cooking', 2);
+  assert.equal(s.skills.xp.cooking, DAILY_FULL + 1);
+  s.time += 1440;
+  practice(s, 'cooking', 2);
+  assert.equal(s.skills.xp.cooking, DAILY_FULL + 3, 'a new day resets the count');
 });

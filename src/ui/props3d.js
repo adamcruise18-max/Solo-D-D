@@ -726,15 +726,17 @@ function bake(root) {
 }
 
 // group finish: bake, center x/z on the origin, bottom on y = 0 (unless keepY), fill userData
-function finish(g, id, keepY = false) {
-  const baked = bake(g);
+function finish(g, id, keepY = false, wall = false) {
+  const holder = new THREE.Group(); holder.add(g); // so a builder's own rotation on g is kept
+  const baked = bake(holder);
   const outer = new THREE.Group();
   outer.add(baked);
   outer.updateMatrixWorld(true);
   const b = new THREE.Box3().setFromObject(baked);
   const size = new THREE.Vector3(); b.getSize(size);
   const c = new THREE.Vector3(); b.getCenter(c);
-  baked.position.set(-c.x, keepY ? 0 : -b.min.y, -c.z);
+  if (wall) baked.position.set(-c.x, -c.y, -b.min.z); // centre of the back plane, facing +z
+  else baked.position.set(-c.x, keepY ? 0 : -b.min.y, -c.z);
   outer.userData.height = size.y;
   outer.userData.radius = Math.max(0.06, Math.hypot(size.x, size.z) / 2);
   outer.userData.kind = id;
@@ -1831,6 +1833,26 @@ const CATALOG = {
 
 const ATLAS_W = 2048, ATLAS_H = 1024, CELL = 256, COLS = 8;
 const PAL_CELL = 31;
+const SIGN_CELL = 30; // four endcap signs stacked in one cell, 256 x 64 each
+const SHELF_TINT = 0xc2c0bc; // darkens shelf stock ~25% against pickable loot
+const ENDCAP_SIGNS = [
+  { t: 'SALE', b: '#c4221c', f: '#fff', a: '#f2c21b' },
+  { t: 'SEASONAL', b: '#2f6a3a', f: '#fff', a: '#c9a24a' },
+  { t: 'BACK TO SCHOOL', b: '#1d4f9a', f: '#fff', a: '#f2c21b' },
+  { t: 'CLEARANCE', b: '#f2c21b', f: '#1c1c1e', a: '#c4221c' },
+];
+function drawEndcapSigns(ctx, rnd) {
+  const [x0, y0] = cellXY(SIGN_CELL);
+  ENDCAP_SIGNS.forEach((S, i) => {
+    const y = y0 + i * 64;
+    ctx.fillStyle = S.b; ctx.fillRect(x0, y, 256, 64);
+    ctx.fillStyle = S.a; ctx.fillRect(x0, y + 4, 256, 4); ctx.fillRect(x0, y + 56, 256, 4);
+    txt(ctx, S.t, x0 + 128, y + 33, 34, { color: S.f, maxW: 236, font: COND });
+    for (let k = 0; k < 140; k++) { ctx.fillStyle = `rgba(${rnd() < 0.5 ? '0,0,0' : '255,255,255'},${0.05 + rnd() * 0.08})`; ctx.fillRect(x0 + rnd() * 256, y + rnd() * 64, 2, 2); }
+    const gr = ctx.createLinearGradient(0, y, 0, y + 64); gr.addColorStop(0, 'rgba(60,50,30,0)'); gr.addColorStop(1, 'rgba(60,50,30,0.3)'); ctx.fillStyle = gr; ctx.fillRect(x0, y, 256, 64);
+  });
+}
+function rectSign(i) { const [x, y] = cellXY(SIGN_CELL); return uvRect(x + 1, y + i * 64 + 1, 254, 62); }
 function cellXY(i) { return [(i % COLS) * CELL, Math.floor(i / COLS) * CELL]; }
 function labelAspect(p) {
   if (p.s === 'box' || p.s === 'bag' || p.s === 'jug') return [256, Math.round(256 * p.h / p.w)];
@@ -1865,6 +1887,9 @@ function shelfAtlas(kind) {
       ctx.fillStyle = s; ctx.fillRect(sx, sy, 64, 64);
       for (let k = 0; k < 120; k++) { ctx.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'; ctx.fillRect(sx + rnd() * 64, sy + rnd() * 64, 2, 2); }
     });
+    drawEndcapSigns(ctx, rnd);
+    // shelf stock sits back visually: about 25% less saturated (loot models keep full colour)
+    ctx.save(); ctx.globalCompositeOperation = 'saturation'; ctx.globalAlpha = 0.28; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, ATLAS_W, ATLAS_H); ctx.restore();
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
@@ -1897,6 +1922,7 @@ function vertGroups(geo) {
 class Merger {
   constructor(nb) { this.b = []; for (let i = 0; i < nb; i++) this.b.push({ p: [], n: [], u: [], i: [] }); }
   add(geo, m, rects, buckets) {
+    if (this.root) m = new THREE.Matrix4().multiplyMatrices(this.root, m);
     const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv, idx = geo.index;
     const vg = vertGroups(geo);
     const nm = new THREE.Matrix3().getNormalMatrix(m);
@@ -2029,8 +2055,8 @@ function placeProduct(merger, tpl, x, y, z, yaw, tip, tipAxis = 0) {
 function shelfMats(kind) {
   const t = shelfAtlas(kind);
   return [
-    mat('shelfMatte|' + kind, { map: t, roughness: 0.72, metalness: 0 }),
-    mat('shelfGloss|' + kind, { map: t, roughness: 0.32, metalness: 0.2 }),
+    mat('shelfMatte|' + kind, { map: t, color: SHELF_TINT, roughness: 0.78, metalness: 0 }),
+    mat('shelfGloss|' + kind, { map: t, color: SHELF_TINT, roughness: 0.4, metalness: 0.2 }),
   ];
 }
 
@@ -2038,59 +2064,61 @@ function shelfMats(kind) {
 // Local frame: shelf runs along z from -length/2 to +length/2, the back is at x = 0 and the front
 // edge at x = 0.4 (products face +x). `levels` are the y heights of the shelf boards.
 // A looted shelf (low fill) also leaves some items on the floor in front of it (x 0.45 .. 1.3, y = 0).
-export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 0.9, 1.3], fill = 0.7, seed = 0) {
-  if (!CATALOG[kind]) kind = 'grocery';
-  const r = rng(hashStr(kind) ^ Math.imul((seed | 0) + 7, 2654435761));
-  fill = THREE.MathUtils.clamp(fill, 0, 1);
+function shelfTemplates(kind) {
   const cat = CATALOG[kind];
   const tpls = cat.map((_, i) => productParts(kind, i));
   const total = cat.reduce((s, p) => s + (p.w8 || 1), 0);
-  const choose = (maxH) => {
+  return { cat, tpls, total };
+}
+// Stock shelf boards in the shelf frame (length along z, products face +x, depth BACK..FRONT).
+// fill is roughly the share of facings still holding something. Returns {count, tipped}.
+function stockLevels(merger, kind, r, length, levels, fill, FRONT = 0.385, BACK = 0.02, topClear = 0.42) {
+  const { cat, tpls, total } = shelfTemplates(kind);
+  const choose = (maxH, maxD) => {
     for (let tries = 0; tries < 12; tries++) {
       let k = r() * total, i = 0;
       while (k > (cat[i].w8 || 1)) { k -= cat[i].w8 || 1; i++; }
-      if (tpls[i].h <= maxH) return i;
+      if (tpls[i].h <= maxH && tpls[i].d <= maxD) return i;
     }
     let best = 0;
-    tpls.forEach((t, i) => { if (t.h < tpls[best].h) best = i; });
+    tpls.forEach((t, i) => { if (t.h * t.d < tpls[best].h * tpls[best].d) best = i; });
     return tpls[best].h <= maxH ? best : -1;
   };
-  const merger = new Merger(2);
-  const FRONT = 0.385, BACK = 0.02;
+  const mess = 1 - fill;
+  const pEmpty = mess * 0.45;                       // whole runs cleared out
+  const q = Math.min(1, fill / (1 - pEmpty));        // depth share left in a run that still has stock
   const sorted = [...levels].sort((a, b) => a - b);
-  let count = 0;
+  let count = 0, tipped = 0;
   sorted.forEach((y, li) => {
-    const clear = (li + 1 < sorted.length ? sorted[li + 1] - y : 0.42) - 0.035;
+    const clear = (li + 1 < sorted.length ? sorted[li + 1] - y : topClear) - 0.035;
+    const gaps = [];
     let z = -length / 2 + 0.015;
     while (z < length / 2 - 0.05) {
-      const pi = choose(clear);
+      const pi = choose(clear, FRONT - BACK);
       if (pi < 0) break;
       const tpl = tpls[pi];
       const p = tpl.p;
       const runLen = 0.25 + r() * 0.45;
       const facings = Math.max(1, Math.round(runLen / (tpl.w + 0.004)));
-      const runEmpty = r() < (1 - fill) * 0.55;
+      const runEmpty = r() < pEmpty;
       const depthSlots = Math.max(1, Math.min(p.wide ? 2 : 3, Math.floor((FRONT - BACK) / (tpl.d + 0.004))));
+      const runStart = z;
       for (let f = 0; f < facings && z + tpl.w < length / 2 - 0.01; f++) {
         const zc = z + tpl.w / 2;
         z += tpl.w + 0.004 + (fill < 0.6 ? r() * 0.01 : 0);
-        if (runEmpty && r() < 0.9) continue;
-        // how many left in this column: looters take from the front
-        const want = fill * depthSlots * (0.6 + r() * 0.8);
-        let k = Math.min(depthSlots, Math.max(0, Math.round(want - 0.2)));
-        if (fill > 0.92) k = depthSlots;
+        if (runEmpty && r() < 0.92) continue;
+        // looters take from the front; what is left sits towards the back
+        let k = fill > 0.92 ? depthSlots : Math.min(depthSlots, Math.max(0, Math.round(depthSlots * q * (0.45 + r() * 1.1) - 0.15)));
+        if (k === 0) gaps.push(zc);
         for (let s = 0; s < k; s++) {
-          // slot 0 is the back; with fill < 1 the remaining items sit at the back
           const frontGap = fill > 0.85 ? 0 : (depthSlots - k) * (tpl.d + 0.004) * (0.3 + r() * 0.7);
           const xc = FRONT - tpl.d / 2 - (k - 1 - s) * (tpl.d + 0.004) - frontGap;
-          const mess = 1 - fill;
           let yaw = Math.PI / 2 + (r() - 0.5) * (0.04 + mess * 0.5);
           let tip = 0, axis = 0;
-          if (s === k - 1 && r() < mess * 0.16) { tip = Math.PI / 2 * (r() < 0.5 ? 1 : -1); axis = r() < 0.5 ? 1 : 0; yaw += (r() - 0.5) * 1.2; }
-          else if (r() < mess * 0.06) yaw += (r() - 0.5) * 2.5;
+          if (s === k - 1 && r() < mess * 0.3) { tip = Math.PI / 2 * (r() < 0.5 ? 1 : -1); axis = r() < 0.5 ? 1 : 0; yaw += (r() - 0.5) * 1.2; tipped++; }
+          else if (r() < mess * 0.1) yaw += (r() - 0.5) * 2.5;
           placeProduct(merger, tpl, Math.max(BACK + tpl.d / 2, xc), y, zc + (r() - 0.5) * mess * 0.02, yaw, tip, axis);
           count++;
-          // stack short items when the store is well stocked
           if (p.stack && !tip && fill > 0.45) {
             const layers = Math.min(p.stack + 1, Math.floor(clear / (tpl.h + 0.002)));
             for (let L2 = 1; L2 < layers; L2++) {
@@ -2101,23 +2129,104 @@ export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 
           }
         }
       }
-      z += r() < 0.15 + (1 - fill) * 0.3 ? r() * 0.08 : 0.002;
+      if (runEmpty) for (let zz = runStart + 0.08; zz < z - 0.08; zz += 0.16) gaps.push(zz);
+      z += r() < 0.15 + mess * 0.3 ? r() * 0.08 : 0.002;
+    }
+    // knocked-over stock lying in the gaps near the shelf edge
+    const fallen = Math.round(mess * mess * length * 2.2 * (0.6 + r() * 0.8));
+    for (let i = 0; i < fallen && gaps.length; i++) {
+      const zc = gaps.splice(Math.floor(r() * gaps.length), 1)[0];
+      const pi = choose(Math.min(clear, 0.3), FRONT - BACK);
+      if (pi < 0) continue;
+      const tpl = tpls[pi];
+      const lie = Math.max(tpl.w, tpl.d, tpl.h);
+      if (lie > FRONT - BACK + 0.06 && r() < 0.5) continue;
+      const x = Math.min(FRONT - 0.05, Math.max(BACK + 0.06, FRONT - 0.04 - r() * 0.15));
+      placeProduct(merger, tpl, x, y, zc + (r() - 0.5) * 0.05, r() * TAU, Math.PI / 2, r() < 0.5 ? 1 : 0);
+      count++; tipped++;
     }
   });
+  return { count, tipped };
+}
+
+// Fill one face of a shelf unit with stock.
+// Local frame: shelf runs along z from -length/2 to +length/2, the back is at x = 0 and the front
+// edge at x = 0.4 (products face +x). `levels` are the y heights of the shelf boards.
+// A looted shelf (low fill) also leaves some items on the floor in front of it (x 0.45 .. 1.3, y = 0).
+export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 0.9, 1.3], fill = 0.7, seed = 0) {
+  if (!CATALOG[kind]) kind = 'grocery';
+  const r = rng(hashStr(kind) ^ Math.imul((seed | 0) + 7, 2654435761));
+  fill = THREE.MathUtils.clamp(fill, 0, 1);
+  const merger = new Merger(2);
+  let { count, tipped } = stockLevels(merger, kind, r, length, levels, fill);
+  const { tpls } = shelfTemplates(kind);
   // spill on the floor in front of the shelf
   const spill = Math.round((1 - fill) * length * (1 + r() * 1.2));
   for (let i = 0; i < spill; i++) {
     const tpl = tpls[Math.floor(r() * tpls.length)];
     if (tpl.h > 0.32) continue;
     placeProduct(merger, tpl, 0.45 + r() * 0.85, 0, (r() - 0.5) * (length - 0.2), r() * TAU, r() < 0.75 ? Math.PI / 2 : 0, r() < 0.5 ? 1 : 0);
-    count++;
+    count++; tipped++;
   }
   const g = new THREE.Group();
   g.name = 'shelfFill:' + kind;
   const meshes = merger.meshes(shelfMats(kind));
   let tris = 0;
   for (const m of meshes) { g.add(m); tris += m.geometry.index.count / 3; }
-  g.userData = { kind, items: count, triangles: tris, drawCalls: meshes.length };
+  g.userData = { kind, items: count, fallen: tipped, triangles: tris, drawCalls: meshes.length };
+  return g;
+}
+
+// End-of-run display: a gondola endcap unit with 3-4 stocked shelves and a generic sign on top.
+// Origin at the bottom centre, facing +z, width along x, depth along z (back at -depth/2).
+// Unit, stock and sign all share the kind's shelf atlas: 2 draw calls (matte + gloss).
+// opts.sign: 0 SALE, 1 SEASONAL, 2 BACK TO SCHOOL, 3 CLEARANCE (default random); opts.unit = false
+// leaves out the metal unit (stock and sign only).
+export function makeEndcap(kind = 'grocery', width = 1.2, height = 1.9, fill = 0.6, seed = 0, depth = 0.55, opts = {}) {
+  if (!CATALOG[kind]) kind = 'grocery';
+  const r = rng(hashStr('endcap' + kind) ^ Math.imul((seed | 0) + 13, 2654435761));
+  fill = THREE.MathUtils.clamp(fill, 0, 1);
+  const W = width, D = depth, H = height;
+  const merger = new Merger(2);
+  const S = (n) => rectSolid(n);
+  const box = (x0, x1, y0, y1, z0, z1, rects, bk = 0) => {
+    const m = new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y0, (z0 + z1) / 2);
+    merger.add(gBox(Math.max(0.002, x1 - x0), Math.max(0.002, y1 - y0), Math.max(0.002, z1 - z0)), m, Array.isArray(rects) ? rects : [rects], [bk]);
+  };
+  const signH = Math.min(0.26, H * 0.14), unitTop = H - signH - 0.06;
+  const nShelves = unitTop > 1.55 ? 4 : 3;
+  const base = 0.12, top = unitTop - 0.32;
+  const levels = [];
+  for (let i = 0; i < nShelves; i++) levels.push(base + (top - base) * i / (nShelves - 1));
+  if (opts.unit !== false) {
+    const grey = S('tin'), dark = S('dark'), white = S('white');
+    box(-W / 2, W / 2, 0, base, -D / 2 + 0.03, D / 2, [dark]);                       // kick base
+    box(-W / 2, W / 2, 0, unitTop, -D / 2, -D / 2 + 0.03, [grey]);                    // back panel
+    for (const sx of [-1, 1]) box(sx < 0 ? -W / 2 : W / 2 - 0.025, sx < 0 ? -W / 2 + 0.025 : W / 2, 0, unitTop, -D / 2, D / 2, [grey]);
+    for (const y of levels.slice(1)) {
+      box(-W / 2 + 0.025, W / 2 - 0.025, y - 0.02, y, -D / 2 + 0.03, D / 2 - 0.01, [grey]);
+      box(-W / 2 + 0.025, W / 2 - 0.025, y - 0.045, y, D / 2 - 0.012, D / 2, [white]);  // price strip
+    }
+    box(-W / 2, W / 2, unitTop - 0.03, unitTop, -D / 2, D / 2, [grey]);              // top cap
+  }
+  // sign on two posts above the unit, kept inside the footprint
+  const si = opts.sign ?? Math.floor(r() * ENDCAP_SIGNS.length);
+  const sw = Math.min(W - 0.06, signH * 4), sy0 = H - signH;
+  for (const sx of [-1, 1]) box(sx * sw * 0.3 - 0.012, sx * sw * 0.3 + 0.012, unitTop, sy0 + 0.02, -0.012, 0.012, [S('tin')], 1);
+  const tilt = (r() - 0.5) * 0.12 * (1 - fill);
+  const sm = new THREE.Matrix4().makeTranslation(0, sy0, 0).multiply(new THREE.Matrix4().makeRotationZ(tilt));
+  const sr = rectSign(si);
+  merger.add(gBox(sw, signH * 0.98, 0.012), sm, [S('white'), S('white'), S('white'), S('white'), sr, sr], [0]);
+  // stock: reuse the shelf stocking in the shelf frame (products face +x), rotated to face +z
+  merger.root = new THREE.Matrix4().makeRotationY(-Math.PI / 2);
+  const res = stockLevels(merger, kind, r, W - 0.07, levels, fill, D / 2 - 0.015, -D / 2 + 0.035, unitTop - levels[levels.length - 1]);
+  merger.root = null;
+  const g = new THREE.Group();
+  g.name = 'endcap:' + kind;
+  const meshes = merger.meshes(shelfMats(kind));
+  let tris = 0;
+  for (const m of meshes) { m.castShadow = true; g.add(m); tris += m.geometry.index.count / 3; }
+  g.userData = { kind, w: W, d: D, h: H, levels, sign: ENDCAP_SIGNS[si].t, items: res.count, fallen: res.tipped, triangles: tris, drawCalls: meshes.length };
   return g;
 }
 export const SHELF_KINDS = Object.keys(CATALOG);
@@ -2905,6 +3014,330 @@ const PROP_BUILDERS = {
   },
 };
 
+
+// ---------- house-room props ----------
+// wall props (wall_frame, wall_clock, curtain): origin at the centre of the back plane, art faces +z
+function atlasRect(cols, rows, i) { const cx = i % cols, cy = Math.floor(i / cols); return [cx / cols, 1 - (cy + 1) / rows, (cx + 1) / cols, 1 - cy / rows]; }
+
+function drawArt(c, w, h, v, rr) {
+  if (v < 3) { // landscapes
+    const skies = [['#9ab8d0', '#e8dcc0'], ['#e8a070', '#f4d8a0'], ['#b8c4cc', '#e4e6e4']];
+    const [s0, s1] = skies[v];
+    const sky = c.createLinearGradient(0, 0, 0, h * 0.6); sky.addColorStop(0, s0); sky.addColorStop(1, s1);
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    if (v === 1) { c.fillStyle = 'rgba(250,220,150,0.9)'; c.beginPath(); c.arc(w * 0.7, h * 0.42, h * 0.08, 0, TAU); c.fill(); }
+    const ridge = (y0, amp, color, f) => {
+      c.fillStyle = color; c.beginPath(); c.moveTo(0, h);
+      for (let x = 0; x <= w; x += 8) c.lineTo(x, y0 - Math.abs(Math.sin(x * f + y0)) * amp - Math.sin(x * f * 3.1) * amp * 0.2);
+      c.lineTo(w, h); c.fill();
+    };
+    if (v === 0) { ridge(h * 0.5, h * 0.22, '#6a7a8a', 0.012); ridge(h * 0.58, h * 0.1, '#4a5a4a', 0.02); c.fillStyle = '#7a9ab0'; c.fillRect(0, h * 0.66, w, h * 0.12); ridge(h * 0.84, h * 0.04, '#3a4a2a', 0.05); }
+    else if (v === 1) { ridge(h * 0.62, h * 0.05, '#8a6a3a', 0.01); for (let i = 0; i < 6; i++) { c.fillStyle = i % 2 ? '#c8a050' : '#a8803a'; c.beginPath(); c.moveTo(0, h * (0.66 + i * 0.06)); c.lineTo(w, h * (0.62 + i * 0.07)); c.lineTo(w, h); c.lineTo(0, h); c.fill(); } c.fillStyle = '#3a2a1a'; c.fillRect(w * 0.2, h * 0.5, w * 0.012, h * 0.14); c.beginPath(); c.arc(w * 0.206, h * 0.48, h * 0.06, 0, TAU); c.fill(); }
+    else { ridge(h * 0.55, h * 0.15, '#9aa4ac', 0.015); c.fillStyle = '#eef0ee'; c.fillRect(0, h * 0.7, w, h * 0.3); for (let i = 0; i < 14; i++) { const x = rr() * w, y = h * (0.62 + rr() * 0.25), s = h * (0.08 + rr() * 0.1); c.fillStyle = '#2a3a2e'; c.beginPath(); c.moveTo(x, y - s); c.lineTo(x + s * 0.35, y); c.lineTo(x - s * 0.35, y); c.fill(); } }
+    // brush texture
+    for (let i = 0; i < 400; i++) { c.fillStyle = `rgba(${rr() < 0.5 ? '0,0,0' : '255,255,255'},0.05)`; c.fillRect(rr() * w, rr() * h, 6 + rr() * 10, 2); }
+  } else { // abstract
+    const pals = [['#e8dcc0', '#c4421c', '#1d4f7a', '#e8b030', '#2a2a2a'], ['#d8d4cc', '#5a7a6a', '#c8a070', '#8a3a2a', '#e8e4d8'], ['#1e2630', '#e8701c', '#e8dcc0', '#4a7a9a', '#c8b040']];
+    const p = pals[v - 3];
+    c.fillStyle = p[0]; c.fillRect(0, 0, w, h);
+    if (v === 3) for (let i = 0; i < 9; i++) { c.fillStyle = p[1 + (i % 4)]; c.fillRect(rr() * w * 0.8, rr() * h * 0.8, w * (0.1 + rr() * 0.3), h * (0.08 + rr() * 0.3)); }
+    else if (v === 4) for (let i = 0; i < 7; i++) { c.fillStyle = p[1 + (i % 4)]; c.globalAlpha = 0.85; c.beginPath(); c.arc(rr() * w, rr() * h, h * (0.08 + rr() * 0.25), 0, TAU); c.fill(); c.globalAlpha = 1; }
+    else for (let i = 0; i < 12; i++) { c.strokeStyle = p[1 + (i % 4)]; c.lineWidth = 6 + rr() * 18; c.beginPath(); c.moveTo(rr() * w, 0); c.bezierCurveTo(rr() * w, h * 0.3, rr() * w, h * 0.7, rr() * w, h); c.stroke(); }
+    for (let i = 0; i < 300; i++) { c.fillStyle = 'rgba(0,0,0,0.05)'; c.fillRect(rr() * w, rr() * h, 3, 3); }
+  }
+}
+
+const HOUSE_PROPS = {
+  wall_frame(g, r) {
+    const v = Math.floor(r() * 6);
+    const land = v < 3 || r() < 0.5;
+    const W = 0.4 + r() * 0.4, H = land ? W * (0.66 + r() * 0.1) : W * (1.2 + r() * 0.15);
+    const b = 0.035 + r() * 0.02, dep = 0.025;
+    const art = tmat(ctex('frameart' + v + land, 512, 512, (c, w, h, rr) => {
+      c.fillStyle = '#ece6d4'; c.fillRect(0, 0, w, h); // mat board
+      c.save(); c.beginPath(); c.rect(36, 36, w - 72, h - 72); c.clip(); c.translate(36, 36);
+      drawArt(c, w - 72, h - 72, v, rr); c.restore();
+      c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2; c.strokeRect(36, 36, w - 72, h - 72);
+      // dust film and a faded corner under the glass
+      c.fillStyle = 'rgba(210,200,180,0.12)'; c.fillRect(0, 0, w, h);
+      const gr = c.createRadialGradient(w, 0, 0, w, 0, w * 0.6); gr.addColorStop(0, 'rgba(255,250,230,0.25)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      grime(c, w, h, rr, 1.2);
+    }), 0.35);
+    const frame = pick(r, [FX.wood('#3a2616'), FX.wood('#8a6440'), col(0x1d1e20, 0.5), col(0xb89a5a, 0.4, 0.5)]);
+    add(g, gBox(W - 2 * b + 0.004, H - 2 * b + 0.004, 0.006), art, 0, -(H - 2 * b) / 2, 0.012);
+    add(g, gBox(W, b, dep), frame, 0, H / 2 - b, dep / 2);
+    add(g, gBox(W, b, dep), frame, 0, -H / 2, dep / 2);
+    add(g, gBox(b, H - 2 * b, dep), frame, -W / 2 + b / 2, -H / 2 + b, dep / 2);
+    add(g, gBox(b, H - 2 * b, dep), frame, W / 2 - b / 2, -H / 2 + b, dep / 2);
+    if (r() < 0.5) g.rotation.z = (r() - 0.5) * 0.12; // hanging crooked
+  },
+  wall_clock(g, r) {
+    const R = 0.13 + r() * 0.05;
+    const caseM = pick(r, [M.blackPl, M.whitePl, FX.wood('#5a3a22')]);
+    const face = tmat(ctex('clockface', 256, 256, (c, w, h, rr) => {
+      c.fillStyle = '#f2ecd8'; c.beginPath(); c.arc(128, 128, 128, 0, TAU); c.fill();
+      for (let i = 0; i < 60; i++) {
+        const a = i / 60 * TAU, big = i % 5 === 0;
+        c.strokeStyle = '#1a1a1a'; c.lineWidth = big ? 5 : 1.5;
+        c.beginPath(); c.moveTo(128 + Math.sin(a) * 118, 128 - Math.cos(a) * 118); c.lineTo(128 + Math.sin(a) * (big ? 100 : 110), 128 - Math.cos(a) * (big ? 100 : 110)); c.stroke();
+      }
+      for (let n = 1; n <= 12; n++) { const a = n / 12 * TAU; txt(c, String(n), 128 + Math.sin(a) * 82, 130 - Math.cos(a) * 82, 24, { color: '#1a1a1a' }); }
+      const gr = c.createRadialGradient(128, 128, 40, 128, 128, 128); gr.addColorStop(0, 'rgba(180,150,90,0)'); gr.addColorStop(1, 'rgba(150,120,60,0.3)'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+      grime(c, w, h, rr, 1.2);
+    }), 0.5);
+    const dep = 0.045;
+    add(g, gCyl(R, R, dep, 24, true), caseM, 0, 0, 0, Math.PI / 2, 0, 0);
+    add(g, gTorus(R - 0.006, 0.01, 4, 24), caseM, 0, 0, dep - 0.004);
+    add(g, gCircle(R - 0.012, 24), face, 0, 0, dep - 0.012, Math.PI / 2, 0, 0);
+    add(g, gCircle(R, 24), caseM, 0, 0, 0.001, -Math.PI / 2, 0, 0);
+    // stopped hands (the minute and hour agree with each other)
+    const hr = Math.floor(r() * 12), mn = Math.floor(r() * 60), sc = Math.floor(r() * 60);
+    const hand = (ang, len, wid, z) => add(g, gBox(wid, len, 0.002), M.blackPl, 0, 0, dep - 0.012 + z, 0, 0, -ang);
+    hand((hr + mn / 60) / 12 * TAU, R * 0.5, 0.012, 0.003);
+    hand(mn / 60 * TAU, R * 0.78, 0.008, 0.006);
+    hand(sc / 60 * TAU, R * 0.82, 0.002, 0.009);
+    add(g, gCyl(0.008, 0.008, 0.012, 8), M.blackPl, 0, 0, dep - 0.012, Math.PI / 2, 0, 0);
+    if (r() < 0.4) g.rotation.z = (r() - 0.5) * 0.1;
+  },
+  curtain(g, r) {
+    const W = 1.2 + r() * 0.5, Hc = 1.5 + r() * 0.5;
+    const color = pick(r, ['#8a3a2a', '#4a5a6a', '#c8b890', '#5a6a4a', '#7a5a7a']);
+    const fab = FX.fabric(color);
+    const cloth = mat('curtain' + color, { map: fab.map, roughness: 0.95, side: THREE.DoubleSide });
+    const metal = pick(r, [col(0xb89a5a, 0.4, 0.5), col(0x2a2a2c, 0.5, 0.3), col(0xb4b9be, 0.38, 0.55)]);
+    const zr = 0.085, yTop = 0;
+    add(g, gCyl(0.012, 0.012, W, 10), metal, -W / 2, yTop, zr, 0, 0, -Math.PI / 2);
+    for (const s of [-1, 1]) {
+      add(g, gSphere(0.025, 8, 6), metal, s * (W / 2 + 0.02), yTop, zr);
+      add(g, gBox(0.02, 0.04, zr), metal, s * (W / 2 - 0.08), yTop - 0.02, zr / 2 - 0.012 + 0.012);
+    }
+    // two panels, each gathered to a random width; one may hang off a few missing rings
+    const open = r();
+    for (const s of [-1, 1]) {
+      const pw = W * (s < 0 ? 0.2 + open * 0.3 : 0.5 - open * 0.3 + 0.2) * 0.9;
+      const x0 = s < 0 ? -W / 2 + 0.02 : W / 2 - 0.02 - pw;
+      const sag = r() < 0.3 ? 0.06 + r() * 0.12 : 0;
+      const nx = 22, ny = 6, folds = Math.max(3, Math.round(pw / 0.09));
+      const geo = new THREE.PlaneGeometry(1, 1, nx, ny);
+      const p = geo.attributes.position, uv = geo.attributes.uv;
+      const ph = r() * 6, flat = pw * 1.8;
+      for (let i = 0; i < p.count; i++) {
+        const u = p.getX(i) + 0.5, v = 0.5 - p.getY(i); // v 0 at top
+        let x = x0 + u * pw, z = zr + 0.02 + Math.sin(u * folds * TAU + ph) * (0.025 + v * 0.02);
+        let y = yTop - 0.03 - v * Hc;
+        const freeEnd = s < 0 ? 1 - u : u; // the end towards the window centre
+        if (sag) y -= sag * Math.max(0, freeEnd - 0.6) / 0.4 * (1 - v * 0.6);
+        if (v > 0.9) y += Math.sin(u * 17 + ph) * 0.015; // uneven hem
+        z += v * v * 0.04 * Math.sin(u * 3 + ph);
+        p.setXYZ(i, x, y, z);
+        uv.setXY(i, u * flat, (1 - v) * Hc);
+      }
+      geo.computeVertexNormals();
+      add(g, geo, cloth);
+      for (let k = 0; k <= folds; k++) {
+        const x = x0 + k / folds * pw;
+        if (sag && (s < 0 ? k / folds < 0.4 : k / folds > 0.6)) continue;
+        add(g, gTorus(0.018, 0.004, 3, 8), metal, x, yTop, zr);
+      }
+    }
+  },
+  mail_pile(g, r) {
+    const t = ctex('mailatlas', 1024, 512, (c, w, h, rr) => {
+      for (let i = 0; i < 8; i++) {
+        const x = (i % 4) * 256, y = Math.floor(i / 4) * 256;
+        c.save(); c.translate(x, y); c.beginPath(); c.rect(0, 0, 256, 256); c.clip();
+        if (i === 0 || i === 1) { // window envelope / plain envelope (no addresses)
+          c.fillStyle = i ? '#eae4d4' : '#f4f2ec'; c.fillRect(0, 0, 256, 256);
+          c.fillStyle = 'rgba(0,0,0,0.06)'; c.fillRect(0, 0, 256, 8);
+          if (!i) { c.fillStyle = '#dfe3e2'; c.fillRect(30, 120, 120, 60); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.strokeRect(30, 120, 120, 60); }
+          c.fillStyle = i ? '#7a9ab8' : '#c8c8c4'; c.fillRect(196, 20, 40, 34); // stamp / postage box
+          if (i) { c.strokeStyle = 'rgba(40,40,40,0.4)'; for (let k = 0; k < 4; k++) { c.beginPath(); c.moveTo(170, 30 + k * 6); c.bezierCurveTo(185, 25 + k * 6, 200, 35 + k * 6, 236, 30 + k * 6); c.stroke(); } }
+        } else if (i === 2) { // manila
+          noiseFill(c, 256, 256, rr, '#d2b47a', 0.08, 800, 2);
+          c.fillStyle = 'rgba(80,60,30,0.3)'; c.beginPath(); c.arc(128, 40, 10, 0, TAU); c.fill();
+        } else if (i === 3) { // weekly specials flyer
+          c.fillStyle = '#f6f2e6'; c.fillRect(0, 0, 256, 256);
+          c.fillStyle = '#c4221c'; c.fillRect(0, 0, 256, 50);
+          txt(c, 'WEEKLY SPECIALS', 128, 26, 26, { color: '#fff', maxW: 240, font: COND });
+          const cols = ['#e8701c', '#2f7a32', '#f2c21b', '#1d4f9a', '#8a4a1a', '#c4221c'];
+          for (let k = 0; k < 6; k++) { const bx2 = 12 + (k % 3) * 82, by = 62 + Math.floor(k / 3) * 96; c.fillStyle = cols[k]; c.beginPath(); c.arc(bx2 + 35, by + 32, 24, 0, TAU); c.fill(); txt(c, '$' + (1 + k) + '.99', bx2 + 35, by + 76, 18, { color: '#c4221c' }); }
+        } else if (i === 4) { // coupon sheet
+          c.fillStyle = '#fbf6dc'; c.fillRect(0, 0, 256, 256);
+          c.setLineDash([6, 4]); c.strokeStyle = '#555';
+          for (let k = 0; k < 4; k++) c.strokeRect(10 + (k % 2) * 124, 40 + Math.floor(k / 2) * 106, 112, 96);
+          c.setLineDash([]);
+          txt(c, 'COUPONS', 128, 20, 22, { color: '#1d4f9a' });
+          for (let k = 0; k < 4; k++) txt(c, ['50% OFF', 'SAVE $1', 'BUY 1 GET 1', 'FREE'][k], 66 + (k % 2) * 124, 88 + Math.floor(k / 2) * 106, 18, { color: '#111', maxW: 100 });
+        } else if (i === 5) { // catalogue cover
+          c.fillStyle = '#e8e4dc'; c.fillRect(0, 0, 256, 256);
+          c.fillStyle = '#3a5a7a'; c.fillRect(0, 40, 256, 150);
+          c.fillStyle = '#c8a070'; c.fillRect(30, 100, 90, 70); c.fillStyle = '#8a3a2a'; c.fillRect(140, 80, 80, 100);
+          txt(c, 'HOME & GARDEN', 128, 22, 22, { color: '#222', maxW: 240 });
+          txt(c, 'SPRING CATALOG', 128, 220, 18, { color: '#222' });
+        } else if (i === 6) { // postcard: lake view
+          drawArt(c, 256, 256, 0, rr);
+        } else { // utility notice, generic
+          c.fillStyle = '#f4f2ec'; c.fillRect(0, 0, 256, 256);
+          c.fillStyle = '#2a6a5a'; c.fillRect(0, 0, 256, 34);
+          txt(c, 'STATEMENT', 128, 18, 20, { color: '#fff' });
+          finePrint(c, 20, 50, 216, 10, 14, rr, '#444');
+          txt(c, 'FINAL NOTICE', 128, 216, 22, { color: '#c4221c' });
+        }
+        grime(c, 256, 256, rr, 1.2);
+        c.restore();
+      }
+    });
+    const merger = new Merger(1);
+    const plain = [0.02, 0.52, 0.05, 0.55];
+    const kinds = [[0.24, 0.0015, 0.105, 0], [0.24, 0.0015, 0.105, 1], [0.23, 0.004, 0.3, 2], [0.216, 0.0008, 0.28, 3], [0.216, 0.0008, 0.28, 4], [0.2, 0.006, 0.26, 5], [0.15, 0.001, 0.105, 6], [0.216, 0.0008, 0.28, 7]];
+    const n = 7 + Math.floor(r() * 8);
+    let y = 0;
+    for (let i = 0; i < n; i++) {
+      const [w, h, d, cell] = kinds[Math.floor(r() * kinds.length)];
+      const rc = atlasRect(4, 2, cell);
+      const slid = i > 2 && r() < 0.15;
+      const x = slid ? (r() - 0.5) * 0.5 : (r() - 0.5) * 0.06, z = slid ? (r() - 0.5) * 0.4 : (r() - 0.5) * 0.06;
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, slid ? 0 : y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, r() * TAU, 0)), new THREE.Vector3(1, 1, 1));
+      merger.add(gBox(w, h, d), m, [plain, plain, rc, plain, plain, plain], [0]);
+      if (!slid) y += h + 0.0004;
+    }
+    for (const mesh of merger.meshes([mat('mailmat', { map: t, roughness: 0.9 })])) g.add(mesh);
+  },
+  shoes(g, r) {
+    const color = pick(r, ['#2a3a5a', '#7a2a22', '#3a3a3c', '#5a6a4a', '#c8c4b8']);
+    const upper = tmat(ctex('shoeup' + color, 256, 128, (c, w, h, rr) => {
+      noiseFill(c, w, h, rr, color, 0.08, 2000, 2);
+      c.fillStyle = shade(color, -0.25); c.fillRect(0, h * 0.75, w, h * 0.25); // toe cap / lower panel
+      c.strokeStyle = 'rgba(255,255,255,0.35)'; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(0, h * 0.72); c.lineTo(w, h * 0.72); c.stroke(); c.setLineDash([]);
+      // mud and salt stains at the bottom
+      for (let i = 0; i < 40; i++) { c.fillStyle = rr() < 0.6 ? 'rgba(80,60,40,0.35)' : 'rgba(235,235,225,0.35)'; c.beginPath(); c.ellipse(rr() * w, h * (0.8 + rr() * 0.2), 3 + rr() * 10, 2 + rr() * 4, 0, 0, TAU); c.fill(); }
+      grime(c, w, h, rr, 1.5);
+    }), 0.8);
+    const sole = mat('shoesole', { color: 0xd8d4c8, roughness: 0.9 });
+    const dark = M.blackPl;
+    const prof = (t) => { // t 0 heel .. 1 toe -> half width
+      const base = 0.036 + 0.012 * Math.sin(Math.min(1, t * 1.25) * Math.PI * 0.9);
+      const toe = t > 0.82 ? Math.sqrt(Math.max(0.05, 1 - ((t - 0.82) / 0.18) ** 2)) : 1;
+      const heel = t < 0.08 ? Math.sqrt(Math.max(0.2, 1 - ((0.08 - t) / 0.08) ** 2)) : 1;
+      return base * toe * heel;
+    };
+    const L = 0.27;
+    const body = (key, h0, hFn, segx, segy, widen) => cached(GEO, 'shoe' + key, () => {
+      const b = new THREE.BoxGeometry(1, 1, 1, segx, segy, 10);
+      const p = b.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const xn = p.getX(i) * 2, yn = p.getY(i) + 0.5, t = p.getZ(i) + 0.5;
+        const hw = prof(t) * widen, hh = hFn(t);
+        p.setXYZ(i, xn * hw * (1 - 0.3 * yn * yn), h0 + yn * hh, (t - 0.5) * L);
+      }
+      b.computeVertexNormals();
+      return b;
+    });
+    const solG = body('sole', 0, () => 0.022, 2, 1, 1.06);
+    const upG = body('up', 0.02, (t) => (t < 0.45 ? 0.085 - t * 0.02 : 0.076 - (t - 0.45) * 0.08) , 3, 3, 1.0);
+    const one = (x, z, ry, side) => {
+      const s = new THREE.Group();
+      add(s, solG, sole);
+      add(s, upG, upper);
+      add(s, gCircle(0.03, 10), dark, 0, 0.1, -0.075, 0, 0, 0, 0.95, 1, 1.5);
+      for (let k = 0; k < 4; k++) add(s, gBox(0.045, 0.004, 0.006), M.whitePl, 0, 0.088 - k * 0.006, -0.03 + k * 0.022, 0.25, 0, 0);
+      s.position.set(x, 0, z); s.rotation.y = ry;
+      if (side) { s.rotation.z = Math.PI / 2 * side; s.position.y = 0.05; s.position.x += side * 0.05; }
+      g.add(s);
+    };
+    const knocked = r() < 0.35;
+    one(-0.055, 0, (r() - 0.5) * 0.15, 0);
+    one(knocked ? 0.12 : 0.055, knocked ? 0.05 : (r() - 0.5) * 0.04, knocked ? 0.6 + r() : (r() - 0.5) * 0.15, knocked ? 1 : 0);
+  },
+  clothes_pile(g, r) {
+    // garment silhouettes on a transparent atlas; draped grids give the pile its shape
+    const t = ctex('clothesatlas', 512, 512, (c, w, h, rr) => {
+      c.clearRect(0, 0, w, h);
+      const cell = (i, draw) => { c.save(); c.translate((i % 2) * 256, Math.floor(i / 2) * 256); draw(); c.restore(); };
+      const fabric = (base, kind) => {
+        noiseFill(c, 256, 256, rr, base, 0.08, 1500, 2);
+        if (kind === 'denim') { c.strokeStyle = 'rgba(255,255,255,0.08)'; for (let k = -256; k < 256; k += 4) { c.beginPath(); c.moveTo(k, 0); c.lineTo(k + 256, 256); c.stroke(); } }
+        if (kind === 'plaid') { c.globalAlpha = 0.5; c.fillStyle = '#1a1a1a'; for (let k = 0; k < 256; k += 48) { c.fillRect(k, 0, 18, 256); c.fillRect(0, k, 256, 18); } c.fillStyle = '#e8d8a0'; for (let k = 30; k < 256; k += 48) { c.fillRect(k, 0, 3, 256); c.fillRect(0, k, 256, 3); } c.globalAlpha = 1; }
+        if (kind === 'knit') { c.strokeStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 256; k += 5) { c.beginPath(); c.moveTo(k, 0); c.lineTo(k, 256); c.stroke(); } }
+        grime(c, 256, 256, rr, 1.5);
+      };
+      const shirt = () => { c.beginPath(); c.moveTo(70, 20); c.lineTo(100, 10); c.quadraticCurveTo(128, 30, 156, 10); c.lineTo(186, 20); c.lineTo(250, 70); c.lineTo(222, 110); c.lineTo(190, 85); c.lineTo(192, 246); c.lineTo(64, 246); c.lineTo(66, 85); c.lineTo(34, 110); c.lineTo(6, 70); c.closePath(); c.clip(); };
+      const pants = () => { c.beginPath(); c.moveTo(56, 6); c.lineTo(200, 6); c.lineTo(226, 250); c.lineTo(146, 250); c.lineTo(128, 90); c.lineTo(110, 250); c.lineTo(30, 250); c.closePath(); c.clip(); };
+      const sweater = () => { c.beginPath(); c.moveTo(60, 14); c.quadraticCurveTo(128, 40, 196, 14); c.lineTo(252, 200); c.lineTo(214, 214); c.lineTo(192, 110); c.lineTo(196, 250); c.lineTo(60, 250); c.lineTo(64, 110); c.lineTo(42, 214); c.lineTo(4, 200); c.closePath(); c.clip(); };
+      cell(0, () => { shirt(); fabric('#7a1d1a', 'plaid'); });
+      cell(1, () => { pants(); fabric('#2a3e5e', 'denim'); c.fillStyle = 'rgba(255,255,255,0.15)'; c.fillRect(0, 0, 256, 14); });
+      cell(2, () => { sweater(); fabric('#8a8a84', 'knit'); });
+      cell(3, () => { shirt(); fabric(pick(rr, ['#2f5a3a', '#c8b890', '#3a4a6a']), 'tee'); });
+    });
+    const merger = new Merger(1);
+    const n = 3 + Math.floor(r() * 3);
+    let top = 0.02;
+    for (let k = 0; k < n; k++) {
+      const cell = k < 4 ? k : Math.floor(r() * 4);
+      const sw = 0.5 + r() * 0.15, sd = cell === 1 ? 0.8 : 0.62;
+      const cx = (r() - 0.5) * 0.25, cz = (r() - 0.5) * 0.25, rot = r() * TAU, ph = r() * 10;
+      const nx = 11, nz = 11;
+      const geo = new THREE.PlaneGeometry(1, 1, nx, nz).rotateX(-Math.PI / 2);
+      const p = geo.attributes.position;
+      const cs = Math.cos(rot), sn = Math.sin(rot);
+      for (let i = 0; i < p.count; i++) {
+        const u = p.getX(i), v = p.getZ(i);
+        // bunch it up: shrink towards the centre and lift into a mound
+        const bunch = 0.55 + r() * 0.08;
+        let x = u * sw * bunch, z = v * sd * bunch;
+        const rx = x * cs - z * sn + cx, rz = x * sn + z * cs + cz;
+        const d = Math.hypot(rx, rz);
+        const mound = Math.max(0, top + 0.06 - d * 0.35) + Math.sin(u * 9 + ph) * 0.012 + Math.cos(v * 11 + ph) * 0.012;
+        p.setXYZ(i, rx, Math.max(0.004 + k * 0.002, mound), rz);
+      }
+      geo.computeVertexNormals();
+      merger.add(geo, new THREE.Matrix4(), [atlasRect(2, 2, cell)], [0]);
+      top += 0.02;
+    }
+    for (const mesh of merger.meshes([mat('clothesmat', { map: t, roughness: 0.95, side: THREE.DoubleSide, alphaTest: 0.5 })])) g.add(mesh);
+  },
+  dish_stack(g, r) {
+    const t = ctex('dishatlas', 256, 256, (c, w, h, rr) => {
+      const cols = ['#f2f0e8', '#e8dcc0', '#3a5a8a', '#8a2a22', '#4a6a4a', '#d8d4cc', '#f2f0e8', '#e8e4dc', '#c8a070'];
+      cols.forEach((cc, i) => {
+        const x = (i % 3) * 85, y = Math.floor(i / 3) * 85;
+        c.fillStyle = cc; c.fillRect(x, y, 85, 85);
+        if (i === 6) for (let k = 0; k < 14; k++) { c.fillStyle = `rgba(${90 + rr() * 60},${50 + rr() * 30},20,0.5)`; c.beginPath(); c.ellipse(x + rr() * 85, y + rr() * 50, 2 + rr() * 6, 1 + rr() * 4, rr() * 3, 0, TAU); c.fill(); } // dried food
+        if (i === 7) { c.fillStyle = 'rgba(90,60,30,0.45)'; c.fillRect(x, y + 50, 85, 10); } // coffee ring
+        for (let k = 0; k < 40; k++) { c.fillStyle = 'rgba(90,80,60,0.12)'; c.fillRect(x + rr() * 85, y + rr() * 85, 2, 2); }
+      });
+    });
+    const R = (i) => { const x = (i % 3) * 85 + 6, y = Math.floor(i / 3) * 85 + 6; return [x / 256, 1 - (y + 73) / 256, (x + 73) / 256, 1 - y / 256]; };
+    const merger = new Merger(1);
+    const M4 = (x, y, z, ry = 0, rx = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)), new THREE.Vector3(1, 1, 1));
+    const plate = gLathe('dplate', [[0, 0], [0.07, 0], [0.09, 0.012], [0.12, 0.018], [0.118, 0.02], [0.088, 0.015], [0.068, 0.004], [0, 0.004]], 16);
+    const bowl = gLathe('dbowl', [[0, 0], [0.035, 0], [0.065, 0.03], [0.075, 0.058], [0.071, 0.058], [0.061, 0.032], [0.033, 0.006], [0, 0.006]], 14);
+    const mug = gLathe('dmug', [[0, 0], [0.04, 0], [0.042, 0.095], [0.037, 0.095], [0.035, 0.008], [0, 0.008]], 12);
+    const handle = gTorus(0.025, 0.007, 4, 8, Math.PI * 1.2);
+    const pc = pick(r, [0, 1, 5]);
+    const np = 3 + Math.floor(r() * 5);
+    const px = -0.08 + (r() - 0.5) * 0.04;
+    for (let i = 0; i < np; i++) merger.add(plate, M4(px + (r() - 0.5) * 0.008, i * 0.0145, (r() - 0.5) * 0.008, r() * TAU), [R(i === np - 1 && r() < 0.6 ? 6 : pc)], [0]);
+    const nb = Math.floor(r() * 3);
+    for (let i = 0; i < nb; i++) merger.add(bowl, M4(0.12, i * 0.02, -0.06, r() * TAU), [R(pick(r, [0, 2, 4]))], [0]);
+    const nm = 1 + Math.floor(r() * 3);
+    for (let i = 0; i < nm; i++) {
+      const c2 = R(pick(r, [2, 3, 4, 7, 1]));
+      const a = 0.6 + i * 1.3 + r() * 0.4, d = 0.17;
+      const mx = Math.cos(a) * d, mz = Math.sin(a) * d, ry = r() * TAU;
+      const tip = i === nm - 1 && r() < 0.3;
+      const base = M4(mx, tip ? 0.042 : 0, mz, ry, tip ? Math.PI / 2 : 0);
+      merger.add(mug, base, [c2], [0]);
+      merger.add(handle, base.clone().multiply(M4(0.045, 0.05, 0, 0, 0).multiply(new THREE.Matrix4().makeRotationZ(-Math.PI * 0.6))), [c2], [0]);
+    }
+    if (r() < 0.6) { // cutlery on the top plate
+      for (let k = 0; k < 2; k++) merger.add(gBox(0.012, 0.003, 0.19), M4(px + (k - 0.5) * 0.04, np * 0.0145 + 0.006 + k * 0.003, 0, 0.3 + k * 0.4), [R(5)], [0]);
+    }
+    for (const mesh of merger.meshes([mat('dishmat', { map: t, roughness: 0.35, side: THREE.DoubleSide })])) g.add(mesh);
+  },
+};
+Object.assign(PROP_BUILDERS, HOUSE_PROPS);
+const WALL_PROPS = new Set(['wall_frame', 'wall_clock', 'curtain']);
 export const PROP_KINDS = Object.keys(PROP_BUILDERS);
 const FLAT_PROPS = new Set(['rug', 'paper_scatter', 'glass_shards']);
 const DECAL = { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
@@ -2915,7 +3348,7 @@ export function makeProp(kind, seed = 0) {
   const fn = PROP_BUILDERS[kind];
   if (fn) fn(g, r);
   else { const b = new THREE.Group(); PROP_BUILDERS.cardboard_box(b, r); g.add(b); }
-  return finish(g, kind, FLAT_PROPS.has(kind));
+  return finish(g, kind, FLAT_PROPS.has(kind), WALL_PROPS.has(kind));
 }
 
 // =====================================================================
@@ -3063,27 +3496,30 @@ const FIXTURES = {
     for (const x of [-lx, lx]) for (const z of [-lz, lz]) bx(g, W, x - 0.03, x + 0.03, 0, H - top, z - 0.03, z + 0.03);
     bx(g, W, -lx, lx, H - top - 0.08, H - top, -lz - 0.01, -lz + 0.01); bx(g, W, -lx, lx, H - top - 0.08, H - top, lz - 0.01, lz + 0.01);
     bx(g, W, -lx - 0.01, -lx + 0.01, H - top - 0.08, H - top, -lz, lz); bx(g, W, lx - 0.01, lx + 0.01, H - top - 0.08, H - top, -lz, lz);
-    if (D < 0.55 || H < 0.55) return;
+    if (D < 0.5 || H < 0.5) return;
     const per = Math.max(1, Math.floor((L - 0.2) / 0.6));
     const seatY = Math.min(0.45, H - 0.22);
-    for (const s of [-1, 1]) for (let i = 0; i < per; i++) {
-      if (r() < 0.15) continue; // a chair is missing
-      const cx = -L / 2 + (i + 0.5) * (L / per) + (r() - 0.5) * 0.08;
-      const zIn = s * (D / 2 - 0.22), zBack = s * (D / 2 - 0.025);
+    const chair = (x, z, ry) => {
       const C = new THREE.Group();
-      const sw = Math.min(0.42, L / per - 0.06);
+      const sw = 0.4;
       bx(C, W, -sw / 2, sw / 2, seatY - 0.035, seatY, -0.2, 0.2);
-      for (const x of [-sw / 2 + 0.03, sw / 2 - 0.03]) for (const z of [-0.17, 0.17]) bx(C, W, x - 0.017, x + 0.017, 0, seatY - 0.035, z - 0.017, z + 0.017);
-      for (const x of [-sw / 2 + 0.03, sw / 2 - 0.03]) bx(C, W, x - 0.017, x + 0.017, seatY, H - top - 0.012, 0.2 - 0.03, 0.2 - 0.005);
+      for (const cx of [-sw / 2 + 0.03, sw / 2 - 0.03]) for (const cz of [-0.17, 0.17]) bx(C, W, cx - 0.017, cx + 0.017, 0, seatY - 0.035, cz - 0.017, cz + 0.017);
+      for (const cx of [-sw / 2 + 0.03, sw / 2 - 0.03]) bx(C, W, cx - 0.017, cx + 0.017, seatY, H - top - 0.012, 0.2 - 0.03, 0.2 - 0.005);
       bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, H - top - 0.1, H - top - 0.02, 0.2 - 0.03, 0.2 - 0.008);
       bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, seatY + 0.12, seatY + 0.16, 0.2 - 0.028, 0.2 - 0.01);
-      C.position.set(cx, 0, (zIn + zBack - s * 0.2 + s * 0.2) / 2 + s * 0.0);
-      C.position.z = zBack - s * 0.2 * 1; // chair back sits at the table edge
-      C.position.z = s > 0 ? D / 2 - 0.205 : -(D / 2 - 0.205);
-      if (s < 0) C.rotation.y = Math.PI;
-      C.rotation.y += (r() - 0.5) * 0.08;
+      C.position.set(x, 0, z); C.rotation.y = ry + (r() - 0.5) * 0.08;
       g.add(C);
+    };
+    // chair backs sit at the table edge (chair local +z is its back)
+    const cw = Math.min(0.4, L / per - 0.06);
+    const ends = L / D < 1.5 && D >= 1.15;
+    for (const s of [-1, 1]) for (let i = 0; i < per; i++) {
+      if (r() < 0.12) continue; // the odd chair is missing
+      const cx = -L / 2 + (i + 0.5) * (L / per) + (r() - 0.5) * (ends ? 0.02 : Math.max(0, L / per - cw - 0.06));
+      chair(cx, s * (D / 2 - 0.205), s > 0 ? 0 : Math.PI);
     }
+    // squarish tables also get a chair at each end
+    if (ends) for (const s of [-1, 1]) if (r() > 0.12) chair(s * (L / 2 - 0.205), (r() - 0.5) * 0.06, s * Math.PI / 2);
   },
   bed(g, L, D, H, r) {
     const W = FX.wood(pick(r, ['#5a3a22', '#7a5a3a', '#3a2a1e']));

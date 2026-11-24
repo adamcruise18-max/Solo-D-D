@@ -57,7 +57,7 @@ export const KEYS = [
   { group: 'Game', keys: ['Enter', 'NumpadEnter'], show: 'Enter', action: 'confirm', label: 'Confirm', ready: true },
   { group: 'Game', keys: ['F5'], show: 'F5', action: 'quicksave', label: 'Quick save', ready: true },
   { group: 'Game', keys: ['F9'], show: 'F9', action: 'quickload', label: 'Quick load (last save)', ready: true },
-  { group: 'Game', keys: ['Backquote'], show: '`', action: 'debug', label: 'Debug readout', ready: true },
+  { group: 'Game', keys: ['F3', 'Backquote'], show: 'F3', action: 'debug', label: 'Diagnostics (FPS, frame time, draw calls, memory)', ready: true },
 ];
 
 // Keys from Adam's list that are left out, with the reason (shown in the PR, not in the game).

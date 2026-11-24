@@ -1142,9 +1142,17 @@
     const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
     return levelFor(xp);
   }
-  function practice(state2, key, amount = 1) {
+  var DAILY_FULL = 20;
+  function practice(state2, key, amount = 1, { book = false } = {}) {
     if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
     const s = skillsOf(state2);
+    if (!book) {
+      const day = dayIndex(state2.time);
+      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
+      const n = (s.today.uses[key] || 0) + 1;
+      s.today.uses[key] = n;
+      if (n > DAILY_FULL) amount /= 2;
+    }
     const before = levelFor(s.xp[key] || 0);
     s.xp[key] = (s.xp[key] || 0) + amount;
     const after = levelFor(s.xp[key]);
@@ -1983,7 +1991,7 @@
     if (first) {
       s.books.push(id);
       log(state2, `You read the ${it.name.toLowerCase()} and take notes.`, "good");
-      practice(state2, it.skill, BOOK_XP);
+      practice(state2, it.skill, BOOK_XP, { book: true });
     } else {
       log(state2, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
       state2.player.morale = clamp2(state2.player.morale + 2, 0, 100);

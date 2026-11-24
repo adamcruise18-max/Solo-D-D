@@ -181,7 +181,7 @@ export function readBook(state, id) {
   if (first) {
     s.books.push(id);
     log(state, `You read the ${it.name.toLowerCase()} and take notes.`, 'good');
-    practice(state, it.skill, BOOK_XP);
+    practice(state, it.skill, BOOK_XP, { book: true });
   } else {
     log(state, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
     state.player.morale = clamp(state.player.morale + 2, 0, 100);

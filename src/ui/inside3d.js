@@ -5,11 +5,11 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, FogExp2, HemisphereLight, AmbientLight, PointLight, SpotLight,
   Object3D, Mesh, InstancedMesh, BoxGeometry, PlaneGeometry, RingGeometry, CylinderGeometry, SphereGeometry,
   MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide,
-  Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
+  Vector3, Matrix4, BufferGeometry, Float32BufferAttribute, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
-import { makeItemModel, makeShelfFill, makeProp, makeFixture, FIXTURE_TYPES } from './props3d.js';
+import { makeItemModel, makeShelfFill, makeProp, makeFixture, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import {
@@ -160,6 +160,27 @@ export function openInside(opts) {
   ceil.rotation.x = Math.PI / 2;
   ceil.position.set(0, H, -D / 2);
   scene.add(worldUV(ceil));
+  // Drop-ceiling grid: thin unlit lines (one draw call), so the ceiling reads as a ceiling
+  // and not a black void when the store is dark. A few tiles are missing (dark holes).
+  if (plan.kind === 'hall' && plan.cat !== 'hardware' && plan.cat !== 'outdoor') {
+    const pts = [];
+    const y = H - 0.01;
+    for (let x = -W / 2; x <= W / 2 + 1e-6; x += 1.2) pts.push(x, y, 0, x, y, -D);
+    for (let z = 0; z >= -D - 1e-6; z -= 0.6) pts.push(-W / 2, y, z, W / 2, y, z);
+    const gg = new BufferGeometry();
+    gg.setAttribute('position', new Float32BufferAttribute(pts, 3));
+    scene.add(new LineSegments(gg, new LineBasicMaterial({ color: dark ? 0x3a3f45 : 0x8d9297, fog: true })));
+    const holeMat = new MeshBasicMaterial({ color: 0x050505 });
+    const holes = [];
+    const nh = Math.round(W * D / 40);
+    for (let i = 0; i < nh; i++) {
+      const g = new PlaneGeometry(1.2, 0.6);
+      g.rotateX(Math.PI / 2);
+      g.translate(-W / 2 + 0.6 + Math.floor(lrnd() * (W / 1.2 - 1)) * 1.2, H - 0.02, -0.3 - Math.floor(lrnd() * (D / 0.6 - 1)) * 0.6);
+      holes.push(g);
+    }
+    if (holes.length) scene.add(new Mesh(mergeGeometries(holes), holeMat));
+  }
   // Ceiling lamps: most are dead; some flicker; dark buildings have an emergency light or two.
   // Lights are added now (not during play): a new light makes three.js rebuild its shaders.
   {
@@ -416,16 +437,28 @@ export function openInside(opts) {
     const free = (x, z, rad) => !solid.some((b) => Math.abs(x - b.x) < b.w / 2 + rad && Math.abs(z - b.z) < b.d / 2 + rad)
       && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad)
       && x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad;
-    const place = (kind, nearWall = false) => {
+    // area: limit to one room ({x1,x2,z1,z2}); the default is the whole building.
+    const place = (kind, nearWall = false, area = null) => {
+      if (!PROP_KINDS.includes(kind)) return null;
       const g = makeProp(kind, Math.floor(lrnd() * 1e6));
       const rad = Math.min(1.2, (g.userData.radius || 0.3) + 0.1);
+      const flat = kind === 'rug' || kind === 'paper_scatter' || kind === 'clothes_pile';
+      const A = area || { x1: -W / 2, x2: W / 2, z1: -D, z2: 0 };
       for (let i = 0; i < 30; i++) {
-        let x = (lrnd() - 0.5) * (W - 2 * rad);
-        if (nearWall) x = (lrnd() < 0.5 ? -1 : 1) * (W / 2 - rad - 0.05);
-        const z = -rad - lrnd() * (D - 2 * rad);
+        let x = A.x1 + rad + lrnd() * Math.max(0, A.x2 - A.x1 - 2 * rad);
+        if (nearWall) x = lrnd() < 0.5 ? A.x1 + rad + 0.05 : A.x2 - rad - 0.05;
+        const z = A.z1 + rad + lrnd() * Math.max(0, A.z2 - A.z1 - 2 * rad);
+        if (flat && area) {
+          // Rugs and paper lie under things: only keep them off walls and the door.
+          if (!(x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad)) continue;
+          g.position.set(x, 0, z);
+          g.rotation.y = lrnd() * Math.PI;
+          statics.add(g);
+          return g;
+        }
         if (!free(x, z, rad)) continue;
         g.position.set(x, 0, z);
-        g.rotation.y = nearWall ? (x > 0 ? -Math.PI / 2 : Math.PI / 2) + (lrnd() - 0.5) * 0.3 : lrnd() * Math.PI * 2;
+        g.rotation.y = nearWall ? (x > (A.x1 + A.x2) / 2 ? -Math.PI / 2 : Math.PI / 2) + (lrnd() - 0.5) * 0.3 : lrnd() * Math.PI * 2;
         g.traverse((o) => { if (o.isMesh) { o.castShadow = rad > 0.25; o.receiveShadow = true; } });
         statics.add(g);
         taken.push([x, z, rad]);
@@ -445,7 +478,47 @@ export function openInside(opts) {
       fire: [['helmet_rack', 1, true], ['hose_reel', 1, true], ['locker_row', 1, true], ['traffic_cone', 2], ['fire_extinguisher', 1, true]],
       house: [['rug', 2], ['lamp', 1, true], ['potted_plant_dead', 1, true], ['chair', 2], ['tv', 1, true], ['bookshelf', 1, true], ['trash_bag', 1], ['cardboard_box', 1]],
     };
-    for (const [kind, n, wall] of SETS[plan.cat] || SETS.house) for (let i = 0; i < n; i++) place(kind, !!wall);
+    if (plan.cat === 'house') {
+      // Lived-in rooms: each room gets its own set. Wall pieces (frames, curtains, a stopped
+      // clock) hang on the room's front or back wall. No faces, names or addresses anywhere.
+      const ROOM_SETS = {
+        kitchen: [['trash_bag', 1], ['paper_scatter', 1], ['chair', 1]],
+        'living room': [['rug', 1], ['tv', 1, true], ['lamp', 1, true], ['potted_plant_dead', 1, true], ['bookshelf', 1, true], ['kids_toy', 1], ['clothes_pile', 1], ['paper_scatter', 1], ['shoes', 1]],
+        bedroom: [['rug', 1], ['lamp', 1, true], ['clothes_pile', 2], ['shoes', 1], ['cardboard_box', 1]],
+        bathroom: [['clothes_pile', 1], ['trash_bag', 1]],
+        'second bedroom': [['rug', 1], ['kids_toy', 2], ['clothes_pile', 1], ['shoes', 1]],
+        garage: [['box_stack', 1, true], ['cardboard_box', 2], ['trash_bag', 1], ['traffic_cone', 1]],
+      };
+      const WALL_SETS = {
+        kitchen: ['wall_clock', 'curtain'], 'living room': ['wall_frame', 'wall_frame', 'curtain'], bedroom: ['wall_frame', 'curtain'],
+        'second bedroom': ['wall_frame', 'curtain'], bathroom: [], garage: [],
+      };
+      for (const sp of plan.spots) {
+        if (!sp.area) continue;
+        const A = { x1: sp.area.x1, x2: sp.area.x2, z1: Math.min(sp.area.z1, sp.area.z2), z2: Math.max(sp.area.z1, sp.area.z2) };
+        for (const [kind, n, wall] of ROOM_SETS[sp.label] || []) for (let i = 0; i < n; i++) place(kind, !!wall, A);
+        (WALL_SETS[sp.label] || []).forEach((kind, i) => {
+          if (!PROP_KINDS.includes(kind)) return;
+          const g = makeProp(kind, Math.floor(lrnd() * 1e6));
+          const back = i % 2 === 0;
+          const x = A.x1 + 0.6 + lrnd() * Math.max(0, A.x2 - A.x1 - 1.2);
+          g.position.set(x, kind === 'curtain' ? 0.9 : 1.45, back ? A.z1 + 0.09 : A.z2 - 0.09);
+          g.rotation.y = back ? 0 : Math.PI;
+          statics.add(g);
+        });
+      }
+      // Things on tables: mail, dishes. Chairs around the table if the model has none.
+      for (const f of plan.fixtures) {
+        if (f.type !== 'table') continue;
+        for (const [kind, dx] of [['mail_pile', -0.25], ['dish_stack', 0.25]]) {
+          if (!PROP_KINDS.includes(kind) || lrnd() < 0.3) continue;
+          const g = makeProp(kind, Math.floor(lrnd() * 1e6));
+          g.position.set(f.x + dx, f.h, f.z + (lrnd() - 0.5) * 0.4);
+          g.rotation.y = lrnd() * Math.PI;
+          statics.add(g);
+        }
+      }
+    } else for (const [kind, n, wall] of SETS[plan.cat] || SETS.house) for (let i = 0; i < n; i++) place(kind, !!wall);
     // On top of fixtures: registers on checkouts, things on kitchen counters.
     for (const f of plan.fixtures) {
       if (f.type === 'checkout') { const g = makeProp('register', Math.floor(f.x * 100)); g.position.set(f.x, f.h, f.z - f.d / 4); g.rotation.y = Math.PI / 2; statics.add(g); }
@@ -469,6 +542,9 @@ export function openInside(opts) {
   }
 
   mergeStatics(statics);
+  // look3d's lamps, decals, notices and shades never move: merge them by material too.
+  // Lights, dust points and sprites stay where they are.
+  mergeInPlace(lk.group);
 
   // ---------- items to pick up ----------
   // Each item from the engine gets a place: on a shelf face in its aisle, or on furniture / the floor in its room.
@@ -570,7 +646,19 @@ export function openInside(opts) {
       obj.position.set(p.x, p.y, p.z);
       obj.rotation.y = (hashString(it.pid) % 628) / 100;
       // Loot is a little brighter than the room, so the eye finds it.
-      obj.traverse((m) => { if (m.isMesh && m.material && m.material.emissive) { m.material = m.material.clone(); m.material.emissive.setHex(notice.lootGlow >= 1 ? 0x4a4a4a : notice.lootGlow > 0 ? 0x363636 : 0x222222); } });
+      // The item lights itself with its own colors (emissive map = its texture), so it stays
+      // bright and saturated in a dim store and reads above the darker shelf stock.
+      const glow = 0.32 + 0.18 * notice.lootGlow;
+      obj.traverse((m) => {
+        if (!m.isMesh || !m.material) return;
+        const fix = (mt) => {
+          if (!mt.emissive) return mt;
+          const c = mt.clone();
+          if (c.map) { c.emissiveMap = c.map; c.emissive.setRGB(glow, glow, glow); } else c.emissive.copy(c.color).multiplyScalar(glow);
+          return c;
+        };
+        m.material = Array.isArray(m.material) ? m.material.map(fix) : fix(m.material);
+      });
       scene.add(obj);
       const h = obj.userData.height || 0.2;
       itemObjs.set(it.pid, { it, obj, x: p.x, y: p.y + h / 2, z: p.z, r: obj.userData.radius || 0.15 });
@@ -664,6 +752,30 @@ export function openInside(opts) {
   let current = null;
   let panel = null; // name of the open panel
   let debugOn = false;
+  // Diagnostics overlay (F3 or `): FPS, frame ms, ms per part of the frame, renderer counts and
+  // an estimate of GPU memory. Off by default; updates 4 times a second. Budget: 33.3 ms (30 FPS).
+  const diag = {
+    acc: { game: 0, look: 0, cull: 0, render: 0 }, n: 0, worst: 0, last: 0, mb: 0, mbAt: -1e9,
+    sample(dt, parts) {
+      for (const k in parts) this.acc[k] += parts[k];
+      this.n += 1;
+      this.worst = Math.max(this.worst, dt * 1000);
+      const now = performance.now();
+      if (now - this.last < 250) return;
+      this.last = now;
+      if (now - this.mbAt > 2000) { this.mb = estimateMB(scene); this.mbAt = now; }
+      const avg = (k) => (this.acc[k] / Math.max(1, this.n)).toFixed(1);
+      const ms = 1000 / Math.max(1, fps);
+      const ri = renderer.info;
+      $('.in-debug').textContent = [
+        `${fps.toFixed(0)} fps  ${ms.toFixed(1)} ms (worst ${this.worst.toFixed(0)})  budget 33.3 ms  q:${quality}`,
+        `game ${avg('game')}  light ${avg('look')}  cull ${avg('cull')}  render ${avg('render')} ms (CPU)`,
+        `${ri.render.calls} calls  ${(ri.render.triangles / 1000).toFixed(0)}k tris  ${ri.memory.geometries} geo  ${ri.memory.textures} tex  ~${this.mb.toFixed(0)} MB`,
+        `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${itemObjs.size} items`,
+      ].join('\n');
+      this.acc = { game: 0, look: 0, cull: 0, render: 0 }; this.n = 0; this.worst = 0;
+    },
+  };
   let fps = 0;
   const stick = { x: 0, y: 0, id: null, ox: 0, oy: 0 };
   let lookId = null;
@@ -1016,7 +1128,7 @@ export function openInside(opts) {
         return interact();
       case 'quicksave': return quickSave();
       case 'quickload': return quickLoad();
-      case 'debug': debugOn = !debugOn; $('.in-debug').hidden = !debugOn; return null;
+      case 'debug': debugOn = !debugOn; $('.in-debug').hidden = !debugOn; diag.last = 0; diag.mbAt = -1e9; return null;
       case 'ping': return ping();
       default:
         if (!k.ready) notYet(k);
@@ -1030,7 +1142,7 @@ export function openInside(opts) {
     if (closed) return;
     const code = e.code;
     // Keys that the browser would use for something else.
-    if (['Tab', 'F5', 'F9', 'Space', 'Backquote', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code) || (e.ctrlKey && code !== 'KeyW')) e.preventDefault();
+    if (['Tab', 'F3', 'F5', 'F9', 'Space', 'Backquote', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code) || (e.ctrlKey && code !== 'KeyW')) e.preventDefault();
     if (code === 'Escape') {
       if (foundOpen()) { showFound(null); return; }
       if (panel) { closePanel(); return; }
@@ -1192,6 +1304,7 @@ export function openInside(opts) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     fps = fps * 0.9 + (dt > 0 ? 1 / dt : 0) * 0.1;
+    const tFrame = performance.now();
     const moving = !paused && !busy && !panel && !hold;
     if (moving) {
       let mx = 0;
@@ -1277,9 +1390,10 @@ export function openInside(opts) {
         nEl.hidden = k === 0;
         nEl.textContent = `You notice ${k} item${k === 1 ? '' : 's'} near you`;
       } else nEl.hidden = true;
-      if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps  ${(1000 / Math.max(1, fps)).toFixed(1)} ms  ${renderer.info.render.calls} calls  ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris  ${renderer.info.memory.geometries} geo  ${renderer.info.memory.textures} tex  q:${quality}`;
     }
+    const tLogic = performance.now();
     lk.update(dt, camera.position);
+    const tLook = performance.now();
     // Shelf products far away are hidden (fog hides them anyway): saves draw calls and triangles.
     for (const face of shelfFaces) {
       if (!face.group) continue;
@@ -1290,13 +1404,16 @@ export function openInside(opts) {
       face.group.visible = inRows ? dx * face.side > 0 && Math.abs(dx) < 3.2 : Math.hypot(dx, dz) < (quality === 'high' ? 11 : 8);
     }
     for (const o of itemObjs.values()) o.obj.visible = Math.hypot(o.x - camera.position.x, o.z - camera.position.z) < CULL_M;
+    const tCull = performance.now();
     renderer.render(scene, camera);
+    const tEnd = performance.now();
+    if (debugOn) diag.sample(dt, { game: tLogic - tFrame, look: tLook - tLogic, cull: tCull - tLook, render: tEnd - tCull });
     requestAnimationFrame(frame);
   }
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
+  window.__llInside = { scene, renderer, plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
   return { close: () => leave() };
 }
@@ -1334,6 +1451,51 @@ function itemModel(id) {
 
 // Merge every mesh under root into one mesh per material (world transforms baked in).
 // Meshes that use other features (instancing, skinning, sprites) are left as they are.
+// Rough GPU memory: vertex/index buffers plus textures (w × h × 4 bytes, +1/3 for mipmaps).
+function estimateMB(scene) {
+  const geos = new Set();
+  const texs = new Set();
+  scene.traverse((o) => {
+    if (o.geometry) geos.add(o.geometry);
+    const mats = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of mats) for (const k of ['map', 'normalMap', 'roughnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap']) if (m[k]) texs.add(m[k]);
+  });
+  let bytes = 0;
+  for (const g of geos) {
+    for (const a of Object.values(g.attributes)) bytes += a.array.byteLength;
+    if (g.index) bytes += g.index.array.byteLength;
+  }
+  for (const t of texs) { const im = t.image; if (im && im.width) bytes += im.width * im.height * 4 * 1.33; }
+  if (scene.environment && scene.environment.image) bytes += 256 * 256 * 6 * 8;
+  return bytes / 1048576;
+}
+
+function mergeInPlace(root) {
+  root.updateMatrixWorld(true);
+  const buckets = new Map();
+  const merged = [];
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material) || o.children.length) return;
+    const g = o.geometry;
+    const key = `${o.material.uuid}|${Object.keys(g.attributes).sort().join(',')}|${o.castShadow ? 1 : 0}|${o.receiveShadow ? 1 : 0}|${o.renderOrder}`;
+    let b = buckets.get(key);
+    if (!b) buckets.set(key, b = { mat: o.material, cast: o.castShadow, recv: o.receiveShadow, order: o.renderOrder, geos: [], src: [] });
+    b.src.push(o);
+  });
+  for (const b of buckets.values()) {
+    if (b.src.length < 2) continue;
+    const geos = b.src.map((o) => { const c = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); c.applyMatrix4(o.matrixWorld); return c; });
+    const geo = mergeGeometries(geos);
+    if (!geo) continue;
+    for (const o of b.src) o.parent.remove(o);
+    const m = new Mesh(geo, b.mat);
+    m.castShadow = b.cast; m.receiveShadow = b.recv; m.renderOrder = b.order;
+    merged.push(m);
+  }
+  // root's own transform is applied to its children: put merged world-space meshes under an identity parent.
+  for (const m of merged) { m.matrixAutoUpdate = false; m.matrix.copy(root.matrixWorld).invert(); root.add(m); }
+}
+
 function mergeStatics(root) {
   root.updateMatrixWorld(true);
   const buckets = new Map();

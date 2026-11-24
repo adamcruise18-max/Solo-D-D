@@ -1293,7 +1293,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
 
   const bg = dark ? 0x040506 : night ? 0x05070b : 0x3a4148;
   scene.background = new Color(bg);
-  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : 0x4a525a, dark ? 0.085 : night ? 0.07 : 0.035);
+  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : 0x4a525a, dark ? (night ? 0.085 : 0.065) : night ? 0.07 : 0.035);
 
   // A tiny environment map: a dim room with a bright doorway toward +z. Glossy floors,
   // puddles, glass and metal reflect it instead of rendering black.
@@ -1328,8 +1328,9 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   // Fill light: what bounces around the room. Low in the dark so the flashlight matters.
   let fill = null;
   if (opts.fill !== false) {
+    // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(0x6e7f96, 0x17130f, 0.55)
+      ? new HemisphereLight(0x7a8aa0, 0x1d1813, night ? 0.55 : 0.95)
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
         : new HemisphereLight(0xd6dee8, 0x8c877e, 1.5);
