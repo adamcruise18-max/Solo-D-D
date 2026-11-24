@@ -1,6 +1,8 @@
 // Save in the browser. One life per run: the game saves after each action,
 // so there is no older save to go back to. Export/import gives a backup file.
 import { SAVE_VERSION } from './state.js';
+import { migrate } from '../core/save.js';
+import { gameSystems } from './systems.js';
 
 const KEY = 'lastlight.save.v1';
 const RUNS_KEY = 'lastlight.runs.v1';
@@ -28,7 +30,9 @@ export function loadGame() {
 export function parseSave(raw) {
   const st = JSON.parse(raw);
   if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error('Not a Last Light save file');
-  return st;
+  // Upgrade each system's fields. A save from before the engine has no
+  // systemVersions: its weather and legacy fields are version 1 already.
+  return migrate(st, { systems: gameSystems() });
 }
 
 export function clearGame() {

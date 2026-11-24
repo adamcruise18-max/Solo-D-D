@@ -46,6 +46,36 @@ try {
   await page.waitForTimeout(1500);
   check(errors.length === 0, `game page loads with no script errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
 
+  // Live play: time moves through the engine clock and the weather system.
+  // Start a run, sleep 10 h twice (past 5 AM), and read the autosave.
+  const play = await (async () => {
+    await page.evaluate(() => localStorage.removeItem('lastlight.save.v1'));
+    await page.reload({ waitUntil: 'load' });
+    await page.waitForTimeout(800);
+    const start = page.locator('#startBtn');
+    if (await start.count()) await start.click();
+    const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lastlight.save.v1') || 'null'));
+    const before = await read();
+    for (let i = 0; i < 2; i++) {
+      await page.locator('[data-act="sleep"]').first().click();
+      await page.locator('[data-hours="10"]').click();
+      await page.waitForTimeout(300);
+      // Close any message (for example the dog) so the next click works.
+      for (const sel of ['#okName', '.modal .primary']) {
+        if (await page.locator(sel).count()) { await page.locator(sel).first().click().catch(() => {}); }
+      }
+    }
+    const after = await read();
+    return { before, after };
+  })().catch((e) => ({ error: String(e) }));
+  check(!play.error && play.before && play.after, `a new run starts and saves${play.error ? ': ' + play.error : ''}`);
+  if (play.after) {
+    check(play.after.systemVersions?.weather === 1, 'the live save has the weather system version');
+    check(play.after.time > play.before.time + 600, `sleeping moves time through the clock (${Math.round(play.before.time)} -> ${Math.round(play.after.time)} min)`);
+    check(play.after.weather.day > play.before.weather.day, `the weather system rolled a new day (day ${play.before.weather.day} -> ${play.after.weather.day})`);
+  }
+  check(errors.length === 0, `no script errors while playing${errors.length ? ': ' + errors.join(' | ') : ''}`);
+
   await page.addScriptTag({ url: '__core.js' });
   const r = await page.evaluate(async () => {
     const C = window.LLCore;

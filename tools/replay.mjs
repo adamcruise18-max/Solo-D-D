@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { newGame, dayIndex } from '../src/engine/state.js';
 import { hashString } from '../src/rng.js';
 import { loadPlaces, botTurn } from './bot.mjs';
+import { setDevChecks } from '../src/engine/systems.js';
 
 export const SEEDS = [42, 1234, 777];
 export const DAYS = 30;
@@ -88,6 +89,7 @@ export function replay(seed, days = DAYS, { trace = null } = {}) {
 
 export function replayAll({ withTrace = false } = {}) {
   loadPlaces();
+  setDevChecks(true); // a system that writes a field another system owns stops the replay
   const seeds = {};
   const traces = {};
   for (const seed of SEEDS) {
