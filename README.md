@@ -62,6 +62,16 @@ This is the **first playable version**: a small part of the full game.
 - The map marks places you visited but did not search fully (amber ring) and places with nothing left (grey).
 - The journal writes itself: one short entry for each day (where you went, what you took, what happened).
 
+### Clothes and wetness
+
+- Clothes go in layers: base, warm layer, shell, hat, gloves, boots and socks. One item per layer; a new
+  item swaps out the old one. The character panel (C) and the Vitals panel list each layer with Take off.
+- Each item has warmth (°F), wind block and "warm when wet". Wool, fleece and synthetics keep most heat
+  when wet; cotton and down lose half. A rain jacket is waterproof and blocks wind.
+- Wetness goes from 0 to 100%. Rain soaks you; a waterproof shell keeps most of it out (less in heavy rain).
+  Clothes dry inside: fast by the fire, slowly in a cold room. Wet clothes show as a risk warning.
+- Clothes come from houses (closets, dressers) and outdoor stores.
+
 ### Skills
 
 - You learn by doing. There are 5 skills with 5 levels each: Scavenging, Tinkering, First aid, Cooking and Survival.

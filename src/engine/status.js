@@ -77,6 +77,8 @@ export function risks(state) {
     const h = (p.warmth - 25) / -rate;
     out.push({ id: 'hypothermia', text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
   }
+  // Wet clothes: in a Portland winter, wet is the main danger.
+  if (p.wetness >= 50 && feltTemp(state, 'rest') < 60) out.push({ id: 'wet', text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
   if (p.water >= 25 && p.water < 40) out.push({ id: 'dehydration', text: 'Water is low: drink soon' });
   if (p.food >= 25 && p.food < 35) out.push({ id: 'hunger', text: 'Food is low: eat soon' });
   return out;

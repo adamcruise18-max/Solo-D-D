@@ -27,11 +27,16 @@
     batteries: { name: "Batteries (1 set)", unit: "set", weight: 0.2, kind: "batteries", portion: 1 },
     pry_bar: { name: "Pry bar", unit: "pc", weight: 3, kind: "tool" },
     backpack: { name: "Backpack", unit: "pc", weight: 1, kind: "tool" },
-    winter_coat: { name: "Winter coat", unit: "pc", weight: 3, kind: "wear", slot: "coat" },
-    winter_hat: { name: "Winter hat", unit: "pc", weight: 0.3, kind: "wear", slot: "hat" },
-    gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves" },
-    boots: { name: "Winter boots", unit: "pair", weight: 2.5, kind: "wear", slot: "boots" },
-    rain_jacket: { name: "Rain jacket", unit: "pc", weight: 1, kind: "wear", slot: "rain" },
+    winter_coat: { name: "Winter coat (down)", unit: "pc", weight: 3, kind: "wear", slot: "mid", warmth: 18, wind: 0.5, wetWarm: false, short: "winter coat" },
+    winter_hat: { name: "Winter hat (wool)", unit: "pc", weight: 0.3, kind: "wear", slot: "hat", warmth: 4, wetWarm: true, short: "hat" },
+    gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves", warmth: 3, wetWarm: false, short: "gloves" },
+    boots: { name: "Winter boots", unit: "pair", weight: 2.5, kind: "wear", slot: "boots", warmth: 4, wetWarm: true, short: "boots" },
+    rain_jacket: { name: "Rain jacket", unit: "pc", weight: 1, kind: "wear", slot: "shell", warmth: 3, wind: 0.8, wetWarm: true, waterproof: true, short: "rain jacket" },
+    thermal_underwear: { name: "Thermal underwear (synthetic)", unit: "set", weight: 0.5, kind: "wear", slot: "base", warmth: 6, wetWarm: true, short: "thermals" },
+    fleece_jacket: { name: "Fleece jacket", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 10, wind: 0.2, wetWarm: true, short: "fleece" },
+    wool_sweater: { name: "Wool sweater", unit: "pc", weight: 1.2, kind: "wear", slot: "mid", warmth: 9, wind: 0.2, wetWarm: true, short: "wool sweater" },
+    cotton_hoodie: { name: "Cotton hoodie", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 6, wind: 0.1, wetWarm: false, short: "hoodie" },
+    windbreaker: { name: "Windbreaker", unit: "pc", weight: 0.6, kind: "wear", slot: "shell", warmth: 2, wind: 0.7, wetWarm: true, short: "windbreaker" },
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
@@ -55,7 +60,7 @@
     blanket: { name: "Wool blanket", unit: "pc", weight: 3, kind: "misc", sleepWarm: 8 },
     sleeping_bag: { name: "Sleeping bag (winter)", unit: "pc", weight: 4, kind: "misc", sleepWarm: 15 },
     hand_warmers: { name: "Hand warmers", unit: "pair", weight: 0.1, kind: "warm", warmth: 15, portion: 1 },
-    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "wear", slot: "socks" },
+    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "wear", slot: "socks", warmth: 2, wetWarm: true, short: "wool socks" },
     trash_bags: { name: "Trash bags (box)", unit: "box", weight: 1, kind: "misc" },
     paper_map: { name: "Paper map of Portland", unit: "pc", weight: 0.2, kind: "misc" },
     toilet_paper: { name: "Toilet paper", unit: "roll", weight: 0.3, kind: "misc" },
@@ -123,7 +128,8 @@
         { id: "can_opener", w: 1 },
         { id: "cooking_pot", w: 1 },
         { id: "vitamins", w: 1 },
-        { id: "book_cooking", w: 0.6 }
+        { id: "book_cooking", w: 0.6 },
+        { id: "cotton_hoodie", w: 0.8 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
     },
@@ -337,7 +343,11 @@
         { id: "radio", w: 3 },
         { id: "matches", w: 4 },
         { id: "book_survival", w: 2 },
-        { id: "book_cooking", w: 1 }
+        { id: "book_cooking", w: 1 },
+        { id: "thermal_underwear", w: 6 },
+        { id: "fleece_jacket", w: 6 },
+        { id: "wool_sweater", w: 3 },
+        { id: "windbreaker", w: 3 }
       ],
       entryText: "Racks of jackets and boots. This place has good winter gear."
     },
@@ -364,7 +374,8 @@
         { id: "radio", w: 3 },
         { id: "energy_bar", w: 6 },
         { id: "book_first_aid", w: 1 },
-        { id: "book_survival", w: 0.5 }
+        { id: "book_survival", w: 0.5 },
+        { id: "thermal_underwear", w: 1 }
       ],
       entryText: "The engine bay is empty. The crews went out on calls and did not come back."
     },
@@ -422,7 +433,12 @@
         { id: "book_first_aid", w: 0.6 },
         { id: "book_repair", w: 0.6 },
         { id: "book_cooking", w: 0.8 },
-        { id: "book_survival", w: 0.4 }
+        { id: "book_survival", w: 0.4 },
+        { id: "thermal_underwear", w: 2 },
+        { id: "wool_sweater", w: 3 },
+        { id: "cotton_hoodie", w: 4 },
+        { id: "fleece_jacket", w: 2 },
+        { id: "windbreaker", w: 1 }
       ]
     }
   };
@@ -645,7 +661,8 @@
         wet: false,
         wetMinutes: 0,
         dryMinutes: 0,
-        worn: { coat: false, hat: false, gloves: false, boots: false, rain: false },
+        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
+        wetness: 0,
         injuries: [],
         illness: { stomachH: 0, infection: null },
         painH: 0,
@@ -1212,16 +1229,74 @@
     };
   }
 
+  // src/engine/clothes.js
+  var SLOTS = ["base", "mid", "shell", "hat", "gloves", "boots", "socks"];
+  var SLOT_NAMES = { base: "Base layer", mid: "Warm layer", shell: "Shell", hat: "Hat", gloves: "Gloves", boots: "Boots", socks: "Socks" };
+  var NORMAL_CLOTHES = { warmth: 10, wind: 0.1, wetWarm: false };
+  var OLD = { coat: ["mid", "winter_coat"], rain: ["shell", "rain_jacket"], hat: ["hat", "winter_hat"], gloves: ["gloves", "gloves"], boots: ["boots", "boots"], socks: ["socks", "wool_socks"] };
+  var WET_LIMIT = 50;
+  function normalizeWorn(p) {
+    const w = p.worn || {};
+    if (!w._v) {
+      const next = { _v: 2 };
+      for (const s of SLOTS) next[s] = false;
+      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next[slot] = id;
+      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next[s] = w[s];
+      p.worn = next;
+    }
+    if (typeof p.wetness !== "number") p.wetness = p.wet ? 80 : 0;
+    return p.worn;
+  }
+  function wornItems(p) {
+    const w = normalizeWorn(p);
+    return SLOTS.filter((s) => w[s]).map((s) => ({ slot: s, id: w[s], it: ITEMS[w[s]] }));
+  }
+  function clothingWarmth(p) {
+    const wet = Math.min(1, (p.wetness ?? (p.wet ? 80 : 0)) / 100);
+    const part = (warmth, wetWarm) => warmth * (wetWarm ? 1 - 0.15 * wet : 1 - 0.5 * wet);
+    let r = part(NORMAL_CLOTHES.warmth, false);
+    for (const { it } of wornItems(p)) r += part(it.warmth || 0, !!it.wetWarm);
+    return r;
+  }
+  function windBlock(p) {
+    return Math.max(NORMAL_CLOTHES.wind, ...wornItems(p).map(({ it }) => it.wind || 0));
+  }
+  function wetGainPerHour(p, weatherType, wetAfter) {
+    if (!wetAfter) return 0;
+    const base2 = WET_LIMIT / wetAfter * 60;
+    const shell = wornItems(p).find(({ slot }) => slot === "shell");
+    if (shell && shell.it.waterproof) return base2 * (weatherType === "heavy_rain" ? 0.4 : 0.1);
+    return base2;
+  }
+  function dryPerHour(temp, byFire) {
+    if (byFire) return 40;
+    if (temp >= 55) return 15;
+    if (temp >= 40) return 6;
+    return 2;
+  }
+  function putOn(p, id) {
+    const it = ITEMS[id];
+    if (!it || it.kind !== "wear" || !SLOTS.includes(it.slot)) return null;
+    const w = normalizeWorn(p);
+    const old = w[it.slot] || null;
+    w[it.slot] = id;
+    return old;
+  }
+  function takeOff(p, slot) {
+    const w = normalizeWorn(p);
+    const old = w[slot] || null;
+    w[slot] = false;
+    return old;
+  }
+  function wornText(p) {
+    const list = wornItems(p).map(({ it }) => it.short || it.name.toLowerCase());
+    return list.length ? list.join(", ") : "normal clothes";
+  }
+
   // src/engine/tick.js
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
-    const w = state2.player.worn;
-    let r = 10;
-    if (w.coat && w.hat && w.gloves && w.boots) r = 40;
-    else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
-    if (w.socks) r += 2;
-    if (state2.player.wet) r /= 2;
-    return r;
+    return clothingWarmth(state2.player);
   }
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
@@ -1241,7 +1316,7 @@
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
     let felt = env.temp + clothingRating(state2);
-    if (env.outside) felt -= env.wind / 10 * 5;
+    if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
     if (mode === "sleep") {
       if (env.home) felt += 10;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
@@ -1282,23 +1357,13 @@
     const sleeping = mode === "sleep";
     const working = mode === "walk" || mode === "work" || mode === "heavy";
     const wx = weatherInfo(state2);
-    if (env.outside && wx.wetAfter && !(p.worn.rain && state2.weather.type !== "heavy_rain")) {
-      p.wetMinutes += dt * 60;
-      if (!p.wet && p.wetMinutes >= wx.wetAfter) {
-        p.wet = true;
-        log(state2, "Your clothes are wet through. Wet clothes keep only half the heat.", "warn");
-      }
-    } else if (p.wet && !env.outside && env.temp >= 55) {
-      p.dryMinutes += dt * 60;
-      if (p.dryMinutes >= 240) {
-        p.wet = false;
-        p.wetMinutes = 0;
-        p.dryMinutes = 0;
-        log(state2, "Your clothes are dry again.");
-      }
-    } else if (!env.outside) {
-      p.wetMinutes = 0;
-    }
+    normalizeWorn(p);
+    const wasWet = p.wetness >= WET_LIMIT;
+    if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
+    p.wet = p.wetness >= WET_LIMIT;
+    if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
+    if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
     const felt = feltTemp(state2, mode, env);
     p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
     const cold = p.warmth < 50;
@@ -1675,6 +1740,7 @@
       const h = (p.warmth - 25) / -rate;
       out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
     }
+    if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
     if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
     if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
     return out;
@@ -1943,14 +2009,10 @@
       case "med":
         return useMed(state2, id, bag);
       case "wear": {
-        const slot = it.slot;
-        if (p.worn[slot]) {
-          log(state2, `You already wear a ${it.name.toLowerCase()}.`);
-          return;
-        }
         addItem(bag, id, -1);
-        p.worn[slot] = true;
-        log(state2, `You put on the ${it.name.toLowerCase()}.`);
+        const old = putOn(p, id);
+        if (old) addItem(bag, old, 1);
+        log(state2, old ? `You take off the ${itemName(old).toLowerCase()} and put on the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`);
         advanceTime(state2, 3);
         return;
       }
@@ -2798,6 +2860,14 @@
     }
     return acts;
   }
+  function takeOffSlot(state2, slot) {
+    const old = takeOff(state2.player, slot);
+    if (!old) return false;
+    addItem(state2.carried, old, 1);
+    log(state2, `You take off the ${itemName(old).toLowerCase()}.`);
+    advanceTime(state2, 2);
+    return true;
+  }
   function doAction(state2, id, arg) {
     if (state2.dead) return;
     switch (id) {
@@ -2825,6 +2895,8 @@
         return seeZone(state2, Number(arg));
       case "open_container":
         return openContainer(state2, String(arg));
+      case "take_off":
+        return takeOffSlot(state2, String(arg));
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -3940,9 +4012,26 @@
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
   }
+  function clothesHtml() {
+    const p = state.player;
+    normalizeWorn(p);
+    const rows = SLOTS.map((sl) => {
+      const id = p.worn[sl];
+      const it = id && ITEMS[id];
+      const tags = it ? [`+${it.warmth || 0}\xB0F`, it.wind ? `wind ${Math.round(it.wind * 100)}%` : "", it.waterproof ? "waterproof" : "", it.wetWarm ? "warm when wet" : "cold when wet"].filter(Boolean).join(" \xB7 ") : "";
+      return `<li><span>${esc(SLOT_NAMES[sl])}</span><span class="q">${it ? esc(it.name) : "\u2014"}</span><span class="b">${it ? `<small>${esc(tags)}</small> <button class="small" data-use="${sl}" data-verb="take_off">Take off</button>` : ""}</span></li>`;
+    }).join("");
+    const out = environment(state, "walk");
+    const feltOut = Math.round(feltTemp(state, "walk", out));
+    return `<h5>Clothes</h5><ul class="inv wear">${rows}</ul>
+    <p class="hint">Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F here \xB7 ${feltOut}\xB0F outside now \xB7 Wet ${Math.round(p.wetness || 0)}%${p.wet ? " (wet through: cotton and down lose heat)" : ""}</p>`;
+  }
   var skillsOpen = false;
+  var clothesOpen = false;
   document.addEventListener("toggle", (e) => {
-    if (e.target.classList && e.target.classList.contains("skills")) skillsOpen = e.target.open;
+    if (!e.target.classList) return;
+    if (e.target.classList.contains("skills")) skillsOpen = e.target.open;
+    if (e.target.classList.contains("clothes")) clothesOpen = e.target.open;
   }, true);
   function skillsHtml(open) {
     const rows = allSkills(state).map((k) => {
@@ -3966,9 +4055,9 @@
     const felt = Math.round(feltTemp(state, "rest"));
     chips.push(["", `Feels like ${felt}\xB0F`]);
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
-    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket", socks: "wool socks" })[k]);
-    chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
-    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>` + skillsHtml(false);
+    if (p.wetness >= 10) chips.push([p.wetness >= 50 ? "bad" : "warn", `Wet ${Math.round(p.wetness)}%`]);
+    chips.push(["", `Wearing: ${wornText(p)}`]);
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
   }
   function renderLocation() {
     const loc = state.location;
@@ -4460,7 +4549,8 @@
       panel: (name) => insidePanel(name),
       useItem: (id, verb) => {
         const n0 = state.log.length;
-        act("use", id, verb, "carried");
+        if (verb === "take_off") act("action", "take_off", id);
+        else act("use", id, verb, "carried");
         return state.log.slice(n0).map((e) => e.text).join(" ");
       },
       quickUse: (action) => {
@@ -4620,10 +4710,9 @@
       if (p.illness.infection) notes.push("Infection");
       if (p.illness.stomachH > 0) notes.push("Stomach bug");
       if (p.wet) notes.push("Wet");
-      const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket", socks: "wool socks" })[k]);
       return `<h4>Character</h4>${rows}
       <p class="hint">${notes.length ? esc(notes.join(" \xB7 ")) : "No injuries or illness."}</p>
-      <p class="hint">Wearing: ${esc(worn.length ? worn.join(", ") : "normal clothes")} \xB7 Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F</p>
+      ${clothesHtml()}
       ${skillsHtml(true)}`;
     }
     if (name === "journal") {
@@ -4643,7 +4732,8 @@
         if (b.dataset.act === "sleep") return showSleep();
         if (b.dataset.act === "walk_in") return walkInside2();
         act("action", b.dataset.act);
-      } else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
+      } else if (b.dataset.use && b.dataset.verb === "take_off") act("action", "take_off", b.dataset.use);
+      else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
       else if (b.dataset.take) act("take", b.dataset.take);
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);

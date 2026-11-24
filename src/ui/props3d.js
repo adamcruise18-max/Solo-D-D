@@ -502,7 +502,10 @@ function texCardboard(variant = 0) {
 }
 // printed shipping carton with tape and arrows
 function texCarton(label = 'FRAGILE', seed = 0) {
-  return ctex('carton' + label + seed, 512, 512, (c, w, h, r) => {
+  return ctex('carton' + label + seed, 512, 512, (c, w, h, r) => drawCarton(c, w, h, r, label, seed));
+}
+function drawCarton(c, w, h, r, label, seed) {
+  {
     noiseFill(c, w, h, r, '#ad8653', 0.1, 4000, 2);
     c.strokeStyle = 'rgba(80,55,25,0.15)';
     for (let y = 0; y < h; y += 5 + r() * 3) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
@@ -520,7 +523,7 @@ function texCarton(label = 'FRAGILE', seed = 0) {
     c.strokeStyle = 'rgba(40,30,20,0.7)'; c.lineWidth = 3; c.strokeRect(w * 0.06, h * 0.62, w * 0.3, h * 0.2);
     finePrint(c, w * 0.08, h * 0.65, w * 0.26, 5, 10, r, 'rgba(40,30,20,0.6)');
     grime(c, w, h, r, 1.2);
-  });
+  }
 }
 function texWood(light = '#b98c5a', dark = '#8a5f35', key = '') {
   return ctex('wood' + light + dark + key, 256, 256, (c, w, h, r) => {
@@ -2285,7 +2288,7 @@ function roundLoop(corners, r = 0.04) {
 }
 function caster(g, x, z, r = 0.05) {
   add(g, gCyl(r, r, 0.03, 10), M.rubber, x + 0.015, r, z, 0, 0, Math.PI / 2);
-  add(g, gCyl(r * 0.5, r * 0.5, 0.032, 8), M.greyPl, x + 0.016, r, z, 0, 0, Math.PI / 2);
+  add(g, gCyl(r * 0.5, r * 0.5, 0.032, 8), M.steel, x + 0.016, r, z, 0, 0, Math.PI / 2);
   add(g, gBox(0.012, r * 1.4, 0.045), M.steel, x + 0.018, r * 0.9, z);
   add(g, gBox(0.012, r * 1.4, 0.045), M.steel, x - 0.018, r * 0.9, z);
   add(g, gBox(0.05, 0.012, 0.05), M.steel, x, r * 2.2, z);
@@ -2299,24 +2302,81 @@ function wheel(g, x, y, z, R, tire, rimMat, spokes = 0) {
 }
 function printedSign(key, w, h, draw) { return tmat(ctex(key, w, h, draw), 0.5); }
 
-function carton(g, w, h, d, r, open) {
-  const label = pick(r, ['FRAGILE', 'CANNED GOODS', 'PAPER TOWELS', 'BOTTLED WATER', 'SUPPLIES', 'HANDLE WITH CARE', 'PRODUCE', 'DRY GOODS']);
-  const t = tmat(texCarton(label, Math.floor(r() * 4)), 0.9);
-  const plain = tmat(texCardboard(), 0.9);
-  const top = open ? col(0x2a2018, 0.95) : tmat(ctex('cartontop', 256, 256, (c, ww, hh, rr) => {
-    noiseFill(c, ww, hh, rr, '#a9824f', 0.1, 2500, 2);
-    c.fillStyle = 'rgba(40,25,10,0.5)'; c.fillRect(0, hh / 2 - 1, ww, 2);
-    c.fillStyle = 'rgba(200,170,110,0.8)'; c.fillRect(0, hh * 0.42, ww, hh * 0.16);
-    c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(0, hh * 0.44, ww, 3);
-    grime(c, ww, hh, rr, 1);
-  }), 0.85);
-  add(g, gBox(w, h, d), [t, t, top, plain, t, t]);
+// One shared carton atlas (4 x 4 cells of 256 px): 0-7 printed sides, 8 plain board,
+// 9 light board (flaps), 10 taped top, 11 dark inside. Every carton uses the same material.
+const CARTON_LABELS = ['FRAGILE', 'CANNED GOODS', 'PAPER TOWELS', 'BOTTLED WATER', 'SUPPLIES', 'HANDLE WITH CARE', 'PRODUCE', 'DRY GOODS'];
+function cartonMat() {
+  return mat('cartonAtlas', { map: ctex('cartonAtlas', 1024, 1024, (c, w, h, r) => {
+    const cell = (i, draw) => { c.save(); c.translate((i % 4) * 256, Math.floor(i / 4) * 256); c.beginPath(); c.rect(0, 0, 256, 256); c.clip(); draw(); c.restore(); };
+    CARTON_LABELS.forEach((lb, i) => cell(i, () => { c.scale(0.5, 0.5); drawCarton(c, 512, 512, r, lb, i % 4); }));
+    cell(8, () => { noiseFill(c, 256, 256, r, '#a9824f', 0.12, 3000, 2); c.strokeStyle = 'rgba(80,55,25,0.18)'; for (let y = 0; y < 256; y += 4 + r() * 3) { c.beginPath(); c.moveTo(0, y); c.lineTo(256, y); c.stroke(); } grime(c, 256, 256, r, 0.6); });
+    cell(9, () => { noiseFill(c, 256, 256, r, '#b99868', 0.12, 3000, 2); grime(c, 256, 256, r, 0.6); });
+    cell(10, () => {
+      noiseFill(c, 256, 256, r, '#a9824f', 0.1, 2500, 2);
+      c.fillStyle = 'rgba(40,25,10,0.5)'; c.fillRect(0, 127, 256, 2);
+      c.fillStyle = 'rgba(200,170,110,0.8)'; c.fillRect(0, 107, 256, 41);
+      c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(0, 113, 256, 3);
+      grime(c, 256, 256, r, 1);
+    });
+    cell(11, () => { c.fillStyle = '#2a2018'; c.fillRect(0, 0, 256, 256); grime(c, 256, 256, r, 0.5); });
+  }), roughness: 0.9 });
 }
+function cartonCell(i) { const x = i % 4, y = Math.floor(i / 4); return [x / 4 + 0.002, 1 - (y + 1) / 4 + 0.002, (x + 1) / 4 - 0.002, 1 - y / 4 - 0.002]; }
+// box geometry (base at y = 0) with each face mapped into an atlas cell
+function gCellBox(w, h, d, cells) {
+  const key = `cbox${w.toFixed(3)},${h.toFixed(3)},${d.toFixed(3)},${cells.join('.')}`;
+  return cached(GEO, key, () => {
+    const g = new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0);
+    const uv = g.attributes.uv;
+    for (let f = 0; f < 6; f++) {
+      const rc = cartonCell(cells[f]);
+      for (let k = 0; k < 4; k++) { const n = f * 4 + k; uv.setXY(n, rc[0] + uv.getX(n) * (rc[2] - rc[0]), rc[1] + uv.getY(n) * (rc[3] - rc[1])); }
+    }
+    g.clearGroups();
+    return g;
+  });
+}
+function carton(g, w, h, d, r, open) {
+  const li = Math.floor(r() * CARTON_LABELS.length);
+  const q = (v) => Math.round(v * 50) / 50; // 2 cm steps keep the geometry cache small
+  add(g, gCellBox(q(w), q(h), q(d), [li, (li + 3) % 8, open ? 11 : 10, 8, li, (li + 5) % 8]), cartonMat());
+}
+
+
+// copy of a cached geometry with the UVs of chosen face groups squeezed into atlas rects ([u0, v0, u1, v1]; null keeps a group as is)
+function gRemap(base, key, rects) {
+  return cached(GEO, 'remap' + key, () => {
+    const g = base.clone();
+    const uv = g.attributes.uv, idx = g.index;
+    const groups = g.groups.length ? g.groups : [{ start: 0, count: idx ? idx.count : uv.count, materialIndex: 0 }];
+    const done = new Uint8Array(uv.count);
+    for (const gr of groups) {
+      const rc = rects[gr.materialIndex] ?? (gr.materialIndex === 0 ? rects[0] : null);
+      if (!rc) continue;
+      for (let k = gr.start; k < gr.start + gr.count; k++) {
+        const v = idx ? idx.getX(k) : k;
+        if (done[v]) continue; done[v] = 1;
+        uv.setXY(v, rc[0] + uv.getX(v) * (rc[2] - rc[0]), rc[1] + uv.getY(v) * (rc[3] - rc[1]));
+      }
+    }
+    return g;
+  });
+}
+// shared litter atlas: can label, soda label, snack wrapper (rows of a 512 x 512 canvas)
+function litterMat() {
+  return tmat(ctex('litteratlas', 512, 512, (c, w, h, r) => {
+    c.save(); drawWrap(c, 512, 170, CAN_LABELS[0], r); c.restore();
+    c.save(); c.translate(0, 170); drawWrap(c, 512, 170, { t: 'COLA', s: 'CLASSIC', n: '12 FL OZ', b: '#a8141a', f: '#fff', a: '#5a0a0a', p: 'bubble' }, r); c.restore();
+    c.save(); c.translate(0, 340); c.scale(4, 172 / 160); drawFront(c, 128, 160, { t: 'CHIPS', b: '#f2c21b', f: '#c41e1e', a: '#c41e1e', p: 'chip' }, r); c.restore();
+    grime(c, w, h, r, 1.5);
+  }), 0.45, 0.15);
+}
+const LITTER_ROWS = [[0, 1 - 170 / 512, 1, 1], [0, 1 - 340 / 512, 1, 1 - 170 / 512], [0, 0, 1, 1 - 340 / 512]];
 
 const PROP_BUILDERS = {
   shopping_cart(g, r) {
     const wm = wireMat();
-    const frame = col(0xc9cdd1, 0.3, 0.5);
+    const frame = M.steel;
     const bt = [[-0.27, 1.0, 0.45], [0.27, 1.0, 0.45], [0.25, 0.98, -0.45], [-0.25, 0.98, -0.45]];
     const bb = [[-0.23, 0.55, 0.38], [0.23, 0.55, 0.38], [0.19, 0.6, -0.36], [-0.19, 0.6, -0.36]];
     const quads = [
@@ -2340,7 +2400,7 @@ const PROP_BUILDERS = {
     const red = col(0xc4221c, 0.45);
     add(g, gCyl(0.016, 0.016, 0.58, 12), red, -0.29, 1.03, 0.5, 0, 0, -Math.PI / 2);
     for (const s of [-1, 1]) add(g, gCyl(0.008, 0.008, 0.06, 6), frame, s * 0.27, 1.0, 0.485, 0.7, 0, 0);
-    add(g, gBox(0.3, 0.06, 0.004), printedSign('cartplate', 256, 64, (c, w, h) => { c.fillStyle = '#c4221c'; c.fillRect(0, 0, w, h); txt(c, 'PLEASE RETURN CART', w / 2, h / 2, 22, { color: '#fff', maxW: w * 0.9 }); }), 0, 0.88, -0.455);
+    add(g, gBox(0.3, 0.06, 0.004), red, 0, 0.88, -0.455);
     for (const [x, z] of [[-0.2, -0.38], [0.2, -0.38], [-0.22, 0.4], [0.22, 0.4]]) caster(g, x, z, 0.055);
     if (r() < 0.4) { // tipped or turned
       g.rotation.y = r() * TAU;
@@ -2356,8 +2416,9 @@ const PROP_BUILDERS = {
     const top = [[-0.22, 0.22, 0.16], [0.22, 0.22, 0.16], [0.22, 0.22, -0.16], [-0.22, 0.22, -0.16]];
     const bot = [[-0.19, 0.0, 0.13], [0.19, 0.0, 0.13], [0.19, 0.0, -0.13], [-0.19, 0.0, -0.13]];
     add(g, gQuads('basket', [[bot[0], bot[1], top[1], top[0]], [bot[1], bot[2], top[2], top[1]], [bot[2], bot[3], top[3], top[2]], [bot[3], bot[0], top[0], top[3]]], 12), m);
-    add(g, gBox(0.38, 0.01, 0.26), col(new THREE.Color(color).getHex(), 0.5));
-    tubePath(g, 'basketrim2', roundLoop(top, 0.03), 0.01, col(new THREE.Color(color).getHex(), 0.45), true, 24);
+    const sr = [0.01, 0.02, 0.09, 0.98]; // solid strip of the hole tile
+    add(g, gRemap(gBox(0.38, 0.01, 0.26), 'basketbottom', [sr, sr, sr, sr, sr, sr]), [m, m, m, m, m, m]);
+    add(g, gRemap(gTube('basketrim2', roundLoop(top, 0.03), 0.01, 24, 6, true), 'basketrim', [sr]), m);
     for (const s of [-1, 1]) tubePath(g, 'baskethandle' + s, [[-0.2, 0.22, s * 0.16], [-0.12, 0.36, s * 0.06], [0.12, 0.36, s * 0.06], [0.2, 0.22, s * 0.16]], 0.009, M.blackPl, false, 16);
   },
   cardboard_box(g, r) {
@@ -2365,10 +2426,10 @@ const PROP_BUILDERS = {
     const open = r() < 0.5;
     carton(g, w, h, d, r, open);
     if (open) {
-      const fl = tmat(texCardboard(1), 0.9);
+      const fl = cartonMat();
       const flap = (x, z, ww, dd, ox, oz, rx, rz) => {
         const f = new THREE.Group();
-        add(f, gBox(ww, 0.004, dd), fl, ox, 0, oz);
+        add(f, gCellBox(+ww.toFixed(2), 0.004, +dd.toFixed(2), [9, 9, 9, 9, 9, 9]), fl, ox, 0, oz);
         f.position.set(x, h, z); f.rotation.set(rx, 0, rz);
         g.add(f);
       };
@@ -2429,7 +2490,7 @@ const PROP_BUILDERS = {
       s.computeVertexNormals();
       return s;
     });
-    const color = pick(r, [0x111214, 0x111214, 0x1f3a1f, 0x6a6a68]);
+    const color = pick(r, [0x111214, 0x111214, 0x1f3a1f]);
     const m = col(color, 0.3, 0.1);
     add(g, geo, m);
     add(g, gCyl(0.02, 0.06, 0.08, 8), m, 0, 0.38 + v * 0.0, 0);
@@ -2449,44 +2510,47 @@ const PROP_BUILDERS = {
       g.add(b);
     }
     // crushed cans, wrappers, flattened box and loose paper
-    const canLab = tmat(wrapTex(pick(r, CAN_LABELS), 512, 200), 0.5);
-    const soda = tmat(wrapTex({ t: 'COLA', s: 'CLASSIC', n: '12 FL OZ', b: '#a8141a', f: '#fff', a: '#5a0a0a', p: 'bubble' }, 512, 150), 0.35, 0.3);
-    const wrap = tmat(frontTex({ t: 'CHIPS', b: '#f2c21b', f: '#c41e1e', a: '#c41e1e', p: 'chip' }, 128, 160), 0.35, 0.3);
+    const lit = litterMat();
     for (let i = 0; i < 7; i++) {
       const a = r() * TAU, d = 0.4 + r() * 0.6;
       const k = i % 3;
-      if (k === 2) add(g, gPillow(0.12, 0.16, 0.02, 0.06, 4, 5), wrap, Math.cos(a) * d, 0.01, Math.sin(a) * d, -Math.PI / 2, 0, r() * 3);
-      else add(g, gCyl(k ? 0.033 : 0.038, k ? 0.033 : 0.038, k ? 0.122 : 0.11, 10), [k ? soda : canLab, M.tin, M.tin], Math.cos(a) * d, k ? 0.033 : 0.038, Math.sin(a) * d, Math.PI / 2, 0, r() * TAU, 1, r() < 0.5 ? 0.6 : 1, 1);
+      if (k === 2) add(g, gRemap(gPillow(0.12, 0.16, 0.02, 0.06, 4, 5), 'litwrap', [LITTER_ROWS[2]]), lit, Math.cos(a) * d, 0.01, Math.sin(a) * d, -Math.PI / 2, 0, r() * 3);
+      else add(g, gRemap(gCyl(k ? 0.033 : 0.038, k ? 0.033 : 0.038, k ? 0.122 : 0.11, 10), 'litcan' + k, [LITTER_ROWS[k], null, null]), [lit, M.tin, M.tin], Math.cos(a) * d, k ? 0.033 : 0.038, Math.sin(a) * d, Math.PI / 2, 0, r() * TAU, 1, r() < 0.5 ? 0.6 : 1, 1);
     }
-    add(g, gBox(0.5, 0.008, 0.4), [tmat(texCardboard(), 0.9), tmat(texCardboard(), 0.9), tmat(texCarton('PAPER TOWELS', 1), 0.9), tmat(texCardboard(), 0.9), tmat(texCardboard(), 0.9), tmat(texCardboard(), 0.9)], -0.6, 0.004, 0.4, 0, r() * 2, 0.05);
+    add(g, gCellBox(0.5, 0.008, 0.4, [8, 8, 2, 8, 8, 8]), cartonMat(), -0.6, 0.004, 0.4, 0, r() * 2, 0.05);
     const p = makeProp('paper_scatter', Math.floor(r() * 1000));
     p.scale.setScalar(0.6);
     g.add(p);
   },
   register(g) {
-    // countertop checkout terminal: screen on a pole, keypad, card reader, receipt printer, cash drawer
-    const dk = col(0x2a2b2e, 0.45);
-    const screen = tmat(ctex('posscreen', 256, 192, (c, w, h, rr) => {
-      c.fillStyle = '#0c0f12'; c.fillRect(0, 0, w, h);
+    // countertop checkout terminal; every part maps into one shared 512 x 256 atlas (1 material)
+    const A = tmat(ctex('registeratlas', 512, 256, (c, w, h, rr) => {
+      c.fillStyle = '#0c0f12'; c.fillRect(0, 0, 256, 192); // screen
       c.fillStyle = 'rgba(120,140,160,0.12)';
-      for (let i = 0; i < 6; i++) c.fillRect(12, 14 + i * 26, w * 0.55, 16);
-      for (let i = 0; i < 8; i++) c.fillRect(w * 0.66 + (i % 2) * 40, 14 + Math.floor(i / 2) * 40, 34, 32);
-      c.fillStyle = 'rgba(255,255,255,0.05)'; c.beginPath(); c.moveTo(0, 0); c.lineTo(w * 0.5, 0); c.lineTo(0, h * 0.7); c.fill();
+      for (let i = 0; i < 6; i++) c.fillRect(12, 14 + i * 26, 140, 16);
+      for (let i = 0; i < 8; i++) c.fillRect(169 + (i % 2) * 40, 14 + Math.floor(i / 2) * 40, 34, 32);
+      c.fillStyle = 'rgba(255,255,255,0.05)'; c.beginPath(); c.moveTo(0, 0); c.lineTo(128, 0); c.lineTo(0, 134); c.fill();
+      c.fillStyle = '#2a2b2e'; c.fillRect(256, 0, 256, 64); c.fillStyle = '#111'; c.fillRect(264, 6, 240, 2); c.fillRect(364, 32, 40, 6); c.fillStyle = '#888'; c.beginPath(); c.arc(482, 32, 6, 0, TAU); c.fill(); // drawer
+      c.fillStyle = '#333'; c.fillRect(256, 64, 256, 96); for (let y = 0; y < 4; y++) for (let x = 0; x < 12; x++) { c.fillStyle = (x > 8 && y < 3) ? '#5a5a5a' : '#cfcfcf'; c.fillRect(262 + x * 20.5, 70 + y * 22, 17, 18); } // keys
+      c.fillStyle = '#2a2b2e'; c.fillRect(256, 160, 64, 96); c.fillStyle = '#dcdcd8'; c.fillRect(320, 160, 64, 96); c.fillStyle = '#f0ece2'; c.fillRect(384, 160, 64, 96); c.fillStyle = '#14181c'; c.fillRect(448, 160, 64, 96);
+      c.fillStyle = '#2a2b2e'; c.fillRect(0, 192, 256, 64);
       grime(c, w, h, rr, 1.5);
-    }), 0.15, 0.1);
-    add(g, gBox(0.44, 0.1, 0.42), [dk, dk, dk, dk, tmat(ctex('drawer', 256, 64, (c, w, h) => { c.fillStyle = '#2a2b2e'; c.fillRect(0, 0, w, h); c.fillStyle = '#111'; c.fillRect(8, 6, w - 16, 2); c.fillRect(w / 2 - 20, h / 2, 40, 6); c.fillStyle = '#888'; c.beginPath(); c.arc(w - 30, h / 2, 6, 0, TAU); c.fill(); }), 0.5), dk], 0, 0, 0);
-    add(g, gCyl(0.025, 0.04, 0.2, 10), dk, 0.0, 0.1, -0.05);
+    }), 0.45, 0.05);
+    const U = (x, y, ww, hh) => [x / 512, 1 - (y + hh) / 256, (x + ww) / 512, 1 - y / 256];
+    const dk = U(262, 166, 52, 84), grey = U(326, 166, 52, 84), paper = U(390, 166, 52, 84), glass = U(454, 166, 52, 84);
+    const scr = U(0, 0, 256, 192), drw = U(256, 0, 256, 64), keys = U(256, 64, 256, 96);
+    const AA = [A, A, A, A, A, A];
+    add(g, gRemap(gBox(0.44, 0.1, 0.42), 'regbase', [dk, dk, dk, dk, drw, dk]), AA, 0, 0, 0);
+    add(g, gRemap(gCyl(0.025, 0.04, 0.2, 10), 'regpole', [dk, dk, dk]), AA, 0.0, 0.1, -0.05);
     const head = new THREE.Group();
-    add(head, gRBox(0.38, 0.28, 0.05, 0.012), [dk, dk, dk, dk, screen, dk]);
+    add(head, gRemap(gRBox(0.38, 0.28, 0.05, 0.012), 'reghead', [dk, dk, dk, dk, scr, dk]), AA);
     head.position.set(0, 0.28, -0.05); head.rotation.x = -0.25;
     g.add(head);
-    add(g, gRBox(0.3, 0.03, 0.12, 0.008), tmat(ctex('keys', 256, 96, (c, w, h) => { c.fillStyle = '#333'; c.fillRect(0, 0, w, h); for (let y = 0; y < 4; y++) for (let x = 0; x < 12; x++) { c.fillStyle = (x > 8 && y < 3) ? '#5a5a5a' : '#cfcfcf'; c.fillRect(6 + x * 20.5, 6 + y * 22, 17, 18); } }), 0.5), 0, 0.1, 0.13, 0.15, 0, 0);
-    // card reader with stylus
-    add(g, gRBox(0.09, 0.05, 0.14, 0.01), dk, 0.3, 0, 0.1, 0.4, -0.3, 0);
-    add(g, gBox(0.07, 0.001, 0.06), mat('readerscreen', { color: 0x14181c, roughness: 0.1 }), 0.3, 0.052, 0.095, 0.4, -0.3, 0);
-    // receipt printer with paper curl
-    add(g, gRBox(0.15, 0.13, 0.18, 0.02), col(0xdcdcd8, 0.5), -0.3, 0, -0.02);
-    add(g, gBox(0.08, 0.001, 0.12), M.paper, -0.3, 0.135, 0.11, -0.5, 0, 0);
+    add(g, gRemap(gRBox(0.3, 0.03, 0.12, 0.008), 'regkeys', [keys, keys, keys, keys, keys, keys]), AA, 0, 0.1, 0.13, 0.15, 0, 0);
+    add(g, gRemap(gRBox(0.09, 0.05, 0.14, 0.01), 'regreader', [dk, dk, dk, dk, dk, dk]), AA, 0.3, 0, 0.1, 0.4, -0.3, 0);
+    add(g, gRemap(gBox(0.07, 0.001, 0.06), 'regrscreen', [glass, glass, glass, glass, glass, glass]), AA, 0.3, 0.052, 0.095, 0.4, -0.3, 0);
+    add(g, gRemap(gRBox(0.15, 0.13, 0.18, 0.02), 'regprinter', [grey, grey, grey, grey, grey, grey]), AA, -0.3, 0, -0.02);
+    add(g, gRemap(gBox(0.08, 0.001, 0.12), 'regpaper', [paper, paper, paper, paper, paper, paper]), AA, -0.3, 0.135, 0.11, -0.5, 0, 0);
   },
   price_strip(g, r) {
     const t = ctex('pricestrip', 1024, 48, (c, w, h, rr) => {
@@ -2654,14 +2718,14 @@ const PROP_BUILDERS = {
     add(g, gRBox(0.36, 0.03, 0.36, 0.02), col(0xd0501a, 0.8));
   },
   mop_bucket(g, r) {
-    const y = col(0xf2c21b, 0.5);
+    const y = col(0xf2c21b, 0.45); // same yellow as the wet floor sign
     add(g, gRBox(0.46, 0.32, 0.34, 0.05), y, 0, 0.06, 0);
     add(g, gBox(0.38, 0.002, 0.26), mat('dirtywater', { color: 0x4a4636, roughness: 0.1, metalness: 0.2 }), 0, 0.33, 0);
-    add(g, gRBox(0.18, 0.2, 0.28, 0.02), col(0x4a4c50, 0.5), 0.12, 0.34, 0);
-    add(g, gCyl(0.012, 0.012, 0.5, 8), col(0x4a4c50, 0.5), 0.2, 0.5, -0.1, 0.6, 0, 0);
+    add(g, gRBox(0.18, 0.2, 0.28, 0.02), M.darkMetal, 0.12, 0.34, 0);
+    add(g, gCyl(0.012, 0.012, 0.5, 8), M.darkMetal, 0.2, 0.5, -0.1, 0.6, 0, 0);
     for (const [x, z] of [[-0.19, -0.13], [0.19, -0.13], [-0.19, 0.13], [0.19, 0.13]]) add(g, gSphere(0.035, 8, 6), M.blackPl, x, 0.035, z);
     // mop: handle leaning, strands in the wringer
-    add(g, gCyl(0.012, 0.012, 1.35, 8), col(0x2a6fd6, 0.4), 0.06, 0.25, 0.04, 0, 0, -0.18);
+    add(g, gCyl(0.012, 0.012, 1.35, 8), M.darkMetal, 0.06, 0.25, 0.04, 0, 0, -0.18);
     const strands = tmat(ctex('mopstrands', 64, 64, (c, w, h, rr) => { c.fillStyle = '#b8b0a0'; c.fillRect(0, 0, w, h); for (let x = 0; x < w; x += 3) { c.fillStyle = `rgba(0,0,0,${0.1 + rr() * 0.25})`; c.fillRect(x, 0, 1, h); } }), 0.95);
     add(g, gCyl(0.08, 0.11, 0.22, 10), strands, 0.03, 0.22, 0.04);
   },
@@ -2769,19 +2833,19 @@ const PROP_BUILDERS = {
       grime(c, w, h, rr, 1);
     }), 0.4, 0.1);
     add(g, gRBox(0.7, 0.85, 0.5, 0.02), [body, body, body, body, front, body], 0, 0.1, 0);
-    add(g, gBox(0.76, 0.03, 0.56), col(0x4a4c50, 0.5), 0, 0.95, 0);
-    for (const s of [-1, 1]) add(g, gBox(0.76, 0.05, 0.01), col(0x4a4c50, 0.5), 0, 0.98, s * 0.275);
+    add(g, gBox(0.76, 0.03, 0.56), M.darkMetal, 0, 0.95, 0);
+    for (const s of [-1, 1]) add(g, gBox(0.76, 0.05, 0.01), M.darkMetal, 0, 0.98, s * 0.275);
     for (const [x, z] of [[-0.28, -0.18], [0.28, -0.18], [-0.28, 0.18], [0.28, 0.18]]) caster(g, x, z, 0.045);
     tubePath(g, 'mcarthandle', [[0.37, 0.8, -0.18], [0.42, 0.82, -0.15], [0.42, 0.82, 0.15], [0.37, 0.8, 0.18]], 0.012, M.chrome, false, 12);
     const gl = new THREE.Group();
     printedBox(gl, 0.24, 0.12, 0.13, { t: 'EXAM GLOVES', s: 'NITRILE  POWDER FREE', n: '100 GLOVES  SIZE L', b: '#2a6fd6', f: '#fff', a: '#fff', tf: '#2a6fd6', p: 'cross' }, { tw: 256, th: 128 });
     gl.position.set(-0.15, 0.98, 0); gl.rotation.y = 0.2;
     g.add(gl);
-    add(g, gBox(0.18, 0.22, 0.12), col(0xc41e1e, 0.45), 0.2, 0.98, -0.05);
-    add(g, gBox(0.14, 0.03, 0.1), col(0xf2f1ec, 0.5), 0.2, 1.2, -0.05);
+    add(g, gBox(0.18, 0.22, 0.12), col(0xc4221c, 0.45), 0.2, 0.98, -0.05);
+    add(g, gBox(0.14, 0.03, 0.1), M.whitePl, 0.2, 1.2, -0.05);
   },
   locker_row(g, r) {
-    const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86', '#3a4a7a']);
+    const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86']);
     const door = tmat(ctex('lockerdoor' + color, 128, 512, (c, w, h, rr) => {
       noiseFill(c, w, h, rr, color, 0.05, 1500, 2);
       c.fillStyle = 'rgba(0,0,0,0.5)';
@@ -2794,14 +2858,15 @@ const PROP_BUILDERS = {
     const inside = col(0x1e2124, 0.8);
     const n = 4, W = 0.3, H = 1.8, D = 0.45;
     add(g, gBox(n * W + 0.02, H, D), [body, body, body, body, inside, body], 0, 0.08, 0);
-    add(g, gBox(n * W + 0.02, 0.08, D - 0.04), col(0x1e1e1e, 0.8), 0, 0, -0.02);
+    add(g, gBox(n * W + 0.02, 0.08, D - 0.04), inside, 0, 0, -0.02);
+    const nums = tmat(ctex('lockernums', 256, 32, (c, w, h) => { c.fillStyle = '#d8d8d4'; c.fillRect(0, 0, w, h); for (let k = 0; k < 4; k++) txt(c, String(101 + k), 32 + k * 64, h / 2, 20, { color: '#111' }); }), 0.5);
     const open = Math.floor(r() * (n + 2));
     for (let i = 0; i < n; i++) {
       const d = new THREE.Group();
       add(d, gBox(W - 0.012, H - 0.03, 0.015), [body, body, body, body, door, body], (W - 0.012) / 2, 0, 0);
       add(d, gBox(0.02, 0.1, 0.02), M.chrome, W * 0.82, H * 0.48, 0.015);
-      const num = ctex('lockernum' + (101 + i), 64, 32, (c, w, h) => { c.fillStyle = '#d8d8d4'; c.fillRect(0, 0, w, h); txt(c, String(101 + i), w / 2, h / 2, 20, { color: '#111' }); });
-      add(d, gBox(0.05, 0.025, 0.002), [M.paper, M.paper, M.paper, M.paper, tmat(num, 0.5), M.paper], W * 0.48, H * 0.86, 0.009);
+      const nr = [i / 4 + 0.01, 0.05, (i + 1) / 4 - 0.01, 0.95], pr = [0.005, 0.1, 0.01, 0.2];
+      add(d, gRemap(gBox(0.05, 0.025, 0.002), 'lockernum' + i, [pr, pr, pr, pr, nr, pr]), [nums, nums, nums, nums, nums, nums], W * 0.48, H * 0.86, 0.009);
       d.position.set(-n * W / 2 + i * W + 0.006, 0.095, D / 2);
       if (i === open) d.rotation.y = -(0.7 + r() * 0.9);
       g.add(d);
@@ -2822,7 +2887,7 @@ const PROP_BUILDERS = {
       for (const y of [0.55, 0.9]) { c.fillStyle = '#d8e040'; c.fillRect(0, h * y, w, h * 0.06); c.fillStyle = '#d8d8d8'; c.fillRect(0, h * y + h * 0.018, w, h * 0.024); }
       grime(c, w, h, rr, 2);
     }), 0.9);
-    const helm = [0xf2c21b, 0x1d1e20, 0xc4221c, 0xf2f1ec];
+    const helm = [M.blackPl, col(0xf2c21b, 0.35), col(0xc4221c, 0.45)];
     for (let i = 0; i < 3; i++) {
       const x = -W / 3 + i * W / 3;
       // coat hanging on a hook
@@ -2832,18 +2897,20 @@ const PROP_BUILDERS = {
       add(g, gTorus(0.1, 0.03, 4, 10), tan, x, 1.42, -0.12, Math.PI / 2, 0, 0, 1, 0.8, 1);
       // helmet on the shelf
       if (r() < 0.85) {
-        const hm = col(pick(r, helm), 0.35);
+        const hm = pick(r, helm);
         const h = new THREE.Group();
         add(h, gLathe('helmdome', [[0, 0.2], [0.07, 0.19], [0.12, 0.15], [0.14, 0.08], [0.15, 0.0]], 14), hm, 0, 0, 0);
         add(h, gCyl(0.19, 0.2, 0.012, 16), hm, 0, -0.005, 0.03, 0, 0, 0, 1, 1, 1.25);
-        add(h, gBox(0.1, 0.06, 0.012), col(0xc59a45, 0.4, 0.5), 0, 0.1, 0.15, -0.5, 0, 0);
+        add(h, gBox(0.1, 0.06, 0.012), M.brass, 0, 0.1, 0.15, -0.5, 0, 0);
         h.position.set(x + (r() - 0.5) * 0.1, 1.625, -0.05); h.rotation.y = (r() - 0.5) * 0.6;
         g.add(h);
       }
       // boots below with pants folded down
-      const bt = col(0x1d1e20, 0.6);
+      const bt = M.blackPl;
       for (const s of [-1, 1]) { add(g, gBox(0.11, 0.06, 0.28), bt, x + s * 0.07, 0.0, 0.07); add(g, gCyl(0.06, 0.065, 0.3, 8), bt, x + s * 0.07, 0.04, 0.0); add(g, gTorus(0.07, 0.035, 4, 8), tan, x + s * 0.07, 0.36, 0.0, Math.PI / 2); add(g, gCyl(0.066, 0.066, 0.03, 8, true), col(0xd8e040, 0.5), x + s * 0.07, 0.25, 0.0); }
-      add(g, gBox(0.1, 0.06, 0.002), tmat(ctex('nametag' + i, 128, 64, (c, w, h) => { c.fillStyle = '#1d1e20'; c.fillRect(0, 0, w, h); txt(c, ['ENGINE 1', 'TRUCK 3', 'RESCUE 7'][i], w / 2, h / 2, 22, { color: '#f2c21b', maxW: w * 0.9 }); }), 0.5), x, 1.52, 0.18);
+      const tags = tmat(ctex('nametags', 384, 64, (c, w, h) => { c.fillStyle = '#1d1e20'; c.fillRect(0, 0, w, h); ['ENGINE 1', 'TRUCK 3', 'RESCUE 7'].forEach((t, k) => txt(c, t, 64 + k * 128, h / 2, 22, { color: '#f2c21b', maxW: 115 })); }), 0.5);
+      const tr = [i / 3 + 0.01, 0.05, (i + 1) / 3 - 0.01, 0.95], dr = [0.002, 0.1, 0.004, 0.2];
+      add(g, gRemap(gBox(0.1, 0.06, 0.002), 'nametag' + i, [dr, dr, dr, dr, tr, dr]), [tags, tags, tags, tags, tags, tags], x, 1.52, 0.18);
     }
   },
   hose_reel(g) {
@@ -2868,23 +2935,28 @@ const PROP_BUILDERS = {
     add(g, gSphere(0.015, 8, 6), M.blackPl, -0.4, 0.19, 0);
     tubePath(g, 'kettlespout', [[-0.32, 0.05, 0], [-0.27, 0.12, 0], [-0.25, 0.16, 0]], 0.012, ss, false, 8);
     add(g, gTorus(0.06, 0.012, 5, 12, Math.PI), M.blackPl, -0.4, 0.17, 0, 0, 0, 0);
-    // stack of plates
-    const plate = mat('plate', { color: 0xf2f1ec, roughness: 0.3, side: THREE.DoubleSide });
-    for (let i = 0; i < 5; i++) add(g, gLathe('plate', [[0, 0], [0.07, 0], [0.09, 0.012], [0.12, 0.018]], 18), plate, -0.1, i * 0.014, 0.05);
-    // mugs
+    // crockery from the shared dish atlas: plates, two mugs, a bowl (one material)
+    const dm = new Merger(1);
+    const M4 = (x, y, z, ry = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1));
+    const plate = gLathe('dplate2', [[0, 0], [0.08, 0], [0.12, 0.018], [0.116, 0.02], [0.078, 0.004], [0, 0.004]], 12);
+    for (let i = 0; i < 5; i++) dm.add(plate, M4(-0.1, i * 0.0145, 0.05, r() * TAU), [dishRect(i === 4 ? 6 : 0)], [0]);
+    const mug = gLathe('dmug2', [[0, 0], [0.04, 0], [0.042, 0.095], [0.037, 0.095], [0.035, 0.008], [0, 0.008]], 10);
+    const handle = gTorus(0.025, 0.007, 4, 8, Math.PI * 1.2);
     for (let i = 0; i < 2; i++) {
-      const mc = mat('mug' + Math.floor(r() * 4), { color: [0x1d4f9a, 0xc4221c, 0xf2f1ec, 0x2f7a32][i % 4], roughness: 0.35, side: THREE.DoubleSide });
-      add(g, gLathe('mug', [[0, 0], [0.04, 0], [0.042, 0.095], [0.037, 0.095], [0.035, 0.008], [0, 0.008]], 14), mc, 0.08 + i * 0.1, 0, -0.08);
-      add(g, gTorus(0.025, 0.007, 4, 10, Math.PI * 1.2), mc, 0.08 + i * 0.1 + 0.045, 0.05, -0.08, 0, 0, -Math.PI * 0.6);
+      const rc = dishRect([2, 3, 4][Math.floor(r() * 3)]);
+      const m = M4(0.08 + i * 0.1, 0, -0.08);
+      dm.add(mug, m, [rc], [0]);
+      dm.add(handle, m.clone().multiply(M4(0.045, 0.05, 0)).multiply(new THREE.Matrix4().makeRotationZ(-Math.PI * 0.6)), [rc], [0]);
     }
+    dm.add(gLathe('dbowl2', [[0, 0], [0.04, 0], [0.075, 0.058], [0.07, 0.058], [0.036, 0.006], [0, 0.006]], 12), M4(0.2, 0, 0.22), [dishRect(1)], [0]);
+    for (const mesh of dm.meshes([dishMat()])) g.add(mesh);
     // cereal box
     const cb = new THREE.Group();
     printedBox(cb, 0.19, 0.29, 0.07, { t: 'CORN FLAKES', s: 'TOASTED', n: 'NET WT 18 OZ', b: '#f2f1ec', f: '#1d4f9a', a: '#e8701c', p: 'grain', top: 'FAMILY SIZE', tf: '#fff' });
     cb.position.set(0.35, 0, 0.05); cb.rotation.y = -0.3;
     g.add(cb);
-    // cutting board, bowl
-    add(g, gRBox(0.36, 0.018, 0.24, 0.008), tmat(texWood('#c9a26c', '#8a6a3a', 'board'), 0.7), -0.05, 0, 0.2);
-    add(g, gLathe('bowl', [[0, 0], [0.04, 0], [0.07, 0.03], [0.08, 0.06], [0.075, 0.06], [0.065, 0.032], [0.035, 0.008], [0, 0.008]], 16), mat('bowl', { color: 0xd8c8a8, roughness: 0.4, side: THREE.DoubleSide }), 0.2, 0, 0.22);
+    // cutting board
+    add(g, gRBox(0.36, 0.018, 0.24, 0.008), FX.wood('#8a6440'), -0.05, 0, 0.2);
   },
   bookshelf(g, r) {
     const wood = tmat(texWood('#7a5032', '#4a2a18', 'shelf'), 0.7);
@@ -3047,24 +3119,46 @@ function drawArt(c, w, h, v, rr) {
   }
 }
 
+
+// shared crockery atlas (3 x 3 swatches): used by dish_stack and kitchen_counter_items
+function dishMat() {
+  return mat('dishmat', { map: ctex('dishatlas', 256, 256, (c, w, h, rr) => {
+      const cols = ['#f2f0e8', '#e8dcc0', '#3a5a8a', '#8a2a22', '#4a6a4a', '#d8d4cc', '#f2f0e8', '#e8e4dc', '#c8a070'];
+      cols.forEach((cc, i) => {
+        const x = (i % 3) * 85, y = Math.floor(i / 3) * 85;
+        c.fillStyle = cc; c.fillRect(x, y, 85, 85);
+        if (i === 6) for (let k = 0; k < 14; k++) { c.fillStyle = `rgba(${90 + rr() * 60},${50 + rr() * 30},20,0.5)`; c.beginPath(); c.ellipse(x + rr() * 85, y + rr() * 50, 2 + rr() * 6, 1 + rr() * 4, rr() * 3, 0, TAU); c.fill(); } // dried food
+        if (i === 7) { c.fillStyle = 'rgba(90,60,30,0.45)'; c.fillRect(x, y + 50, 85, 10); } // coffee ring
+        for (let k = 0; k < 40; k++) { c.fillStyle = 'rgba(90,80,60,0.12)'; c.fillRect(x + rr() * 85, y + rr() * 85, 2, 2); }
+      });
+        }), roughness: 0.35, side: THREE.DoubleSide });
+}
+function dishRect(i) { const x = (i % 3) * 85 + 6, y = Math.floor(i / 3) * 85 + 6; return [x / 256, 1 - (y + 73) / 256, (x + 73) / 256, 1 - y / 256]; }
+
 const HOUSE_PROPS = {
   wall_frame(g, r) {
     const v = Math.floor(r() * 6);
     const land = v < 3 || r() < 0.5;
     const W = 0.4 + r() * 0.4, H = land ? W * (0.66 + r() * 0.1) : W * (1.2 + r() * 0.15);
     const b = 0.035 + r() * 0.02, dep = 0.025;
-    const art = tmat(ctex('frameart' + v + land, 512, 512, (c, w, h, rr) => {
-      c.fillStyle = '#ece6d4'; c.fillRect(0, 0, w, h); // mat board
-      c.save(); c.beginPath(); c.rect(36, 36, w - 72, h - 72); c.clip(); c.translate(36, 36);
-      drawArt(c, w - 72, h - 72, v, rr); c.restore();
-      c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2; c.strokeRect(36, 36, w - 72, h - 72);
-      // dust film and a faded corner under the glass
-      c.fillStyle = 'rgba(210,200,180,0.12)'; c.fillRect(0, 0, w, h);
-      const gr = c.createRadialGradient(w, 0, 0, w, 0, w * 0.6); gr.addColorStop(0, 'rgba(255,250,230,0.25)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
-      grime(c, w, h, rr, 1.2);
+    // all six pictures share one atlas (3 x 2 cells of 512 px), so every frame uses the same art material
+    const art = tmat(ctex('frameartatlas', 1536, 1024, (c, w, h, rr) => {
+      for (let k = 0; k < 6; k++) {
+        c.save(); c.translate((k % 3) * 512, Math.floor(k / 3) * 512);
+        c.fillStyle = '#ece6d4'; c.fillRect(0, 0, 512, 512); // mat board
+        c.save(); c.beginPath(); c.rect(36, 36, 440, 440); c.clip(); c.translate(36, 36);
+        drawArt(c, 440, 440, k, rr); c.restore();
+        c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2; c.strokeRect(36, 36, 440, 440);
+        c.fillStyle = 'rgba(210,200,180,0.12)'; c.fillRect(0, 0, 512, 512);
+        const gr = c.createRadialGradient(512, 0, 0, 512, 0, 300); gr.addColorStop(0, 'rgba(255,250,230,0.25)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = gr; c.fillRect(0, 0, 512, 512);
+        grime(c, 512, 512, rr, 1.2);
+        c.restore();
+      }
     }), 0.35);
-    const frame = pick(r, [FX.wood('#3a2616'), FX.wood('#8a6440'), col(0x1d1e20, 0.5), col(0xb89a5a, 0.4, 0.5)]);
-    add(g, gBox(W - 2 * b + 0.004, H - 2 * b + 0.004, 0.006), art, 0, -(H - 2 * b) / 2, 0.012);
+    const cr = [(v % 3) / 3, 1 - (Math.floor(v / 3) + 1) / 2, (v % 3 + 1) / 3, 1 - Math.floor(v / 3) / 2];
+    const edge = [cr[0] + 0.005, cr[1] + 0.005, cr[0] + 0.01, cr[1] + 0.01];
+    const frame = pick(r, [FX.wood('#3a2616'), FX.wood('#8a6440'), col(0x1d1e20, 0.5)]);
+    add(g, gRemap(gBox(+(W - 2 * b + 0.004).toFixed(3), +(H - 2 * b + 0.004).toFixed(3), 0.006), `frameart${v}|${(W - 2 * b).toFixed(3)}|${(H - 2 * b).toFixed(3)}`, [edge, edge, edge, edge, cr, edge]), [art, art, art, art, art, art], 0, -(H - 2 * b) / 2, 0.012);
     add(g, gBox(W, b, dep), frame, 0, H / 2 - b, dep / 2);
     add(g, gBox(W, b, dep), frame, 0, -H / 2, dep / 2);
     add(g, gBox(b, H - 2 * b, dep), frame, -W / 2 + b / 2, -H / 2 + b, dep / 2);
@@ -3101,7 +3195,7 @@ const HOUSE_PROPS = {
   },
   curtain(g, r) {
     const W = 1.2 + r() * 0.5, Hc = 1.5 + r() * 0.5;
-    const color = pick(r, ['#8a3a2a', '#4a5a6a', '#c8b890', '#5a6a4a', '#7a5a7a']);
+    const color = pick(r, ['#8a3a2a', '#4a5a6a', '#c8b890']);
     const fab = FX.fabric(color);
     const cloth = mat('curtain' + color, { map: fab.map, roughness: 0.95, side: THREE.DoubleSide });
     const metal = pick(r, [col(0xb89a5a, 0.4, 0.5), col(0x2a2a2c, 0.5, 0.3), col(0xb4b9be, 0.38, 0.55)]);
@@ -3204,7 +3298,7 @@ const HOUSE_PROPS = {
     for (const mesh of merger.meshes([mat('mailmat', { map: t, roughness: 0.9 })])) g.add(mesh);
   },
   shoes(g, r) {
-    const color = pick(r, ['#2a3a5a', '#7a2a22', '#3a3a3c', '#5a6a4a', '#c8c4b8']);
+    const color = pick(r, ['#2a3a5a', '#7a2a22', '#3a3a3c']);
     const upper = tmat(ctex('shoeup' + color, 256, 128, (c, w, h, rr) => {
       noiseFill(c, w, h, rr, color, 0.08, 2000, 2);
       c.fillStyle = shade(color, -0.25); c.fillRect(0, h * 0.75, w, h * 0.25); // toe cap / lower panel
@@ -3297,25 +3391,15 @@ const HOUSE_PROPS = {
     for (const mesh of merger.meshes([mat('clothesmat', { map: t, roughness: 0.95, side: THREE.DoubleSide, alphaTest: 0.5 })])) g.add(mesh);
   },
   dish_stack(g, r) {
-    const t = ctex('dishatlas', 256, 256, (c, w, h, rr) => {
-      const cols = ['#f2f0e8', '#e8dcc0', '#3a5a8a', '#8a2a22', '#4a6a4a', '#d8d4cc', '#f2f0e8', '#e8e4dc', '#c8a070'];
-      cols.forEach((cc, i) => {
-        const x = (i % 3) * 85, y = Math.floor(i / 3) * 85;
-        c.fillStyle = cc; c.fillRect(x, y, 85, 85);
-        if (i === 6) for (let k = 0; k < 14; k++) { c.fillStyle = `rgba(${90 + rr() * 60},${50 + rr() * 30},20,0.5)`; c.beginPath(); c.ellipse(x + rr() * 85, y + rr() * 50, 2 + rr() * 6, 1 + rr() * 4, rr() * 3, 0, TAU); c.fill(); } // dried food
-        if (i === 7) { c.fillStyle = 'rgba(90,60,30,0.45)'; c.fillRect(x, y + 50, 85, 10); } // coffee ring
-        for (let k = 0; k < 40; k++) { c.fillStyle = 'rgba(90,80,60,0.12)'; c.fillRect(x + rr() * 85, y + rr() * 85, 2, 2); }
-      });
-    });
-    const R = (i) => { const x = (i % 3) * 85 + 6, y = Math.floor(i / 3) * 85 + 6; return [x / 256, 1 - (y + 73) / 256, (x + 73) / 256, 1 - y / 256]; };
+    const R = dishRect;
     const merger = new Merger(1);
     const M4 = (x, y, z, ry = 0, rx = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, 0)), new THREE.Vector3(1, 1, 1));
-    const plate = gLathe('dplate', [[0, 0], [0.07, 0], [0.09, 0.012], [0.12, 0.018], [0.118, 0.02], [0.088, 0.015], [0.068, 0.004], [0, 0.004]], 16);
-    const bowl = gLathe('dbowl', [[0, 0], [0.035, 0], [0.065, 0.03], [0.075, 0.058], [0.071, 0.058], [0.061, 0.032], [0.033, 0.006], [0, 0.006]], 14);
-    const mug = gLathe('dmug', [[0, 0], [0.04, 0], [0.042, 0.095], [0.037, 0.095], [0.035, 0.008], [0, 0.008]], 12);
+    const plate = gLathe('dplate2', [[0, 0], [0.08, 0], [0.12, 0.018], [0.116, 0.02], [0.078, 0.004], [0, 0.004]], 12);
+    const bowl = gLathe('dbowl2', [[0, 0], [0.04, 0], [0.075, 0.058], [0.07, 0.058], [0.036, 0.006], [0, 0.006]], 12);
+    const mug = gLathe('dmug2', [[0, 0], [0.04, 0], [0.042, 0.095], [0.037, 0.095], [0.035, 0.008], [0, 0.008]], 10);
     const handle = gTorus(0.025, 0.007, 4, 8, Math.PI * 1.2);
     const pc = pick(r, [0, 1, 5]);
-    const np = 3 + Math.floor(r() * 5);
+    const np = 3 + Math.floor(r() * 4);
     const px = -0.08 + (r() - 0.5) * 0.04;
     for (let i = 0; i < np; i++) merger.add(plate, M4(px + (r() - 0.5) * 0.008, i * 0.0145, (r() - 0.5) * 0.008, r() * TAU), [R(i === np - 1 && r() < 0.6 ? 6 : pc)], [0]);
     const nb = Math.floor(r() * 3);
@@ -3333,7 +3417,7 @@ const HOUSE_PROPS = {
     if (r() < 0.6) { // cutlery on the top plate
       for (let k = 0; k < 2; k++) merger.add(gBox(0.012, 0.003, 0.19), M4(px + (k - 0.5) * 0.04, np * 0.0145 + 0.006 + k * 0.003, 0, 0.3 + k * 0.4), [R(5)], [0]);
     }
-    for (const mesh of merger.meshes([mat('dishmat', { map: t, roughness: 0.35, side: THREE.DoubleSide })])) g.add(mesh);
+    for (const mesh of merger.meshes([dishMat()])) g.add(mesh);
   },
 };
 Object.assign(PROP_BUILDERS, HOUSE_PROPS);
@@ -3373,8 +3457,12 @@ function dust(c, w, h, r, amt = 1) {
   // fine settled dust
   for (let i = 0; i < 1500 * amt; i++) { c.fillStyle = `rgba(200,190,170,${0.04 + r() * 0.06})`; c.fillRect(r() * w, r() * h, 1.5, 1.5); }
 }
+// every wood in props and fixtures snaps to one of three shared tones (one texture each)
+const WOOD_TONES = ['#4a3020', '#6a4528', '#8a6440'];
+function woodTone(hex) { const l = new THREE.Color(hex).getHSL({}, THREE.SRGBColorSpace).l; return l < 0.25 ? WOOD_TONES[0] : l < 0.34 ? WOOD_TONES[1] : WOOD_TONES[2]; }
 const FX = {
   wood(tone = '#6a4528') {
+    tone = woodTone(tone);
     return mat('fxwood' + tone, { map: tex1m('wood' + tone, 512, (c, w, h, r) => {
       c.fillStyle = tone; c.fillRect(0, 0, w, h);
       for (let i = 0; i < 140; i++) {
@@ -3463,7 +3551,7 @@ function rbx(g, m, x0, x1, y0, y1, z0, z1, rad) {
 // height H, front facing +z, everything inside x in [-L/2, L/2], z in [-D/2, D/2], y in [0, H].
 const FIXTURES = {
   sofa(g, L, D, H, r) {
-    const F = FX.fabric(pick(r, ['#5a5f4a', '#6a4a3a', '#3e4a5a', '#7a7468', '#4a3a42']));
+    const F = FX.fabric(pick(r, ['#5a5f4a', '#6a4a3a', '#3e4a5a']));
     const W = FX.wood('#3a2616');
     const legH = Math.min(0.08, H * 0.1), seatH = Math.min(0.46, H * 0.55);
     const a = Math.min(0.2, L * 0.1), bt = Math.min(0.22, D * 0.25), armH = Math.min(H, seatH + 0.2);
@@ -3622,7 +3710,7 @@ const FIXTURES = {
     }
   },
   counter(g, L, D, H, r) {
-    const C = FX.painted(pick(r, ['#e8e2d2', '#8a9a88', '#5a6a7a', '#d8d0c0']));
+    const C = FX.painted(pick(r, ['#e8e2d2', '#8a9a88', '#5a6a7a']));
     const T = FX.counterTop(pick(r, ['#cfc8b8', '#6a6a68', '#b8a890']));
     const S = FX.metal('#b8bcc0', 'ss');
     const K = mat('fxcooktop', { map: ctex('cooktop', 256, 256, (c, w, h, rr) => {
@@ -3706,7 +3794,7 @@ const FIXTURES = {
     for (const z of [-0.09, 0.09]) add(g, gCyl(0.022, 0.022, 0.03, 8), S, -L / 2 + wt, H - 0.07, z, 0, 0, -Math.PI / 2);
   },
   cabinet(g, L, D, H, r) {
-    const P = FX.painted(pick(r, ['#d8d4c8', '#6a7a6a', '#8a7a6a', '#b8bcc0']));
+    const P = FX.painted(pick(r, ['#d8d4c8', '#6a7a6a', '#8a7a6a']));
     const S = FX.metal('#9a9ea2', 'cab');
     bx(g, P, -L / 2, L / 2, 0, H, -D / 2, D / 2 - 0.02);
     const nd = L > 0.55 ? 2 : 1;
@@ -3721,7 +3809,7 @@ const FIXTURES = {
     bx(g, FX.dark('kickc'), -L / 2 + 0.02, L / 2 - 0.02, 0, 0.08, D / 2 - 0.05, D / 2 - 0.03);
   },
   checkout(g, L, D, H, r) {
-    const P = FX.laminate(pick(r, ['#8a8e92', '#b8b0a0', '#5a6a5a']));
+    const P = FX.laminate('#8a8e92'); // lanes in one store match
     const K = FX.dark('belt', '#18191b', 0.85);
     const S = FX.metal('#b0b4b8', 'lane');
     const ch = Math.min(0.92, H);
@@ -3757,7 +3845,7 @@ const FIXTURES = {
   },
   coolers(g, L, D, H, r) {
     const F = FX.dark('coolerframe', '#2a2c2f', 0.45);
-    const I = mat('fxcoolerin', { color: 0x16181a, roughness: 0.7 });
+    const I = F; // dark inside shares the frame material
     const G = FX.glass();
     const n = Math.max(1, Math.round(L / 0.76));
     const dw = L / n;
@@ -3876,7 +3964,7 @@ const FIXTURES = {
     if (back) for (let i = 0; i < 2; i++) bx(g, W, -L / 2, L / 2, H - 0.12 - i * 0.14, H - 0.02 - i * 0.14, -D / 2 + 0.04, -D / 2 + 0.075);
   },
   locker(g, L, D, H, r) {
-    const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86', '#3a4a7a']);
+    const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86']);
     const P = FX.painted(color);
     const Dm = mat('fxlockerdoor' + color, { map: ctex('fxlockerdoor' + color, 128, 512, (c, w, h, rr) => {
       noiseFill(c, w, h, rr, color, 0.05, 1500, 2);
@@ -3939,7 +4027,7 @@ const FIXTURES = {
   },
 };
 function texPlaidMat(r, world = false) {
-  const p = pick(r, [['#7a1d1a', '#22304a', '#e8d8a0'], ['#2f4a2a', '#1a1a1a', '#c8a24a'], ['#4a5a7a', '#e8e8e0', '#1a2a4a'], ['#8a7a5a', '#3a2a1a', '#e8e0d0']]);
+  const p = pick(r, [['#7a1d1a', '#22304a', '#e8d8a0'], ['#2f4a2a', '#1a1a1a', '#c8a24a'], ['#4a5a7a', '#e8e8e0', '#1a2a4a']]);
   return mat('fxplaid' + p.join() + world, { map: texPlaid(p[0], p[1], p[2]), roughness: 0.95, side: THREE.DoubleSide });
 }
 

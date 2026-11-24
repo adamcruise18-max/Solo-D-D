@@ -36,7 +36,7 @@ test('wool socks can be worn', () => {
   const s = newGame(4);
   s.carried = { wool_socks: 1 };
   perform(s, 'use', 'wool_socks', 'wear');
-  assert.equal(s.player.worn.socks, true);
+  assert.equal(s.player.worn.socks, 'wool_socks');
 });
 
 test('a water tablet makes 1 gal of unsafe water safe', () => {

@@ -11,17 +11,13 @@ import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
 import { infectRiskFactor } from './skills.js';
+import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+// Clothes in layers (engine/clothes.js): warmth, wind block and wetness.
 export function clothingRating(state) {
-  const w = state.player.worn;
-  let r = 10;
-  if (w.coat && w.hat && w.gloves && w.boots) r = 40;
-  else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
-  if (w.socks) r += 2;
-  if (state.player.wet) r /= 2;
-  return r;
+  return clothingWarmth(state.player);
 }
 
 // Where is the player, and what air does the player feel?
@@ -44,7 +40,7 @@ export function environment(state, mode, t = state.time) {
 
 export function feltTemp(state, mode, env = environment(state, mode)) {
   let felt = env.temp + clothingRating(state);
-  if (env.outside) felt -= (env.wind / 10) * 5;
+  if (env.outside) felt -= (env.wind / 10) * 7 * (1 - windBlock(state.player));
   if (mode === 'sleep') {
     if (env.home) felt += 10; // bed and blankets
     // The best sleeping gear you have (a sleeping bag, a wool blanket).
@@ -91,23 +87,16 @@ function tickStep(state, dt, mode) {
   const sleeping = mode === 'sleep';
   const working = mode === 'walk' || mode === 'work' || mode === 'heavy';
 
-  // Wet and dry
+  // Wet and dry: wetness 0..100. Rain soaks you (a waterproof shell keeps most of it out);
+  // inside, clothes dry: fast by a fire, slowly in a cold room.
   const wx = weatherInfo(state);
-  if (env.outside && wx.wetAfter && !(p.worn.rain && state.weather.type !== 'heavy_rain')) {
-    p.wetMinutes += dt * 60;
-    if (!p.wet && p.wetMinutes >= wx.wetAfter) {
-      p.wet = true;
-      log(state, 'Your clothes are wet through. Wet clothes keep only half the heat.', 'warn');
-    }
-  } else if (p.wet && !env.outside && env.temp >= 55) {
-    p.dryMinutes += dt * 60;
-    if (p.dryMinutes >= 240) {
-      p.wet = false; p.wetMinutes = 0; p.dryMinutes = 0;
-      log(state, 'Your clothes are dry again.');
-    }
-  } else if (!env.outside) {
-    p.wetMinutes = 0;
-  }
+  normalizeWorn(p);
+  const wasWet = p.wetness >= WET_LIMIT;
+  if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state.weather.type, wx.wetAfter) * dt, 0, 100);
+  else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state.home.fireHours > 0) * dt, 0, 100);
+  p.wet = p.wetness >= WET_LIMIT;
+  if (p.wet && !wasWet) log(state, 'Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.', 'warn');
+  if (!p.wet && wasWet) log(state, 'Your clothes are dry again.');
 
   // Warmth
   const felt = feltTemp(state, mode, env);

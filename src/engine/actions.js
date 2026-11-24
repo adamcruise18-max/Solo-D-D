@@ -14,6 +14,7 @@ import { travel } from './travel.js';
 import { getPlace } from './placesdb.js';
 import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vitals.js';
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
+import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -122,11 +123,11 @@ export function useItem(state, id, verb, from = 'carried') {
     case 'med':
       return useMed(state, id, bag);
     case 'wear': {
-      const slot = it.slot;
-      if (p.worn[slot]) { log(state, `You already wear a ${it.name.toLowerCase()}.`); return; }
+      // One item per layer; the old one goes back into the same bag.
       addItem(bag, id, -1);
-      p.worn[slot] = true;
-      log(state, `You put on the ${it.name.toLowerCase()}.`);
+      const old = putOn(p, id);
+      if (old) addItem(bag, old, 1);
+      log(state, old ? `You take off the ${itemName(old).toLowerCase()} and put on the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`);
       advanceTime(state, 3);
       return;
     }
@@ -1016,6 +1017,16 @@ export function listActions(state) {
   return acts;
 }
 
+// Take off one layer (it goes into the pack).
+export function takeOffSlot(state, slot) {
+  const old = takeOff(state.player, slot);
+  if (!old) return false;
+  addItem(state.carried, old, 1);
+  log(state, `You take off the ${itemName(old).toLowerCase()}.`);
+  advanceTime(state, 2);
+  return true;
+}
+
 export function doAction(state, id, arg) {
   if (state.dead) return;
   switch (id) {
@@ -1031,6 +1042,7 @@ export function doAction(state, id, arg) {
     case 'pickup': return pickUp(state, arg);
     case 'see_zone': return seeZone(state, Number(arg));
     case 'open_container': return openContainer(state, String(arg));
+    case 'take_off': return takeOffSlot(state, String(arg));
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
