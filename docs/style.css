@@ -302,3 +302,6 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   #inside .in-found { top: auto; bottom: 180px; transform: none; }
 }
 #inside.is-touch kbd { display: none; }
+.pick-banner { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); z-index: 5;
+  background: rgba(18,22,28,.94); color: var(--text); border: 1px solid var(--accent); border-radius: 6px;
+  padding: 8px 12px; max-width: calc(100% - 32px); font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
