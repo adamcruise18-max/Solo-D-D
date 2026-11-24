@@ -80,3 +80,67 @@ test('old saves with only a count keep their done zones', () => {
   perform(s, 'action', 'search', 5);
   assert.equal(ps.zonesDone, 4);
 });
+
+test('items in a zone are picked up one by one', async () => {
+  const { buildingItems } = await import('../src/engine/actions.js');
+  setPlaces([{ id: 'h9', name: 'Home Depot', cat: 'hardware', lat: 45.5, lon: -122.8 }]);
+  const s = newGame(11);
+  s.location = { kind: 'place', id: 'h9' };
+  s.carried.backpack = 1;
+  const ps = placeState(s, { id: 'h9', cat: 'hardware', name: 'Home Depot' });
+  const items = buildingItems(s);
+  assert.ok(items.length > 3, `items ${items.length}`);
+  assert.deepEqual(buildingItems(s).map((i) => i.pid), items.map((i) => i.pid), 'same list each time');
+  const light = items.find((i) => i.item === 'hardware_parts' || i.item === 'batteries' || i.item === 'seeds') || items[0];
+  const t0 = s.time;
+  perform(s, 'action', 'pickup', light.pid);
+  assert.ok(s.time > t0, 'pick up costs time');
+  assert.ok(ps.taken.includes(light.pid));
+  assert.ok(!buildingItems(s).some((i) => i.pid === light.pid));
+  const t1 = s.time;
+  perform(s, 'action', 'pickup', light.pid);
+  assert.equal(s.time, t1, 'cannot take twice');
+  // Take the rest of that zone: the zone is then done.
+  for (const it of buildingItems(s).filter((i) => i.zone === light.zone)) {
+    s.carried = { backpack: 1 }; // empty the pack so all fits
+    perform(s, 'action', 'pickup', it.pid);
+  }
+  assert.ok(ps.doneList.includes(light.zone));
+});
+
+test('panel search takes what is left in the zone, and the 3D view agrees', async () => {
+  const { buildingItems } = await import('../src/engine/actions.js');
+  setPlaces([{ id: 's7', name: 'Safeway', cat: 'supermarket', lat: 45.5, lon: -122.8 }]);
+  const s = newGame(12);
+  s.location = { kind: 'place', id: 's7' };
+  const before = buildingItems(s).filter((i) => i.zone === 0).length;
+  perform(s, 'action', 'search', 0);
+  const ps = placeState(s, { id: 's7', cat: 'supermarket', name: 'Safeway' });
+  const inLeft = Object.values(ps.leftovers).reduce((a, b) => a + b, 0);
+  assert.equal(inLeft, before);
+  assert.equal(buildingItems(s).filter((i) => i.zone === 0).length, 0);
+});
+
+test('a too heavy item stays', async () => {
+  const { buildingItems } = await import('../src/engine/actions.js');
+  setPlaces([{ id: 'h8', name: 'Hardware', cat: 'hardware', lat: 45.5, lon: -122.8 }]);
+  const s = newGame(13);
+  s.location = { kind: 'place', id: 'h8' };
+  s.carried = { firewood: 1 }; // 20 lb, limit 10 * 1.5
+  const it = buildingItems(s)[0];
+  perform(s, 'action', 'pickup', it.pid);
+  assert.ok(!(placeState(s, { id: 'h8', cat: 'hardware' }).taken || []).includes(it.pid));
+});
+
+test('items behind a locked counter stay until the gate opens', async () => {
+  const { pickUp } = await import('../src/engine/actions.js');
+  setPlaces([{ id: 'p9', name: 'Pharmacy', cat: 'pharmacy', lat: 45.5, lon: -122.8 }]);
+  const s = newGame(21);
+  s.location = { kind: 'place', id: 'p9' };
+  perform(s, 'action', 'search', 0); // creates the place state
+  const ps = placeState(s, { id: 'p9', cat: 'pharmacy' });
+  const counter = ps.zones - 1;
+  const pid = `z${counter}i0`;
+  assert.equal(pickUp(s, pid), false);
+  assert.ok(!(ps.taken || []).includes(pid));
+});

@@ -1970,33 +1970,131 @@
   function counterIndex(place, ps) {
     return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
   }
+  function zoneCtx(state2) {
+    const loc = state2.location;
+    if (loc.kind === "place") {
+      const place = getPlace(loc.id);
+      const ps = placeState(state2, place);
+      return { holder: ps, key: place.id, catId: place.cat, stock: ps.stock, zones: ps.zones, counterIdx: counterIndex(place, ps), house: false, place };
+    }
+    if (loc.kind === "house") {
+      const hs = state2.houses[loc.id];
+      return { holder: hs, key: loc.id, catId: "house", stock: CATEGORIES.house.stock, zones: HOUSE_ROOMS.length, counterIdx: -1, house: true };
+    }
+    return null;
+  }
+  function doneListOf(ctx) {
+    return ctx.house ? zonesDoneList(ctx.holder, "roomsDone", "doneList") : zonesDoneList(ctx.holder);
+  }
+  function markZoneDone(ctx, zone) {
+    const done = doneListOf(ctx);
+    if (done.includes(zone)) return;
+    done.push(zone);
+    if (ctx.house) ctx.holder.roomsDone = done.length;
+    else ctx.holder.zonesDone = done.length;
+  }
+  function zoneItemList(state2, ctx, zone) {
+    const h = ctx.holder;
+    if (!h.zoneItems) h.zoneItems = {};
+    if (!h.taken) h.taken = [];
+    if (!h.zoneItems[zone]) {
+      const found = rollZone(state2, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state2));
+      if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
+      const list = [];
+      for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
+      h.zoneItems[zone] = list;
+    }
+    return h.zoneItems[zone];
+  }
+  function buildingItems(state2) {
+    const ctx = zoneCtx(state2);
+    if (!ctx) return [];
+    const done = doneListOf(ctx);
+    const out = [];
+    for (let z = 0; z < ctx.zones; z++) {
+      if (done.includes(z) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z])) continue;
+      for (const it of zoneItemList(state2, ctx, z)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z });
+    }
+    return out;
+  }
+  function zoneLeft(ctx, zone) {
+    const list = ctx.holder.zoneItems && ctx.holder.zoneItems[zone] || [];
+    return list.filter((it) => !ctx.holder.taken.includes(it.pid));
+  }
+  function touchZone(state2, ctx, zone) {
+    const h = ctx.holder;
+    if (!h.touched) h.touched = [];
+    if (h.touched.includes(zone)) return;
+    h.touched.push(zone);
+    zoneInjuryCheck(state2);
+    if (ctx.catId === "supermarket" && h.touched.length === 1) {
+      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
+      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
+    }
+  }
+  var PICKUP_MINUTES = 1;
+  function pickUp(state2, pid) {
+    const ctx = zoneCtx(state2);
+    if (!ctx) return false;
+    const zone = Number(String(pid).slice(1).split("i")[0]);
+    if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return false;
+    const it = zoneItemList(state2, ctx, zone).find((x) => x.pid === pid);
+    if (!it || ctx.holder.taken.includes(pid)) return false;
+    const w = ITEMS[it.item].weight;
+    if (w > freeWeight(state2) + 1e-9) {
+      log(state2, `Your pack is too full to take the ${itemName(it.item).toLowerCase()} (${w} lb).`, "warn");
+      return false;
+    }
+    const env = environment(state2, "work");
+    advanceTime(state2, PICKUP_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
+    if (state2.dead) return true;
+    touchZone(state2, ctx, zone);
+    ctx.holder.taken.push(pid);
+    addItem(state2.carried, it.item, 1);
+    log(state2, `You take: ${itemName(it.item)}.`);
+    if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
+      markZoneDone(ctx, zone);
+      state2.stats.zonesSearched += 1;
+    }
+    return true;
+  }
+  function seeZone(state2, zone) {
+    const ctx = zoneCtx(state2);
+    if (!ctx || doneListOf(ctx).includes(zone)) return;
+    if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return;
+    zoneItemList(state2, ctx, zone);
+    if (!zoneLeft(ctx, zone).length) {
+      markZoneDone(ctx, zone);
+      state2.stats.zonesSearched += 1;
+      log(state2, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
+    }
+  }
   function searchZone(state2, index) {
-    const place = getPlace(state2.location.id);
+    const ctx = zoneCtx(state2);
+    if (!ctx || ctx.house) return false;
+    const { holder: ps, place } = ctx;
     const cat = CATEGORIES[place.cat];
-    const ps = placeState(state2, place);
     if (!ps.unlocked) return false;
-    const cIdx = counterIndex(place, ps);
+    const cIdx = ctx.counterIdx;
     const done = zonesDoneList(ps);
     const zone = index == null ? nextZone(ps, cIdx) : Number(index);
     if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
     const counterZone = zone === cIdx;
     if (counterZone && !ps.counterOpen) return false;
     const env = environment(state2, "work");
-    const minutes = searchMinutes(state2, cat.zoneMinutes, env.dark);
-    advanceTime(state2, minutes, "work");
+    advanceTime(state2, searchMinutes(state2, cat.zoneMinutes, env.dark), "work");
     if (state2.dead) return true;
-    zoneInjuryCheck(state2);
-    const found = rollZone(state2, place.id, place.cat, ps.stock, zone, dogExtra(state2));
-    if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
-    done.push(zone);
-    ps.zonesDone = done.length;
+    zoneItemList(state2, ctx, zone);
+    touchZone(state2, ctx, zone);
+    const found = {};
+    for (const it of zoneLeft(ctx, zone)) {
+      ps.taken.push(it.pid);
+      found[it.item] = (found[it.item] || 0) + 1;
+    }
+    markZoneDone(ctx, zone);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
     reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
-    if (place.cat === "supermarket" && ps.zonesDone === 1) {
-      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
-      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
-    }
     state2.lastFound = found;
     return true;
   }
@@ -2096,18 +2194,23 @@
     else log(state2, "The house is empty and cold. A family lived here.");
   }
   function searchRoom(state2, index) {
-    const loc = state2.location;
-    const hs = state2.houses[loc.id];
-    const done = zonesDoneList(hs, "roomsDone", "doneList");
-    let room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+    const ctx = zoneCtx(state2);
+    if (!ctx || !ctx.house) return false;
+    const hs = ctx.holder;
+    const done = doneListOf(ctx);
+    const room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
     if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
     const env = environment(state2, "work");
     advanceTime(state2, searchMinutes(state2, CATEGORIES.house.zoneMinutes, env.dark), "work");
     if (state2.dead) return true;
-    zoneInjuryCheck(state2);
-    const found = rollZone(state2, loc.id, "house", CATEGORIES.house.stock, room, dogExtra(state2));
-    done.push(room);
-    hs.roomsDone = done.length;
+    zoneItemList(state2, ctx, room);
+    touchZone(state2, ctx, room);
+    const found = {};
+    for (const it of zoneLeft(ctx, room)) {
+      hs.taken.push(it.pid);
+      found[it.item] = (found[it.item] || 0) + 1;
+    }
+    markZoneDone(ctx, room);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
     reportFound(state2, found, HOUSE_ROOMS[room]);
@@ -2224,6 +2327,10 @@
         return walkInside(state2, arg);
       case "flashlight":
         return toggleFlashlight(state2);
+      case "pickup":
+        return pickUp(state2, arg);
+      case "see_zone":
+        return seeZone(state2, Number(arg));
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -3805,6 +3912,29 @@
         act("action", "counter");
         return state.log.slice(n0).map((e) => e.text).join(" ") || "The gate does not move.";
       },
+      items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
+      onPickUp: (pid) => {
+        const n0 = state.log.length;
+        const it = buildingItems(state).find((x) => x.pid === pid);
+        const wasDead = !!state.dead;
+        perform(state, "action", "pickup", pid);
+        if (!wasDead && state.dead) recordRun(state);
+        const ok = !buildingItems(state).some((x) => x.pid === pid);
+        saveGame(state);
+        render();
+        const msgs = state.log.slice(n0).filter((e) => e.kind !== "info" || !ok).map((e) => e.text).join(" ");
+        return { ok, name: it ? itemName(it.item) : "", msg: msgs };
+      },
+      onSeeZone: (zone) => {
+        perform(state, "action", "see_zone", zone);
+        saveGame(state);
+      },
+      describeItem: (it, near, touch) => {
+        const def = ITEMS[it.item];
+        const need = projectNeeds()[it.item];
+        const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
+        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+      },
       onSearch: (zone) => {
         const n0 = state.log.length;
         const t0 = state.time;
@@ -3842,6 +3972,16 @@
         commit();
       }
     });
+  }
+  function projectNeeds() {
+    const out = {};
+    for (const p of PROJECTS) {
+      const st = projectStatus(state, p);
+      if (st.built || st.started || st.missingReq.length) continue;
+      for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+      for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
+    }
+    return out;
   }
   function insidePanel(name) {
     const p = state.player;

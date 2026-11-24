@@ -6,7 +6,7 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice } from '../engine/actions.js';
+import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
@@ -665,6 +665,28 @@ async function walkInside() {
       act('action', 'counter');
       return state.log.slice(n0).map((e) => e.text).join(' ') || 'The gate does not move.';
     },
+    items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
+    onPickUp: (pid) => {
+      const n0 = state.log.length;
+      const it = buildingItems(state).find((x) => x.pid === pid);
+      const wasDead = !!state.dead;
+      perform(state, 'action', 'pickup', pid);
+      if (!wasDead && state.dead) recordRun(state);
+      const ok = !buildingItems(state).some((x) => x.pid === pid);
+      saveGame(state);
+      render();
+      const msgs = state.log.slice(n0).filter((e) => e.kind !== 'info' || !ok).map((e) => e.text).join(' ');
+      return { ok, name: it ? itemName(it.item) : '', msg: msgs };
+    },
+    onSeeZone: (zone) => { perform(state, 'action', 'see_zone', zone); saveGame(state); },
+    describeItem: (it, near, touch) => {
+      const def = ITEMS[it.item];
+      const need = projectNeeds()[it.item];
+      const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
+      return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
+        + (need ? `<span class="need">Needed: ${esc(need)}</span>` : '')
+        + (near > 1 ? `<small class="more">Hold ${touch ? 'USE' : 'E'}: take all ${near} in reach</small>` : '');
+    },
     onSearch: (zone) => {
       const n0 = state.log.length;
       const t0 = state.time;
@@ -703,6 +725,18 @@ async function walkInside() {
       commit();
     },
   });
+}
+
+// Parts that unbuilt home projects still need: item id -> "Rain barrels 1/2".
+function projectNeeds() {
+  const out = {};
+  for (const p of PROJECTS) {
+    const st = projectStatus(state, p);
+    if (st.built || st.started || st.missingReq.length) continue;
+    for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+    for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
+  }
+  return out;
 }
 
 // Panels inside the 3D view (Tab, C, J, O).

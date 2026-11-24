@@ -355,3 +355,7 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   #inside.is-touch .in-found { left: 12px; right: auto; width: calc(100% - 112px); }
   #inside.is-touch .in-panel { width: calc(100% - 24px); }
 }
+#inside .in-cross.on { width: 10px; height: 10px; margin: -5px; background: transparent; border: 2px solid var(--accent); }
+#inside .in-prompt .need { display: block; margin-top: 3px; color: var(--signal); font-size: 12px; letter-spacing: .08em; }
+#inside .in-prompt .more { display: block; margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+#inside .in-prompt .bad { color: var(--bad); }

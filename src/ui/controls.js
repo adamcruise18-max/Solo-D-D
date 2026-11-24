@@ -14,8 +14,8 @@ export const KEYS = [
   { group: 'Movement', keys: [], show: 'Mouse', action: 'look', label: 'Look (click the view first)', ready: true },
 
   // Interaction
-  { group: 'Interact', keys: ['KeyE'], show: 'E', action: 'interact', label: 'Use (door, gate). Hold E: search the aisle or room', ready: true },
-  { group: 'Interact', keys: ['KeyF'], show: 'F', action: 'context', label: 'Context action: take all that fits, open, leave', ready: true },
+  { group: 'Interact', keys: ['KeyE'], show: 'E', action: 'interact', label: 'Take the item you look at (also doors, gates). Hold E: take all in reach', ready: true },
+  { group: 'Interact', keys: ['KeyF'], show: 'F', action: 'context', label: 'Context: take the item, or items found before. Hold F: take all in reach', ready: true },
   { group: 'Interact', keys: ['KeyL'], show: 'L', action: 'flashlight', label: 'Flashlight on / off', ready: true },
   { group: 'Interact', keys: ['Mouse1'], show: 'Middle mouse', action: 'ping', label: 'Mark a spot on the floor', ready: true },
   { group: 'Interact', keys: ['Mouse2'], show: 'Right mouse (hold)', action: 'aim', label: 'Look closer (zoom)', ready: true },
@@ -82,7 +82,7 @@ export const SPRINT_SPEED = 4.4;
 export const SLOW_WALK_SPEED = 1.3;
 export const JUMP_SPEED = 3.6; // m/s up
 export const GRAVITY = 9.8;
-export const HOLD_SEARCH_MS = 1100; // hold E this long to search
+export const HOLD_SEARCH_MS = 700; // hold E or F this long to take all in reach
 
 export function moveSpeed({ stance, sprint, slowWalk }) {
   if (stance !== 'stand') return STANCES[stance].speed;
