@@ -10,8 +10,8 @@ export const ITEMS = {
   formula: { name: 'Liquid nutrition bag', unit: 'bag', weight: 1, kind: 'food', cal: 250, water: 8, portion: 1 },
   dog_food: { name: 'Dog food bag', unit: 'bag', weight: 15, kind: 'dogfood', portion: 1 / 15 },
 
-  water_bottle: { name: 'Bottled water (1 gal)', unit: 'gal', weight: 8.3, kind: 'drink', water: 40, portion: 0.25 },
-  saline: { name: 'Saline bag (sterile)', unit: 'bag', weight: 2.2, kind: 'drink', water: 40, portion: 1 },
+  water_bottle: { name: 'Bottled water (1 gal)', unit: 'gal', weight: 8.3, kind: 'drink', water: 25, portion: 0.25 },
+  saline: { name: 'Saline bag (sterile)', unit: 'bag', weight: 2.2, kind: 'drink', water: 27, portion: 1 },
   ors: { name: 'Oral rehydration salts', unit: 'pack', weight: 0.1, kind: 'med', med: 'ors', portion: 1 },
 
   first_aid: { name: 'First aid kit', unit: 'kit', weight: 1, kind: 'med', med: 'bandage', portion: 0.2 },

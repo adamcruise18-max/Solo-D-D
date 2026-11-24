@@ -17,7 +17,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31)) {
     rngState: seed,
     time: START_MINUTE,
     player: {
-      food: 30, water: 20, warmth: 60, energy: 40, health: 70, morale: 40,
+      food: 40, water: 35, warmth: 60, energy: 40, health: 70, morale: 40,
       energyMax: 60, weak: true, weakGoodHours: 0,
       wet: false, wetMinutes: 0, dryMinutes: 0,
       worn: { coat: false, hat: false, gloves: false, boots: false, rain: false },
