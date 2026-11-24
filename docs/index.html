@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Last Light: Portland</title>
+  <meta name="description" content="A solo survival game on the real map of the Portland area. You are the last person alive.">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <main id="mapwrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button id="centerBtn" title="Show where you are">◎ Me</button>
+        <button id="menuBtn" title="Save, backup, new run">☰ Game</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </main>
+    <aside id="panel">
+      <header id="clock"></header>
+      <section id="stats"></section>
+      <section id="location"></section>
+      <section id="items"></section>
+      <section id="dog" hidden></section>
+      <section id="home"></section>
+      <section id="log"></section>
+      <footer class="credits">Last Light: Portland · first playable version · Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></footer>
+    </aside>
+  </div>
+  <div id="modal" hidden></div>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="data/places.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
