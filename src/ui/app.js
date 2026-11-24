@@ -2,11 +2,12 @@
 import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import {
-  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME,
+  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, has, hasLight,
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
-import { feltTemp, INJURY_NAMES } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel } from '../engine/actions.js';
+import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
+import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList } from '../engine/actions.js';
+import { buildInterior } from '../engine/interior.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -456,6 +457,143 @@ function showMenu() {
   });
 }
 
+// ---------- first-person view inside a building ----------
+// The 3D code is a separate file (docs/inside3d.js), loaded the first time it is used.
+let insideLoading = null;
+function loadInside3d() {
+  if (window.LLInside3D) return Promise.resolve(window.LLInside3D);
+  if (!insideLoading) {
+    insideLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'inside3d.js';
+      s.onload = () => resolve(window.LLInside3D);
+      s.onerror = () => { insideLoading = null; reject(new Error('3D view did not load')); };
+      document.head.appendChild(s);
+    });
+  }
+  return insideLoading;
+}
+
+function webglOk() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch (e) { return false; }
+}
+
+async function walkInside() {
+  if (!state || state.dead || document.getElementById('inside')) return;
+  if (!webglOk()) {
+    alert('This browser cannot show 3D. Use the search buttons in the panel.');
+    return;
+  }
+  let api;
+  try { api = await loadInside3d(); } catch (e) {
+    alert('The 3D view did not load. Check the connection and try again.');
+    return;
+  }
+  const loc = state.location;
+  let plan;
+  let cat;
+  let bag;
+  let zoneList;
+  let stock;
+  let counterIdx = -1;
+  let title;
+  let zoneName;
+  if (loc.kind === 'place') {
+    const place = getPlace(loc.id);
+    const ps = placeState(state, place);
+    cat = CATEGORIES[place.cat];
+    plan = buildInterior(place.cat, place.id, ps.zones);
+    zoneList = () => zonesDoneList(ps);
+    stock = ps.stock;
+    counterIdx = cat.lockedZone ? ps.zones - 1 : -1;
+    title = place.name;
+    zoneName = cat.zoneName;
+  } else if (loc.kind === 'house') {
+    const hs = state.houses[loc.id];
+    cat = CATEGORIES.house;
+    plan = buildInterior('house', loc.id, 6, { body: hs.body });
+    zoneList = () => zonesDoneList(hs, 'roomsDone', 'doneList');
+    stock = cat.stock;
+    title = loc.label;
+    zoneName = 'room';
+  } else return;
+  const env = environment(state, 'work');
+  const night = isNight(state.time);
+  document.body.classList.add('inside-open');
+  const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === 'warn' || e.kind === 'bad' || e.kind === 'story').map((e) => e.text);
+  api.openInside({
+    plan,
+    title,
+    subtitle: `${cat.label} · inside`,
+    dark: env.dark,
+    night,
+    hasLight: hasLight(state),
+    stock,
+    isDone: (z) => zoneList().includes(z),
+    isCounterOpen: () => (loc.kind === 'place' ? placeState(state, getPlace(loc.id)).counterOpen : true),
+    isDead: () => !!state.dead,
+    getStatus: () => {
+      const p = state.player;
+      const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
+      const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h` : 'No flashlight';
+      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
+        + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
+    },
+    describe: (n) => {
+      if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
+      if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>`;
+      if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
+        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}`}</small>`;
+      }
+      const e = environment(state, 'work');
+      const min = searchMinutes(state, cat.zoneMinutes, e.dark);
+      return `<kbd>E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? ' · dark, no light' : ''}</small>`;
+    },
+    onWalk: (m) => {
+      perform(state, 'action', 'walk_inside', m);
+      if (state.dead) recordRun(state);
+      saveGame(state);
+    },
+    onCounter: () => {
+      const n0 = state.log.length;
+      act('action', 'counter');
+      return state.log.slice(n0).map((e) => e.text).join(' ') || 'The gate does not move.';
+    },
+    onSearch: (zone) => {
+      const n0 = state.log.length;
+      const t0 = state.time;
+      delete state.lastFound;
+      const wasDead = !!state.dead;
+      perform(state, 'action', loc.kind === 'place' ? 'search' : 'room', zone);
+      if (!wasDead && state.dead) recordRun(state);
+      const found = state.lastFound || {};
+      delete state.lastFound;
+      commit();
+      const items = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? ` ×${q}` : ''}`);
+      const label = plan.spots.find((s) => s.zone === zone)?.label || zoneName;
+      const extra = lastLines(n0).join(' ');
+      return {
+        title: `${label} · ${formatDuration(state.time - t0)}`,
+        items,
+        canTake: Object.keys(hereBag(state)).length > 0,
+        note: extra,
+      };
+    },
+    onTakeAll: () => {
+      const n0 = state.log.length;
+      act('takeall');
+      return state.log.slice(n0).map((e) => e.text).join(' ') || `You put it in your pack. Bag: ${bagWeight(state.carried)} / ${carryLimit(state)} lb.`;
+    },
+    onLeave: () => {
+      document.body.classList.remove('inside-open');
+      commit();
+    },
+  });
+}
+
 // ---------- events ----------
 function bindEvents() {
   document.body.addEventListener('click', (e) => {
@@ -463,6 +601,7 @@ function bindEvents() {
     if (!b || b.disabled || !state || b.closest('#modal') || b.closest('.maplibregl-popup')) return;
     if (b.dataset.act) {
       if (b.dataset.act === 'sleep') return showSleep();
+      if (b.dataset.act === 'walk_in') return walkInside();
       act('action', b.dataset.act);
     } else if (b.dataset.use) act('use', b.dataset.use, b.dataset.verb, b.dataset.from);
     else if (b.dataset.take) act('take', b.dataset.take);

@@ -491,7 +491,7 @@ export function openCounter(state) {
   } else if (chance(state, 0.25)) addInjury(state, 'small_cut');
 }
 
-function searchMinutes(state, base, dark) {
+export function searchMinutes(state, base, dark) {
   const p = state.player;
   let m = base;
   if (dark && !hasLight(state)) m *= 2;
@@ -524,29 +524,66 @@ function reportFound(state, found, where) {
   else log(state, `You search the ${where}. You find nothing useful.`);
 }
 
-export function searchZone(state) {
+// Which zones (aisles, rooms) are done. Old saves only have a count: zones 0..n-1.
+export function zonesDoneList(ps, countKey = 'zonesDone', listKey = 'doneList') {
+  if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_, i) => i);
+  return ps[listKey];
+}
+
+// The zone index the panel button searches: the first one not done.
+// The locked counter (last zone) comes last.
+export function nextZone(ps, counterIdx = -1) {
+  const done = zonesDoneList(ps);
+  for (let i = 0; i < ps.zones; i++) if (i !== counterIdx && !done.includes(i)) return i;
+  if (counterIdx >= 0 && !done.includes(counterIdx)) return counterIdx;
+  return -1;
+}
+
+export function counterIndex(place, ps) {
+  return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
+}
+
+// Search one zone. With no index, search the next zone (panel button).
+export function searchZone(state, index) {
   const place = getPlace(state.location.id);
   const cat = CATEGORIES[place.cat];
   const ps = placeState(state, place);
-  if (ps.zonesDone >= ps.zones) return;
+  if (!ps.unlocked) return false;
+  const cIdx = counterIndex(place, ps);
+  const done = zonesDoneList(ps);
+  const zone = index == null ? nextZone(ps, cIdx) : Number(index);
+  if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
+  const counterZone = zone === cIdx;
+  if (counterZone && !ps.counterOpen) return false;
   const env = environment(state, 'work');
-  const counterZone = cat.lockedZone && ps.zonesDone === ps.zones - 1;
   const minutes = searchMinutes(state, cat.zoneMinutes, env.dark);
   advanceTime(state, minutes, 'work');
-  if (state.dead) return;
+  if (state.dead) return true;
   zoneInjuryCheck(state);
-  const found = rollZone(state, place.id, place.cat, ps.stock, ps.zonesDone, dogExtra(state));
+  const found = rollZone(state, place.id, place.cat, ps.stock, zone, dogExtra(state));
   if (counterZone) found.antibiotics = (found.antibiotics || 0) + (ps.stock > 0.2 ? 1 : 0);
-  ps.zonesDone += 1;
+  done.push(zone);
+  ps.zonesDone = done.length;
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-  reportFound(state, found, counterZone ? lz(cat) : `${cat.zoneName} (${ps.zonesDone} of ${ps.zones})`);
+  reportFound(state, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
   if (place.cat === 'supermarket' && ps.zonesDone === 1) {
     state.player.morale = clamp(state.player.morale - 3, 0, 100);
     log(state, 'The fresh food section is black and rotten. Rats run under the shelves.', 'warn');
   }
+  state.lastFound = found;
+  return true;
 }
 const lz = (cat) => cat.lockedZone.name;
+
+// First-person walking inside a building. Walking pace inside: 60 m for each game minute
+// (slow and careful, over debris). The time moves only when the player moves.
+export const INSIDE_M_PER_MIN = 60;
+export function walkInside(state, meters) {
+  const m = Number(meters);
+  if (!(m > 0)) return;
+  advanceTime(state, m / INSIDE_M_PER_MIN, 'work');
+}
 
 // ---------- houses ----------
 export function areaKey(state) {
@@ -603,20 +640,24 @@ export function enterNearbyHouse(state) {
   else log(state, 'The house is empty and cold. A family lived here.');
 }
 
-export function searchRoom(state) {
+export function searchRoom(state, index) {
   const loc = state.location;
   const hs = state.houses[loc.id];
-  if (hs.roomsDone >= HOUSE_ROOMS.length) return;
-  const room = HOUSE_ROOMS[hs.roomsDone];
+  const done = zonesDoneList(hs, 'roomsDone', 'doneList');
+  let room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+  if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
   const env = environment(state, 'work');
   advanceTime(state, searchMinutes(state, CATEGORIES.house.zoneMinutes, env.dark), 'work');
-  if (state.dead) return;
+  if (state.dead) return true;
   zoneInjuryCheck(state);
-  const found = rollZone(state, loc.id, 'house', CATEGORIES.house.stock, hs.roomsDone, dogExtra(state));
-  hs.roomsDone += 1;
+  const found = rollZone(state, loc.id, 'house', CATEGORIES.house.stock, room, dogExtra(state));
+  done.push(room);
+  hs.roomsDone = done.length;
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-  reportFound(state, found, room);
+  reportFound(state, found, HOUSE_ROOMS[room]);
+  state.lastFound = found;
+  return true;
 }
 
 export function leaveHouse(state) {
@@ -686,7 +727,7 @@ export function listActions(state) {
     const ps = placeState(state, place);
     if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar' : 'd20 DC 12' });
     else if (ps.zonesDone < ps.zones) {
-      if (cat.lockedZone && ps.zonesDone === ps.zones - 1 && !ps.counterOpen) {
+      if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
         add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}` });
       } else {
         const env = environment(state, 'work');
@@ -694,13 +735,16 @@ export function listActions(state) {
         add('search', `Search the next ${cat.zoneName}`, { note: `${ps.zonesDone}/${ps.zones} done · ${formatDuration(min)}${env.dark && !hasLight(state) ? ' (dark, no light)' : ''}` });
       }
     } else add('search', 'Nothing left to search', { disabled: 'You searched all of it' });
+    if (ps.unlocked) add('walk_in', 'Walk inside (first person)', { note: 'look for loot yourself' });
     add('house', 'Search a house nearby', { disabled: nearbyHousesLeft(state) <= 0 && 'No more houses near here' });
     add('go_home', 'Walk home');
   }
   if (loc.kind === 'house') {
     const hs = state.houses[loc.id];
-    if (hs.roomsDone < HOUSE_ROOMS.length) add('room', `Search the ${HOUSE_ROOMS[hs.roomsDone]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
+    const nextRoom = HOUSE_ROOMS.findIndex((_, i) => !zonesDoneList(hs, 'roomsDone', 'doneList').includes(i));
+    if (nextRoom >= 0) add('room', `Search the ${HOUSE_ROOMS[nextRoom]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
     else add('room', 'All rooms searched', { disabled: 'Nothing left' });
+    add('walk_in', 'Walk inside (first person)', { note: 'look for loot yourself' });
     add('leave_house', 'Leave the house');
   }
   add('rest', 'Rest 1 hour');
@@ -717,11 +761,12 @@ export function doAction(state, id, arg) {
   switch (id) {
     case 'rest': return rest(state, 1);
     case 'sleep': return sleep(state, Number(arg) || 8);
-    case 'search': return searchZone(state);
+    case 'search': return searchZone(state, arg);
     case 'force': return forceEntry(state);
     case 'counter': return openCounter(state);
     case 'house': return enterNearbyHouse(state);
-    case 'room': return searchRoom(state);
+    case 'room': return searchRoom(state, arg);
+    case 'walk_inside': return walkInside(state, arg);
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
