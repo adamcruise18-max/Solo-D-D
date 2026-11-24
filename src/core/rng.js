@@ -16,10 +16,12 @@ function next(pos) {
 // Returns a function that gives the next number in [0, 1) for this stream.
 export function stream(state, name) {
   if (!name || typeof name !== 'string') throw new Error('A random stream needs a name');
-  const all = (state.rngStreams = state.rngStreams || {});
-  if (all[name] == null) all[name] = hashString(`${state.seed}:stream:${name}`) | 0;
+  if (state.seed == null) throw new Error('A random stream needs a game seed');
+  const start = () => hashString(`${state.seed}:stream:${name}`) | 0;
   return function rng() {
-    const r = next(all[name]);
+    // Look up the position on each call: a loaded or copied state keeps working.
+    const all = (state.rngStreams = state.rngStreams || {});
+    const r = next(all[name] ?? start());
     all[name] = r.pos;
     return r.value;
   };

@@ -28,6 +28,9 @@ export function unwrapSave(data) {
 // (state.systemVersions[id] -> system.version).
 export function migrate(state, { version, gameMigrations = {}, systems = null } = {}) {
   let s = structuredCloneSafe(state);
+  if (s.version == null) s.version = 1;
+  s.version = Number(s.version);
+  if (!Number.isInteger(s.version) || s.version < 1) throw new Error(`Bad save version: ${state.version}`);
   if (version != null) {
     if (s.version > version) throw new Error(`This save is from a newer game (v${s.version}). Update the game first.`);
     while (s.version < version) {
@@ -39,7 +42,11 @@ export function migrate(state, { version, gameMigrations = {}, systems = null } 
     }
   }
   if (systems) {
-    s.systemVersions = s.systemVersions || {};
+    if (!s.systemVersions) {
+      // A save from before the engine: all its fields are already there (version 1).
+      // Do not run init, because init would overwrite the saved values.
+      s.systemVersions = Object.fromEntries(systems.list().map((sys) => [sys.id, 1]));
+    }
     for (const sys of systems.list()) {
       let v = s.systemVersions[sys.id];
       if (v == null) {
@@ -113,7 +120,8 @@ export function indexedDbBackend(idb = globalThis.indexedDB, dbName = 'lastlight
     const req = idb.open(dbName, 1);
     req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(storeName)) req.result.createObjectStore(storeName); };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => { dbp = null; reject(req.error); };
+    req.onerror = () => { dbp = null; reject(req.error || new Error('Cannot open the save database')); };
+    req.onblocked = () => { dbp = null; reject(new Error('The save database is busy in another tab. Close the other tab and try again.')); };
   }));
   const tx = async (mode, fn) => {
     const db = await open();
@@ -121,7 +129,7 @@ export function indexedDbBackend(idb = globalThis.indexedDB, dbName = 'lastlight
       const t = db.transaction(storeName, mode);
       const req = fn(t.objectStore(storeName));
       t.oncomplete = () => resolve(req?.result ?? null);
-      t.onerror = () => reject(t.error);
+      t.onerror = () => reject(t.error || req?.error || new Error('Save failed'));
       t.onabort = () => reject(t.error || new Error('Save was stopped'));
     });
   };
@@ -141,23 +149,68 @@ export function bestBackend(env = globalThis) {
   return memoryBackend();
 }
 
+// ---------- integrity ----------
+// FNV-1a over the JSON text of the state: finds a cut or changed save.
+export function checksum(state) {
+  const str = JSON.stringify(state);
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+
+export function verify(env) {
+  if (!env || env.format !== SAVE_FORMAT) return true; // old bare save: nothing to check
+  return env.sum == null || env.sum === checksum(env.state);
+}
+
+// Ask the browser not to clear our storage (Safari can clear it after 7 days).
+export async function askPersistentStorage(nav = globalThis.navigator) {
+  try { return nav?.storage?.persist ? await nav.storage.persist() : false; } catch { return false; }
+}
+
 // ---------- slots ----------
+// Safe writes: the last good save is copied to "<slot>~prev" before the new save is
+// written, and every save has a checksum. If the newest save is cut or broken, load()
+// falls back to the last good one. A broken write never destroys the last good save.
 export function createSaveStore(backend = bestBackend(), opts = {}) {
+  const PREV = '~prev';
   return {
     backend: backend.name,
-    async save(slot, state) { await backend.set(slot, wrapSave(state)); return true; },
+    lastLoad: null, // { from: 'current' | 'previous', problem? }
+    async save(slot, state) {
+      const env = wrapSave(state);
+      env.sum = checksum(state);
+      const cur = await backend.get(slot);
+      if (cur != null && verify(cur)) await backend.set(slot + PREV, cur);
+      await backend.set(slot, env);
+      return true;
+    },
     async load(slot) {
-      const data = await backend.get(slot);
-      return data == null ? null : migrate(unwrapSave(data), opts);
+      for (const [key, from] of [[slot, 'current'], [slot + PREV, 'previous']]) {
+        let data;
+        try { data = await backend.get(key); } catch (err) { this.lastLoad = { from, problem: String(err) }; continue; }
+        if (data == null) continue;
+        if (!verify(data)) { this.lastLoad = { from, problem: 'checksum does not match' }; continue; }
+        try {
+          const st = migrate(unwrapSave(data), opts);
+          this.lastLoad = { from, problem: from === 'previous' ? this.lastLoad?.problem || 'newest save missing' : null };
+          return st;
+        } catch (err) {
+          this.lastLoad = { from, problem: String(err.message || err) };
+        }
+      }
+      return null;
     },
     async list() {
       const out = [];
       for (const k of await backend.keys()) {
+        if (k.endsWith(PREV)) continue;
         const d = await backend.get(k);
         if (d?.format === SAVE_FORMAT) out.push({ slot: k, savedAt: d.savedAt, time: d.state?.time, dead: !!d.state?.dead });
+        else if (d?.player && d?.home) out.push({ slot: k, savedAt: 0, time: d.time, dead: !!d.dead });
       }
       return out.sort((a, b) => b.savedAt - a.savedAt);
     },
-    remove: (slot) => backend.remove(slot),
+    async remove(slot) { await backend.remove(slot); await backend.remove(slot + PREV); },
   };
 }

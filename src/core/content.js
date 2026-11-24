@@ -18,6 +18,7 @@ export function checkContent({ items = {}, categories = {}, projects = [] } = {}
 
   for (const [cid, cat] of Object.entries(categories)) {
     const where = `place type ${cid}`;
+    if (!cat || typeof cat !== 'object') { bad(where, 'is not an object'); continue; }
     if (!cat.label) bad(where, 'has no label');
     if (!(cat.stock >= 0 && cat.stock <= 1)) bad(where, 'stock must be 0 to 1');
     if (!(Number.isInteger(cat.zones) && cat.zones > 0)) bad(where, 'zones must be a whole number above 0');
@@ -25,6 +26,7 @@ export function checkContent({ items = {}, categories = {}, projects = [] } = {}
     if (!Array.isArray(cat.loot) || !cat.loot.length) { bad(where, 'has no loot table'); continue; }
     const seen = new Set();
     for (const e of cat.loot) {
+      if (!e || !e.id) { bad(where, 'loot has an entry with no id'); continue; }
       if (!items[e.id]) bad(where, `loot names unknown item "${e.id}"`);
       if (!(e.w > 0)) bad(where, `loot weight for "${e.id}" must be above 0`);
       if (seen.has(e.id)) bad(where, `loot lists "${e.id}" two times`);
@@ -32,6 +34,10 @@ export function checkContent({ items = {}, categories = {}, projects = [] } = {}
     }
   }
 
+  projects = projects.filter((p, i) => {
+    if (!p || typeof p.id !== 'string' || !p.id) { bad(`project #${i}`, 'has no id'); return false; }
+    return true;
+  });
   const projIds = new Set();
   for (const p of projects) {
     if (projIds.has(p.id)) bad(`project ${p.id}`, 'id is used two times');

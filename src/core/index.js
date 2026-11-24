@@ -19,7 +19,7 @@ export function createEngine({ systems = [], actions = [] } = {}) {
   const events = createEvents();
   const sys = createSystems(systems);
   const clock = createClock({ systems: sys, events });
-  const acts = createActions(actions, { events });
+  const acts = createActions(actions, { events, clock });
   return {
     events,
     systems: sys,
@@ -32,13 +32,11 @@ export function createEngine({ systems = [], actions = [] } = {}) {
       return state;
     },
     advance: (state, minutes, mode) => clock.advance(state, minutes, mode),
-    perform(state, id, arg) {
-      const r = acts.run(state, id, arg);
-      if (state.dead && !state._deathSent) {
-        state._deathSent = true;
-        events.emit('player.died', { cause: state.dead.cause, days: state.dead.days });
-      }
-      return r;
-    },
+    perform: (state, id, arg) => acts.run(state, id, arg),
   };
 }
+
+export { createProfiler, FRAME_BUDGET_MS, SECTION_BUDGET_MS, MEMORY_BUDGETS_MB } from './profiler.js';
+export { createGrid, classify, tierOf, simDue, DEFAULT_RINGS, DEFAULT_CELL_METERS, TIER_INFO, TIER_ORDER } from './cells.js';
+export { createStreamer } from './streamer.js';
+export { recordChange, changesFor, hasChange, applyChanges, changesBytes, CHANGE_KINDS } from './changes.js';

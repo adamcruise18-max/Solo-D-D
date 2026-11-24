@@ -11,6 +11,8 @@ export const dayIndex = (t) => Math.floor(t / 1440);
 export const minuteOfDay = (t) => ((t % 1440) + 1440) % 1440;
 export const gameDay = (t) => dayIndex(t - DAY_START_MINUTE);
 
+const deathSent = new WeakSet(); // states whose death event was sent
+
 export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES } = {}) {
   if (!systems) throw new Error('The clock needs a systems list');
 
@@ -31,6 +33,10 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
         events?.emit('day.start', { day: d, time: state.time });
       }
       systems.step(state, step / 60, ctx);
+    }
+    if (state.dead && events && !deathSent.has(state)) {
+      deathSent.add(state);
+      events.emit('player.died', { cause: state.dead.cause, days: state.dead.days, time: state.time });
     }
     return state;
   }

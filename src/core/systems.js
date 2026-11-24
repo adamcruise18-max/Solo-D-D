@@ -50,8 +50,9 @@ export function createSystems(list = []) {
   for (const s of list) add(s);
 
   function run(hook, state, arg, ctx) {
+    // Death is checked by the clock between steps, not here: like the old
+    // tickStep(), every system finishes the step in which the player dies.
     for (const s of ordered) {
-      if (state.dead && hook !== 'init') return;
       if (s[hook]) s[hook](state, arg, ctx);
     }
   }

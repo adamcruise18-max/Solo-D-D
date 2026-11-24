@@ -55,13 +55,20 @@ try {
     await store.save('check-slot', game);
     const back = await store.load('check-slot');
     const list = await store.list();
+    // A cut newest save falls back to the last good one.
+    await store.save('check-slot', { ...game, time: 700 });
+    const raw = await backend.get('check-slot');
+    raw.state.time = 1;
+    await backend.set('check-slot', raw);
+    const fallback = await store.load('check-slot');
     await store.remove('check-slot');
     const gone = await store.load('check-slot');
-    return { backend: backend.name, same: JSON.stringify(back) === JSON.stringify(game), listed: list.some((x) => x.slot === 'check-slot'), gone: gone === null };
+    return { backend: backend.name, same: JSON.stringify(back) === JSON.stringify(game), listed: list.some((x) => x.slot === 'check-slot'), gone: gone === null, fallback: fallback?.time === 600 && store.lastLoad.from === 'previous' };
   });
   check(r.backend === 'indexedDB', `best save backend in Chromium is IndexedDB (got ${r.backend})`);
   check(r.same, 'a game saved to IndexedDB loads back the same');
   check(r.listed, 'the save slot shows in the list');
+  check(r.fallback, 'a broken newest save falls back to the last good save');
   check(r.gone, 'a removed slot is gone');
 } finally {
   await browser.close();

@@ -6,6 +6,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { newGame, dayIndex } from '../src/engine/state.js';
+import { hashString } from '../src/rng.js';
 import { loadPlaces, botTurn } from './bot.mjs';
 
 export const SEEDS = [42, 1234, 777];
@@ -22,6 +23,10 @@ function snap(s) {
     r1(s.stats.miles), s.stats.placesSearched, s.dog.stage,
     Object.keys(s.carried).length, Object.keys(s.home.storage).length,
     s.dead ? s.dead.cause : '',
+    s.rngState,
+    // Hash of the core rule fields: catches changes not in the numbers above.
+    // (Not the whole state: new features add new fields, which is not a rule change.)
+    hashString(JSON.stringify([s.time, s.pos, s.location, s.player, s.home, s.carried, s.dog, s.weather, s.stats])).toString(36),
   ].join('|');
 }
 

@@ -4,7 +4,7 @@
 //   when(state)    - true, or a short reason why the action is not possible now
 //   minutes(state, arg) - game minutes it will cost (shown before you act)
 //   risk(state, arg)    - null, or { chance: 0..1, text } (shown before you act)
-//   run(state, arg)     - do it (rules only, no screen code)
+//   run(state, arg, ctx) - do it (rules only, no screen code); ctx = { clock, events }
 // The screen asks list(state) and shows label, time and risk the same way for
 // every action. That is the "risk and time shown before rolling" rule.
 
@@ -22,7 +22,8 @@ export function defineAction(a) {
 
 const call = (v, ...args) => (typeof v === 'function' ? v(...args) : v);
 
-export function createActions(list = [], { events = null } = {}) {
+export function createActions(list = [], { events = null, clock = null } = {}) {
+  const ctx = { events, clock };
   const byId = new Map();
 
   function add(a) {
@@ -38,7 +39,7 @@ export function createActions(list = [], { events = null } = {}) {
     if (state.dead) return 'You are dead';
     if (!d.when) return null;
     const w = d.when(state, arg);
-    if (w === true || w == null) return null;
+    if (w === true || w == null || w === '') return null;
     return w === false ? 'Not possible now' : String(w);
   }
 
@@ -72,7 +73,7 @@ export function createActions(list = [], { events = null } = {}) {
       return { ok: false, why };
     }
     const t0 = state.time;
-    const result = d.run(state, arg);
+    const result = d.run(state, arg, ctx);
     events?.emit('action.done', { id, arg, minutes: state.time - t0 });
     return { ok: true, result, minutes: state.time - t0 };
   }
