@@ -629,6 +629,50 @@
   var getPlace = (id) => INDEX[id];
   var allPlaces = () => LIST;
 
+  // src/engine/season.js
+  var SEASONS = {
+    winter: { label: "Winter", months: [10, 11, 0, 1] },
+    // Nov to Feb: cold, wet, dark
+    spring: { label: "Spring", months: [2, 3, 4] },
+    summer: { label: "Summer", months: [5, 6, 7] },
+    fall: { label: "Fall", months: [8, 9] }
+  };
+  function seasonOf(t) {
+    const m = calendar(t).month;
+    return Object.keys(SEASONS).find((k) => SEASONS[k].months.includes(m));
+  }
+  function overgrowth(t) {
+    const days = Math.max(0, dayIndex(t));
+    return Math.min(1, 0.08 + days / 730);
+  }
+  var SEASON_START_TEXT = {
+    spring: "Spring. The days are longer. Green shoots push up through the cracks in the roads.",
+    summer: "Summer. The city is green and quiet. Grass grows tall in the streets and on the lawns.",
+    fall: "Fall. The leaves turn and drop. They pile up on the cars and fill the gutters.",
+    winter: "Winter. Cold rain and short days. Dead weeds bend over the sidewalks."
+  };
+  var GROWTH_TEXT = [
+    "Moss grows on the north side of the parked cars.",
+    "Weeds come up in the cracks of the parking lots.",
+    "Blackberry vines climb over the fences on your street.",
+    "Ivy covers the walls of the stores. Some windows are green now.",
+    "Small trees grow in the gutters and on the flat roofs.",
+    "The lawns are fields now. Deer walk down the middle of the street.",
+    "Grass hides the road lines. Some side streets look like trails.",
+    "Young alder trees stand in the parking lots, taller than the cars."
+  ];
+  function seasonDaily(state2, day) {
+    const t = day * 1440;
+    const prev = state2.season || seasonOf(t);
+    const now = seasonOf(t);
+    if (now !== prev) log(state2, SEASON_START_TEXT[now], "story");
+    state2.season = now;
+    if (calendar(t).date === 24 && day > 0) {
+      const n = Math.round(day / 30.4) - 1;
+      log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
+    }
+  }
+
   // src/data/projects.js
   var WINGS = {
     power: { label: "Power", icon: "\u26A1", blurb: "Solar panels and the home battery." },
@@ -1067,6 +1111,7 @@
   function dailyRollover(state2, day) {
     const p = state2.player;
     rollWeather(state2, day);
+    seasonDaily(state2, day);
     log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
     if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
     if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
@@ -2221,11 +2266,11 @@
     const c = parseColor(str);
     if (!c) return str;
     const gray = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
-    const mix = (v, t) => v + (t - v) * toward;
+    const mix2 = (v, t) => v + (t - v) * toward;
     return toCss({
-      r: mix(c.r + (gray - c.r) * desat, SNOW.r),
-      g: mix(c.g + (gray - c.g) * desat, SNOW.g),
-      b: mix(c.b + (gray - c.b) * desat, SNOW.b) + 4,
+      r: mix2(c.r + (gray - c.r) * desat, SNOW.r),
+      g: mix2(c.g + (gray - c.g) * desat, SNOW.g),
+      b: mix2(c.b + (gray - c.b) * desat, SNOW.b) + 4,
       a: c.a
     });
   }
@@ -2286,6 +2331,234 @@
     }
     return out;
   }
+  function mix(a, b, f) {
+    const x = parseColor(a);
+    const y = parseColor(b);
+    return toCss({ r: x.r + (y.r - x.r) * f, g: x.g + (y.g - x.g) * f, b: x.b + (y.b - x.b) * f, a: x.a + (y.a - x.a) * f });
+  }
+  var SEASON_COLORS = {
+    winter: ["#eaeff3", "#d6e2da", "#dbe5de", "rgba(170,196,180,0.65)", "rgba(212,221,229,0.55)", "#ffffff"],
+    spring: ["#edf0e8", "#c8dfbc", "#d0e4c3", "rgba(132,184,128,0.7)", "rgba(214,226,206,0.55)", "#ffffff"],
+    summer: ["#eceee2", "#b2d39c", "#bfdba8", "rgba(104,166,96,0.75)", "rgba(204,222,188,0.6)", "#fdfdf7"],
+    fall: ["#efede5", "#d4d6a6", "#dcdcb4", "rgba(196,158,96,0.7)", "rgba(222,220,200,0.55)", "#fffdf6"]
+  };
+  var WILD = ["#e3ead8", "#9cc884", "#a9d08f", "rgba(84,150,80,0.8)", "rgba(176,206,150,0.65)", "#e6eedb"];
+  var WILD_WINTER = ["#e6ece4", "#c3d6c2", "#c9dbc8", "rgba(130,170,140,0.75)", "rgba(196,212,200,0.6)", "#eef2ec"];
+  function seasonPaint(season, growth) {
+    const base2 = SEASON_COLORS[season] || SEASON_COLORS.winter;
+    const wild = season === "winter" ? WILD_WINTER : WILD;
+    const g = Math.max(0, Math.min(1, growth)) * (season === "winter" ? 0.6 : 0.85);
+    const c = base2.map((col, i) => mix(col, wild[i], g));
+    return [
+      ["background", "background-color", c[0]],
+      ["park", "fill-color", c[1]],
+      ["landcover_grass", "fill-color", c[2]],
+      ["landuse_pitch", "fill-color", c[2]],
+      ["landuse_cemetery", "fill-color", c[2]],
+      ["landcover_wood", "fill-color", c[3]],
+      ["landuse_residential", "fill-color", c[4]],
+      ["road_minor", "line-color", c[5]],
+      ["road_service_track", "line-color", c[5]],
+      ["road_path_pedestrian", "line-color", c[5]],
+      ["tunnel_minor", "line-color", c[5]]
+    ];
+  }
+
+  // src/ui/details.js
+  var DETAIL_INFO = {
+    car: { label: "Abandoned car", text: "The doors are shut. Dust and leaves cover the glass. The battery is long dead." },
+    debris: { label: "Debris", text: "Broken glass, a fallen sign and bits of a shop front." },
+    barricade: { label: "Barricade", text: "Concrete blocks and plastic barriers from the last weeks of the outbreak." },
+    trash: { label: "Trash", text: "Black bags piled at the curb. Nobody came to take them away." },
+    sign: { label: "Quarantine sign", text: "COUNTY HEALTH ORDER. QUARANTINE AREA. NO ENTRY. The paper is wet and torn." },
+    tent: { label: "Medical tent", text: "A white tent with folding cots inside. It sags under the rain." },
+    bush: { label: "Overgrowth", text: "Weeds and blackberry vines grow over the curb." },
+    tree: { label: "Young tree", text: "A young tree grows out of a crack in the asphalt." }
+  };
+  var NEAR = {
+    hospital: [["barricade", 4], ["sign", 3], ["tent", 3], ["car", 4], ["trash", 2]],
+    clinic: [["barricade", 1], ["sign", 2], ["tent", 1], ["car", 2]],
+    pharmacy: [["sign", 1], ["car", 2], ["trash", 1], ["debris", 1]],
+    supermarket: [["car", 5], ["trash", 2], ["debris", 1], ["barricade", 1]],
+    convenience: [["car", 2], ["trash", 1], ["debris", 1]],
+    gas: [["car", 3], ["debris", 1]],
+    hardware: [["car", 4], ["debris", 1]],
+    outdoor: [["car", 2], ["trash", 1]],
+    fire: [["barricade", 2], ["sign", 1], ["car", 1]]
+  };
+  var CAR_STYLES = 4;
+  function pointNear(rng, lat, lon, minM, maxM) {
+    const a = rng() * Math.PI * 2;
+    const d = minM + rng() * (maxM - minM);
+    return [lon + Math.sin(a) * d / (111320 * Math.cos(lat * Math.PI / 180)), lat + Math.cos(a) * d / 111320];
+  }
+  function detailFeatures(places, home) {
+    const features = [];
+    const add = (type, coord, rng, extra = {}) => features.push({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: coord },
+      properties: {
+        type,
+        icon: type === "car" ? `ll-car-${Math.floor(rng() * CAR_STYLES)}` : `ll-${type}`,
+        rot: Math.round(rng() * 360),
+        g: 0,
+        ...extra
+      }
+    });
+    const spots = [...places, { id: "__home", cat: "home", lat: home.lat, lon: home.lon }];
+    for (const p of spots) {
+      const rng = mulberry32(hashString(`detail:${p.id}`));
+      const list = p.cat === "home" ? [["car", 3], ["trash", 1]] : NEAR[p.cat] || [];
+      for (const [type, n] of list) {
+        for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === "home" ? 30 : 25, type === "car" ? 110 : 80), rng);
+      }
+      const greens = p.cat === "home" ? 6 : 5;
+      for (let i = 0; i < greens; i++) {
+        add(rng() < 0.6 ? "bush" : "tree", pointNear(rng, p.lat, p.lon, 15, 130), rng, { g: 0.05 + i / greens * 0.8 + rng() * 0.1 });
+      }
+    }
+    return { type: "FeatureCollection", features };
+  }
+  function canvas(size, draw) {
+    const px = 2;
+    const c = document.createElement("canvas");
+    c.width = size * px;
+    c.height = size * px;
+    const x = c.getContext("2d");
+    x.scale(px, px);
+    draw(x, size);
+    return { data: x.getImageData(0, 0, c.width, c.height), pixelRatio: px };
+  }
+  function rrect(x, a, b, w, h, r) {
+    x.beginPath();
+    x.moveTo(a + r, b);
+    x.arcTo(a + w, b, a + w, b + h, r);
+    x.arcTo(a + w, b + h, a, b + h, r);
+    x.arcTo(a, b + h, a, b, r);
+    x.arcTo(a, b, a + w, b, r);
+    x.closePath();
+  }
+  var CAR_COLORS = ["#7d8792", "#5b6b7c", "#8a5a52", "#c9cdd2"];
+  function addDetailIcons(map) {
+    const icons = {};
+    CAR_COLORS.forEach((col, i) => {
+      icons[`ll-car-${i}`] = canvas(16, (x) => {
+        x.fillStyle = "rgba(10,20,30,0.25)";
+        rrect(x, 5, 1.5, 7, 14, 2.2);
+        x.fill();
+        x.fillStyle = col;
+        x.strokeStyle = "#26313c";
+        x.lineWidth = 0.8;
+        rrect(x, 4.5, 1, 7, 14, 2.2);
+        x.fill();
+        x.stroke();
+        x.fillStyle = "#2f3d4a";
+        rrect(x, 5.6, 3.6, 4.8, 2.6, 0.8);
+        x.fill();
+        rrect(x, 5.6, 10.6, 4.8, 2, 0.8);
+        x.fill();
+      });
+    });
+    icons["ll-debris"] = canvas(14, (x) => {
+      x.fillStyle = "#8b939b";
+      x.strokeStyle = "#4b5560";
+      x.lineWidth = 0.6;
+      for (const [a, b, w] of [[2, 3, 4], [7, 2, 3], [4, 8, 5], [9, 7, 3]]) {
+        x.beginPath();
+        x.moveTo(a, b);
+        x.lineTo(a + w, b + 1);
+        x.lineTo(a + w - 1, b + w * 0.7);
+        x.lineTo(a + 0.5, b + w * 0.6);
+        x.closePath();
+        x.fill();
+        x.stroke();
+      }
+    });
+    icons["ll-barricade"] = canvas(18, (x) => {
+      x.fillStyle = "#b7bcc1";
+      x.strokeStyle = "#4b5560";
+      x.lineWidth = 0.7;
+      rrect(x, 1, 6, 16, 6, 1);
+      x.fill();
+      x.stroke();
+      x.save();
+      x.beginPath();
+      rrect(x, 1, 6, 16, 6, 1);
+      x.clip();
+      x.fillStyle = "#c23a46";
+      for (let i = -6; i < 18; i += 4) {
+        x.beginPath();
+        x.moveTo(i, 12);
+        x.lineTo(i + 2, 12);
+        x.lineTo(i + 8, 6);
+        x.lineTo(i + 6, 6);
+        x.fill();
+      }
+      x.restore();
+    });
+    icons["ll-trash"] = canvas(14, (x) => {
+      x.strokeStyle = "#0b0f13";
+      x.lineWidth = 0.6;
+      for (const [a, b, r] of [[5, 8, 3.4], [9, 6, 3], [8, 10, 2.8]]) {
+        x.fillStyle = "#1d2329";
+        x.beginPath();
+        x.arc(a, b, r, 0, Math.PI * 2);
+        x.fill();
+        x.stroke();
+      }
+    });
+    icons["ll-sign"] = canvas(16, (x) => {
+      x.fillStyle = "#f1d046";
+      x.strokeStyle = "#1a1a1a";
+      x.lineWidth = 1.2;
+      rrect(x, 2, 2, 12, 12, 1);
+      x.fill();
+      x.stroke();
+      x.fillStyle = "#1a1a1a";
+      x.fillRect(7.1, 4.2, 1.8, 5.2);
+      x.fillRect(7.1, 10.4, 1.8, 1.8);
+    });
+    icons["ll-tent"] = canvas(18, (x) => {
+      x.fillStyle = "#f4f6f8";
+      x.strokeStyle = "#5a6672";
+      x.lineWidth = 0.8;
+      rrect(x, 2, 3, 14, 12, 1.5);
+      x.fill();
+      x.stroke();
+      x.strokeStyle = "#9aa6b2";
+      x.beginPath();
+      x.moveTo(9, 3);
+      x.lineTo(9, 15);
+      x.stroke();
+      x.fillStyle = "#2f7fb8";
+      x.fillRect(2.5, 8, 13, 2);
+    });
+    icons["ll-bush"] = canvas(14, (x) => {
+      x.fillStyle = "rgba(70,120,60,0.85)";
+      for (const [a, b, r] of [[5, 7, 3.5], [8.5, 5.5, 3.2], [9, 9, 3], [5.5, 10, 2.6]]) {
+        x.beginPath();
+        x.arc(a, b, r, 0, Math.PI * 2);
+        x.fill();
+      }
+    });
+    icons["ll-tree"] = canvas(18, (x) => {
+      x.fillStyle = "rgba(20,40,20,0.2)";
+      x.beginPath();
+      x.arc(10, 10, 7, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = "rgba(58,110,52,0.9)";
+      x.beginPath();
+      x.arc(9, 9, 6.5, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = "rgba(96,150,80,0.9)";
+      x.beginPath();
+      x.arc(7.5, 7.5, 3, 0, Math.PI * 2);
+      x.fill();
+    });
+    for (const [id, img] of Object.entries(icons)) {
+      if (!map.hasImage(id)) map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
+    }
+  }
 
   // src/ui/map.js
   var STYLE_URLS = [
@@ -2344,6 +2617,37 @@
     colorExpr.push("#999");
     const ready = new Promise((resolve) => map.on("load", resolve));
     await ready;
+    addDetailIcons(map);
+    map.addSource("details", { type: "geojson", data: detailFeatures(places, HOME) });
+    map.addLayer({
+      id: "details",
+      type: "symbol",
+      source: "details",
+      minzoom: 14,
+      filter: ["<=", ["get", "g"], 0.08],
+      layout: {
+        "icon-image": ["get", "icon"],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.75, 16, 1.1, 18, 1.8],
+        "icon-rotate": ["match", ["get", "type"], ["car", "debris", "trash", "barricade", "bush"], ["get", "rot"], 0],
+        "icon-rotation-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true
+      }
+    });
+    let detailPopup = null;
+    map.on("click", "details", (e) => {
+      const f = e.features && e.features[0];
+      if (!f || map.queryRenderedFeatures(e.point, { layers: ["places"] }).length) return;
+      const info = DETAIL_INFO[f.properties.type];
+      if (detailPopup) detailPopup.remove();
+      detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px" }).setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
+    });
+    map.on("mouseenter", "details", () => {
+      map.getCanvas().style.cursor = "help";
+    });
+    map.on("mouseleave", "details", () => {
+      map.getCanvas().style.cursor = "";
+    });
     map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
     map.addLayer({
       id: "edge-glow",
@@ -2407,10 +2711,23 @@
     youEl.title = "You";
     youEl.innerHTML = "<i></i>";
     const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    let seasonKey = "";
+    function applySeason(t) {
+      const season = seasonOf(t);
+      const growth = Math.round(overgrowth(t) * 20) / 20;
+      const key = `${season}:${growth}`;
+      if (key === seasonKey) return;
+      seasonKey = key;
+      for (const [id, prop, color] of seasonPaint(season, growth)) {
+        if (map.getLayer(id)) map.setPaintProperty(id, prop, color);
+      }
+      map.setFilter("details", ["<=", ["get", "g"], growth]);
+    }
     return {
       map,
       online,
       update(state2, list) {
+        applySeason(state2.time);
         map.getSource("places").setData(placesGeo(list, state2.places));
         you.setLngLat([state2.pos.lon, state2.pos.lat]);
         youEl.classList.toggle("at-home", state2.location.kind === "home");
@@ -2455,10 +2772,10 @@
   function createFx(wrap) {
     const layer = document.createElement("div");
     layer.className = "fx";
-    layer.innerHTML = '<div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
     wrap.appendChild(layer);
-    const canvas = layer.querySelector("canvas");
-    const ctx = canvas.getContext("2d");
+    const canvas2 = layer.querySelector("canvas");
+    const ctx = canvas2.getContext("2d");
     let kind = "none";
     let strength = 0;
     let wind = 0;
@@ -2468,29 +2785,30 @@
     function resize() {
       const r = wrap.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.max(1, r.width * dpr);
-      canvas.height = Math.max(1, r.height * dpr);
-      canvas.style.width = `${r.width}px`;
-      canvas.style.height = `${r.height}px`;
+      canvas2.width = Math.max(1, r.width * dpr);
+      canvas2.height = Math.max(1, r.height * dpr);
+      canvas2.style.width = `${r.width}px`;
+      canvas2.style.height = `${r.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     function spawn(w, h, anywhere) {
-      const snow = kind === "snow";
+      const snow = kind === "snow" || kind === "leaves";
       return {
         x: Math.random() * (w + 200) - 100,
         y: anywhere ? Math.random() * h : -10,
-        r: snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
+        r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
+        c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
         v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
         p: Math.random() * Math.PI * 2
       };
     }
     function frame() {
       raf = 0;
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
+      const w = canvas2.clientWidth;
+      const h = canvas2.clientHeight;
       ctx.clearRect(0, 0, w, h);
       if (!enabled || kind === "none" || document.hidden) return;
-      const want = Math.round((kind === "snow" ? 160 : 220) * strength * Math.min(1, w * h / 6e5 + 0.3));
+      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h / 6e5 + 0.3));
       while (parts.length < want) parts.push(spawn(w, h, true));
       if (parts.length > want) parts.length = want;
       const drift = wind / 12;
@@ -2508,6 +2826,21 @@
           ctx.fill();
         }
         ctx.shadowBlur = 0;
+      } else if (kind === "leaves") {
+        for (const s of parts) {
+          s.p += 0.05;
+          s.y += s.v * 0.9;
+          s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
+          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(s.p);
+          ctx.fillStyle = s.c;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, s.r, s.r * 0.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
       } else {
         ctx.strokeStyle = "rgba(60,90,120,0.38)";
         ctx.lineWidth = 1;
@@ -2531,11 +2864,13 @@
     document.addEventListener("visibilitychange", run);
     return {
       // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
-      update({ weather, night, windMph }) {
-        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : "none";
+      update({ weather, night, windMph, season }) {
+        const windy = weather === "windstorm" || (windMph || 0) >= 12;
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : season === "fall" && windy ? "leaves" : "none";
         if (nextKind !== kind) parts = [];
         kind = nextKind;
-        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : 0;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
+        for (const s of ["winter", "spring", "summer", "fall"]) layer.classList.toggle(`is-${s}`, season === s);
         wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
         layer.classList.toggle("is-night", !!night);
         layer.classList.toggle("is-fog", weather === "fog");
@@ -2547,7 +2882,7 @@
         enabled = on;
         setFxEnabled(on);
         layer.classList.toggle("off", !on);
-        if (!on) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!on) ctx.clearRect(0, 0, canvas2.width, canvas2.height);
         run();
       },
       get enabled() {
@@ -2632,11 +2967,12 @@
     $("#hud").innerHTML = `
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
+    <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
     ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}`;
     $("#hud").hidden = false;
-    if (fx) fx.update({ weather: w.type, night, windMph: w.wind });
+    if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
   }
   function renderHeader() {
     const t = state.time;
@@ -2649,7 +2985,7 @@
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
   }
   function renderStats() {
     const p = state.player;

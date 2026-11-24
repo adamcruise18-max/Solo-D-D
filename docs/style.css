@@ -46,6 +46,9 @@ a { color: var(--accent); }
 /* ---------- effects over the map ---------- */
 .fx, .fx > * { position: absolute; inset: 0; pointer-events: none; }
 .fx { z-index: 1; }
+.fx-season { opacity: 0; transition: opacity 2s, background 2s; mix-blend-mode: multiply; }
+.fx.is-summer .fx-season { opacity: .1; background: radial-gradient(ellipse at 60% 30%, rgb(255, 236, 180), rgb(240, 214, 150)); }
+.fx.is-fall .fx-season { opacity: .08; background: rgb(240, 200, 150); }
 .fx-night { background: rgb(28, 52, 98); mix-blend-mode: multiply; opacity: 0; transition: opacity 1.2s; }
 .fx.is-night .fx-night { opacity: .26; }
 .fx-fog { background: radial-gradient(ellipse at 50% 50%, rgba(232, 238, 243, 0) 30%, rgba(232, 238, 243, .55) 75%, rgba(232, 238, 243, .85) 100%);
@@ -55,7 +58,7 @@ a { color: var(--accent); }
   background-size: 72px 72px; }
 .fx-vignette { background: radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(9, 16, 24, .26) 100%); transition: background .8s; }
 .fx.is-storm .fx-vignette { background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(9, 16, 24, .4) 100%); }
-.fx.off .fx-night, .fx.off .fx-fog, .fx.off .fx-fall { display: none; }
+.fx.off .fx-season, .fx.off .fx-night, .fx.off .fx-fog, .fx.off .fx-fall { display: none; }
 
 /* ---------- HUD on the map ---------- */
 .hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center;
@@ -66,7 +69,7 @@ a { color: var(--accent); }
 .hud span:first-child { border-left: 0; }
 .hud .h-day { color: var(--signal); }
 .hud .h-time { font-variant-numeric: tabular-nums; color: #fff; }
-.hud .h-wx, .hud .h-temp { color: var(--muted); }
+.hud .h-wx, .hud .h-temp, .hud .h-season { color: var(--muted); }
 .hud .h-alert { color: #ffd2cb; background: rgba(229, 96, 79, .22); animation: blink 1.6s ease-in-out infinite; }
 @keyframes blink { 50% { background: rgba(229, 96, 79, .08); } }
 
@@ -223,7 +226,7 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   .legend, .coords { display: none; }
   .hud { top: 50px; left: 10px; transform: none; font-size: 12px; max-width: calc(100% - 20px); }
   .hud span { padding: 6px 8px; }
-  .hud .h-alert { display: none; }
+  .hud .h-alert, .hud .h-season { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .marker-you i, .marker-home.here span, .hud .h-alert { animation: none; }
