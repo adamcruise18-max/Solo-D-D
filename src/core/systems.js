@@ -9,13 +9,15 @@
 //     daily(state, day, ctx),  // once per game day, at 5 AM
 //     version: 1,              // version of this system's save fields
 //     migrations: { 2(state) {...} }, // upgrade old saves: key = new version
+//     legacy: true,            // its fields were in saves from before the engine
+//                              // (old saves: no init for it; other systems run init)
 //   }
 //
 // All hooks are optional except id. A new feature is a new system file,
 // not an edit to one large function.
 
 const HOOKS = ['init', 'step', 'daily'];
-const KNOWN = new Set(['id', 'order', 'version', 'migrations', 'label', ...HOOKS]);
+const KNOWN = new Set(['id', 'order', 'version', 'migrations', 'label', 'legacy', ...HOOKS]);
 
 export function defineSystem(sys) {
   if (!sys || typeof sys.id !== 'string' || !sys.id) throw new Error('A system needs an id');

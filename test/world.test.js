@@ -103,12 +103,14 @@ test('streamer: a budget drops the lowest priority cells, never the player cell'
 test('streamer: a failed load is counted and retried on the next update', async () => {
   const g = createGrid({ origin: ALOHA, cellMeters: 256 });
   let fail = true;
-  const s = createStreamer({ load: async (k) => { if (k === '0,0' && fail) throw new Error('disk'); return k; } });
+  let t = 0;
+  const s = createStreamer({ now: () => t, load: async (k) => { if (k === '0,0' && fail) throw new Error('disk'); return k; } });
   s.update(classify(g, ALOHA));
   await s.idle();
   assert.equal(s.report().failed, 1);
   assert.equal(s.status('0,0'), 'unloaded');
   fail = false;
+  t = 5000; // after the retry wait
   s.update(classify(g, ALOHA));
   await s.idle();
   assert.equal(s.status('0,0'), 'loaded');
@@ -123,11 +125,15 @@ test('streamer: rapid travel across many cells stays inside the budget', async (
     unload: (k) => live.delete(k),
     maxLoaded: 40,
   });
-  for (let i = 0; i < 200; i++) {
-    s.update(classify(g, g.center(`${i},${Math.round(i / 3)}`), { heading: { x: 3, z: 1 } }));
-    if (i % 5 === 0) await s.idle();
+  // 60 cells east and back again, inside the 15 mile area, fast.
+  const path = [...Array(60).keys(), ...[...Array(60).keys()].reverse()];
+  for (let n = 0; n < path.length; n++) {
+    const i = path[n];
+    s.update(classify(g, g.center(`${i},${Math.round(i / 3)}`), { heading: { x: n < 60 ? 3 : -3, z: n < 60 ? 1 : -1 } }));
+    if (n % 5 === 0) await s.idle();
   }
   await s.idle();
+  assert.equal(s.status('0,0'), 'loaded', 'back at the start, the start cell is loaded');
   assert.ok(peak <= 40 + 4, `peak ${peak} cells in memory`);
   assert.equal(live.size, s.loadedKeys().length, 'every loaded cell is freed exactly once');
 });
@@ -218,11 +224,15 @@ test('saves: many saves in a row keep one good copy and one previous copy', asyn
 
 // ---------- reviewer findings ----------
 test('saves: an old save with no systemVersions keeps its values (no init over them)', () => {
-  const systems = createSystems([{ id: 'vitals', init: (s) => { s.player = { food: 40 }; } }]);
+  const systems = createSystems([
+    { id: 'vitals', legacy: true, init: (s) => { s.player = { food: 40 }; } },
+    { id: 'skills', init: (s) => { s.skills = { fishing: 0 }; } }, // added after the engine
+  ]);
   const old = { version: 1, player: { food: 3 }, home: {} };
   const up = migrate(old, { systems });
-  assert.equal(up.player.food, 3);
-  assert.deepEqual(up.systemVersions, { vitals: 1 });
+  assert.equal(up.player.food, 3, 'legacy system keeps the saved value');
+  assert.deepEqual(up.skills, { fishing: 0 }, 'new system adds its fields');
+  assert.deepEqual(up.systemVersions, { vitals: 1, skills: 1 });
 });
 
 test('saves: a string or missing version is read as a number', () => {
@@ -267,4 +277,135 @@ test('content: no crash on null entries; projects with no id are named', () => {
   const p = checkContent({ items: {}, categories: { a: null }, projects: [{ hours: 1 }] });
   assert.ok(p.some((x) => x.includes('place type a: is not an object')));
   assert.ok(p.some((x) => x.includes('project #0: has no id')));
+});
+
+// ---------- second review findings ----------
+test('streamer: a cost budget that a cell cannot fit does not load and drop it forever', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  let loads = 0;
+  const costs = { active: 4, near: 4, mid: 5 };
+  const tiers = classify(g, ALOHA);
+  const s = createStreamer({ load: async (k) => { loads++; return k; }, cost: (k) => costs[tiers.get(k)], budget: 10 });
+  s.update(tiers);
+  await s.idle();
+  assert.ok(loads < 30, `${loads} loads`);
+  assert.ok(s.report().cost <= 10);
+  assert.equal(s.status('0,0'), 'loaded');
+});
+
+test('streamer: a listener that throws does not break the counts', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  const s = createStreamer({ load: async (k) => k });
+  const orig = console.error; console.error = () => {};
+  s.on(() => { throw new Error('ui bug'); });
+  s.update(classify(g, ALOHA));
+  await s.idle();
+  console.error = orig;
+  const r = s.report();
+  assert.equal(r.loading, 0);
+  assert.equal(r.loaded, 25);
+  assert.equal(r.failed, 0);
+});
+
+test('streamer: a cell cancelled and wanted again keeps its one load (no stale unload)', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  const freed = [];
+  let n = 0;
+  const s = createStreamer({ load: (k) => new Promise((r) => setTimeout(() => r(`${k}#${++n}`), 5)), unload: (k, d) => freed.push(d) });
+  s.update(classify(g, ALOHA));
+  s.update(classify(g, g.center('20,0'))); // walk away while loading
+  s.update(classify(g, ALOHA)); // and back
+  await s.idle();
+  await s.idle();
+  assert.equal(s.status('0,0'), 'loaded');
+  assert.equal(freed.filter((d) => d.startsWith('0,0#')).length, 0, 'the live cell was not freed');
+});
+
+test('streamer: a failing cell waits longer before each retry', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  let t = 0;
+  let tries = 0;
+  const s = createStreamer({ now: () => t, load: async (k) => { if (k === '0,0') { tries++; throw new Error('x'); } return k; } });
+  const tiers = classify(g, ALOHA);
+  s.update(tiers); await s.idle();
+  s.update(tiers); await s.idle();
+  assert.equal(tries, 1, 'no retry before the wait');
+  t = 1500; s.update(tiers); await s.idle();
+  assert.equal(tries, 2);
+  t = 2000; s.update(tiers); await s.idle();
+  assert.equal(tries, 2, 'second wait is 2 s');
+});
+
+test('changes: records apply in time order; set records merge', () => {
+  const st = {};
+  recordChange(st, 'p', { o: 'cab', k: 'emptied' });
+  recordChange(st, 'p', { o: 'cab', k: 'set', v: { contents: { can: 1 } } });
+  recordChange(st, 'p', { o: 'cab', k: 'emptied' });
+  assert.deepEqual(applyChanges({ objects: { cab: {} } }, changesFor(st, 'p')).objects.cab.contents, {});
+  recordChange(st, 'p', { o: 'x', k: 'set', v: { a: 1 } });
+  recordChange(st, 'p', { o: 'x', k: 'set', v: { b: 2 } });
+  const x = applyChanges({ objects: { x: {} } }, changesFor(st, 'p')).objects.x;
+  assert.equal(x.a, 1);
+  assert.equal(x.b, 2);
+});
+
+test('saves: a cut current copy does not stop later saves', async () => {
+  const m = new Map();
+  const backend = {
+    name: 'test',
+    async get(k) { const v = m.get(k); if (v === 'CUT') throw new SyntaxError('Unexpected end of JSON'); return v ?? null; },
+    async set(k, v) { m.set(k, JSON.parse(JSON.stringify(v))); },
+    async remove(k) { m.delete(k); },
+    async keys() { return [...m.keys()]; },
+  };
+  const store = createSaveStore(backend);
+  const g = newGame(30);
+  await store.save('run', g);
+  m.set('run', 'CUT');
+  await store.save('run', { ...g, time: g.time + 5 });
+  assert.equal((await store.load('run')).time, g.time + 5);
+});
+
+test('saves: a save from a newer game is an error, not a silent load of the older copy', async () => {
+  const backend = memoryBackend();
+  const store = createSaveStore(backend, { version: 1 });
+  const g = newGame(31);
+  await store.save('run', g);
+  await store.save('run', { ...g, version: 5 });
+  await assert.rejects(() => store.load('run'), /newer game/);
+});
+
+test('events: death from an action with no time sends one event; a loaded dead save sends none', () => {
+  const events = createEvents();
+  const acts = createActions([{ id: 'fall', run: (s) => { s.dead = { cause: 'fall', days: 2 }; } }], { events });
+  const s = { time: 0 };
+  acts.run(s, 'fall');
+  assert.equal(events.drain().filter((e) => e.type === 'player.died').length, 1);
+  const loaded = JSON.parse(JSON.stringify(s));
+  createClock({ systems: createSystems([]), events }).advance(loaded, 10);
+  assert.equal(events.drain().filter((e) => e.type === 'player.died').length, 0);
+});
+
+test('streamer: random moves, random load times and failures never leak a cell', async () => {
+  const g = createGrid({ origin: ALOHA, cellMeters: 256 });
+  let seed = 99;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const live = new Map();
+  let t = 0;
+  const s = createStreamer({
+    now: () => t,
+    maxLoaded: 30,
+    load: (k) => new Promise((res, rej) => setTimeout(() => (rnd() < 0.1 ? rej(new Error('io')) : res({ k, id: rnd() })), Math.floor(rnd() * 4))),
+    // Data of a cancelled load was never live; freeing it must not touch a live copy.
+    unload: (k, d) => { if (live.get(k) === d) live.delete(k); else assert.ok(!live.has(k), `unload of old data while ${k} is live`); },
+  });
+  s.on((ev) => { if (ev.type === 'loaded') { assert.ok(!live.has(ev.key), `two live copies of ${ev.key}`); live.set(ev.key, ev.data); } });
+  for (let i = 0; i < 300; i++) {
+    t += 700;
+    s.update(classify(g, g.center(`${Math.floor(rnd() * 30) - 15},${Math.floor(rnd() * 30) - 15}`)));
+    if (rnd() < 0.3) await new Promise((r) => setTimeout(r, 1));
+  }
+  await s.idle();
+  assert.deepEqual([...live.keys()].sort(), s.loadedKeys().sort());
+  assert.ok(s.loadedKeys().length <= 30);
 });

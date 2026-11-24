@@ -72,7 +72,8 @@ export function createGrid({ origin, cellMeters = DEFAULT_CELL_METERS, radiusMil
 }
 
 // Tier of every cell within the far ring. Cells not in the result are dormant.
-// heading: optional { x, z } direction of travel (any length); the cells ahead of
+// heading: optional { x, z } direction of travel in grid metres (x = east, z = SOUTH,
+// as in the 3D view); any length. The cells ahead of
 // the player get one tier better, so they load before the player arrives.
 export function classify(grid, pos, { rings = DEFAULT_RINGS, heading = null } = {}) {
   const here = grid.cellAt(pos);

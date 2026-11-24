@@ -4,54 +4,94 @@
 // places and houses in the cell, or 3D street meshes later). unload(key, data)
 // frees it. State (what exists) is never in here: only representation.
 //
-// Priority of a cell = its tier (active first), then distance, then last use.
+// Priority of a cell = its tier (active first), then last use.
+//
+// Each key has at most one entry and at most one load in flight:
+//   loading   -> loaded            (load done)
+//   loading   -> cancelled         (not needed now; the load still runs)
+//   cancelled -> loading           (needed again: the same load is kept, not started again)
+//   cancelled -> (gone)            (load done: its data is freed with unload)
+//   loading   -> failed            (load error: retried after a wait that doubles)
+//   loaded    -> (gone)            (unloaded: out of range or over budget)
 import { TIER_INFO, TIER_ORDER, tierOf } from './cells.js';
 
-export function createStreamer({ load, unload = () => {}, maxLoaded = 40, maxInFlight = 4, now = () => Date.now(), cost = () => 1, budget = Infinity } = {}) {
+export function createStreamer({
+  load, unload = () => {}, maxLoaded = 40, maxInFlight = 4, now = () => Date.now(),
+  cost = () => 1, budget = Infinity, retryMs = 1000, maxRetryMs = 30000,
+} = {}) {
   if (typeof load !== 'function') throw new Error('The streamer needs a load(key) function');
-  const cells = new Map(); // key -> { status: 'loading'|'loaded', data, lastUsed, cost, token }
+  const cells = new Map(); // key -> { status, data, lastUsed, cost, token, tries, retryAt }
+  const lastCost = new Map(); // key -> cost of its last load (to skip cells that do not fit)
+  let dropped = new Set(); // keys dropped for the budget: not loaded again until the next update()
   let inFlight = 0;
   let token = 0;
-  const stats = { requests: 0, loaded: 0, unloaded: 0, failed: 0, cancelled: 0, hits: 0, latencyMs: [] };
+  const stats = { requests: 0, loaded: 0, unloaded: 0, failed: 0, cancelled: 0, hits: 0, listenerErrors: 0, latencyMs: [] };
   let lastTiers = new Map();
   const listeners = new Set();
 
-  const usedCost = () => [...cells.values()].filter((c) => c.status === 'loaded').reduce((a, c) => a + c.cost, 0);
+  const isLoaded = (c) => c.status === 'loaded';
+  const usedCost = () => { let s = 0; for (const c of cells.values()) if (isLoaded(c)) s += c.cost; return s; };
   const rank = (key) => TIER_ORDER.indexOf(tierOf(lastTiers, key));
+
+  function tell(ev) {
+    for (const fn of [...listeners]) {
+      try { fn(ev); } catch (err) {
+        stats.listenerErrors++;
+        if (typeof console !== 'undefined') console.error('Streamer listener failed', err);
+      }
+    }
+  }
 
   function start(key) {
     const t0 = now();
     const my = ++token;
-    const c = { status: 'loading', data: null, lastUsed: t0, cost: 0, token: my };
-    cells.set(key, c);
+    const prev = cells.get(key);
+    cells.set(key, { status: 'loading', data: null, lastUsed: t0, cost: 0, token: my, tries: prev?.tries || 0, t0 });
     inFlight++;
     stats.requests++;
-    Promise.resolve()
-      .then(() => load(key))
-      .then((data) => {
-        inFlight--;
-        const cur = cells.get(key);
-        if (!cur || cur.token !== my) { stats.cancelled++; unload(key, data); pump(); return; }
-        cur.status = 'loaded';
-        cur.data = data;
-        cur.cost = cost(key, data);
-        stats.loaded++;
-        stats.latencyMs.push(now() - t0);
-        if (stats.latencyMs.length > 100) stats.latencyMs.shift();
-        for (const fn of listeners) fn({ type: 'loaded', key, data });
-        trim();
-        pump();
-      })
-      .catch((err) => {
-        inFlight--;
-        const cur = cells.get(key);
-        // Keep a 'failed' mark so pump() does not retry at once in a loop.
-        // The next update() (the player moves or the view asks again) clears it.
-        if (cur && cur.token === my) { cur.status = 'failed'; cur.data = null; }
-        stats.failed++;
-        for (const fn of listeners) fn({ type: 'failed', key, error: err });
-        pump();
-      });
+    Promise.resolve().then(() => load(key)).then(
+      (data) => done(key, my, data),
+      (err) => fail(key, my, err),
+    );
+  }
+
+  function done(key, my, data) {
+    inFlight--;
+    const cur = cells.get(key);
+    if (!cur || cur.token !== my) { unload(key, data); return pump(); } // should not happen: free it anyway
+    if (cur.status === 'cancelled') {
+      cells.delete(key);
+      stats.cancelled++;
+      unload(key, data); // nothing else of this key is loaded, so this is safe
+      return pump();
+    }
+    cur.status = 'loaded';
+    cur.data = data;
+    cur.tries = 0;
+    cur.cost = cost(key, data);
+    lastCost.set(key, cur.cost);
+    stats.loaded++;
+    stats.latencyMs.push(now() - cur.t0);
+    if (stats.latencyMs.length > 100) stats.latencyMs.shift();
+    tell({ type: 'loaded', key, data });
+    trim();
+    pump();
+  }
+
+  function fail(key, my, err) {
+    inFlight--;
+    const cur = cells.get(key);
+    stats.failed++;
+    if (cur && cur.token === my) {
+      if (cur.status === 'cancelled') cells.delete(key);
+      else {
+        cur.status = 'failed';
+        cur.tries += 1;
+        cur.retryAt = now() + Math.min(maxRetryMs, retryMs * 2 ** (cur.tries - 1));
+      }
+    }
+    tell({ type: 'failed', key, error: err });
+    pump();
   }
 
   function wanted() {
@@ -60,60 +100,76 @@ export function createStreamer({ load, unload = () => {}, maxLoaded = 40, maxInF
       .sort((a, b) => TIER_ORDER.indexOf(a[1]) - TIER_ORDER.indexOf(b[1]));
   }
 
-  // Full: no room for more cells (failed marks do not count). A new cell then loads only when it is more
-  // important than the least important loaded cell (which trim() then drops).
-  // Without this rule, a full budget would load and drop the same cells forever.
-  function full() {
+  // Room for this cell? When full, a cell loads only if it is more important than the
+  // least important loaded cell (which trim() then drops). Its cost from an earlier
+  // load is counted, so a cell that cannot fit is not loaded and dropped in a loop.
+  function fits(key) {
     let n = 0;
-    for (const c of cells.values()) if (c.status !== 'failed') n++;
-    return n >= maxLoaded || usedCost() >= budget;
-  }
-  function worstRank() {
-    let w = -1;
-    for (const [k, c] of cells) if (c.status === 'loaded') w = Math.max(w, rank(k));
-    return w;
+    let worst = -1;
+    for (const [k, c] of cells) {
+      if (c.status === 'loading' || c.status === 'loaded') n++;
+      if (isLoaded(c)) worst = Math.max(worst, rank(k));
+    }
+    const full = n >= maxLoaded || usedCost() + (lastCost.get(key) || 0) > budget;
+    return !full || rank(key) < worst;
   }
 
   function pump() {
+    const t = now();
     for (const [key] of wanted()) {
       if (inFlight >= maxInFlight) break;
-      if (cells.has(key)) continue;
-      if (full() && rank(key) >= worstRank()) continue;
-      start(key);
+      const c = cells.get(key);
+      if (c?.status === 'cancelled') { c.status = 'loading'; continue; } // still in flight: keep it
+      if (c?.status === 'failed' && t >= c.retryAt && fits(key)) { start(key); continue; }
+      if (c || dropped.has(key)) continue;
+      if (fits(key)) start(key);
     }
   }
 
-  function drop(key) {
+  function drop(key, why) {
     const c = cells.get(key);
     if (!c) return;
+    // A load in flight is never forgotten: done() frees its data when it ends.
+    if (c.status === 'loading' || c.status === 'cancelled') { c.status = 'cancelled'; return; }
     cells.delete(key);
-    if (c.status === 'loaded') { unload(key, c.data); stats.unloaded++; }
-    for (const fn of listeners) fn({ type: 'unloaded', key });
+    if (isLoaded(c)) {
+      if (why === 'budget') dropped.add(key);
+      unload(key, c.data);
+      stats.unloaded++;
+      tell({ type: 'unloaded', key });
+    }
   }
 
   // Keep at most maxLoaded cells and the cost budget: drop the lowest priority first.
   function trim() {
-    const loaded = [...cells.entries()].filter(([, c]) => c.status === 'loaded');
-    const over = () => loaded.length > maxLoaded || usedCost() > budget;
-    if (!over()) return;
+    const loaded = [...cells.entries()].filter(([, c]) => isLoaded(c));
+    let n = loaded.length;
+    let used = usedCost();
+    if (n <= maxLoaded && used <= budget) return;
     loaded.sort((a, b) => rank(b[0]) - rank(a[0]) || a[1].lastUsed - b[1].lastUsed);
-    while (loaded.length && over()) {
-      const [key] = loaded.shift();
-      if (tierOf(lastTiers, key) === 'active') break; // never drop the player's cell
-      drop(key);
+    for (const [key, c] of loaded) {
+      if (n <= maxLoaded && used <= budget) break;
+      if (tierOf(lastTiers, key) === 'active') continue; // never drop the player's cell
+      drop(key, 'budget');
+      n--;
+      used -= c.cost;
     }
   }
 
   // Call when the player moves (or each frame in a 3D view). tiers = classify(...).
   function update(tiers) {
     lastTiers = tiers;
+    dropped = new Set();
     const t = now();
     for (const [key, c] of [...cells.entries()]) {
-      if (c.status === 'failed') { cells.delete(key); continue; }
-      const tier = tierOf(tiers, key);
-      if (!TIER_INFO[tier].loaded && !TIER_INFO[tier].keep) {
-        if (c.status === 'loading') { cells.delete(key); stats.cancelled++; } else drop(key);
-      } else c.lastUsed = t;
+      const info = TIER_INFO[tierOf(tiers, key)];
+      if (!info.loaded && !info.keep) {
+        if (c.status === 'failed') cells.delete(key);
+        else drop(key, 'range');
+      } else {
+        c.lastUsed = t;
+        if (c.status === 'cancelled') c.status = 'loading'; // wanted again: keep its load
+      }
     }
     trim();
     pump();
@@ -121,17 +177,18 @@ export function createStreamer({ load, unload = () => {}, maxLoaded = 40, maxInF
 
   function get(key) {
     const c = cells.get(key);
-    if (c?.status === 'loaded') { stats.hits++; c.lastUsed = now(); return c.data; }
+    if (c && isLoaded(c)) { stats.hits++; c.lastUsed = now(); return c.data; }
     return null;
   }
 
   function report() {
     const lat = stats.latencyMs;
+    let loaded = 0;
+    for (const c of cells.values()) if (isLoaded(c)) loaded++;
     return {
-      loaded: [...cells.values()].filter((c) => c.status === 'loaded').length,
-      loading: inFlight,
-      cost: usedCost(),
-      requests: stats.requests, unloaded: stats.unloaded, failed: stats.failed, cancelled: stats.cancelled, hits: stats.hits,
+      loaded, loading: inFlight, cost: usedCost(),
+      requests: stats.requests, unloaded: stats.unloaded, failed: stats.failed, cancelled: stats.cancelled,
+      hits: stats.hits, listenerErrors: stats.listenerErrors,
       avgLatencyMs: lat.length ? lat.reduce((a, b) => a + b, 0) / lat.length : null,
     };
   }
@@ -143,8 +200,8 @@ export function createStreamer({ load, unload = () => {}, maxLoaded = 40, maxInF
 
   return {
     update, get, report, idle,
-    status: (key) => { const st = cells.get(key)?.status; return st && st !== 'failed' ? st : 'unloaded'; },
-    loadedKeys: () => [...cells.entries()].filter(([, c]) => c.status === 'loaded').map(([k]) => k),
+    status: (key) => { const st = cells.get(key)?.status; return st === 'loaded' || st === 'loading' ? st : 'unloaded'; },
+    loadedKeys: () => [...cells.entries()].filter(([, c]) => isLoaded(c)).map(([k]) => k),
     on: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
   };
 }

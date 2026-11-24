@@ -43,9 +43,10 @@ export function migrate(state, { version, gameMigrations = {}, systems = null } 
   }
   if (systems) {
     if (!s.systemVersions) {
-      // A save from before the engine: all its fields are already there (version 1).
-      // Do not run init, because init would overwrite the saved values.
-      s.systemVersions = Object.fromEntries(systems.list().map((sys) => [sys.id, 1]));
+      // A save from before the engine. Systems marked legacy already have their fields
+      // in it (version 1): no init, because init would overwrite the saved values.
+      // Systems added after the engine are new to this save: they run init below.
+      s.systemVersions = Object.fromEntries(systems.list().filter((sys) => sys.legacy).map((sys) => [sys.id, 1]));
     }
     for (const sys of systems.list()) {
       let v = s.systemVersions[sys.id];
@@ -180,24 +181,24 @@ export function createSaveStore(backend = bestBackend(), opts = {}) {
     async save(slot, state) {
       const env = wrapSave(state);
       env.sum = checksum(state);
-      const cur = await backend.get(slot);
+      let cur = null;
+      try { cur = await backend.get(slot); } catch { cur = null; } // a cut copy is not a good copy
       if (cur != null && verify(cur)) await backend.set(slot + PREV, cur);
       await backend.set(slot, env);
       return true;
     },
     async load(slot) {
+      this.lastLoad = null;
       for (const [key, from] of [[slot, 'current'], [slot + PREV, 'previous']]) {
         let data;
         try { data = await backend.get(key); } catch (err) { this.lastLoad = { from, problem: String(err) }; continue; }
         if (data == null) continue;
         if (!verify(data)) { this.lastLoad = { from, problem: 'checksum does not match' }; continue; }
-        try {
-          const st = migrate(unwrapSave(data), opts);
-          this.lastLoad = { from, problem: from === 'previous' ? this.lastLoad?.problem || 'newest save missing' : null };
-          return st;
-        } catch (err) {
-          this.lastLoad = { from, problem: String(err.message || err) };
-        }
+        // An upgrade error (for example a save from a newer game) is not a broken file:
+        // pass it up. Loading the older copy would lose progress (one life per run).
+        const st = migrate(unwrapSave(data), opts);
+        this.lastLoad = { from, problem: from === 'previous' ? this.lastLoad?.problem || 'newest save missing' : null };
+        return st;
       }
       return null;
     },

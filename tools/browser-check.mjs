@@ -61,9 +61,10 @@ try {
     raw.state.time = 1;
     await backend.set('check-slot', raw);
     const fallback = await store.load('check-slot');
+    const fellBack = fallback?.time === 600 && store.lastLoad?.from === 'previous';
     await store.remove('check-slot');
     const gone = await store.load('check-slot');
-    return { backend: backend.name, same: JSON.stringify(back) === JSON.stringify(game), listed: list.some((x) => x.slot === 'check-slot'), gone: gone === null, fallback: fallback?.time === 600 && store.lastLoad.from === 'previous' };
+    return { backend: backend.name, same: JSON.stringify(back) === JSON.stringify(game), listed: list.some((x) => x.slot === 'check-slot'), gone: gone === null, fallback: fellBack };
   });
   check(r.backend === 'indexedDB', `best save backend in Chromium is IndexedDB (got ${r.backend})`);
   check(r.same, 'a game saved to IndexedDB loads back the same');

@@ -7,7 +7,8 @@
 //   const now = applyChanges(base, changesFor(state, 'place:n123'))
 //
 // Record kinds (k): taken, opened, closed, emptied, moved, damaged, discovered, set.
-// A later record for the same object and kind replaces the earlier one.
+// A later record for the same object and kind replaces the earlier one and moves to
+// the end of the list (records apply in time order). Two "set" records merge.
 
 export const CHANGE_KINDS = ['taken', 'opened', 'closed', 'emptied', 'moved', 'damaged', 'discovered', 'set'];
 
@@ -28,7 +29,12 @@ export function recordChange(state, locKey, change) {
   // opened/closed replace each other; other kinds replace the same kind.
   const same = (r) => r.o === rec.o && (r.k === rec.k || (['opened', 'closed'].includes(r.k) && ['opened', 'closed'].includes(rec.k)));
   const i = list.findIndex(same);
-  if (i >= 0) list[i] = rec; else list.push(rec);
+  if (i >= 0) {
+    const old = list.splice(i, 1)[0];
+    // Two "set" records merge, so earlier fields are kept.
+    if (rec.k === 'set' && old.v && typeof old.v === 'object' && rec.v && typeof rec.v === 'object') rec.v = { ...old.v, ...rec.v };
+  }
+  list.push(rec); // the newest record goes last, so records apply in time order
   return rec;
 }
 

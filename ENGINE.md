@@ -58,8 +58,10 @@ It is made again from its base (seed + content data) plus its change records.
   abstract (daily) cell runs.
 - `streamer.js`: loads the cells a tier asks for, async, most important first, at most
   `maxInFlight` at a time, inside `maxLoaded` and a cost budget. When full, a new cell
-  loads only if it is more important than the least important loaded cell. Failed loads
-  are retried on the next update, not in a loop. Never drops the player's cell.
+  loads only if it is more important than the least important loaded cell, and a cell
+  dropped for the budget is not loaded again before the next update. One load per cell
+  at a time: a cell that is cancelled and wanted again keeps its load. Failed loads wait
+  1 s, 2 s, 4 s ... (at most 30 s) before a retry. Never drops the player's cell.
 - `changes.js`: change records (taken, opened, closed, emptied, moved, damaged,
   discovered, set) per location key. `applyChanges(base, records)` rebuilds the current
   version. A later record for the same object replaces the earlier one.
@@ -95,7 +97,8 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
 2. Every random roll comes from the seed (`stream()` or the old `rand(state)`), never
    `Math.random()` in rules.
 3. A new rule set is a system file with its own fields. If it changes the shape of saved
-   fields, raise its `version` and add a migration.
+   fields, raise its `version` and add a migration. A system made from old code whose
+   fields were already in old saves gets `legacy: true` (old saves then skip its `init`).
 4. Content is data. `npm test` checks the links.
 5. Time costs and risks are declared on the action, not written by hand in the panel.
 

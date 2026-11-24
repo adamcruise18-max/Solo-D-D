@@ -8,6 +8,8 @@
 // The screen asks list(state) and shows label, time and risk the same way for
 // every action. That is the "risk and time shown before rolling" rule.
 
+import { sendDeath } from './clock.js';
+
 const KNOWN = new Set(['id', 'group', 'label', 'when', 'minutes', 'risk', 'run', 'note']);
 
 export function defineAction(a) {
@@ -75,6 +77,7 @@ export function createActions(list = [], { events = null, clock = null } = {}) {
     const t0 = state.time;
     const result = d.run(state, arg, ctx);
     events?.emit('action.done', { id, arg, minutes: state.time - t0 });
+    sendDeath(state, events); // an action can kill without moving time
     return { ok: true, result, minutes: state.time - t0 };
   }
 

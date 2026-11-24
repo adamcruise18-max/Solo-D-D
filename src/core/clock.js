@@ -11,7 +11,13 @@ export const dayIndex = (t) => Math.floor(t / 1440);
 export const minuteOfDay = (t) => ((t % 1440) + 1440) % 1440;
 export const gameDay = (t) => dayIndex(t - DAY_START_MINUTE);
 
-const deathSent = new WeakSet(); // states whose death event was sent
+// Send "player.died" once per run. The flag is in the state, so a loaded dead save
+// does not send it again.
+export function sendDeath(state, events) {
+  if (!state.dead || !events || state.deathSent) return;
+  state.deathSent = true;
+  events.emit('player.died', { cause: state.dead.cause, days: state.dead.days, time: state.time });
+}
 
 export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES } = {}) {
   if (!systems) throw new Error('The clock needs a systems list');
@@ -34,10 +40,7 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
       }
       systems.step(state, step / 60, ctx);
     }
-    if (state.dead && events && !deathSent.has(state)) {
-      deathSent.add(state);
-      events.emit('player.died', { cause: state.dead.cause, days: state.dead.days, time: state.time });
-    }
+    sendDeath(state, events);
     return state;
   }
 
