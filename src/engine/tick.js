@@ -4,7 +4,8 @@
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
 import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from './world.js';
-import { dayIndex, log, hasLight, bagWeight, carryLimit } from './state.js';
+import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
+import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
@@ -17,6 +18,7 @@ export function clothingRating(state) {
   let r = 10;
   if (w.coat && w.hat && w.gloves && w.boots) r = 40;
   else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
+  if (w.socks) r += 2;
   if (state.player.wet) r /= 2;
   return r;
 }
@@ -44,6 +46,8 @@ export function feltTemp(state, mode, env = environment(state, mode)) {
   if (env.outside) felt -= (env.wind / 10) * 5;
   if (mode === 'sleep') {
     if (env.home) felt += 10; // bed and blankets
+    // The best sleeping gear you have (a sleeping bag, a wool blanket).
+    felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state, id)).map((id) => ITEMS[id].sleepWarm));
     const d = state.dog;
     if (d.stage === 'joined' && d.bond >= 80) felt += 5;
   }

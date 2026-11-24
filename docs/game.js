@@ -41,10 +41,10 @@
     flea_spray: { name: "Flea spray", unit: "can", weight: 1, kind: "misc" },
     seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
     lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
-    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" },
-    radio: { name: "Hand-crank radio", unit: "pc", weight: 1.2, kind: "comfort" },
+    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort", comfortText: "You read and play cards for a while. Your mind is calmer." },
+    radio: { name: "Hand-crank radio", unit: "pc", weight: 1.2, kind: "comfort", comfortText: "You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps." },
     // Supplies with no use of their own yet (more uses come with crafting and home projects).
-    candles: { name: "Candles", unit: "box", weight: 0.8, kind: "misc" },
+    candles: { name: "Candles", unit: "box", weight: 0.8, kind: "comfort", portion: 0.1, comfortText: "You light a candle and sit by the small flame for a while. The dark feels less heavy." },
     matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
     duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
     rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
@@ -52,16 +52,16 @@
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
     cooking_pot: { name: "Cooking pot", unit: "pc", weight: 2, kind: "misc" },
-    blanket: { name: "Wool blanket", unit: "pc", weight: 3, kind: "misc" },
-    sleeping_bag: { name: "Sleeping bag (winter)", unit: "pc", weight: 4, kind: "misc" },
-    hand_warmers: { name: "Hand warmers", unit: "pair", weight: 0.1, kind: "misc" },
-    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "misc" },
+    blanket: { name: "Wool blanket", unit: "pc", weight: 3, kind: "misc", sleepWarm: 8 },
+    sleeping_bag: { name: "Sleeping bag (winter)", unit: "pc", weight: 4, kind: "misc", sleepWarm: 15 },
+    hand_warmers: { name: "Hand warmers", unit: "pair", weight: 0.1, kind: "warm", warmth: 15, portion: 1 },
+    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "wear", slot: "socks" },
     trash_bags: { name: "Trash bags (box)", unit: "box", weight: 1, kind: "misc" },
     paper_map: { name: "Paper map of Portland", unit: "pc", weight: 0.2, kind: "misc" },
     toilet_paper: { name: "Toilet paper", unit: "roll", weight: 0.3, kind: "misc" },
-    soap: { name: "Bar of soap", unit: "bar", weight: 0.25, kind: "misc" },
+    soap: { name: "Bar of soap", unit: "bar", weight: 0.25, kind: "comfort", portion: 0.1, comfortText: "You wash with soap and cold water. You feel more like yourself." },
     toothpaste: { name: "Toothpaste", unit: "tube", weight: 0.25, kind: "misc" },
-    water_tablets: { name: "Water purification tablets", unit: "pack", weight: 0.05, kind: "misc" },
+    water_tablets: { name: "Water purification tablets", unit: "pack", weight: 0.05, kind: "misc", portion: 0.1 },
     vitamins: { name: "Vitamins", unit: "bottle", weight: 0.3, kind: "misc" },
     // Parts for home base projects (kind 'part': no use on their own).
     toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
@@ -1078,6 +1078,7 @@
     let r = 10;
     if (w.coat && w.hat && w.gloves && w.boots) r = 40;
     else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
+    if (w.socks) r += 2;
     if (state2.player.wet) r /= 2;
     return r;
   }
@@ -1102,6 +1103,7 @@
     if (env.outside) felt -= env.wind / 10 * 5;
     if (mode === "sleep") {
       if (env.home) felt += 10;
+      felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
       const d = state2.dog;
       if (d.stage === "joined" && d.bond >= 80) felt += 5;
     }
@@ -1745,6 +1747,7 @@
     if (it.kind === "wear") uses.push({ verb: "wear", label: "Wear" });
     if (it.kind === "batteries") uses.push({ verb: "batteries", label: "Put in flashlight" });
     if (it.kind === "comfort") uses.push({ verb: "comfort", label: "Use" });
+    if (it.kind === "warm") uses.push({ verb: "warm", label: "Use" });
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
     return uses;
@@ -1809,8 +1812,16 @@
         }
         p.lastComfortDay = day;
         p.morale = clamp2(p.morale + 5, 0, 100);
-        log(state2, id === "radio" ? "You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps." : "You read and play cards for a while. Your mind is calmer.", "good");
+        if (it.portion) addItem(bag, id, -it.portion);
+        log(state2, it.comfortText || "You rest your mind for a while.", "good");
         advanceTime(state2, 60);
+        return;
+      }
+      case "warm": {
+        addItem(bag, id, -1);
+        p.warmth = clamp2(p.warmth + it.warmth, 0, 100);
+        log(state2, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
+        advanceTime(state2, 1);
         return;
       }
       case "feeddog":
@@ -1979,6 +1990,16 @@
         h.safeGal += g;
         log(state2, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
         advanceTime(state2, 20);
+        return;
+      }
+      case "purify": {
+        const bag = (state2.carried.water_tablets || 0) > 0 ? state2.carried : h.storage;
+        const g = Math.min(1, h.rawGal);
+        addItem(bag, "water_tablets", -ITEMS.water_tablets.portion);
+        h.rawGal -= g;
+        h.safeGal += g;
+        log(state2, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
+        advanceTime(state2, 30);
         return;
       }
       case "filter_water": {
@@ -2495,6 +2516,7 @@
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
         if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
+        if (has2(state2, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
         add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
@@ -3699,7 +3721,7 @@
     const felt = Math.round(feltTemp(state, "rest"));
     chips.push(["", `Feels like ${felt}\xB0F`]);
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
-    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
+    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket", socks: "wool socks" })[k]);
     chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
     $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
   }
@@ -4343,7 +4365,7 @@
       if (p.illness.infection) notes.push("Infection");
       if (p.illness.stomachH > 0) notes.push("Stomach bug");
       if (p.wet) notes.push("Wet");
-      const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
+      const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket", socks: "wool socks" })[k]);
       return `<h4>Character</h4>${rows}
       <p class="hint">${notes.length ? esc(notes.join(" \xB7 ")) : "No injuries or illness."}</p>
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(", ") : "normal clothes")} \xB7 Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F</p>`;

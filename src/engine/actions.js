@@ -84,6 +84,7 @@ export function itemUses(state, id) {
   if (it.kind === 'wear') uses.push({ verb: 'wear', label: 'Wear' });
   if (it.kind === 'batteries') uses.push({ verb: 'batteries', label: 'Put in flashlight' });
   if (it.kind === 'comfort') uses.push({ verb: 'comfort', label: 'Use' });
+  if (it.kind === 'warm') uses.push({ verb: 'warm', label: 'Use' });
   if (it.kind === 'food' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Give to dog' });
   if (it.kind === 'dogfood' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Feed dog' });
   return uses;
@@ -140,10 +141,16 @@ export function useItem(state, id, verb, from = 'carried') {
       if (p.lastComfortDay === day) { log(state, 'You already did that today. It does not help again.'); return; }
       p.lastComfortDay = day;
       p.morale = clamp(p.morale + 5, 0, 100);
-      log(state, id === 'radio'
-        ? 'You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps.'
-        : 'You read and play cards for a while. Your mind is calmer.', 'good');
+      if (it.portion) addItem(bag, id, -it.portion);
+      log(state, it.comfortText || 'You rest your mind for a while.', 'good');
       advanceTime(state, 60);
+      return;
+    }
+    case 'warm': {
+      addItem(bag, id, -1);
+      p.warmth = clamp(p.warmth + it.warmth, 0, 100);
+      log(state, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, 'good');
+      advanceTime(state, 1);
       return;
     }
     case 'feeddog':
@@ -306,6 +313,17 @@ function homeAction(state, id) {
       h.safeGal += g;
       log(state, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
       advanceTime(state, 20);
+      return;
+    }
+    case 'purify': {
+      // One tablet treats 1 gal; it is safe after 30 minutes.
+      const bag = (state.carried.water_tablets || 0) > 0 ? state.carried : h.storage;
+      const g = Math.min(1, h.rawGal);
+      addItem(bag, 'water_tablets', -ITEMS.water_tablets.portion);
+      h.rawGal -= g;
+      h.safeGal += g;
+      log(state, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
+      advanceTime(state, 30);
       return;
     }
     case 'filter_water': {
@@ -871,6 +889,7 @@ export function listActions(state) {
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
       if (built(state, 'filter_station')) add('filter_water', 'Filter 2 gal of water (no fuel)', { note: '10 min' });
+      if (has(state, 'water_tablets')) add('purify', 'Purify 1 gal with a tablet (no fuel)', { note: '30 min' });
       add('drink_raw', 'Drink water without boiling', { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);

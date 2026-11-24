@@ -1158,7 +1158,7 @@ export function openInside(opts) {
         if (!n) p.hidden = true;
         else { p.hidden = false; p.innerHTML = opts.describe(n); }
       }
-      if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps`;
+      if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps  ${(1000 / Math.max(1, fps)).toFixed(1)} ms  ${renderer.info.render.calls} calls  ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris  ${renderer.info.memory.geometries} geo  ${renderer.info.memory.textures} tex  q:${quality}`;
     }
     lk.update(dt, camera.position);
     // Shelf products far away are hidden (fog hides them anyway): saves draw calls and triangles.

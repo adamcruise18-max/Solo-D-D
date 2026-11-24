@@ -1,3 +1,5 @@
+// Item list. Optional fields: comfortText (comfort items), sleepWarm (°F felt while you sleep
+// if you have it), warmth (hand warmers), slot (clothes).
 // Item list for the first playable version. Numbers come from the game rules doc.
 // weight: lb for one unit. portion: part of one unit used per "use".
 // kind decides which action the item gives.
@@ -48,11 +50,11 @@ export const ITEMS = {
   flea_spray: { name: 'Flea spray', unit: 'can', weight: 1, kind: 'misc' },
   seeds: { name: 'Seed packet', unit: 'pack', weight: 0.05, kind: 'misc' },
   lighter: { name: 'Lighter', unit: 'pc', weight: 0.05, kind: 'misc' },
-  comfort: { name: 'Book or deck of cards', unit: 'pc', weight: 1, kind: 'comfort' },
-  radio: { name: 'Hand-crank radio', unit: 'pc', weight: 1.2, kind: 'comfort' },
+  comfort: { name: 'Book or deck of cards', unit: 'pc', weight: 1, kind: 'comfort', comfortText: 'You read and play cards for a while. Your mind is calmer.' },
+  radio: { name: 'Hand-crank radio', unit: 'pc', weight: 1.2, kind: 'comfort', comfortText: 'You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps.' },
 
   // Supplies with no use of their own yet (more uses come with crafting and home projects).
-  candles: { name: 'Candles', unit: 'box', weight: 0.8, kind: 'misc' },
+  candles: { name: 'Candles', unit: 'box', weight: 0.8, kind: 'comfort', portion: 0.1, comfortText: 'You light a candle and sit by the small flame for a while. The dark feels less heavy.' },
   matches: { name: 'Matches', unit: 'box', weight: 0.1, kind: 'misc' },
   duct_tape: { name: 'Duct tape', unit: 'roll', weight: 0.6, kind: 'part' },
   rope: { name: 'Rope (50 ft)', unit: 'coil', weight: 2, kind: 'misc' },
@@ -60,16 +62,16 @@ export const ITEMS = {
   multitool: { name: 'Multitool', unit: 'pc', weight: 0.5, kind: 'misc' },
   can_opener: { name: 'Can opener', unit: 'pc', weight: 0.2, kind: 'misc' },
   cooking_pot: { name: 'Cooking pot', unit: 'pc', weight: 2, kind: 'misc' },
-  blanket: { name: 'Wool blanket', unit: 'pc', weight: 3, kind: 'misc' },
-  sleeping_bag: { name: 'Sleeping bag (winter)', unit: 'pc', weight: 4, kind: 'misc' },
-  hand_warmers: { name: 'Hand warmers', unit: 'pair', weight: 0.1, kind: 'misc' },
-  wool_socks: { name: 'Wool socks', unit: 'pair', weight: 0.2, kind: 'misc' },
+  blanket: { name: 'Wool blanket', unit: 'pc', weight: 3, kind: 'misc', sleepWarm: 8 },
+  sleeping_bag: { name: 'Sleeping bag (winter)', unit: 'pc', weight: 4, kind: 'misc', sleepWarm: 15 },
+  hand_warmers: { name: 'Hand warmers', unit: 'pair', weight: 0.1, kind: 'warm', warmth: 15, portion: 1 },
+  wool_socks: { name: 'Wool socks', unit: 'pair', weight: 0.2, kind: 'wear', slot: 'socks' },
   trash_bags: { name: 'Trash bags (box)', unit: 'box', weight: 1, kind: 'misc' },
   paper_map: { name: 'Paper map of Portland', unit: 'pc', weight: 0.2, kind: 'misc' },
   toilet_paper: { name: 'Toilet paper', unit: 'roll', weight: 0.3, kind: 'misc' },
-  soap: { name: 'Bar of soap', unit: 'bar', weight: 0.25, kind: 'misc' },
+  soap: { name: 'Bar of soap', unit: 'bar', weight: 0.25, kind: 'comfort', portion: 0.1, comfortText: 'You wash with soap and cold water. You feel more like yourself.' },
   toothpaste: { name: 'Toothpaste', unit: 'tube', weight: 0.25, kind: 'misc' },
-  water_tablets: { name: 'Water purification tablets', unit: 'pack', weight: 0.05, kind: 'misc' },
+  water_tablets: { name: 'Water purification tablets', unit: 'pack', weight: 0.05, kind: 'misc', portion: 0.1 },
   vitamins: { name: 'Vitamins', unit: 'bottle', weight: 0.3, kind: 'misc' },
 
   // Parts for home base projects (kind 'part': no use on their own).

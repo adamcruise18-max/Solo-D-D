@@ -160,7 +160,7 @@ function renderStats() {
   const felt = Math.round(feltTemp(state, 'rest'));
   chips.push(['', `Feels like ${felt}°F`]);
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
-  const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
+  const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket', socks: 'wool socks' }[k]));
   chips.push(['', `Wearing: ${worn.length ? worn.join(', ') : 'normal clothes'}`]);
   $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>`;
 }
@@ -821,7 +821,7 @@ function insidePanel(name) {
     if (p.illness.infection) notes.push('Infection');
     if (p.illness.stomachH > 0) notes.push('Stomach bug');
     if (p.wet) notes.push('Wet');
-    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
+    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket', socks: 'wool socks' }[k]));
     return `<h4>Character</h4>${rows}
       <p class="hint">${notes.length ? esc(notes.join(' · ')) : 'No injuries or illness.'}</p>
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(', ') : 'normal clothes')} · Feels like ${Math.round(feltTemp(state, 'rest'))}°F</p>`;
