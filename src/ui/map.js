@@ -3,8 +3,11 @@
 import { CATEGORIES } from '../data/places.js';
 import { HOME, MAP_RADIUS_MILES } from '../engine/state.js';
 
+// "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
+// Do not use "dark": its colors are almost black, so the map looks empty.
 const STYLE_URLS = [
-  'https://tiles.openfreemap.org/styles/dark',
+  'https://tiles.openfreemap.org/styles/liberty',
+  'https://tiles.openfreemap.org/styles/bright',
   'https://tiles.openfreemap.org/styles/positron',
 ];
 

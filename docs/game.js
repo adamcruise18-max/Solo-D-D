@@ -1906,7 +1906,8 @@
 
   // src/ui/map.js
   var STYLE_URLS = [
-    "https://tiles.openfreemap.org/styles/dark",
+    "https://tiles.openfreemap.org/styles/liberty",
+    "https://tiles.openfreemap.org/styles/bright",
     "https://tiles.openfreemap.org/styles/positron"
   ];
   var OFFLINE_STYLE = {
