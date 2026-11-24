@@ -53,6 +53,10 @@ This is the **first playable version**: a small part of the full game.
   low water or food.
 - Risky buttons show the d20 roll before you choose: the modifiers, the DC and your chance (for example
   "d20 −2 tired vs DC 12 · 35%").
+- Advantage and disadvantage: some rolls use 2 d20 and keep the higher (advantage) or the lower (disadvantage).
+  Advantage: the right tool (a tool kit to force a door), daylight outside, your dog helps.
+  Disadvantage: an injured limb, rain or night outside, very tired. One of each cancels. The odds show it
+  (for example "d20 adv. (tool kit) vs DC 12 · 70%").
 - The item panel shows how many days of food and water you have (carried and stored at home) and sorts items in groups.
 - The home panel shows solar power in, power out and how long the battery lasts with the heater on.
 - The map marks places you visited but did not search fully (amber ring) and places with nothing left (grey).

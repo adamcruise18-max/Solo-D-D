@@ -515,6 +515,9 @@ export function enterPlace(state, place) {
   if (cat.bodies && chance(state, 0.5)) seeBody(state, 'There are bodies here, under sheets and in the chairs. You do not look long.');
 }
 
+// The right tool gives advantage when you force a door or gate.
+export function forceOpts(state) { return has(state, 'toolkit') ? { adv: ['tool kit'] } : {}; }
+
 export function forceEntry(state) {
   const place = getPlace(state.location.id);
   const ps = placeState(state, place);
@@ -526,7 +529,7 @@ export function forceEntry(state) {
   }
   state.player.energy = clamp(state.player.energy - 5, 0, 100);
   advanceTime(state, 5, 'heavy');
-  if (check(state, 'Kick open the locked door', 12, forceBonus(state)).success) {
+  if (check(state, 'Kick open the locked door', 12, forceBonus(state), forceOpts(state)).success) {
     ps.unlocked = true;
     log(state, 'The door breaks open.');
     practice(state, 'tinkering', 4);
@@ -547,7 +550,7 @@ export function openCounter(state) {
     return;
   }
   advanceTime(state, 10, 'heavy');
-  if (check(state, `Force the ${lz.name} gate`, lz.dc, forceBonus(state)).success) {
+  if (check(state, `Force the ${lz.name} gate`, lz.dc, forceBonus(state), forceOpts(state)).success) {
     ps.counterOpen = true;
     log(state, 'The gate bends open.');
     practice(state, 'tinkering', 4);
@@ -875,7 +878,7 @@ export function enterNearbyHouse(state) {
       advanceTime(state, 2);
     } else {
       state.player.energy = clamp(state.player.energy - 5, 0, 100);
-      if (!check(state, 'Kick open the locked door', 12, forceBonus(state)).success) {
+      if (!check(state, 'Kick open the locked door', 12, forceBonus(state), forceOpts(state)).success) {
         log(state, 'The door holds. You break a window and climb in.');
         if (chance(state, 0.25)) addInjury(state, 'small_cut');
       }
@@ -982,10 +985,10 @@ export function listActions(state) {
     const place = getPlace(loc.id);
     const cat = CATEGORIES[place.cat];
     const ps = placeState(state, place);
-    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, 12, forceBonus(state)))} · fail: 30% sprain`, risk: !has(state, 'pry_bar') });
+    if (!ps.unlocked) add('force', 'Force the locked door', { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, 12, forceBonus(state), forceOpts(state)))} · fail: 30% sprain`, risk: !has(state, 'pry_bar') });
     else if (ps.zonesDone < ps.zones) {
       if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, cat.lockedZone.dc, forceBonus(state)))} · fail: 25% cut`, risk: !has(state, 'pry_bar') });
+        add('counter', `Open the ${cat.lockedZone.name}`, { note: has(state, 'pry_bar') ? 'pry bar: sure to work' : `${oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state)))} · fail: 25% cut`, risk: !has(state, 'pry_bar') });
       } else {
         const env = environment(state, 'work');
         const min = searchMinutes(state, cat.zoneMinutes, env.dark);

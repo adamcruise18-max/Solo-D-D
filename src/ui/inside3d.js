@@ -9,7 +9,7 @@ import {
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
-import { makeItemModel, makeShelfFill, makeProp, makeFixture, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
+import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import {
@@ -310,6 +310,14 @@ export function openInside(opts) {
           }
         }
       }
+      continue;
+    }
+    if (f.type === 'endcap') {
+      // Picked-over display at the end of a shelf row, with a generic sign (props3d.js).
+      const g = makeEndcap(FILL_KIND, f.w, f.h, Math.max(0.05, opts.stock * 0.5), hashString(`${opts.title}:end:${f.x.toFixed(2)}`), f.d);
+      g.position.set(f.x, 0, f.z);
+      g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+      statics.add(g);
       continue;
     }
     if (FIXTURE_TYPES.includes(f.type)) {
@@ -1496,6 +1504,16 @@ function mergeInPlace(root) {
   for (const m of merged) { m.matrixAutoUpdate = false; m.matrix.copy(root.matrixWorld).invert(); root.add(m); }
 }
 
+// Two materials that would draw the same get one bucket (props often build equal materials per copy).
+const MAP_KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap'];
+function matSig(m) {
+  if (m.type !== 'MeshStandardMaterial' && m.type !== 'MeshBasicMaterial' && m.type !== 'MeshLambertMaterial') return m.uuid;
+  if (m.onBeforeCompile && m.onBeforeCompile.toString() !== 'onBeforeCompile(){}' && m.customProgramCacheKey) return m.uuid;
+  const maps = MAP_KEYS.map((k) => (m[k] ? (m[k].source ? m[k].source.uuid : m[k].uuid) + m[k].repeat.x.toFixed(3) + m[k].repeat.y.toFixed(3) + m[k].offset.x.toFixed(3) + m[k].offset.y.toFixed(3) : '-')).join(',');
+  const c = (x) => (x ? x.getHexString() : '-');
+  return [m.type, c(m.color), c(m.emissive), m.emissiveIntensity, m.roughness, m.metalness, m.transparent, m.opacity, m.side, m.alphaTest, m.vertexColors, m.flatShading, m.depthWrite, m.polygonOffset, m.polygonOffsetFactor, m.envMapIntensity, maps].join('|');
+}
+
 function mergeStatics(root) {
   root.updateMatrixWorld(true);
   const buckets = new Map();
@@ -1504,7 +1522,7 @@ function mergeStatics(root) {
     // Meshes with a material list (one material per face) stay as they are.
     if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material)) { if (o.isLine || o.isPoints || o.isSprite || o.isInstancedMesh || (o.isMesh && Array.isArray(o.material))) keepers.push(o); return; }
     const g = o.geometry;
-    const key = `${o.material.uuid}|${Object.keys(g.attributes).sort().join(',')}|${o.castShadow ? 1 : 0}`;
+    const key = `${matSig(o.material)}|${Object.keys(g.attributes).sort().join(',')}|${o.castShadow ? 1 : 0}`;
     let b = buckets.get(key);
     if (!b) buckets.set(key, b = { mat: o.material, cast: o.castShadow, geos: [] });
     const c = (g.index ? g.toNonIndexed() : g.clone());

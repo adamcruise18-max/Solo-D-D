@@ -1556,40 +1556,59 @@
   function standardMods(state2, { outside = false } = {}) {
     const p = state2.player;
     const mods = [];
-    if (p.energy < 50) mods.push(["tired", -2]);
+    if (p.energy < 50 && p.energy >= 25) mods.push(["tired", -2]);
     if (p.water < 25) mods.push(["very thirsty", -2]);
     if (p.warmth < 25) mods.push(["hypothermia", -3]);
     if (p.health < 25) mods.push(["badly hurt", -3]);
     if (p.morale < 25) mods.push(["despair", -2]);
-    const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
-    if (limb && p.painH <= 0) mods.push(["injured", -3]);
-    if (outside && !isNight(state2.time)) mods.push(["daylight", 1]);
     return mods;
+  }
+  var RAIN = ["rain", "heavy_rain", "windstorm"];
+  function edges(state2, opts = {}) {
+    const p = state2.player;
+    const adv = [...opts.adv || []];
+    const dis = [...opts.dis || []];
+    if (opts.outside && !isNight(state2.time)) adv.push("daylight");
+    const d = state2.dog;
+    if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
+    const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
+    if (limb && p.painH <= 0) dis.push("injured");
+    if (opts.outside && state2.weather && RAIN.includes(state2.weather.type)) dis.push("rain");
+    if (opts.outside && isNight(state2.time)) dis.push("night");
+    if (p.energy < 25) dis.push("very tired");
+    const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
+    return { mode, adv, dis };
   }
   function check(state2, label, dc, extraMods = [], opts = {}) {
     const mods = [...standardMods(state2, opts), ...extraMods];
-    if (opts.outside && isNight(state2.time)) dc += 3;
-    const roll = randInt(state2, 1, 20);
+    const e = edges(state2, opts);
+    const a = randInt(state2, 1, 20);
+    const b = e.mode === "normal" ? a : randInt(state2, 1, 20);
+    const roll = e.mode === "adv" ? Math.max(a, b) : e.mode === "dis" ? Math.min(a, b) : a;
     const total = roll + mods.reduce((s, m) => s + m[1], 0);
     const success = roll === 20 ? true : roll === 1 ? false : total >= dc;
     const modText = mods.map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"} ${Math.abs(v)} (${n})`).join("");
+    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b}]` : "";
     const note = roll === 20 ? " natural 20!" : roll === 1 ? " natural 1!" : "";
-    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
-    return { roll, total, dc, success };
+    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${edgeText}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
+    return { roll, total, dc, success, mode: e.mode };
   }
   function odds(state2, dc, extraMods = [], opts = {}) {
     const mods = [...standardMods(state2, opts), ...extraMods];
-    if (opts.outside && isNight(state2.time)) dc += 3;
+    const e = edges(state2, opts);
     const sum = mods.reduce((s, m) => s + m[1], 0);
     let ok = 0;
     for (let roll = 1; roll <= 20; roll++) if (roll === 20 || roll !== 1 && roll + sum >= dc) ok += 1;
-    return { dc, mods, sum, pct: ok * 5 };
+    const p1 = ok / 20;
+    const p = e.mode === "adv" ? 1 - (1 - p1) ** 2 : e.mode === "dis" ? p1 * p1 : p1;
+    return { dc, mods, sum, pct: Math.round(p * 100), mode: e.mode, adv: e.adv, dis: e.dis };
   }
   function oddsText(o) {
     const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
     const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
-    return `d20${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
+    const edge = o.mode === "adv" ? ` adv. (${o.adv.join(", ")})` : o.mode === "dis" ? ` disadv. (${o.dis.join(", ")})` : "";
+    return `d20${edge}${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
   }
 
   // src/engine/status.js
@@ -2333,6 +2352,9 @@
     }
     if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
   }
+  function forceOpts(state2) {
+    return has2(state2, "toolkit") ? { adv: ["tool kit"] } : {};
+  }
   function forceEntry(state2) {
     const place = getPlace(state2.location.id);
     const ps = placeState(state2, place);
@@ -2344,7 +2366,7 @@
     }
     state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
     advanceTime(state2, 5, "heavy");
-    if (check(state2, "Kick open the locked door", 12, forceBonus(state2)).success) {
+    if (check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
       ps.unlocked = true;
       log(state2, "The door breaks open.");
       practice(state2, "tinkering", 4);
@@ -2364,7 +2386,7 @@
       return;
     }
     advanceTime(state2, 10, "heavy");
-    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc, forceBonus(state2)).success) {
+    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc, forceBonus(state2), forceOpts(state2)).success) {
       ps.counterOpen = true;
       log(state2, "The gate bends open.");
       practice(state2, "tinkering", 4);
@@ -2647,7 +2669,7 @@
         advanceTime(state2, 2);
       } else {
         state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
-        if (!check(state2, "Kick open the locked door", 12, forceBonus(state2)).success) {
+        if (!check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
           log(state2, "The door holds. You break a window and climb in.");
           if (chance(state2, 0.25)) addInjury(state2, "small_cut");
         }
@@ -2746,10 +2768,10 @@
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
       const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12, forceBonus(state2)))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
       else if (ps.zonesDone < ps.zones) {
         if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc, forceBonus(state2)))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
         } else {
           const env = environment(state2, "work");
           const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
@@ -2880,6 +2902,7 @@
       const cx = x + SHELF / 2;
       const tipped = cat !== "gas" && cat !== "convenience" && r() < 0.08;
       plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === "clothes" ? 1.5 : 2, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
+      if (cfg.fixture === "shelf" && !tipped) plan.fixtures.push({ type: "endcap", x: cx, z: rowZ + cfg.len / 2 + 0.28, w: SHELF, d: 0.55, h: 1.7, solid: true });
       if (i < aisles) {
         const ax = cx + SHELF / 2 + AISLE / 2;
         plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
@@ -4466,7 +4489,7 @@
         if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state))))}</small>`;
+          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
         }
         const e = environment(state, "work");
         return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;

@@ -6,7 +6,7 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
+import { forceOpts, listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
@@ -705,7 +705,7 @@ async function walkInside() {
       if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
       if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state))))}</small>`;
+        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
       }
       const e = environment(state, 'work');
       return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? ' · dark, no light: 2 min an item' : ''}</small>`;
