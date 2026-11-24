@@ -37,6 +37,10 @@ This is the **first playable version**: a small part of the full game.
   The map stays light and in color. Snow, rain, fog and a night tint show on the map
   (turn them off in **☰ Game**). The look takes ideas from modern "city after a disaster" games,
   but all art and layout are our own.
+- Home base projects: 10 projects in 5 wings (Power, Water, Heat and shelter, Medical, Food).
+  Find parts in the city (hardware stores, houses, gas stations), bring them home, and work on a
+  project in blocks of up to 2 hours. Each project has one clear effect, for example a second battery,
+  rain barrels, a wood stove or a sick room. The panel shows which parts you still need.
 - Turn-based clock, real sunrise and sunset for Aloha, daily weather from Portland averages.
 - Player stats and their effects, from the game rules doc. "Weak" status after the coma.
 - Visible d20 risk checks (D&D style) for doors, searches and road events.

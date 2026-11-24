@@ -31,7 +31,19 @@
     flea_spray: { name: "Flea spray", unit: "can", weight: 1, kind: "misc" },
     seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
     lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
-    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" }
+    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" },
+    // Parts for home base projects (kind 'part': no use on their own).
+    toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
+    scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
+    hardware_parts: { name: "Nails, screws and brackets", unit: "box", weight: 1, kind: "part" },
+    wiring: { name: "Electrical wire and connectors", unit: "roll", weight: 2, kind: "part" },
+    pipe_fittings: { name: "Pipe, hose and fittings", unit: "set", weight: 2, kind: "part" },
+    plastic_sheet: { name: "Plastic sheeting", unit: "roll", weight: 3, kind: "part" },
+    insulation: { name: "Foam board insulation", unit: "pack", weight: 4, kind: "part" },
+    metal_bin: { name: "Metal can with lid", unit: "pc", weight: 8, kind: "part" },
+    rain_barrel: { name: "Rain barrel (55 gal, empty)", unit: "pc", weight: 15, kind: "part" },
+    stove_kit: { name: "Wood stove and pipe kit", unit: "kit", weight: 40, kind: "part" },
+    battery_module: { name: "Home battery module", unit: "pc", weight: 40, kind: "part" }
   };
   function itemName(id) {
     return ITEMS[id] ? ITEMS[id].name : id;
@@ -93,7 +105,10 @@
         { id: "lighter", w: 12 },
         { id: "batteries", w: 8 },
         { id: "propane_1lb", w: 8 },
-        { id: "tarp", w: 3 }
+        { id: "tarp", w: 3 },
+        { id: "wiring", w: 4 },
+        { id: "pipe_fittings", w: 3 },
+        { id: "metal_bin", w: 3 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -176,7 +191,18 @@
         { id: "seeds", w: 8 },
         { id: "bleach", w: 5 },
         { id: "lighter", w: 6 },
-        { id: "firewood", w: 4 }
+        { id: "firewood", w: 4 },
+        { id: "toolkit", w: 6 },
+        { id: "scrap_wood", w: 12 },
+        { id: "hardware_parts", w: 14 },
+        { id: "wiring", w: 10 },
+        { id: "pipe_fittings", w: 10 },
+        { id: "plastic_sheet", w: 10 },
+        { id: "insulation", w: 8 },
+        { id: "metal_bin", w: 6 },
+        { id: "rain_barrel", w: 5 },
+        { id: "stove_kit", w: 2 },
+        { id: "water_filter", w: 3 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -197,7 +223,8 @@
         { id: "propane_1lb", w: 8 },
         { id: "flashlight", w: 6 },
         { id: "snacks", w: 6 },
-        { id: "backpack", w: 3 }
+        { id: "backpack", w: 3 },
+        { id: "plastic_sheet", w: 6 }
       ],
       entryText: "Racks of jackets and boots. This place has good winter gear."
     },
@@ -216,7 +243,8 @@
         { id: "flashlight", w: 8 },
         { id: "batteries", w: 8 },
         { id: "water_bottle", w: 10 },
-        { id: "gloves", w: 6 }
+        { id: "gloves", w: 6 },
+        { id: "toolkit", w: 8 }
       ],
       entryText: "The engine bay is empty. The crews went out on calls and did not come back."
     },
@@ -243,7 +271,15 @@
         { id: "comfort", w: 5 },
         { id: "firewood", w: 4 },
         { id: "dog_food", w: 2 },
-        { id: "lighter", w: 4 }
+        { id: "lighter", w: 4 },
+        { id: "toolkit", w: 2 },
+        { id: "scrap_wood", w: 3 },
+        { id: "hardware_parts", w: 3 },
+        { id: "wiring", w: 2 },
+        { id: "pipe_fittings", w: 2 },
+        { id: "metal_bin", w: 2 },
+        { id: "rain_barrel", w: 1 },
+        { id: "battery_module", w: 0.6 }
       ]
     }
   };
@@ -495,7 +531,11 @@
         rawGal: 0,
         safeGal: 0,
         furniture: 12,
-        fridgeOpened: false
+        fridgeOpened: false,
+        projects: {},
+        // built home base projects (see data/projects.js)
+        work: {}
+        // hours of work done on started projects
       },
       places: {},
       houses: {},
@@ -589,6 +629,223 @@
   var getPlace = (id) => INDEX[id];
   var allPlaces = () => LIST;
 
+  // src/data/projects.js
+  var WINGS = {
+    power: { label: "Power", icon: "\u26A1", blurb: "Solar panels and the home battery." },
+    water: { label: "Water", icon: "\u{1F4A7}", blurb: "Collect, store and clean water." },
+    heat: { label: "Heat and shelter", icon: "\u{1F525}", blurb: "Keep the living room warm with less fuel." },
+    medical: { label: "Medical", icon: "\u271A", blurb: "Heal faster and stay healthy." },
+    food: { label: "Food", icon: "\u{1F96B}", blurb: "Cook and store food." }
+  };
+  var PROJECTS = [
+    // ---- Power ----
+    {
+      id: "led_lights",
+      wing: "power",
+      name: "LED lights on the battery",
+      effect: "Light at home after dark. Morale +3 each day.",
+      needs: { wiring: 1, hardware_parts: 1 },
+      tools: ["toolkit"],
+      hours: 2
+    },
+    {
+      id: "second_battery",
+      wing: "power",
+      name: "Second battery",
+      effect: "Battery storage 13.5 \u2192 27 kWh.",
+      needs: { battery_module: 1, wiring: 2 },
+      tools: ["toolkit"],
+      requires: ["led_lights"],
+      hours: 8
+    },
+    // ---- Water ----
+    {
+      id: "rain_barrels",
+      wing: "water",
+      name: "Rain barrel system",
+      effect: "Rain fills 2 barrels from the gutter (110 gal). Boil or filter it before you drink.",
+      needs: { rain_barrel: 2, pipe_fittings: 1 },
+      tools: [],
+      hours: 3
+    },
+    {
+      id: "filter_station",
+      wing: "water",
+      name: "Water filter station",
+      effect: "Filter 2 gal of unsafe water in 10 min, with no fire or power.",
+      needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 },
+      tools: [],
+      requires: ["rain_barrels"],
+      hours: 2
+    },
+    // ---- Heat ----
+    {
+      id: "insulate_living",
+      wing: "heat",
+      name: "Insulate the living room",
+      effect: "The house loses heat half as fast.",
+      needs: { insulation: 2, plastic_sheet: 1, hardware_parts: 1 },
+      tools: [],
+      hours: 4
+    },
+    {
+      id: "wood_stove",
+      wing: "heat",
+      name: "Wood stove",
+      effect: "Fire gives more heat (+30 \xB0F), and one bundle burns 4 h, not 2 h.",
+      needs: { stove_kit: 1, pipe_fittings: 1, hardware_parts: 2 },
+      tools: ["toolkit"],
+      requires: ["insulate_living"],
+      hours: 16
+    },
+    // ---- Medical ----
+    {
+      id: "sick_room",
+      wing: "medical",
+      name: "Clean sick room",
+      effect: "When you sleep at home, injuries heal 50% faster and you get back more Health.",
+      needs: { bleach: 1, plastic_sheet: 1, first_aid: 1 },
+      tools: [],
+      hours: 2
+    },
+    {
+      id: "med_cabinet",
+      wing: "medical",
+      name: "Locked medicine cabinet",
+      effect: "Medicine is sorted and ready: pain pills work 9 h, not 6 h.",
+      needs: { scrap_wood: 2, hardware_parts: 1 },
+      tools: ["toolkit"],
+      requires: ["sick_room"],
+      hours: 3
+    },
+    // ---- Food ----
+    {
+      id: "rocket_stove",
+      wing: "food",
+      name: "Rocket stove in the garage",
+      effect: "Cook and boil water with scrap wood: no fire in the fireplace and no battery power needed.",
+      needs: { metal_bin: 1, hardware_parts: 1, scrap_wood: 1 },
+      tools: [],
+      hours: 3
+    },
+    {
+      id: "sealed_store",
+      wing: "food",
+      name: "Sealed food store",
+      effect: "Morale +5 one time. Then Morale +2 each day while 10 or more food items are in storage.",
+      needs: { metal_bin: 3 },
+      tools: [],
+      requires: ["rocket_stove"],
+      hours: 1
+    }
+  ];
+  var PROJECT_BY_ID = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
+
+  // src/engine/base.js
+  var WORK_BLOCK_H = 2;
+  var MIN_WORK_ENERGY = 15;
+  function base(state2) {
+    const h = state2.home;
+    if (!h.projects) h.projects = {};
+    if (!h.work) h.work = {};
+    return h;
+  }
+  function built(state2, id) {
+    return !!(state2.home.projects && state2.home.projects[id]);
+  }
+  function builtCount(state2) {
+    return PROJECTS.filter((p) => built(state2, p.id)).length;
+  }
+  function haveQty(state2, id) {
+    return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
+  }
+  function projectStatus(state2, proj) {
+    const h = base(state2);
+    const started = h.work[proj.id] != null;
+    const doneH = h.work[proj.id] || 0;
+    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
+    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
+    const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
+    const partsOk = started || parts.every((x) => x.have >= x.need);
+    const toolsOk = tools.every((t) => t.have);
+    let blocked = null;
+    if (built(state2, proj.id)) blocked = "Built";
+    else if (missingReq.length) blocked = `Build first: ${missingReq.map((r) => PROJECT_BY_ID[r].name).join(", ")}`;
+    else if (!partsOk) blocked = "Missing parts";
+    else if (!toolsOk) blocked = `Needs ${tools.filter((t) => !t.have).map((t) => itemName(t.id).toLowerCase()).join(", ")}`;
+    else if (state2.location.kind !== "home") blocked = "Go home to work on it";
+    else if (state2.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
+    return {
+      built: built(state2, proj.id),
+      started,
+      doneH,
+      leftH: Math.max(0, proj.hours - doneH),
+      parts,
+      tools,
+      missingReq,
+      blocked,
+      canWork: !blocked
+    };
+  }
+  function wingSummary(state2) {
+    return Object.entries(WINGS).map(([id, w]) => {
+      const list = PROJECTS.filter((p) => p.wing === id);
+      return { id, ...w, projects: list, built: list.filter((p) => built(state2, p.id)).length };
+    });
+  }
+  function takeParts(state2, needs) {
+    for (const [id, need] of Object.entries(needs)) {
+      let left = need;
+      for (const bag of [state2.home.storage, state2.carried]) {
+        const take = Math.min(left, bag[id] || 0);
+        if (take > 0) addItem(bag, id, -take);
+        left -= take;
+      }
+    }
+  }
+  function workOnProject(state2, id) {
+    const proj = PROJECT_BY_ID[id];
+    if (!proj) return;
+    const h = base(state2);
+    const st = projectStatus(state2, proj);
+    if (!st.canWork) {
+      log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
+      return;
+    }
+    if (!st.started) {
+      takeParts(state2, proj.needs);
+      h.work[id] = 0;
+      log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
+    }
+    const hours = Math.min(WORK_BLOCK_H, st.leftH);
+    advanceTime(state2, Math.round(hours * 60), "heavy");
+    if (state2.dead) return;
+    h.work[id] += hours;
+    if (h.work[id] >= proj.hours - 1e-9) {
+      delete h.work[id];
+      h.projects[id] = true;
+      finishProject(state2, proj);
+    } else {
+      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h.work[id]) * 60)} of work left.`);
+    }
+  }
+  function finishProject(state2, proj) {
+    const h = state2.home;
+    const p = state2.player;
+    if (proj.id === "second_battery") h.batteryMax = 27;
+    let morale = 5;
+    if (proj.id === "sealed_store") morale += 5;
+    p.morale = Math.min(100, p.morale + morale);
+    log(state2, `Project done: ${proj.name}. ${proj.effect}`, "good");
+  }
+  var fireHoursPerBundle = (state2) => built(state2, "wood_stove") ? 4 : 2;
+  var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
+  var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
+  var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
+  function foodItemsStored(state2) {
+    return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
+  }
+
   // src/engine/tick.js
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
@@ -606,7 +863,7 @@
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
-      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night, air, home: true };
+      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night && !built(state2, "led_lights"), air, home: true };
     }
     let dark = night;
     if (state2.location.kind === "place") {
@@ -700,7 +957,8 @@
     for (const inj of p.injuries) {
       if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
       inj.ageH += dt;
-      const slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+      let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
+      if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
       if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
@@ -728,7 +986,8 @@
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
     const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
-    if (ok) p.health += (sleeping ? 1 : 0.25) * dt;
+    const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
+    if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
     if (p.weak && p.food > 50 && p.water > 50) p.weakGoodHours += dt;
     if (env.dark && !sleeping && hasLight(state2) && (mode === "walk" || state2.location.kind !== "home")) {
@@ -749,7 +1008,7 @@
     const air = env.air;
     let heat = 0;
     if (h.fireHours > 0) {
-      heat += 20;
+      heat += fireHeat(state2);
       h.fireHours = Math.max(0, h.fireHours - dt);
       if (h.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
     }
@@ -764,13 +1023,18 @@
     }
     const passive = air + 6;
     const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05;
+    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
     h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
     const m = (state2.time % 1440 + 1440) % 1440;
     const s = sunFor(state2.time);
     if (m > s.rise && m < s.set) {
       const hours = (s.set - s.rise) / 60;
       h.battery = Math.min(h.batteryMax, h.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
     }
     if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
       h.tapWorks = false;
@@ -809,6 +1073,8 @@
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
+    if (built(state2, "led_lights")) p.morale += 3;
+    if (built(state2, "sealed_store") && foodItemsStored(state2) >= 10) p.morale += 2;
     if (state2.dog.stage === "joined") {
       p.morale += 8;
       if (state2.dog.food >= 25) state2.dog.bond += 3;
@@ -1130,10 +1396,11 @@
     return "";
   }
   function canHeat(state2, kwh) {
-    return state2.home.fireHours > 0 || state2.home.battery >= kwh;
+    return state2.home.fireHours > 0 || built(state2, "rocket_stove") || state2.home.battery >= kwh;
   }
   function useHeat(state2, kwh) {
     if (state2.home.fireHours > 0) return "on the fire";
+    if (built(state2, "rocket_stove")) return "on the rocket stove";
     state2.home.battery -= kwh;
     return "on the electric hot plate";
   }
@@ -1278,8 +1545,8 @@
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = 6;
-      log(state2, "You take pain pills. The pain is less for 6 hours.");
+      p.painH = painPillHours(state2);
+      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.`);
       advanceTime(state2, 2);
       return;
     }
@@ -1301,7 +1568,8 @@
     if (!have) return;
     const w = ITEMS[id].weight;
     const maxByWeight = w > 0 ? Math.floor(freeWeight(state2) / w * 1e3) / 1e3 : have;
-    const n = Math.min(qty ?? have, have, maxByWeight);
+    let n = Math.min(qty ?? have, have, maxByWeight);
+    if (["part", "tool", "wear"].includes(ITEMS[id].kind)) n = Math.floor(n + 1e-9);
     if (n <= 0) {
       log(state2, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, "warn");
       return;
@@ -1402,6 +1670,14 @@
         advanceTime(state2, 20);
         return;
       }
+      case "filter_water": {
+        const g = Math.min(2, h.rawGal);
+        h.rawGal -= g;
+        h.safeGal += g;
+        log(state2, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
+        advanceTime(state2, 10);
+        return;
+      }
       case "drink_safe":
         h.safeGal = Math.max(0, h.safeGal - 0.25);
         addWater(state2, 40);
@@ -1433,8 +1709,10 @@
         const bag = (h.storage.firewood || 0) > 0 ? h.storage : state2.carried;
         addItem(bag, "firewood", -1);
         const lit = h.fireHours > 0;
-        h.fireHours += 2;
-        log(state2, lit ? "You put more wood on the fire (+2 h)." : "You light a fire in the fireplace. One bundle burns for about 2 hours.", "good");
+        const per = fireHoursPerBundle(state2);
+        const where = built(state2, "wood_stove") ? "wood stove" : "fireplace";
+        h.fireHours += per;
+        log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         return;
       }
@@ -1578,9 +1856,9 @@
       log(state2, "The gate bends open.");
     } else if (chance(state2, 0.25)) addInjury(state2, "small_cut");
   }
-  function searchMinutes(state2, base, dark) {
+  function searchMinutes(state2, base2, dark) {
     const p = state2.player;
-    let m = base;
+    let m = base2;
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
@@ -1716,10 +1994,11 @@
       if (h.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
+        if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
         add("drink_raw", "Drink water without boiling (risk)");
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
-      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : "Light a fire in the fireplace", { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
       add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
       const food = ["dry_food", "canned_food"].some((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
@@ -1792,6 +2071,8 @@
         return playWithDog(state2);
       case "dog_follow":
         return toggleDogFollow(state2);
+      case "build":
+        return workOnProject(state2, arg);
       default:
         return homeAction(state2, id);
     }
@@ -2280,6 +2561,7 @@
   var mapApi = null;
   var popup = null;
   var fx = null;
+  var openWings = /* @__PURE__ */ new Set();
   var $ = (sel) => document.querySelector(sel);
   var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
@@ -2456,7 +2738,8 @@
     const atHome = state.location.kind === "home";
     const pct = Math.round(h.battery / h.batteryMax * 100);
     $("#home").innerHTML = `
-    <h3>Home ${atHome ? "" : "<small>(you are away)</small>"}</h3>
+    <div class="eyebrow">Home base</div>
+    <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}\xB0F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : "out"}</b>
@@ -2465,7 +2748,52 @@
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
       <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
-    </div>`;
+    </div>
+    ${renderBase()}`;
+  }
+  function renderBase() {
+    const done = builtCount(state);
+    const wings = wingSummary(state).map((w) => {
+      const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
+      const cards = w.projects.map(projectCard).join("");
+      return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? "open" : ""}>
+      <summary><span class="wi">${w.icon}</span><span class="wn">${esc(w.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc(w.blurb)}</p>${cards}</details>`;
+    }).join("");
+    const need = {};
+    for (const p of PROJECTS) {
+      const st = projectStatus(state, p);
+      if (st.built || st.started || st.missingReq.length) continue;
+      for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
+      for (const t of st.tools) if (!t.have) need[t.id] = 1;
+    }
+    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} \xD7${q}</span>`).join("");
+    return `<div class="base">
+    <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
+    <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
+    ${wings}
+    ${list ? `<p class="sub">Look for these parts (hardware stores, houses, gas stations):</p><div class="chips">${list}</div>` : ""}
+  </div>`;
+  }
+  function projectCard(p) {
+    const st = projectStatus(state, p);
+    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
+    const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc(itemName(t.id))}</span>`).join("");
+    let foot;
+    if (st.built) foot = '<span class="built">\u2713 Built</span>';
+    else {
+      const block = Math.min(WORK_BLOCK_H, st.leftH);
+      const label = st.started ? `Work ${block} h (${st.leftH} h left)` : `Start project (${p.hours} h total)`;
+      foot = `${st.started ? `<div class="basebar small"><i style="width:${st.doneH / p.hours * 100}%"></i></div>` : ""}
+      <button class="small" data-build="${p.id}" ${st.canWork ? "" : "disabled"}>${label}</button>
+      ${st.blocked ? `<small class="why">${esc(st.blocked)}</small>` : ""}`;
+    }
+    return `<div class="proj ${st.built ? "is-built" : ""}">
+    <div class="pn">${esc(p.name)}</div>
+    <div class="pe">${esc(p.effect)}</div>
+    ${st.built ? "" : `<div class="chips">${parts}${tools}</div>`}
+    <div class="pf">${foot}</div>
+  </div>`;
   }
   function renderDog() {
     const d = state.dog;
@@ -2655,9 +2983,16 @@
       else if (b.dataset.take) act("take", b.dataset.take);
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);
+      else if (b.dataset.build) act("action", "build", b.dataset.build);
       else if (b.id === "menuBtn") showMenu();
       else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
+    document.body.addEventListener("toggle", (e) => {
+      const w = e.target.dataset && e.target.dataset.wing;
+      if (!w) return;
+      if (e.target.open) openWings.add(w);
+      else openWings.delete(w);
+    }, true);
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });

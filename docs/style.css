@@ -228,3 +228,30 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 @media (prefers-reduced-motion: reduce) {
   .marker-you i, .marker-home.here span, .hud .h-alert { animation: none; }
 }
+
+/* ---------- home base projects ---------- */
+.base { margin-top: 12px; }
+.basebar { height: 5px; background: #1b252f; margin: 2px 0 10px; position: relative; }
+.basebar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); box-shadow: 0 0 8px rgba(111, 211, 230, .5); }
+.basebar.small { height: 3px; margin: 6px 0; }
+.wing { border: 1px solid var(--line); background: #121a22; margin: 6px 0; }
+.wing summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  font: 600 13px/1 var(--cond); letter-spacing: .16em; text-transform: uppercase; }
+.wing summary::-webkit-details-marker { display: none; }
+.wing summary::after { content: "+"; margin-left: 4px; color: var(--muted); font-size: 15px; }
+.wing[open] summary::after { content: "−"; }
+.wing[open] summary { border-bottom: 1px solid var(--line); }
+.wing .wi { width: 18px; text-align: center; }
+.wing .wn { flex: 1; }
+.wing .pips { display: flex; gap: 3px; }
+.wing .pips i { width: 14px; height: 5px; background: #26323e; transform: skewX(-20deg); }
+.wing .pips i.on { background: var(--accent); box-shadow: 0 0 6px rgba(111, 211, 230, .6); }
+.wing > .hint { margin: 8px 10px 4px; }
+.proj { margin: 6px 10px 10px; padding: 8px 10px; border-left: 2px solid var(--line-2); background: #0f161d; }
+.proj.is-built { border-left-color: var(--accent); opacity: .8; }
+.proj .pn { font: 700 15px/1.15 var(--cond); letter-spacing: .04em; text-transform: uppercase; }
+.proj .pe { color: var(--muted); font-size: 13px; margin: 2px 0 4px; }
+.proj .pf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.proj .pf .basebar { flex-basis: 100%; }
+.proj .why { color: var(--warn); font-size: 12px; }
+.proj .built { color: var(--accent); font: 600 12px/1 var(--cond); letter-spacing: .16em; text-transform: uppercase; }

@@ -14,11 +14,14 @@ import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
 import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns } from '../engine/save.js';
 import { createMap } from './map.js';
 import { createFx } from './fx.js';
+import { PROJECTS } from '../data/projects.js';
+import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H } from '../engine/base.js';
 
 let state = null;
 let mapApi = null;
 let popup = null;
 let fx = null;
+const openWings = new Set();
 const $ = (sel) => document.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -208,7 +211,8 @@ function renderHome() {
   const atHome = state.location.kind === 'home';
   const pct = Math.round((h.battery / h.batteryMax) * 100);
   $('#home').innerHTML = `
-    <h3>Home ${atHome ? '' : '<small>(you are away)</small>'}</h3>
+    <div class="eyebrow">Home base</div>
+    <h3>House status ${atHome ? '' : '<small>(you are away)</small>'}</h3>
     <div class="grid">
       <span>Inside temp</span><b>${Math.round(h.indoorTemp)}°F</b>
       <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : 'out'}</b>
@@ -217,7 +221,56 @@ function renderHome() {
       <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
       <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
       <span>Kitchen tap</span><b>${h.tapWorks ? 'weak flow' : 'stopped'}</b>
-    </div>`;
+    </div>
+    ${renderBase()}`;
+}
+
+// Home base projects, grouped in wings.
+function renderBase() {
+  const done = builtCount(state);
+  const wings = wingSummary(state).map((w) => {
+    const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? 'on' : ''}"></i>`).join('');
+    const cards = w.projects.map(projectCard).join('');
+    return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? 'open' : ''}>
+      <summary><span class="wi">${w.icon}</span><span class="wn">${esc(w.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc(w.blurb)}</p>${cards}</details>`;
+  }).join('');
+  // Parts still needed for the projects you can start now
+  const need = {};
+  for (const p of PROJECTS) {
+    const st = projectStatus(state, p);
+    if (st.built || st.started || st.missingReq.length) continue;
+    for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
+    for (const t of st.tools) if (!t.have) need[t.id] = 1;
+  }
+  const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} ×${q}</span>`).join('');
+  return `<div class="base">
+    <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
+    <div class="basebar"><i style="width:${(done / PROJECTS.length) * 100}%"></i></div>
+    ${wings}
+    ${list ? `<p class="sub">Look for these parts (hardware stores, houses, gas stations):</p><div class="chips">${list}</div>` : ''}
+  </div>`;
+}
+
+function projectCard(p) {
+  const st = projectStatus(state, p);
+  const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? 'ok' : 'bad'}">${esc(itemName(x.id))} ${st.started ? '✓' : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join('');
+  const tools = st.tools.map((t) => `<span class="chip ${t.have ? 'ok' : 'bad'}">🔧 ${esc(itemName(t.id))}</span>`).join('');
+  let foot;
+  if (st.built) foot = '<span class="built">✓ Built</span>';
+  else {
+    const block = Math.min(WORK_BLOCK_H, st.leftH);
+    const label = st.started ? `Work ${block} h (${st.leftH} h left)` : `Start project (${p.hours} h total)`;
+    foot = `${st.started ? `<div class="basebar small"><i style="width:${(st.doneH / p.hours) * 100}%"></i></div>` : ''}
+      <button class="small" data-build="${p.id}" ${st.canWork ? '' : 'disabled'}>${label}</button>
+      ${st.blocked ? `<small class="why">${esc(st.blocked)}</small>` : ''}`;
+  }
+  return `<div class="proj ${st.built ? 'is-built' : ''}">
+    <div class="pn">${esc(p.name)}</div>
+    <div class="pe">${esc(p.effect)}</div>
+    ${st.built ? '' : `<div class="chips">${parts}${tools}</div>`}
+    <div class="pf">${foot}</div>
+  </div>`;
 }
 
 function renderDog() {
@@ -413,8 +466,14 @@ function bindEvents() {
     else if (b.dataset.take) act('take', b.dataset.take);
     else if (b.dataset.takeall) act('takeall');
     else if (b.dataset.drop) act('drop', b.dataset.drop);
+    else if (b.dataset.build) act('action', 'build', b.dataset.build);
     else if (b.id === 'menuBtn') showMenu();
     else if (b.id === 'centerBtn' && mapApi) mapApi.flyTo(state.pos);
   });
+  document.body.addEventListener('toggle', (e) => {
+    const w = e.target.dataset && e.target.dataset.wing;
+    if (!w) return;
+    if (e.target.open) openWings.add(w); else openWings.delete(w);
+  }, true);
   window.addEventListener('beforeunload', () => { if (state) saveGame(state); });
 }

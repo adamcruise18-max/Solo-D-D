@@ -39,6 +39,19 @@ export const ITEMS = {
   seeds: { name: 'Seed packet', unit: 'pack', weight: 0.05, kind: 'misc' },
   lighter: { name: 'Lighter', unit: 'pc', weight: 0.05, kind: 'misc' },
   comfort: { name: 'Book or deck of cards', unit: 'pc', weight: 1, kind: 'comfort' },
+
+  // Parts for home base projects (kind 'part': no use on their own).
+  toolkit: { name: 'Tool kit', unit: 'kit', weight: 6, kind: 'tool' },
+  scrap_wood: { name: 'Lumber and plywood', unit: 'pc', weight: 6, kind: 'part' },
+  hardware_parts: { name: 'Nails, screws and brackets', unit: 'box', weight: 1, kind: 'part' },
+  wiring: { name: 'Electrical wire and connectors', unit: 'roll', weight: 2, kind: 'part' },
+  pipe_fittings: { name: 'Pipe, hose and fittings', unit: 'set', weight: 2, kind: 'part' },
+  plastic_sheet: { name: 'Plastic sheeting', unit: 'roll', weight: 3, kind: 'part' },
+  insulation: { name: 'Foam board insulation', unit: 'pack', weight: 4, kind: 'part' },
+  metal_bin: { name: 'Metal can with lid', unit: 'pc', weight: 8, kind: 'part' },
+  rain_barrel: { name: 'Rain barrel (55 gal, empty)', unit: 'pc', weight: 15, kind: 'part' },
+  stove_kit: { name: 'Wood stove and pipe kit', unit: 'kit', weight: 40, kind: 'part' },
+  battery_module: { name: 'Home battery module', unit: 'pc', weight: 40, kind: 'part' },
 };
 
 export function itemName(id) {
