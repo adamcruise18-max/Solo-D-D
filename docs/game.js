@@ -3364,10 +3364,13 @@
         // Your marks: amber ring = partly searched, grey = searched.
         "circle-stroke-color": ["match", ["get", "status"], 2, "#6b7682", 1, "#e3b04b", "#16202a"],
         "circle-stroke-width": [
-          "case",
-          ["==", ["get", "status"], 1],
-          ["interpolate", ["linear"], ["zoom"], 9, 1.6, 14, 3],
-          ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6]
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          9,
+          ["case", ["==", ["get", "status"], 1], 1.6, 0.8],
+          14,
+          ["case", ["==", ["get", "status"], 1], 3, 1.6]
         ],
         "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, 1]
       }
