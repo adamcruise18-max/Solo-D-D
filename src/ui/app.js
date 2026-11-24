@@ -6,7 +6,7 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList } from '../engine/actions.js';
+import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { placeState } from '../engine/loot.js';
@@ -607,27 +607,53 @@ async function walkInside() {
     subtitle: `${cat.label} · inside`,
     dark: env.dark,
     night,
-    hasLight: hasLight(state),
     stock,
+    hasFlashlight: () => (state.carried.flashlight || 0) > 0,
+    isLightOn: () => hasLight(state),
+    toggleLight: () => {
+      const n0 = state.log.length;
+      act('action', 'flashlight');
+      return state.log.slice(n0).map((e) => e.text).join(' ');
+    },
+    hasLoot: () => Object.keys(hereBag(state)).length > 0,
+    panel: (name) => insidePanel(name),
+    useItem: (id, verb) => {
+      const n0 = state.log.length;
+      act('use', id, verb, 'carried');
+      return state.log.slice(n0).map((e) => e.text).join(' ');
+    },
+    quickUse: (action) => {
+      const slot = { quick_med: 'med', quick_food: 'food', quick_utility: 'utility' }[action];
+      const c = quickChoice(state, slot);
+      if (c.why) return c.why;
+      const n0 = state.log.length;
+      act('use', c.id, c.verb, 'carried');
+      return state.log.slice(n0).map((e) => e.text).join(' ');
+    },
+    quickSave: () => {
+      const ok = saveGame(state);
+      return ok ? `Game saved (Day ${dayIndex(state.time) + 1}, ${formatClock(state.time)}).` : 'The game could not save in this browser.';
+    },
+    canQuickLoad: () => !!loadGame(),
     isDone: (z) => zoneList().includes(z),
     isCounterOpen: () => (loc.kind === 'place' ? placeState(state, getPlace(loc.id)).counterOpen : true),
     isDead: () => !!state.dead,
     getStatus: () => {
       const p = state.player;
       const low = Object.keys(STAT_INFO).filter((k) => p[k] < 25).map((k) => STAT_INFO[k].label);
-      const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h` : 'No flashlight';
+      const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : 'No flashlight';
       return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
     },
     describe: (n) => {
       if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
-      if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>`;
+      if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
         return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar' : `d20 DC ${cat.lockedZone.dc}`}</small>`;
       }
       const e = environment(state, 'work');
       const min = searchMinutes(state, cat.zoneMinutes, e.dark);
-      return `<kbd>E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? ' · dark, no light' : ''}</small>`;
+      return `<kbd>Hold E</kbd> Search the ${esc(n.label)} <small>${formatDuration(min)}${e.dark && !hasLight(state) ? ' · dark, no light' : ''}</small>`;
     },
     onWalk: (m) => {
       perform(state, 'action', 'walk_inside', m);
@@ -664,11 +690,63 @@ async function walkInside() {
       act('takeall');
       return state.log.slice(n0).map((e) => e.text).join(' ') || `You put it in your pack. Bag: ${bagWeight(state.carried)} / ${carryLimit(state)} lb.`;
     },
-    onLeave: () => {
+    onLeave: (died, why) => {
       document.body.classList.remove('inside-open');
+      if (why === 'quickload') {
+        const saved = loadGame();
+        if (saved) state = saved;
+        commit(true);
+        return;
+      }
+      // Outside, the flashlight goes back on by itself (night walks need it).
+      if (state.player.lightOff) state.player.lightOff = false;
       commit();
     },
   });
+}
+
+// Panels inside the 3D view (Tab, C, J, O).
+function insidePanel(name) {
+  const p = state.player;
+  if (name === 'inventory') {
+    const c = state.carried;
+    const ids = Object.keys(c).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+    const rows = ids.map((id) => {
+      const it = ITEMS[id];
+      const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
+        .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
+      return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
+    }).join('') || '<li class="empty">You carry nothing.</li>';
+    const here = hereBag(state);
+    const hereIds = Object.keys(here);
+    const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
+      <button class="primary small" data-in="take">Take all that fits (F)</button>` : '';
+    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><ul class="inv">${rows}</ul>${hereList}`;
+  }
+  if (name === 'character') {
+    const rows = Object.keys(STAT_INFO).map((k) => {
+      const v = Math.round(p[k]);
+      const cls = v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok';
+      return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span><span class="bar"><i style="width:${v}%"></i></span><span class="sv">${v}</span><span class="sw">${statWord(k, p[k])}</span></div>`;
+    }).join('');
+    const notes = [];
+    for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`);
+    if (p.illness.infection) notes.push('Infection');
+    if (p.illness.stomachH > 0) notes.push('Stomach bug');
+    if (p.wet) notes.push('Wet');
+    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
+    return `<h4>Character</h4>${rows}
+      <p class="hint">${notes.length ? esc(notes.join(' · ')) : 'No injuries or illness.'}</p>
+      <p class="hint">Wearing: ${esc(worn.length ? worn.join(', ') : 'normal clothes')} · Feels like ${Math.round(feltTemp(state, 'rest'))}°F</p>`;
+  }
+  if (name === 'journal') {
+    const items = state.log.slice(-14).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
+    return `<h4>Journal</h4><ul class="jr">${items}</ul>`;
+  }
+  if (name === 'objectives') {
+    return '<h4>Objectives</h4><p>There is nobody to save and nothing to find. Stay alive: eat, drink, keep warm, and get home before night.</p>';
+  }
+  return null;
 }
 
 // ---------- events ----------

@@ -24,10 +24,14 @@ This is the **first playable version**: a small part of the full game.
 
 ### Inside a building (first person)
 
-- Computer: click the view to look with the mouse. **W A S D** or the arrow keys walk. **Shift** walks faster.
-  **E** searches the aisle or room you stand in. **T** takes all that fits. **Esc** opens the menu.
+- Computer: click the view to look with the mouse. Press **Esc** to see the full key list.
+  The main keys: **W A S D** walk, **Space** jump, **Shift** sprint, **Ctrl** crouch, **Z** stand / crouch / prone,
+  **Caps Lock** slow walk, **E** use a door or gate, **hold E** search, **F** take all that fits, **L** flashlight,
+  **Tab** inventory, **C** character, **M** floor plan, **J** journal, **5** medicine, **7** eat or drink,
+  **9** new batteries, **F5** save, **F9** load. Right mouse looks closer. Middle mouse marks a spot.
+  Weapon keys (left mouse, R, 1–4, G, V, Q and others) show "not yet in the game".
 - Phone or tablet: drag on the left half of the screen to walk, drag on the right half to look,
-  tap **USE** to search.
+  hold **USE** to search, tap **USE** for doors. Buttons on the right: jump, crouch, light, bag, map.
 - A blue ring on the floor marks a place you did not search yet. A grey ring is done.
 - Walk to the front door and press **E** to go back to the map.
 - Game time: each search costs the same time as before (for example 20 min for a supermarket aisle,

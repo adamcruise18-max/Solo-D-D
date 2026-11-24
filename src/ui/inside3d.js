@@ -5,14 +5,15 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, FogExp2, HemisphereLight, AmbientLight, PointLight, SpotLight,
   Object3D, Mesh, InstancedMesh, BoxGeometry, PlaneGeometry, RingGeometry, CylinderGeometry, SphereGeometry,
   MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide,
-  Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial,
+  Vector3, Matrix4, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2,
 } from 'three';
 import { collide, nearestSpot } from '../engine/interior.js';
+import {
+  KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
+} from './controls.js';
 
-const EYE = 1.62;
-const WALK_SPEED = 2.6; // m/s on screen
-const RUN_SPEED = 4.2;
 const ACCENT = 0x6fd3e6;
+const IS_MAC = typeof navigator !== 'undefined' && /Mac/.test(navigator.platform || '');
 const WALK_FLUSH_M = 30; // send walked distance to the game clock every 30 m
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -85,18 +86,30 @@ export function openInside(opts) {
     <div class="in-bar" hidden><i></i></div>
     <div class="in-found corners" hidden></div>
     <div class="in-toast" hidden></div>
-    <div class="in-help">WASD / arrows: walk · Mouse: look · <b>E</b>: search · <b>T</b>: take all · <b>Esc</b>: menu</div>
+    <div class="in-stance" hidden></div>
+    <div class="in-debug" hidden></div>
+    <div class="in-panel corners" hidden></div>
+    <div class="in-help">WASD: walk · Space: jump · Shift: sprint · Ctrl: crouch · <b>Hold E</b>: search · F: take · L: light · Tab: bag · M: map · <b>Esc</b>: all keys</div>
     <div class="in-touch">
       <div class="in-stick"><i></i></div>
       <button class="in-use" type="button">USE</button>
+      <div class="in-tbtns">
+        <button type="button" data-tk="jump">JUMP</button>
+        <button type="button" data-tk="stance">CROUCH</button>
+        <button type="button" data-tk="flashlight">LIGHT</button>
+        <button type="button" data-tk="inventory">BAG</button>
+        <button type="button" data-tk="map">MAP</button>
+      </div>
       <button class="in-menu" type="button">☰</button>
     </div>
     <div class="in-pause" hidden>
       <div class="box corners">
         <h3>${esc(opts.title)}</h3>
         <p class="hint">Game time moves only when you walk or search. It is stopped now.</p>
-        <button class="primary" data-in="resume">Resume</button>
-        <button data-in="leave">Leave the building</button>
+        <div class="row"><button class="primary" data-in="resume">Resume</button>
+        <button data-in="leave">Leave the building</button></div>
+        <h4>Keys</h4>
+        <div class="in-keys">${keyTableHtml()}</div>
       </div>
     </div>`;
   document.body.appendChild(root);
@@ -114,15 +127,17 @@ export function openInside(opts) {
   scene.add(camera);
   const { w: W, d: D, h: H } = plan.size;
   const dark = opts.dark; // big store, or night
-  const lit = opts.hasLight;
   const bg = dark ? 0x05070a : 0x2a3138;
   scene.background = new Color(bg);
-  scene.fog = new FogExp2(bg, dark ? (lit ? 0.07 : 0.11) : 0.035);
+  scene.fog = new FogExp2(bg, 0.035);
 
   // Light
+  let darkAmb = null;
+  let darkHemi = null;
   if (dark) {
-    scene.add(new AmbientLight(0x8fa4b8, lit ? 0.08 : 0.28));
-    scene.add(new HemisphereLight(0xb8c8d8, 0x202020, lit ? 0.12 : 0.25));
+    darkAmb = new AmbientLight(0x8fa4b8, 0.28);
+    darkHemi = new HemisphereLight(0xb8c8d8, 0x202020, 0.25);
+    scene.add(darkAmb, darkHemi);
   } else {
     scene.add(new HemisphereLight(0xdfe8f0, 0x3a3630, 1.3));
     scene.add(new AmbientLight(0xffffff, 0.25));
@@ -132,7 +147,7 @@ export function openInside(opts) {
   doorLight.position.set(0, 2.2, -0.6);
   scene.add(doorLight);
   let flash = null;
-  if (lit) {
+  if (opts.hasFlashlight()) {
     flash = new SpotLight(0xfff3dd, 38, 24, 0.5, 0.45, 1.4);
     flash.position.set(0.15, -0.15, 0);
     camera.add(flash);
@@ -141,6 +156,17 @@ export function openInside(opts) {
     camera.add(tgt);
     flash.target = tgt;
   }
+  // The flashlight beam follows the game: on, off, or empty batteries.
+  function applyLight() {
+    const on = !!flash && opts.isLightOn();
+    if (flash) flash.visible = on;
+    if (dark) {
+      darkAmb.intensity = on ? 0.08 : 0.28;
+      darkHemi.intensity = on ? 0.12 : 0.25;
+      scene.fog.density = on ? 0.07 : 0.11;
+    }
+  }
+  applyLight();
 
   // ---------- building ----------
   const floorKind = plan.cat === 'house' ? 'house' : plan.kind;
@@ -359,16 +385,28 @@ export function openInside(opts) {
   const pos = { x: plan.start.x, z: plan.start.z };
   let yaw = plan.start.yaw || 0;
   let pitch = 0;
+  let feet = 0; // height of the feet above the floor (jumps)
+  let vy = 0;
+  let stance = 'stand';
+  let crouchHeld = false;
+  let slowWalk = false;
+  let aiming = false;
+  let eye = STANCES.stand.eye;
   const keys = new Set();
   let paused = false;
   let busy = false; // searching
   let closed = false;
   let walked = 0;
   let current = null;
+  let panel = null; // name of the open panel
+  let debugOn = false;
+  let fps = 0;
   const stick = { x: 0, y: 0, id: null, ox: 0, oy: 0 };
   let lookId = null;
   let lookLast = null;
   let bob = 0;
+  let hold = null; // { what: 'search', t0, raf, cancel }
+  let eDown = 0;
 
   function resize() {
     const w = root.clientWidth;
@@ -399,8 +437,71 @@ export function openInside(opts) {
     const list = res.items.length ? `<ul>${res.items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : '<p class="hint">Nothing useful here.</p>';
     box.innerHTML = `<h4>${esc(res.title)}</h4>${list}
       <p class="hint">${esc(res.note || '')}</p>
-      <div class="row">${res.canTake ? '<button class="primary" data-in="take">Take all that fits (T)</button>' : ''}<button data-in="close">Close</button></div>`;
+      <div class="row">${res.canTake ? '<button class="primary" data-in="take">Take all that fits (F)</button>' : ''}<button data-in="close">Close</button></div>`;
     box.hidden = false;
+  }
+  const foundOpen = () => !$('.in-found').hidden;
+
+  function showStance() {
+    const el = $('.in-stance');
+    const words = [];
+    if (stance !== 'stand') words.push(stance === 'crouch' ? 'Crouching' : 'Prone');
+    if (slowWalk && stance === 'stand') words.push('Slow walk');
+    if (aiming) words.push('Looking closer');
+    el.hidden = !words.length;
+    el.textContent = words.join(' · ');
+  }
+
+  // ---------- panels (inventory, character, map, journal) ----------
+  function openPanel(name) {
+    const el = $('.in-panel');
+    if (panel === name) { closePanel(); return; }
+    let html;
+    if (name === 'map') html = mapHtml();
+    else html = opts.panel(name);
+    if (!html) return;
+    panel = name;
+    keys.clear();
+    el.innerHTML = `${html}<div class="row"><button data-in="closepanel">Close</button></div>`;
+    el.hidden = false;
+    if (document.pointerLockElement === canvas) document.exitPointerLock();
+  }
+  function closePanel() {
+    panel = null;
+    $('.in-panel').hidden = true;
+  }
+  function refreshPanel() {
+    if (panel && panel !== 'map') {
+      const name = panel;
+      panel = null;
+      openPanel(name);
+    }
+  }
+
+  // Floor plan seen from above, with you and the search spots.
+  function mapHtml() {
+    const pad = 1;
+    const vw = W + pad * 2;
+    const vh = D + pad * 2 + 1.5;
+    const tx = (x) => (x + W / 2 + pad).toFixed(2);
+    const tz = (z) => (z + D + pad).toFixed(2); // door at the bottom
+    const rect = (b, cls) => `<rect class="${cls}" x="${tx(b.x - b.w / 2)}" y="${tz(b.z - b.d / 2)}" width="${b.w.toFixed(2)}" height="${b.d.toFixed(2)}"/>`;
+    const walls = plan.walls.map((b) => rect(b, 'w')).join('');
+    const fix = plan.fixtures.filter((f) => f.type !== 'gate').map((f) => rect(f, 'f')).join('');
+    const spots = plan.spots.map((sp) => `<circle class="${opts.isDone(sp.zone) ? 'sd' : 's'}" cx="${tx(sp.x)}" cy="${tz(sp.z)}" r="0.45"/>`).join('');
+    const pings = pingList.map((p) => `<circle class="pg" cx="${tx(p.x)}" cy="${tz(p.z)}" r="0.3"/>`).join('');
+    const ax = Math.sin(yaw);
+    const az = Math.cos(yaw);
+    const px = +tx(pos.x);
+    const pz = +tz(pos.z);
+    const tip = `${(px - ax * 0.9).toFixed(2)},${(pz - az * 0.9).toFixed(2)}`;
+    const l = `${(px - az * 0.45).toFixed(2)},${(pz + ax * 0.45).toFixed(2)}`;
+    const r = `${(px + az * 0.45).toFixed(2)},${(pz - ax * 0.45).toFixed(2)}`;
+    return `<h4>Floor plan</h4>
+      <svg class="in-map" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">${fix}${walls}${spots}${pings}
+        <polygon class="me" points="${tip} ${l} ${r}"/>
+        <text x="${tx(0)}" y="${(D + pad + 1.2).toFixed(1)}" text-anchor="middle">Door</text></svg>
+      <p class="hint">Blue: not searched. Grey: searched. Triangle: you.</p>`;
   }
 
   // ---------- actions ----------
@@ -409,35 +510,59 @@ export function openInside(opts) {
     walked = 0;
   }
 
-  async function use() {
+  // Tap E: doors and gates. On a search spot, E must be held.
+  function interact() {
     if (busy || paused || closed || !current) return;
     if (current.type === 'exit') { leave(); return; }
     const s = current;
     if (opts.isDone(s.zone)) { toast(`You already searched the ${s.label}.`); return; }
-    if (s.counter && !opts.isCounterOpen()) {
-      flushWalk();
-      const r = opts.onCounter();
-      if (gateMesh) gateMesh.visible = !opts.isCounterOpen();
-      toast(r);
-      afterGameStep();
-      return;
-    }
+    if (s.counter && !opts.isCounterOpen()) { openGate(); return; }
+    toast(`Hold E to search the ${s.label}.`, 1600);
+  }
+
+  function openGate() {
+    flushWalk();
+    const r = opts.onCounter();
+    if (gateMesh) gateMesh.visible = !opts.isCounterOpen();
+    toast(r);
+    afterGameStep();
+  }
+
+  function canSearchHere() {
+    return current && current.type === 'search' && !opts.isDone(current.zone) && !(current.counter && !opts.isCounterOpen());
+  }
+
+  function startHold() {
+    if (busy || paused || closed || hold || !canSearchHere()) return false;
+    const s = current;
+    const bar = $('.in-bar');
+    const fill = bar.querySelector('i');
+    bar.hidden = false;
+    fill.style.width = '0%';
+    hold = { t0: performance.now(), spot: s };
+    const step = () => {
+      if (!hold) return;
+      const k = Math.min(1, (performance.now() - hold.t0) / HOLD_SEARCH_MS);
+      fill.style.width = `${k * 100}%`;
+      if (k < 1) { hold.raf = requestAnimationFrame(step); return; }
+      const spot = hold.spot;
+      hold = null;
+      bar.hidden = true;
+      doSearch(spot);
+    };
+    step();
+    return true;
+  }
+  function cancelHold() {
+    if (!hold) return;
+    cancelAnimationFrame(hold.raf);
+    hold = null;
+    $('.in-bar').hidden = true;
+  }
+
+  function doSearch(s) {
     busy = true;
     flushWalk();
-    const bar = $('.in-bar');
-    bar.hidden = false;
-    const fill = bar.querySelector('i');
-    fill.style.width = '0%';
-    const t0 = performance.now();
-    await new Promise((res) => {
-      const step = () => {
-        const k = Math.min(1, (performance.now() - t0) / 1100);
-        fill.style.width = `${k * 100}%`;
-        if (k < 1) requestAnimationFrame(step); else res();
-      };
-      step();
-    });
-    bar.hidden = true;
     const res = opts.onSearch(s.zone);
     busy = false;
     refreshProducts();
@@ -451,6 +576,73 @@ export function openInside(opts) {
     showFound(null);
     if (msg) toast(msg);
     afterGameStep();
+    refreshPanel();
+  }
+
+  // F: the one thing that makes sense here.
+  function context() {
+    if (foundOpen() && $('[data-in="take"]')) { takeAll(); return; }
+    if (opts.hasLoot()) { takeAll(); return; }
+    if (current && current.type === 'exit') { leave(); return; }
+    if (current && current.counter && !opts.isCounterOpen()) { openGate(); return; }
+    toast('Nothing to take here.', 1500);
+  }
+
+  function toggleLight() {
+    if (!opts.hasFlashlight()) { toast('You have no flashlight.'); return; }
+    const msg = opts.toggleLight();
+    applyLight();
+    status();
+    if (msg) toast(msg, 1800);
+  }
+
+  function quick(action) {
+    const msg = opts.quickUse(action);
+    if (msg) toast(msg, 3200);
+    afterGameStep();
+    applyLight();
+    refreshPanel();
+  }
+
+  function notYet(k) {
+    const now = performance.now();
+    if (notYet.last && now - notYet.last < 700) return;
+    notYet.last = now;
+    toast(`${k.label}: not yet in the game.`, 1800);
+  }
+
+  // Middle mouse: put a mark on the floor where you look.
+  const pingList = [];
+  const ray = new Raycaster();
+  const floorPlane = new Plane(new Vector3(0, 1, 0), 0);
+  const pingGeo = new RingGeometry(0.15, 0.24, 24);
+  function ping() {
+    ray.setFromCamera(new Vector2(0, 0), camera);
+    const hit = new Vector3();
+    if (!ray.ray.intersectPlane(floorPlane, hit) || hit.distanceTo(camera.position) > 25) { toast('Look at the floor to mark it.', 1500); return; }
+    const m = new Mesh(pingGeo, new MeshBasicMaterial({ color: 0xe9cf96, side: DoubleSide, fog: false }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(hit.x, 0.03, hit.z);
+    scene.add(m);
+    pingList.push({ x: hit.x, z: hit.z, m });
+    if (pingList.length > 5) scene.remove(pingList.shift().m);
+    toast('Marked.', 900);
+  }
+
+  function jump() {
+    if (feet > 0.001 || vy !== 0) return;
+    if (stance !== 'stand') { stance = 'stand'; crouchHeld = false; showStance(); return; }
+    vy = JUMP_SPEED;
+  }
+
+  function quickSave() {
+    flushWalk();
+    toast(opts.quickSave(), 1800);
+  }
+  function quickLoad() {
+    flushWalk();
+    if (!opts.canQuickLoad()) { toast('There is no save to load.'); return; }
+    close(false, 'quickload');
   }
 
   function afterGameStep() {
@@ -464,70 +656,168 @@ export function openInside(opts) {
     close(false);
   }
 
-  function close(died) {
+  function close(died, why) {
     if (closed) return;
     closed = true;
+    cancelHold();
     if (document.pointerLockElement === canvas) document.exitPointerLock();
     window.removeEventListener('resize', resize);
-    window.removeEventListener('keydown', onKey);
-    window.removeEventListener('keyup', onKeyUp);
+    window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('keyup', onKeyUp, true);
+    window.removeEventListener('blur', onBlur);
     document.removeEventListener('pointerlockchange', onLockChange);
     renderer.dispose();
     root.remove();
-    opts.onLeave(!!died);
+    opts.onLeave(!!died, why);
   }
 
   function setPaused(v) {
     paused = v;
     $('.in-pause').hidden = !v;
-    if (v) keys.clear();
+    if (v) { keys.clear(); cancelHold(); aiming = false; }
+  }
+
+  // One action from the key table.
+  function run(k, e) {
+    switch (k.action) {
+      case 'jump': return jump();
+      case 'stance': stance = nextStance(stance); crouchHeld = false; return showStance();
+      case 'walktoggle': slowWalk = !slowWalk; return showStance();
+      case 'interact': return null; // handled by keydown / keyup (tap or hold)
+      case 'context': return context();
+      case 'flashlight': return toggleLight();
+      case 'inventory': case 'character': case 'map': case 'journal': case 'objectives': return openPanel(k.action);
+      case 'quick_med': case 'quick_food': case 'quick_utility': return quick(k.action);
+      case 'confirm':
+        if (foundOpen() && $('[data-in="take"]')) return takeAll();
+        if (panel) return closePanel();
+        return interact();
+      case 'quicksave': return quickSave();
+      case 'quickload': return quickLoad();
+      case 'debug': debugOn = !debugOn; $('.in-debug').hidden = !debugOn; return null;
+      case 'ping': return ping();
+      default:
+        if (!k.ready) notYet(k);
+        return null;
+    }
   }
 
   // ---------- input ----------
+  const HELD = new Set(['move', 'sprint', 'crouch']);
   function onKey(e) {
     if (closed) return;
-    const k = e.key.toLowerCase();
-    if (k === 'escape') {
-      if (!$('.in-found').hidden) { showFound(null); return; }
+    const code = e.code;
+    // Keys that the browser would use for something else.
+    if (['Tab', 'F5', 'F9', 'Space', 'Backquote', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(code) || (e.ctrlKey && code !== 'KeyW')) e.preventDefault();
+    if (code === 'Escape') {
+      if (foundOpen()) { showFound(null); return; }
+      if (panel) { closePanel(); return; }
       if (!document.pointerLockElement) setPaused(!paused);
       return;
     }
-    if (paused) return;
-    if (k === 'e' || k === ' ' || k === 'enter') { e.preventDefault(); use(); return; }
-    if (k === 't' && !$('.in-found').hidden && $('[data-in="take"]')) { takeAll(); return; }
-    keys.add(e.code);
-    if (e.code.startsWith('Arrow')) e.preventDefault();
+    if (paused) {
+      if (code === 'Enter') setPaused(false);
+      return;
+    }
+    if (code === 'CapsLock') { slowWalk = !slowWalk; showStance(); return; }
+    const k = keyFor(code) || (code.startsWith('Arrow') ? { action: 'move' } : null);
+    if (!k) return;
+    if (panel && !['inventory', 'character', 'map', 'journal', 'objectives', 'pause', 'quicksave', 'quickload', 'confirm'].includes(k.action) && !k.action.startsWith('quick')) return;
+    if (HELD.has(k.action)) {
+      keys.add(code);
+      if (k.action === 'crouch' && !e.repeat) { crouchHeld = true; if (stance === 'stand') stance = 'crouch'; showStance(); }
+      return;
+    }
+    if (e.repeat) return;
+    if (k.action === 'interact') {
+      eDown = performance.now();
+      // Hold E on a search spot: start the search bar now.
+      startHold();
+      return;
+    }
+    run(k, e);
   }
-  function onKeyUp(e) { keys.delete(e.code); }
+  function onKeyUp(e) {
+    keys.delete(e.code);
+    // On a Mac, Caps Lock sends keydown when it goes on and keyup when it goes off.
+    if (e.code === 'CapsLock' && IS_MAC) { slowWalk = false; showStance(); return; }
+    const k = keyFor(e.code);
+    if (!k) return;
+    if (k.action === 'crouch' && crouchHeld) { crouchHeld = false; if (stance === 'crouch') stance = 'stand'; showStance(); }
+    if (k.action === 'interact' && eDown) {
+      const short = performance.now() - eDown < 300;
+      eDown = 0;
+      if (hold) { if (short) toast(`Hold E to search the ${hold.spot.label}.`, 1600); cancelHold(); return; }
+      if (short && !paused && !panel) interact();
+    }
+  }
+  function onBlur() { keys.clear(); cancelHold(); }
   function onLockChange() {
-    if (!document.pointerLockElement && !closed && !touch) setPaused(true);
+    if (!document.pointerLockElement && !closed && !touch && !panel && !foundOpen()) setPaused(true);
   }
-  window.addEventListener('keydown', onKey);
-  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('keyup', onKeyUp, true);
+  window.addEventListener('blur', onBlur);
   document.addEventListener('pointerlockchange', onLockChange);
-  canvas.addEventListener('click', () => {
-    if (!touch && !paused && canvas.requestPointerLock) {
-      try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* no lock: drag to look */ }
+  function lock() {
+    if (touch || paused || panel || !canvas.requestPointerLock) return;
+    try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (err) { /* no lock: drag to look */ }
+  }
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('mousedown', (e) => {
+    if (paused || touch) return;
+    const locked = document.pointerLockElement === canvas;
+    if (e.button === 1) { e.preventDefault(); run(keyFor('Mouse1')); return; }
+    if (e.button === 2) { aiming = true; showStance(); return; }
+    if (e.button === 0) {
+      if (!locked) { lock(); return; }
+      run(keyFor('Mouse0'));
     }
   });
+  window.addEventListener('mouseup', (e) => { if (e.button === 2 && aiming) { aiming = false; showStance(); } });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (!paused) run(keyFor('Wheel')); }, { passive: false });
   canvas.addEventListener('mousemove', (e) => {
     if (paused) return;
     if (document.pointerLockElement === canvas || e.buttons === 1) look(e.movementX, e.movementY);
   });
   function look(dx, dy) {
-    yaw -= dx * 0.0024;
-    pitch = Math.max(-1.3, Math.min(1.3, pitch - dy * 0.0024));
+    const k = aiming ? 0.45 : 1;
+    yaw -= dx * 0.0024 * k;
+    pitch = Math.max(-1.3, Math.min(1.3, pitch - dy * 0.0024 * k));
   }
   root.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-in]');
+    const b = e.target.closest('[data-in],[data-use],[data-tk]');
     if (!b) return;
+    if (b.dataset.use) { toast(opts.useItem(b.dataset.use, b.dataset.verb) || '', 3000); afterGameStep(); applyLight(); refreshPanel(); return; }
+    if (b.dataset.tk) {
+      const k = KEYS.find((x) => x.action === b.dataset.tk);
+      if (k.action === 'stance') { stance = nextStance(stance); showStance(); b.textContent = stance === 'stand' ? 'CROUCH' : stance === 'crouch' ? 'PRONE' : 'STAND'; return; }
+      run(k);
+      return;
+    }
     const what = b.dataset.in;
-    if (what === 'resume') { setPaused(false); if (!touch) canvas.requestPointerLock?.(); }
+    if (what === 'resume') { setPaused(false); lock(); }
     else if (what === 'leave') leave();
     else if (what === 'take') takeAll();
     else if (what === 'close') showFound(null);
+    else if (what === 'closepanel') closePanel();
   });
-  $('.in-use').addEventListener('click', use);
+  // USE button: tap for doors, hold to search.
+  const useBtn = $('.in-use');
+  useBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); eDown = performance.now(); startHold(); });
+  const useUp = () => {
+    if (!eDown) return;
+    const short = performance.now() - eDown < 300;
+    eDown = 0;
+    if (hold) { if (short) toast('Hold USE to search.', 1600); cancelHold(); return; }
+    if (short) {
+      if (foundOpen() && $('[data-in="take"]')) takeAll();
+      else interact();
+    }
+  };
+  useBtn.addEventListener('pointerup', useUp);
+  useBtn.addEventListener('pointerleave', useUp);
+  useBtn.addEventListener('pointercancel', useUp);
   $('.in-menu').addEventListener('click', () => setPaused(true));
   // Touch: left half moves (virtual stick), right half looks.
   canvas.addEventListener('touchstart', (e) => {
@@ -576,7 +866,9 @@ export function openInside(opts) {
     if (closed) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    if (!paused && !busy) {
+    fps = fps * 0.9 + (dt > 0 ? 1 / dt : 0) * 0.1;
+    const moving = !paused && !busy && !panel && !hold;
+    if (moving) {
       let mx = 0;
       let mz = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) mz -= 1;
@@ -587,7 +879,8 @@ export function openInside(opts) {
       mz += stick.y;
       const len = Math.hypot(mx, mz);
       if (len > 0.05) {
-        const sp = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? RUN_SPEED : WALK_SPEED) * Math.min(1, len) / len;
+        const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
+        const sp = moveSpeed({ stance, sprint, slowWalk }) * Math.min(1, len) / len;
         const sx = (mx * Math.cos(yaw) + mz * Math.sin(yaw)) * sp * dt;
         const sz = (-mx * Math.sin(yaw) + mz * Math.cos(yaw)) * sp * dt;
         const next = collide(plan, pos.x + sx, pos.z + sz, 0.3, { counter: opts.isCounterOpen() });
@@ -595,13 +888,28 @@ export function openInside(opts) {
         next.z = Math.min(next.z, 0.2);
         const moved = Math.hypot(next.x - pos.x, next.z - pos.z);
         walked += moved;
-        bob += moved * 3.2;
+        if (feet === 0) bob += moved * (stance === 'stand' ? 3.2 : 2);
         pos.x = next.x;
         pos.z = next.z;
         if (walked >= WALK_FLUSH_M) { flushWalk(); status(); if (opts.isDead()) { close(true); return; } }
       }
     }
-    camera.position.set(pos.x, EYE + Math.sin(bob) * 0.03, pos.z);
+    // Jump and fall
+    if (vy !== 0 || feet > 0) {
+      vy -= GRAVITY * dt;
+      feet = Math.max(0, feet + vy * dt);
+      if (feet === 0) vy = 0;
+    }
+    // Smooth change of eye height between stances
+    const want = STANCES[stance].eye;
+    eye += (want - eye) * Math.min(1, dt * 10);
+    // Look closer (right mouse)
+    const fov = aiming ? 40 : 72;
+    if (Math.abs(camera.fov - fov) > 0.1) {
+      camera.fov += (fov - camera.fov) * Math.min(1, dt * 12);
+      camera.updateProjectionMatrix();
+    }
+    camera.position.set(pos.x, eye + feet + Math.sin(bob) * (stance === 'stand' ? 0.03 : 0.015), pos.z);
     camera.rotation.order = 'YXZ';
     camera.rotation.set(pitch, yaw, 0);
     camera.getWorldDirection(fwd);
@@ -616,6 +924,8 @@ export function openInside(opts) {
         p.hidden = false;
         p.innerHTML = opts.describe(n);
       }
+      if (hold && (!n || n.zone !== hold.spot.zone || n.type !== 'search')) cancelHold();
+      if (debugOn) $('.in-debug').textContent = `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${fps.toFixed(0)} fps`;
     }
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
@@ -623,9 +933,20 @@ export function openInside(opts) {
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; } };
+  window.__llInside = { plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.visible : null }) };
 
   return { close: () => leave() };
+}
+
+// The key list in the pause menu, made from the key table.
+function keyTableHtml() {
+  const groups = [];
+  for (const k of KEYS) {
+    let g = groups.find((x) => x.name === k.group);
+    if (!g) groups.push(g = { name: k.group, rows: [] });
+    g.rows.push(k);
+  }
+  return groups.map((g) => `<div class="kg"><h5>${esc(g.name)}</h5>${g.rows.map((k) => `<div class="kr ${k.ready ? '' : 'no'}"><kbd>${esc(k.show)}</kbd><span>${esc(k.label)}</span></div>`).join('')}</div>`).join('');
 }
 
 // A shelf unit: uprights, boards, and a back panel.

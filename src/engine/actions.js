@@ -585,6 +585,46 @@ export function walkInside(state, meters) {
   advanceTime(state, m / INSIDE_M_PER_MIN, 'work');
 }
 
+// ---------- flashlight and quick items (first-person keys) ----------
+export function toggleFlashlight(state) {
+  const p = state.player;
+  if (!(state.carried.flashlight || 0)) { log(state, 'You have no flashlight.'); return; }
+  p.lightOff = !p.lightOff;
+  if (!p.lightOff && p.lightHours <= 0) log(state, 'You switch on the flashlight. Nothing. The batteries are empty.', 'warn');
+  else log(state, p.lightOff ? 'You switch off the flashlight to save the batteries.' : 'You switch on the flashlight.');
+}
+
+// Which carried item a quick key uses. Returns { id, verb } or { why } (nothing to use).
+export function quickChoice(state, slot) {
+  const c = state.carried;
+  const p = state.player;
+  const haveAny = (ids) => ids.find((id) => (c[id] || 0) > 0);
+  if (slot === 'med') {
+    const open = p.injuries.some((i) => !i.bandaged);
+    if (open && haveAny(['first_aid'])) return { id: 'first_aid', verb: 'med' };
+    if (p.illness.infection && p.illness.infection.abxH == null && haveAny(['antibiotics'])) return { id: 'antibiotics', verb: 'med' };
+    if (p.illness.stomachH > 0 && haveAny(['ors'])) return { id: 'ors', verb: 'med' };
+    if ((p.injuries.length || p.health < 60) && !(p.painH > 0) && haveAny(['pain_pills'])) return { id: 'pain_pills', verb: 'med' };
+    if (!haveAny(['first_aid', 'antibiotics', 'ors', 'pain_pills'])) return { why: 'You carry no medical items.' };
+    return { why: 'You do not need medicine now.' };
+  }
+  if (slot === 'food') {
+    const drink = haveAny(['water_bottle', 'saline']);
+    const food = haveAny(['snacks', 'peanut_butter', 'canned_food', 'formula']);
+    if (!drink && !food) return { why: 'You carry no food or water you can use now.' };
+    const wantDrink = drink && (!food || p.water <= p.food);
+    if (wantDrink) return { id: drink, verb: 'drink' };
+    return { id: food, verb: 'eat' };
+  }
+  if (slot === 'utility') {
+    if (!(c.flashlight || 0)) return { why: 'You have no flashlight.' };
+    if (!(c.batteries || 0)) return { why: 'You carry no batteries.' };
+    if (p.lightHours > 9) return { why: 'The flashlight batteries are still good.' };
+    return { id: 'batteries', verb: 'batteries' };
+  }
+  return { why: 'Nothing for this key yet.' };
+}
+
 // ---------- houses ----------
 export function areaKey(state) {
   return state.location.kind === 'place' ? state.location.id : 'home';
@@ -767,6 +807,7 @@ export function doAction(state, id, arg) {
     case 'house': return enterNearbyHouse(state);
     case 'room': return searchRoom(state, arg);
     case 'walk_inside': return walkInside(state, arg);
+    case 'flashlight': return toggleFlashlight(state);
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);

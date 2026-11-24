@@ -164,8 +164,9 @@ export function has(state, id) {
   return (state.carried[id] || 0) > 0 || (state.location.kind === 'home' && (state.home.storage[id] || 0) > 0);
 }
 
+// A flashlight that is on and has power. The player can switch it off to save batteries.
 export function hasLight(state) {
-  return (state.carried.flashlight || 0) > 0 && state.player.lightHours > 0;
+  return (state.carried.flashlight || 0) > 0 && state.player.lightHours > 0 && !state.player.lightOff;
 }
 
 // ---------- log ----------
