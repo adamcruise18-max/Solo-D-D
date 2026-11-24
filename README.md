@@ -45,6 +45,19 @@ This is the **first playable version**: a small part of the full game.
   Time does not move when you stand still or when the menu is open.
 - Big stores, hospitals and all places at night are dark. A flashlight in your pack lights the way.
 
+### Easier to read
+
+- Vitals: each need has 4 stages. Past the first limit, the panel says what the stage does
+  (for example "Thirsty: below 25, −2 on d20 rolls"). The top bar shows only the needs that are past a limit.
+- Yellow risk warnings come before an illness: infection risk of an open wound, time until hypothermia,
+  low water or food.
+- Risky buttons show the d20 roll before you choose: the modifiers, the DC and your chance (for example
+  "d20 −2 tired vs DC 12 · 35%").
+- The item panel shows how many days of food and water you have (carried and stored at home) and sorts items in groups.
+- The home panel shows solar power in, power out and how long the battery lasts with the heater on.
+- The map marks places you visited but did not search fully (amber ring) and places with nothing left (grey).
+- The journal writes itself: one short entry for each day (where you went, what you took, what happened).
+
 ## Run the game
 
 - **On the web:** after this is on `main`, turn on GitHub Pages

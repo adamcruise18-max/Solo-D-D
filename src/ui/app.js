@@ -66,6 +66,7 @@ export async function start() {
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
+    + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
     mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
@@ -334,7 +335,7 @@ function renderDog() {
 
 function renderLog() {
   const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
-  $('#log').innerHTML = `<h3>Journal</h3><ul>${items}</ul>`;
+  $('#log').innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
 }
 
 // ---------- map popup ----------
@@ -778,6 +779,21 @@ function projectNeeds() {
   return out;
 }
 
+// The journal writes itself: one entry per day, newest first.
+function journalHtml(maxDays) {
+  const days = (state.journal || []).slice(-maxDays).reverse();
+  if (!days.length) return '<p class="hint">Nothing yet.</p>';
+  return days.map((d) => {
+    const parts = [];
+    if (d.places.length) parts.push(`You went to ${d.places.join(', ')}.`);
+    if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? 's' : ''}.`);
+    if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? 's' : ''}.`);
+    if (!parts.length && !d.events.length) parts.push('You stayed close to home.');
+    const ev = d.events.map((t) => `<li>${esc(t)}</li>`).join('');
+    return `<div class="jday"><b>Day ${d.day + 1} · ${esc(formatDate(d.day * 1440))}</b><p>${esc(parts.join(' '))}</p>${ev ? `<ul>${ev}</ul>` : ''}</div>`;
+  }).join('');
+}
+
 // Panels inside the 3D view (Tab, C, J, O).
 function insidePanel(name) {
   const p = state.player;
@@ -810,8 +826,8 @@ function insidePanel(name) {
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(', ') : 'normal clothes')} · Feels like ${Math.round(feltTemp(state, 'rest'))}°F</p>`;
   }
   if (name === 'journal') {
-    const items = state.log.slice(-14).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
-    return `<h4>Journal</h4><ul class="jr">${items}</ul>`;
+    const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
+    return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
   }
   if (name === 'objectives') {
     return '<h4>Objectives</h4><p>There is nobody to save and nothing to find. Stay alive: eat, drink, keep warm, and get home before night.</p>';

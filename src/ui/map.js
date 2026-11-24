@@ -126,9 +126,11 @@ export async function createMap(container, { places, onPlaceClick }) {
     paint: {
       'circle-color': ['case', ['==', ['get', 'status'], 2], '#9aa5b1', colorExpr],
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 13, 5, 16, 9],
-      'circle-stroke-color': ['case', ['==', ['get', 'status'], 2], '#6b7682', '#16202a'],
-      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 14, 1.6],
-      'circle-opacity': ['case', ['==', ['get', 'status'], 2], 0.55, ['==', ['get', 'status'], 1], 0.8, 1],
+      // Your marks: amber ring = partly searched, grey = searched.
+      'circle-stroke-color': ['match', ['get', 'status'], 2, '#6b7682', 1, '#e3b04b', '#16202a'],
+      'circle-stroke-width': ['case', ['==', ['get', 'status'], 1],
+        ['interpolate', ['linear'], ['zoom'], 9, 1.6, 14, 3], ['interpolate', ['linear'], ['zoom'], 9, 0.8, 14, 1.6]],
+      'circle-opacity': ['case', ['==', ['get', 'status'], 2], 0.55, 1],
     },
   });
   map.on('click', 'places', (e) => {

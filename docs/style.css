@@ -372,3 +372,11 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 .stock { margin: 0 0 8px; padding: 6px 8px; font-size: 13px; background: rgba(255, 255, 255, .04); border-left: 2px solid var(--accent, #56c2d6); }
 .stock small { color: var(--muted, #9aa4ad); font-size: 11px; }
 ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted, #9aa4ad); padding: 6px 0 2px; border: 0; background: none; }
+
+/* QoL step 4: your marks and the journal */
+.legend i.part { background: transparent; box-shadow: 0 0 0 2px #e3b04b; }
+.legend i.done { background: #9aa5b1; opacity: .6; }
+.journal .jday, #inside .jday { margin: 0 0 8px; font-size: 12px; }
+.journal .jday b, #inside .jday b { color: var(--accent, #56c2d6); font-weight: 600; }
+.journal .jday p, #inside .jday p { margin: 2px 0; }
+.journal .jday ul, #inside .jday ul { margin: 2px 0 0 14px; padding: 0; color: var(--muted, #9aa4ad); }

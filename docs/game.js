@@ -633,6 +633,34 @@
   function log(state2, text, kind = "info") {
     state2.log.push({ t: state2.time, text, kind });
     if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
+    journalNote(state2, text, kind);
+  }
+  function journalNote(state2, text, kind) {
+    if (!state2.journal) state2.journal = [];
+    const day = dayIndex(state2.time);
+    let d = state2.journal[state2.journal.length - 1];
+    if (!d || d.day !== day) {
+      d = { day, places: [], taken: 0, searched: 0, events: [] };
+      state2.journal.push(d);
+    }
+    const arrive = /^You arrive at (.+)\.$/.exec(text);
+    if (arrive) {
+      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      return;
+    }
+    if (/^You walk to a house/.test(text)) {
+      if (!d.places.includes("a house")) d.places.push("a house");
+      return;
+    }
+    if (/^You take: /.test(text)) {
+      d.taken += 1;
+      return;
+    }
+    if (/^You search the /.test(text)) {
+      d.searched = (d.searched || 0) + 1;
+      return;
+    }
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
   }
 
   // src/engine/vitals.js
@@ -3208,9 +3236,15 @@
       paint: {
         "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
         "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
-        "circle-stroke-color": ["case", ["==", ["get", "status"], 2], "#6b7682", "#16202a"],
-        "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6],
-        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, ["==", ["get", "status"], 1], 0.8, 1]
+        // Your marks: amber ring = partly searched, grey = searched.
+        "circle-stroke-color": ["match", ["get", "status"], 2, "#6b7682", 1, "#e3b04b", "#16202a"],
+        "circle-stroke-width": [
+          "case",
+          ["==", ["get", "status"], 1],
+          ["interpolate", ["linear"], ["zoom"], 9, 1.6, 14, 3],
+          ["interpolate", ["linear"], ["zoom"], 9, 0.8, 14, 1.6]
+        ],
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, 1]
       }
     });
     map.on("click", "places", (e) => {
@@ -3452,7 +3486,7 @@
     state = loadGame();
     bindEvents();
     fx = createFx($("#mapwrap"));
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="edge"></i>15-mile edge</span>';
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span><span><i class="edge"></i>15-mile edge</span>';
     try {
       mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
       window.__llMap = mapApi.map;
@@ -3708,7 +3742,7 @@
   }
   function renderLog() {
     const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
-    $("#log").innerHTML = `<h3>Journal</h3><ul>${items}</ul>`;
+    $("#log").innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
   }
   function showPlacePopup(id, lngLat) {
     if (!state || !mapApi || picking) return;
@@ -4144,6 +4178,19 @@
     }
     return out;
   }
+  function journalHtml(maxDays) {
+    const days = (state.journal || []).slice(-maxDays).reverse();
+    if (!days.length) return '<p class="hint">Nothing yet.</p>';
+    return days.map((d) => {
+      const parts = [];
+      if (d.places.length) parts.push(`You went to ${d.places.join(", ")}.`);
+      if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? "s" : ""}.`);
+      if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? "s" : ""}.`);
+      if (!parts.length && !d.events.length) parts.push("You stayed close to home.");
+      const ev = d.events.map((t) => `<li>${esc(t)}</li>`).join("");
+      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc(formatDate(d.day * 1440))}</b><p>${esc(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
+    }).join("");
+  }
   function insidePanel(name) {
     const p = state.player;
     if (name === "inventory") {
@@ -4173,8 +4220,8 @@
       <p class="hint">Wearing: ${esc(worn.length ? worn.join(", ") : "normal clothes")} \xB7 Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F</p>`;
     }
     if (name === "journal") {
-      const items = state.log.slice(-14).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
-      return `<h4>Journal</h4><ul class="jr">${items}</ul>`;
+      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+      return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
     }
     if (name === "objectives") {
       return "<h4>Objectives</h4><p>There is nobody to save and nothing to find. Stay alive: eat, drink, keep warm, and get home before night.</p>";

@@ -173,4 +173,23 @@ export function hasLight(state) {
 export function log(state, text, kind = 'info') {
   state.log.push({ t: state.time, text, kind });
   if (state.log.length > 300) state.log.splice(0, state.log.length - 300);
+  journalNote(state, text, kind);
+}
+
+// QoL step 4: the journal writes itself. One short record per day, kept for the whole run
+// (the log keeps only the last 300 lines). Places, items taken, and the main events.
+function journalNote(state, text, kind) {
+  if (!state.journal) state.journal = [];
+  const day = dayIndex(state.time);
+  let d = state.journal[state.journal.length - 1];
+  if (!d || d.day !== day) {
+    d = { day, places: [], taken: 0, searched: 0, events: [] };
+    state.journal.push(d);
+  }
+  const arrive = /^You arrive at (.+)\.$/.exec(text);
+  if (arrive) { if (!d.places.includes(arrive[1])) d.places.push(arrive[1]); return; }
+  if (/^You walk to a house/.test(text)) { if (!d.places.includes('a house')) d.places.push('a house'); return; }
+  if (/^You take: /.test(text)) { d.taken += 1; return; }
+  if (/^You search the /.test(text)) { d.searched = (d.searched || 0) + 1; return; }
+  if ((kind === 'danger' || kind === 'good' || kind === 'warn') && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
 }
