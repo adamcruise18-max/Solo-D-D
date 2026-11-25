@@ -17,6 +17,7 @@
 //
 // All hooks are optional except id. A new feature is a new system file,
 // not an edit to one large function.
+import { withSource } from './activity.js';
 
 const HOOKS = ['init', 'step', 'daily'];
 const KNOWN = new Set(['id', 'order', 'version', 'migrations', 'label', 'legacy', 'owns', 'catchUp', ...HOOKS]);
@@ -86,9 +87,11 @@ export function createSystems(list = [], { dev = false } = {}) {
     // tickStep(), every system finishes the step in which the player dies.
     for (const s of ordered) {
       if (!s[hook]) continue;
-      if (!dev || !owner.size) { s[hook](state, arg, ctx); continue; }
+      // The activity log names the system that wrote each journal line.
+      const call = () => s[hook](state, arg, ctx);
+      if (!dev || !owner.size) { withSource({ sys: s.id, hook }, call); continue; }
       const before = snapOthers(state, s.id);
-      s[hook](state, arg, ctx);
+      withSource({ sys: s.id, hook }, call);
       for (const [f, v] of Object.entries(before)) {
         if (JSON.stringify(state[f] ?? null) !== v) {
           throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);

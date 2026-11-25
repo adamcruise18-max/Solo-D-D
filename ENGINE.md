@@ -193,6 +193,19 @@ request that says which rule change is meant and why.
 - Sleep: `whereNow()` is `'asleep'` in sleep mode. Then only events with
   `where: 'asleep'` (written as a sound that wakes you) can happen; `'any'` means awake.
 
+## Activity log and diagnostics (external review 3.4, milestone 3)
+
+- `src/core/activity.js`: one record per player action (in memory only, never
+  saved): the action, minutes, each journal line with the system and hook that
+  wrote it (`currentSource()`, set by the systems runner), which random sources
+  moved, and in deep mode the changed state paths (same paths as the replay trace).
+- `src/engine/activity.js` holds the game's recorder; `perform()` opens and closes
+  a record; `log()` adds lines.
+- `src/engine/diagnostics.js`: `diagnostics(state)` gives weather (with spell),
+  pacer, decay, systems and versions, rng positions, save size and recent records.
+  `setDeepActivity(true)` while the F3 view is open; `activityText(r)` for a
+  bug report. The F3 view itself is UI (builder).
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).
