@@ -3177,6 +3177,80 @@ function drawArt(c, w, h, v, rr) {
 }
 
 
+// ---------- people in pictures (stylized, soft cartoon; no real people) ----------
+// Used in family photos, magazine covers and phone lock screens. Children appear only in pictures.
+const P_SKIN = ['#f3d0ae', '#e6b48c', '#cf9468', '#a8704a', '#7a5238', '#5a3c2a'];
+const P_HAIR = ['#2a1d16', '#4a2e1c', '#8a5a2e', '#c8964e', '#e0c080', '#8a8682', '#1a1414', '#a4402a'];
+const P_SHIRT = ['#c4421c', '#3a6a9a', '#e8b030', '#4a7a5a', '#8a3a5a', '#f2ede0', '#2a3a5a', '#e8806a', '#6a8aa0'];
+// x, y: bottom centre of the shoulders; s: head radius in px
+function drawPerson(c, x, y, s, rr, o = {}) {
+  const pk = (a) => a[Math.floor(rr() * a.length)];
+  const skin = o.skin || pk(P_SKIN), hair = o.hair || pk(P_HAIR), shirt = o.shirt || pk(P_SHIRT);
+  const long = o.long ?? rr() < 0.45, hx = x, hy = y - s * 1.95;
+  c.save();
+  if (long) { c.fillStyle = hair; c.beginPath(); c.ellipse(hx, hy + s * 0.35, s * 1.12, s * 1.35, 0, 0, TAU); c.fill(); }
+  // shoulders and shirt
+  c.fillStyle = shirt; c.beginPath(); c.moveTo(x - s * 1.75, y);
+  c.bezierCurveTo(x - s * 1.75, y - s * 0.95, x - s * 1.1, y - s * 1.05, x, y - s * 1.05);
+  c.bezierCurveTo(x + s * 1.1, y - s * 1.05, x + s * 1.75, y - s * 0.95, x + s * 1.75, y); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.ellipse(x - s * 0.6, y - s * 0.75, s * 0.7, s * 0.22, -0.2, 0, TAU); c.fill();
+  // neck and collar
+  c.fillStyle = skin; c.fillRect(x - s * 0.32, y - s * 1.35, s * 0.64, s * 0.45);
+  c.fillStyle = 'rgba(0,0,0,0.12)'; c.beginPath(); c.ellipse(x, y - s * 1.02, s * 0.42, s * 0.14, 0, 0, Math.PI); c.fill();
+  // head with a soft light from the top left
+  const hg = c.createRadialGradient(hx - s * 0.35, hy - s * 0.4, s * 0.1, hx, hy, s * 1.1);
+  hg.addColorStop(0, shade(skin, 0.12)); hg.addColorStop(1, shade(skin, -0.08));
+  c.fillStyle = hg; c.beginPath(); c.ellipse(hx, hy, s * 0.88, s, 0, 0, TAU); c.fill();
+  c.fillStyle = skin; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(hx + sx * s * 0.86, hy + s * 0.05, s * 0.16, s * 0.22, 0, 0, TAU); c.fill(); }
+  // hair on top
+  c.fillStyle = hair; c.beginPath(); c.ellipse(hx, hy - s * 0.42, s * 0.95, s * 0.66, 0, Math.PI * 0.98, Math.PI * 2.02); c.fill();
+  c.beginPath(); c.ellipse(hx + s * 0.25, hy - s * 0.48, s * 0.62, s * 0.34, 0.35, 0, TAU); c.fill();
+  if (o.cap) { c.fillStyle = o.cap; c.beginPath(); c.ellipse(hx, hy - s * 0.5, s * 0.98, s * 0.62, 0, Math.PI, TAU); c.fill(); c.fillRect(hx - s * 0.2, hy - s * 0.58, s * 1.3, s * 0.16); }
+  // face: dot eyes, rosy cheeks, a smile
+  c.fillStyle = '#2a1e18'; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(hx + sx * s * 0.32, hy + s * 0.02, s * 0.085, s * 0.11, 0, 0, TAU); c.fill(); }
+  c.fillStyle = 'rgba(230,110,100,0.28)'; for (const sx of [-1, 1]) { c.beginPath(); c.arc(hx + sx * s * 0.52, hy + s * 0.3, s * 0.17, 0, TAU); c.fill(); }
+  c.strokeStyle = shade(skin, -0.45); c.lineWidth = Math.max(1, s * 0.07); c.lineCap = 'round';
+  c.beginPath(); c.arc(hx, hy + s * 0.28, s * 0.24, Math.PI * 0.18, Math.PI * 0.82); c.stroke();
+  c.restore();
+}
+
+// a printed photo: soft background, then 1 to 4 people. v picks the scene.
+function drawPhoto(c, w, h, v, rr) {
+  const bgs = [['#a8c8e0', '#e8e0c8', '#7a9a5a'], ['#e8b888', '#f4dcb0', '#d8c090'], ['#b8b4c8', '#e4dcd8', null], ['#9ac0d0', '#d8ecf0', '#e8d8a8']];
+  const [b0, b1, ground] = bgs[v % 4];
+  const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, b0); sky.addColorStop(1, b1);
+  c.fillStyle = sky; c.fillRect(0, 0, w, h);
+  if (ground) { c.fillStyle = ground; c.beginPath(); c.moveTo(0, h * 0.72); c.quadraticCurveTo(w * 0.5, h * 0.62, w, h * 0.74); c.lineTo(w, h); c.lineTo(0, h); c.fill(); }
+  if (v % 4 === 0) for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(70,110,60,0.7)'; c.beginPath(); c.arc(w * (0.08 + i * 0.3), h * 0.6, h * 0.12, 0, TAU); c.fill(); }
+  // group: adults at the back, children (photos only) in front and smaller
+  const groups = [[1, 1, 0.6, 0.55], [1, 1], [1], [1, 1, 0.6]];
+  const g = groups[v % 4], n = g.length;
+  const S = h * (n > 2 ? 0.15 : n === 2 ? 0.19 : 0.23);
+  g.forEach((k, i) => {
+    const kid = k < 1;
+    const px = w * (n === 1 ? 0.5 : 0.2 + (i / (n - 1)) * 0.6) + (kid ? (i % 2 ? -1 : 1) * w * 0.04 : 0);
+    drawPerson(c, px, h + (kid ? 0 : S * 0.2), S * (kid ? 0.78 : 1), rr, kid ? { long: rr() < 0.5 } : {});
+  });
+  // print finish: light vignette and a warm fade
+  const vg = c.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(60,40,20,0.22)');
+  c.fillStyle = vg; c.fillRect(0, 0, w, h);
+  c.fillStyle = 'rgba(255,230,190,0.08)'; c.fillRect(0, 0, w, h);
+}
+
+// a magazine cover: a smiling model, a big title and a few cover lines (generic names only)
+function drawCover(c, w, h, v, rr) {
+  const pals = [['#e86a4a', '#f4e0c8', '#fff'], ['#3a6a9a', '#d8e6ee', '#f4d040'], ['#4a7a5a', '#e8eedc', '#fff']];
+  const [a, b, t] = pals[v % 3];
+  const bg = c.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, b); bg.addColorStop(1, shade(b, -0.12));
+  c.fillStyle = bg; c.fillRect(0, 0, w, h);
+  drawPerson(c, w * 0.55, h * 1.02, h * 0.17, rr, { shirt: a });
+  c.fillStyle = a; c.fillRect(0, 0, w, h * 0.17);
+  txt(c, ['WEEKEND', 'NORTHWEST HOME', 'TRAIL & TABLE'][v % 3], w / 2, h * 0.09, h * 0.1, { color: t, maxW: w * 0.92, font: COND });
+  for (let k = 0; k < 3; k++) { c.fillStyle = a; c.fillRect(w * 0.05, h * (0.3 + k * 0.12), w * 0.26, h * 0.018); c.fillStyle = 'rgba(40,40,40,0.55)'; c.fillRect(w * 0.05, h * (0.33 + k * 0.12), w * 0.2, h * 0.012); }
+  c.fillStyle = t === '#fff' ? '#c4221c' : t; c.beginPath(); c.arc(w * 0.18, h * 0.82, w * 0.11, 0, TAU); c.fill();
+  txt(c, 'NEW', w * 0.18, h * 0.825, w * 0.07, { color: '#fff' });
+}
+
 // shared crockery atlas (3 x 3 swatches): used by dish_stack and kitchen_counter_items
 function dishMat() {
   return mat('dishmat', { map: ctex('dishatlas', 256, 256, (c, w, h, rr) => {
@@ -3194,17 +3268,18 @@ function dishRect(i) { const x = (i % 3) * 85 + 6, y = Math.floor(i / 3) * 85 + 
 
 const HOUSE_PROPS = {
   wall_frame(g, r) {
-    const v = Math.floor(r() * 6);
-    const land = v < 3 || r() < 0.5;
+    const v = Math.floor(r() * 8);
+    const land = v < 3 || v >= 6 || r() < 0.5;
     const W = 0.4 + r() * 0.4, H = land ? W * (0.66 + r() * 0.1) : W * (1.2 + r() * 0.15);
     const b = 0.035 + r() * 0.02, dep = 0.025;
-    // all six pictures share one atlas (3 x 2 cells of 512 px), so every frame uses the same art material
-    const art = tmat(ctex('frameartatlas', 1536, 1024, (c, w, h, rr) => {
-      for (let k = 0; k < 6; k++) {
-        c.save(); c.translate((k % 3) * 512, Math.floor(k / 3) * 512);
-        c.fillStyle = '#ece6d4'; c.fillRect(0, 0, 512, 512); // mat board
+    // all eight pictures share one atlas (4 x 2 cells of 512 px), so every frame uses the same art material.
+    // Cells 6 and 7 are family photos (stylized people).
+    const art = tmat(ctex('frameartatlas2', 2048, 1024, (c, w, h, rr) => {
+      for (let k = 0; k < 8; k++) {
+        c.save(); c.translate((k % 4) * 512, Math.floor(k / 4) * 512);
+        c.fillStyle = k >= 6 ? '#f6f2ea' : '#ece6d4'; c.fillRect(0, 0, 512, 512); // mat board
         c.save(); c.beginPath(); c.rect(36, 36, 440, 440); c.clip(); c.translate(36, 36);
-        drawArt(c, 440, 440, k, rr); c.restore();
+        if (k >= 6) drawPhoto(c, 440, 440, k - 6, rr); else drawArt(c, 440, 440, k, rr); c.restore();
         c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 2; c.strokeRect(36, 36, 440, 440);
         c.fillStyle = 'rgba(210,200,180,0.12)'; c.fillRect(0, 0, 512, 512);
         const gr = c.createRadialGradient(512, 0, 0, 512, 0, 300); gr.addColorStop(0, 'rgba(255,250,230,0.25)'); gr.addColorStop(1, 'rgba(255,250,230,0)'); c.fillStyle = gr; c.fillRect(0, 0, 512, 512);
@@ -3212,7 +3287,7 @@ const HOUSE_PROPS = {
         c.restore();
       }
     }), 0.35);
-    const cr = [(v % 3) / 3, 1 - (Math.floor(v / 3) + 1) / 2, (v % 3 + 1) / 3, 1 - Math.floor(v / 3) / 2];
+    const cr = atlasRect(4, 2, v);
     const edge = [cr[0] + 0.005, cr[1] + 0.005, cr[0] + 0.01, cr[1] + 0.01];
     const frame = pick(r, [FX.wood('#3a2616'), FX.wood('#8a6440'), col(0x1d1e20, 0.5)]);
     add(g, gRemap(gBox(+(W - 2 * b + 0.004).toFixed(3), +(H - 2 * b + 0.004).toFixed(3), 0.006), `frameart${v}|${(W - 2 * b).toFixed(3)}|${(H - 2 * b).toFixed(3)}`, [edge, edge, edge, edge, cr, edge]), [art, art, art, art, art, art], 0, -(H - 2 * b) / 2, 0.012);
@@ -3319,12 +3394,12 @@ const HOUSE_PROPS = {
           c.setLineDash([]);
           txt(c, 'COUPONS', 128, 20, 22, { color: '#1d4f9a' });
           for (let k = 0; k < 4; k++) txt(c, ['50% OFF', 'SAVE $1', 'BUY 1 GET 1', 'FREE'][k], 66 + (k % 2) * 124, 88 + Math.floor(k / 2) * 106, 18, { color: '#111', maxW: 100 });
-        } else if (i === 5) { // catalogue cover
+        } else if (i === 5) { // catalogue cover with a smiling model
           c.fillStyle = '#e8e4dc'; c.fillRect(0, 0, 256, 256);
-          c.fillStyle = '#3a5a7a'; c.fillRect(0, 40, 256, 150);
-          c.fillStyle = '#c8a070'; c.fillRect(30, 100, 90, 70); c.fillStyle = '#8a3a2a'; c.fillRect(140, 80, 80, 100);
+          c.fillStyle = '#9ab8cc'; c.fillRect(0, 40, 256, 160);
+          c.save(); c.beginPath(); c.rect(0, 40, 256, 160); c.clip(); drawPerson(c, 128, 204, 34, rr, { shirt: '#c8a070' }); c.restore();
           txt(c, 'HOME & GARDEN', 128, 22, 22, { color: '#222', maxW: 240 });
-          txt(c, 'SPRING CATALOG', 128, 220, 18, { color: '#222' });
+          txt(c, 'SPRING CATALOG', 128, 222, 18, { color: '#222' });
         } else if (i === 6) { // postcard: lake view
           drawArt(c, 256, 256, 0, rr);
         } else { // utility notice, generic
@@ -3475,6 +3550,61 @@ const HOUSE_PROPS = {
       for (let k = 0; k < 2; k++) merger.add(gBox(0.012, 0.003, 0.19), M4(px + (k - 0.5) * 0.04, np * 0.0145 + 0.006 + k * 0.003, 0, 0.3 + k * 0.4), [R(5)], [0]);
     }
     for (const mesh of merger.meshes([dishMat()])) g.add(mesh);
+  },
+
+  // a magazine (or two) left on a table or the floor; the cover shows a stylized model
+  magazine(g, r) {
+    const t = ctex('magcovers', 768, 512, (c, w, h, rr) => {
+      for (let k = 0; k < 3; k++) { c.save(); c.translate(k * 256, 0); c.beginPath(); c.rect(0, 0, 256, 340); c.clip(); drawCover(c, 256, 340, k, rr); c.restore(); }
+      c.fillStyle = '#efebe2'; c.fillRect(0, 340, w, h - 340); // inner pages (edge colour)
+    });
+    const m = mat('magmat', { map: t, roughness: 0.45 });
+    const page = [0.02, 0.05, 0.05, 0.08];
+    const n = 1 + Math.floor(r() * 3);
+    let y = 0;
+    for (let i = 0; i < n; i++) {
+      const k = Math.floor(r() * 3), rc = [k / 3, 1 - 340 / 512, (k + 1) / 3, 1];
+      const geo = gRemap(gBox(0.21, 0.004, 0.275), `mag${k}`, [page, page, rc, page, page, page]);
+      add(g, geo, m, (r() - 0.5) * 0.08, y + 0.002, (r() - 0.5) * 0.08, 0, r() * TAU, 0);
+      y += 0.0042;
+    }
+  },
+  // an old phone, dead or with a little charge left; the lock screen shows a family photo
+  old_phone(g, r) {
+    const v = Math.floor(r() * 4);
+    const scr = tmat(ctex('phonescreens', 512, 256, (c, w, h, rr) => {
+      for (let k = 0; k < 4; k++) {
+        c.save(); c.translate(k * 128, 0); c.beginPath(); c.rect(0, 0, 128, 256); c.clip();
+        drawPhoto(c, 128, 256, k, rr);
+        c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(0, 0, 128, 256);
+        txt(c, ['6:14', '11:52', '9:03', '3:47'][k], 64, 58, 34, { color: '#fff' });
+        txt(c, 'Thursday, August 20', 64, 86, 11, { color: '#fff' });
+        if (k === 2) { c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(20, 0); c.lineTo(50, 90); c.lineTo(38, 160); c.moveTo(50, 90); c.lineTo(110, 120); c.stroke(); } // cracked
+        c.restore();
+      }
+    }), 0.15, 0, { emissive: 0xffffff, emissiveIntensity: 0.12 });
+    const dead = r() < 0.6;
+    const black = mat('phonedark', { color: 0x0c0d10, roughness: 0.2, metalness: 0.2 });
+    const body = mat('phonebody' + v, { color: [0x1d1e22, 0xd8d4cc, 0x3a4a6a, 0xc89a8a][v], roughness: 0.4, metalness: 0.3 });
+    add(g, gBox(0.072, 0.009, 0.148), body, 0, 0, 0); // gBox stands on y = 0
+    const rc = [v / 4, 0, (v + 1) / 4, 1], e = [rc[0], 0, rc[0] + 0.001, 0.001];
+    add(g, gRemap(gBox(0.066, 0.0008, 0.14), `phone${v}`, [e, e, rc, e, e, e]), dead ? black : scr, 0, 0.009, 0);
+    g.rotation.y = r() * TAU;
+  },
+  // a body under a sheet: only a soft covered shape, adult sized, with worn sneakers at the end. No gore.
+  covered_body(g, r) {
+    const sheet = mat('bodysheet', { color: TOON ? 0xd6cfc0 : 0xcfd3cf, roughness: 1 });
+    const L = 1.62 + r() * 0.16;
+    add(g, new THREE.CapsuleGeometry(0.2, L - 0.62, 6, 12), sheet, 0, 0.11, 0.05, Math.PI / 2, 0, 0, 1.15, 1, 0.55);
+    add(g, gSphere(0.15, 12, 9), sheet, 0, 0.12, -L / 2 + 0.1, 0, 0, 0, 1, 1.1, 0.75);
+    for (const sx of [-1, 1]) add(g, gSphere(0.08, 8, 6), sheet, sx * 0.1, 0.14, L / 2 - 0.25, 0, 0, 0, 1, 1.4, 0.6); // knees and feet under the sheet
+    // drape skirt on the floor
+    add(g, gBox(0.62, 0.006, L - 0.1), sheet, 0, 0.003, 0.02);
+    const shoe = pick(r, [0x3a4a6a, 0x7a2a22, 0x4a4a46, 0xd8d4c8]);
+    for (const sx of [-1, 1]) {
+      add(g, gBox(0.09, 0.05, 0.26), mat('bodyshoe' + shoe, { color: shoe, roughness: 0.8 }), sx * 0.11, 0.06, L / 2 + 0.04, 0.7, sx * 0.15, 0);
+      add(g, gBox(0.095, 0.02, 0.27), mat('bodysole', { color: 0xe4e0d6, roughness: 0.9 }), sx * 0.11, 0.035, L / 2 + 0.03, 0.7, sx * 0.15, 0);
+    }
   },
 };
 Object.assign(PROP_BUILDERS, HOUSE_PROPS);
