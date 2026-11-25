@@ -541,6 +541,35 @@
     smoke: { label: "Wildfire smoke", solar: 0.4 }
   };
 
+  // src/engine/hazards.js
+  var HAZARDS = {
+    feral_dogs: { label: "loose dogs, you take side streets", walk: 0.9 },
+    black_ice: { label: "black ice", walk: 0.8 },
+    road_blocked: { label: "fallen trees and lines on the roads", walk: 0.9 },
+    flood: { label: "flooded low streets", walk: 0.85 },
+    cold_snap: { label: "cold snap", colder: 12 }
+  };
+  function startHazard(state2, id, hours) {
+    var _a;
+    if (!HAZARDS[id]) throw new Error(`Unknown hazard "${id}"`);
+    state2.flags || (state2.flags = {});
+    clearOldHazards(state2);
+    const hz = (_a = state2.flags).hazards || (_a.hazards = {});
+    hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
+  }
+  function activeHazards(state2, t = state2.time) {
+    const hz = state2.flags?.hazards || {};
+    return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
+  }
+  function hazardColder(state2, t = state2.time) {
+    return activeHazards(state2, t).reduce((a, h) => a + (h.colder || 0), 0);
+  }
+  function clearOldHazards(state2) {
+    const hz = state2.flags?.hazards;
+    if (!hz) return;
+    for (const id of Object.keys(hz)) if (state2.time >= hz[id]) delete hz[id];
+  }
+
   // src/engine/world.js
   var dayOf = (t) => Math.floor(t / 1440);
   function monthOfDay(day) {
@@ -609,6 +638,9 @@
     return m < s.rise || m > s.set;
   }
   function airTemp(state2, t) {
+    return baseAirTemp(state2, t) - hazardColder(state2, t);
+  }
+  function baseAirTemp(state2, t) {
     const w = state2.weather;
     const m = (t % 1440 + 1440) % 1440;
     const s = sunFor(t);
@@ -1300,9 +1332,16 @@
   var FRAME_BUDGET_MS = 1e3 / 30;
 
   // src/data/events.js
+  var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
+  var dogWithYou = (s) => s.dog?.stage === "joined";
+  var inHouse = (s) => s.location?.kind === "house";
+  var calMonth = (s) => new Date(Date.UTC(2026, 10, 24) + Math.floor(s.time / 1440) * 864e5).getUTCMonth();
+  var isWinter = (s) => [11, 0, 1].includes(calMonth(s));
+  var isColdSeason = (s) => [10, 11, 0, 1, 2].includes(calMonth(s));
+  var isRainySeason = (s) => [9, 10, 11, 0, 1, 2, 3].includes(calMonth(s));
   var EVENTS = [
     { id: "geese", size: "small", where: "outside", months: [3, 99], text: "A long line of geese flies over, very low and loud. Then it is quiet again." },
-    { id: "frost_windows", size: "small", where: "home", months: [3, 6], text: "Frost makes ferns on the inside of the windows." },
+    { id: "frost_windows", size: "small", where: "home", months: [3, 99], when: isColdSeason, text: "Frost makes ferns on the inside of the windows." },
     { id: "car_alarm_dies", size: "small", where: "any", months: [3, 5], text: "Far away, a car alarm that has cried for days goes weak, then stops." },
     { id: "shelf_falls", size: "small", where: "inside", months: [3, 99], text: "Somewhere in the building, a shelf gives way with a crash. You hold still until the dust settles." },
     { id: "wind_chimes", size: "small", where: "home", months: [3, 99], text: "A neighbor\u2019s wind chimes ring in the wind. For a moment it sounds like a normal street." },
@@ -1312,8 +1351,31 @@
     { id: "night_crash", size: "small", where: "asleep", months: [3, 99], text: "A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again." },
     { id: "night_owls", size: "small", where: "asleep", months: [3, 99], text: "Owls call to each other outside. You wake, and lie listening until they stop." },
     { id: "night_dogs", size: "medium", where: "asleep", months: [3, 99], text: "Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while." },
-    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
-    { id: "power_line_down", size: "big", where: "any", months: [3, 99], text: "A loud crack and a crash: a power pole goes down somewhere close. The street will be blocked." }
+    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", apply: (s) => startHazard(s, "road_blocked", 72), text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
+    { id: "power_line_down", size: "big", where: "any", months: [3, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A loud crack and a crash: a power pole goes down somewhere close. Walking anywhere takes longer for two days." },
+    // ---- small ----
+    { id: "dog_bone", size: "small", where: "home", months: [3, 99], when: dogWithYou, apply: (s) => {
+      s.dog.bond = Math.min(100, s.dog.bond + 3);
+    }, text: "The dog comes in proud, with an old bone from a yard. It lies at your feet to chew it. (Bond +3)" },
+    { id: "pipe_burst", size: "small", where: "inside", months: [3, 99], when: isColdSeason, text: "A pipe has burst somewhere above. Water runs down a wall and across the floor. You step around it." },
+    { id: "crows_porch", size: "small", where: "outside", months: [3, 99], text: "Crows gather on a porch down the street. You know what they found there, and you do not look." },
+    { id: "cat_watches", size: "small", where: "outside", months: [3, 99], text: "A thin cat watches you from under a car. When you stop, it is gone." },
+    { id: "rain_gutter", size: "small", where: "home", months: [3, 99], when: raining, text: "Rain pours over a blocked gutter in a sheet. It is loud, and somehow it helps." },
+    { id: "radio_static", size: "small", where: "home", months: [3, 99], text: "You try the old radio again. Only static on every band. You turn it off." },
+    { id: "deer_street", size: "small", where: "outside", months: [4, 99], text: "Two deer stand in the middle of the road, eating the grass in the cracks. They look at you, then walk away slowly." },
+    // ---- medium ----
+    { id: "feral_dogs", size: "medium", where: "outside", months: [3, 99], apply: (s) => startHazard(s, "feral_dogs", 24), text: "A pack of loose dogs blocks the street ahead, heads low. You back away and go around. For a day you keep to the side streets (walking is slower)." },
+    { id: "roof_leak", size: "medium", where: "home", months: [3, 99], when: raining, apply: (s) => {
+      s.home.rawGal = (s.home.rawGal || 0) + 2;
+      s.home.indoorTemp -= 3;
+    }, text: "Water drips through the ceiling in the hall. You put a pot under it: 2 gal of rain water to filter, but the house is colder." },
+    { id: "gas_smell", size: "medium", where: "inside", months: [3, 8], when: inHouse, text: "A strong smell of gas in this house. You open a window, and you do not light anything in here." },
+    { id: "black_ice", size: "medium", where: "outside", months: [3, 99], when: (s) => isColdSeason(s) && (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, "black_ice", 18), text: "Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts." },
+    { id: "house_fire_far", size: "medium", where: "any", months: [3, 99], when: (s) => !raining(s), text: "To the south, the sky glows orange under a column of smoke. A house burns there, and the next one catches. The smell reaches you an hour later." },
+    // ---- big ----
+    { id: "cold_snap", size: "big", where: "any", months: [3, 99], when: isWinter, apply: (s) => startHazard(s, "cold_snap", 72), text: "The air turns hard and dry. A cold snap from the north: the next three days are about 12 \xB0F colder. Keep the fire going." },
+    { id: "flood_low_streets", size: "big", where: "any", months: [3, 99], when: (s) => isRainySeason(s) && s.weather?.type === "heavy_rain", apply: (s) => startHazard(s, "flood", 24), text: "The creeks are over their banks. Low streets are under brown water, and you must go around them for a day." },
+    { id: "bridge_debris", size: "big", where: "outside", months: [4, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A pile-up of cars and a fallen sign block an overpass. You must find other ways for a while." }
   ];
 
   // src/engine/status.js
@@ -1504,6 +1566,22 @@
   // src/engine/decay.js
   var byId = new Map(DECAY.map((r) => [r.id, r]));
   var monthStartDay = (m) => (m - START_MONTH) * 30;
+  function failDay(state2, row, area) {
+    const u = ((hashString(`${state2.seed}:decay:${row.id}:${area}`) >>> 0) + 0.5) / 4294967296;
+    const wait = row.chanceByDay >= 1 ? 0 : Math.floor(Math.log(u) / Math.log(1 - row.chanceByDay));
+    return Math.max(0, monthStartDay(row.month)) + wait;
+  }
+  function decayActive(state2, id, area, t = state2.time) {
+    const row = byId.get(id);
+    if (!row) throw new Error(`Unknown decay row "${id}"`);
+    return gameDay(t) >= failDay(state2, row, area);
+  }
+  function decayShare(state2, id, t = state2.time) {
+    const row = byId.get(id);
+    if (!row) throw new Error(`Unknown decay row "${id}"`);
+    const days = gameDay(t) - monthStartDay(row.month) + 1;
+    return days <= 0 ? 0 : 1 - (1 - row.chanceByDay) ** days;
+  }
   function initDecay(state2) {
     state2.decay = { started: {} };
   }
@@ -2710,6 +2788,7 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
+    for (const h of activeHazards(state2, t)) if (h.walk) apply(h.walk, h.label);
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -2817,7 +2896,16 @@
     return `${est.miles.toFixed(1)} mi \xB7 about ${formatDuration(est.minutes)} \xB7 Energy \u2212${Math.round(est.energy)}`;
   }
 
+  // src/engine/breakdown.js
+  function batteryHours(state2) {
+    return Math.max(3, Math.round(10 * (1 - 0.7 * decayShare(state2, "battery_drain"))));
+  }
+  function medicineFactor(state2) {
+    return 1 - 0.3 * decayShare(state2, "old_medicine");
+  }
+
   // src/engine/actions.js
+  var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
   var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source2(state2, from) {
@@ -2930,8 +3018,8 @@
           return;
         }
         addItem(bag, id, -1);
-        p.lightHours = 10;
-        log(state2, "You put new batteries in the flashlight (10 h of light).");
+        p.lightHours = batteryHours(state2);
+        log(state2, p.lightHours >= 10 ? "You put new batteries in the flashlight (10 h of light)." : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
         advanceTime(state2, 2);
         return;
       }
@@ -3025,8 +3113,8 @@
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = painPillHours(state2);
-      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.`);
+      p.painH = Math.max(1, Math.round(painPillHours(state2) * medicineFactor(state2)));
+      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state2) < 0.95 ? " They are past their date and work less well." : ""}`);
       advanceTime(state2, 2);
       return;
     }
@@ -4167,6 +4255,11 @@
     if (chill >= 3) {
       out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
     }
+    for (const h of activeHazards(state2)) {
+      const left = formatDuration(h.endsAt - state2.time);
+      if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} (about ${left} more).`, level: "warn" });
+      if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} \xB0F colder (about ${left} more).`, level: "danger" });
+    }
     return out;
   }
   function nextDayStart(t) {
@@ -4922,7 +5015,7 @@
   function createFx(wrap) {
     const layer = document.createElement("div");
     layer.className = "fx";
-    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><div class="fx-haze"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
     wrap.appendChild(layer);
     const canvas2 = layer.querySelector("canvas");
     const ctx = canvas2.getContext("2d");
@@ -5016,14 +5109,17 @@
       // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
       update({ weather, night, windMph, season }) {
         const windy = weather === "windstorm" || (windMph || 0) >= 12;
-        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : season === "fall" && windy ? "leaves" : "none";
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" || weather === "ice_storm" ? "rain" : season === "fall" && windy ? "leaves" : "none";
         if (nextKind !== kind) parts = [];
         kind = nextKind;
-        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "ice_storm" ? 0.6 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
         for (const s of ["winter", "spring", "summer", "fall"]) layer.classList.toggle(`is-${s}`, season === s);
         wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
         layer.classList.toggle("is-night", !!night);
         layer.classList.toggle("is-fog", weather === "fog");
+        layer.classList.toggle("is-smoke", weather === "smoke");
+        layer.classList.toggle("is-heat", weather === "heat_wave");
+        layer.classList.toggle("is-ice", weather === "ice_storm");
         layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
         layer.classList.toggle("off", !enabled);
         run2();
