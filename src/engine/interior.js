@@ -245,7 +245,7 @@ export function solidBoxes(plan, open = {}) {
 // The spot the player can use now. A spot with an area (an aisle, a room) is usable
 // from anywhere inside that area. Other spots (counter, door) need the player near and facing them.
 export function nearestSpot(plan, x, z, yaw, reach = 2.2) {
-  for (const s of plan.spots) {
+  for (const s of plan.home ? [] : plan.spots) {
     const a = s.area;
     if (a && x >= a.x1 && x <= a.x2 && z >= a.z1 && z <= a.z2) return { ...s, type: 'search', dist: 0 };
   }
@@ -253,6 +253,12 @@ export function nearestSpot(plan, x, z, yaw, reach = 2.2) {
   const fx = -Math.sin(yaw);
   const fz = -Math.cos(yaw);
   const cands = plan.spots.filter((s) => !s.area).map((s) => ({ ...s, type: 'search' }));
+  // Home: the project places (built or not) can be looked at from up to 2.2 m.
+  // Only in the room you stand in (not through a wall).
+  if (plan.projects) {
+    const here = plan.spots.find((s) => s.area && x >= s.area.x1 && x <= s.area.x2 && z >= s.area.z1 && z <= s.area.z2);
+    for (const p of plan.projects) if (here && p.room === here.label) cands.push({ ...p, type: 'project', label: p.id });
+  }
   cands.push({ type: 'exit', x: plan.exit.x, z: plan.exit.z, label: 'Leave the building' });
   for (const s of cands) {
     const dx = s.x - x;
@@ -261,10 +267,73 @@ export function nearestSpot(plan, x, z, yaw, reach = 2.2) {
     if (dist > reach) continue;
     const facing = dist < 0.6 ? 1 : (dx * fx + dz * fz) / dist;
     if (facing < 0.35) continue;
-    const score = dist - facing;
+    const score = dist - facing + (s.type === 'project' && s.y >= 2 ? 0.8 : 0); // ceiling things last
     if (!best || score < best.score) best = { ...s, dist, score };
   }
   return best;
 }
 
 export { HOUSE_ROOMS };
+
+// ---------- your home ----------
+// The same six rooms as a house (HOUSE_ROOMS), clean, with no search zones to loot.
+// Each home project has a fixed place in a room: built, it is a solid object; not built,
+// an outline you can look at to see what it needs (plan.projects).
+// Slots: A = inner front corner, B = inner back corner, W = flat on the back wall, C = ceiling.
+export const HOME_PROJECT_SLOTS = {
+  wood_stove: { room: 'living room', slot: 'A', w: 0.9, d: 0.9, h: 1.0 },
+  insulate_living: { room: 'living room', slot: 'W', w: 3.0, d: 0.12, h: 2.2 },
+  led_lights: { room: 'living room', slot: 'C', w: 1.4, d: 0.3, h: 0.08 },
+  filter_station: { room: 'kitchen', slot: 'A', w: 0.7, d: 0.6, h: 1.5 },
+  sealed_store: { room: 'kitchen', slot: 'B', w: 1.0, d: 0.6, h: 1.0 },
+  rocket_stove: { room: 'garage', slot: 'A', w: 0.6, d: 0.6, h: 0.8 },
+  rain_barrels: { room: 'garage', slot: 'B', w: 1.4, d: 0.7, h: 1.1 },
+  second_battery: { room: 'garage', slot: 'W', w: 0.6, d: 0.3, h: 0.8, dx: 0.75 },
+  sick_room: { room: 'second bedroom', slot: 'A', w: 1.0, d: 0.9, h: 1.9 },
+  med_cabinet: { room: 'bathroom', slot: 'A', w: 0.6, d: 0.3, h: 0.8, y: 1.0 },
+};
+
+// built(id) -> true when the project is built.
+export function buildHome(built) {
+  const r = mulberry32(hashString('interior:home'));
+  const plan = roomsPlan('house', HOUSE_ROOMS.length, r, {});
+  plan.cat = 'house';
+  plan.home = true;
+  plan.dark = false;
+  plan.exposed = null;
+  plan.projects = [];
+  const roomOf = (name) => plan.spots.find((s) => s.label === name);
+  for (const [id, s] of Object.entries(HOME_PROJECT_SLOTS)) {
+    const sp = roomOf(s.room);
+    if (!sp) continue;
+    const a = sp.area;
+    const side = sp.x > 0 ? 1 : -1;
+    const xin = side > 0 ? a.x1 : a.x2; // the room's wall to the hallway
+    const cx = (a.x1 + a.x2) / 2;
+    let x;
+    let z;
+        if (s.slot === 'A' || s.slot === 'B') {
+      x = xin + side * (s.w / 2 + 0.15);
+      const gap = s.y ? 0.02 : 0.15; // wall-hung things touch the wall
+      z = s.slot === 'A' ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
+    } else if (s.slot === 'W') {
+      x = cx + (s.dx || 0) * side;
+      z = a.z1 + s.d / 2 + 0.02;
+    } else {
+      x = cx;
+      z = (a.z1 + a.z2) / 2;
+    }
+    const isBuilt = !!built(id);
+    const flat = s.slot === 'W' || s.slot === 'C';
+    const f = { type: 'proj', proj: id, built: isBuilt, x, z, w: s.w, d: s.d, h: s.h, y: s.slot === 'C' ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
+    plan.fixtures.push(f);
+    plan.projects.push({ id, x, z, room: s.room, built: isBuilt, y: f.y, h: s.h });
+  }
+  // The home battery is always there (garage wall).
+  const g = roomOf('garage');
+  if (g) {
+    const a = g.area;
+    plan.fixtures.push({ type: 'proj', proj: 'home_battery', built: true, x: (a.x1 + a.x2) / 2 + 0.05 * (g.x > 0 ? 1 : -1), z: a.z1 + 0.1, w: 0.5, d: 0.16, h: 0.7, y: 0, zone: g.zone, solid: true });
+  }
+  return plan;
+}

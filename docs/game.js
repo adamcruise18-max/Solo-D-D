@@ -3884,6 +3884,7 @@
         const startP = gasStartChance(state2);
         add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
+      add("walk_in", "Walk around your home (first person)", { note: "see what you built" });
       if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
       add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
       const cookId = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
@@ -4167,6 +4168,60 @@
       const kind = r() < 0.5 ? "box" : r() < 0.6 ? "can" : "paper";
       plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
+  }
+  var HOME_PROJECT_SLOTS = {
+    wood_stove: { room: "living room", slot: "A", w: 0.9, d: 0.9, h: 1 },
+    insulate_living: { room: "living room", slot: "W", w: 3, d: 0.12, h: 2.2 },
+    led_lights: { room: "living room", slot: "C", w: 1.4, d: 0.3, h: 0.08 },
+    filter_station: { room: "kitchen", slot: "A", w: 0.7, d: 0.6, h: 1.5 },
+    sealed_store: { room: "kitchen", slot: "B", w: 1, d: 0.6, h: 1 },
+    rocket_stove: { room: "garage", slot: "A", w: 0.6, d: 0.6, h: 0.8 },
+    rain_barrels: { room: "garage", slot: "B", w: 1.4, d: 0.7, h: 1.1 },
+    second_battery: { room: "garage", slot: "W", w: 0.6, d: 0.3, h: 0.8, dx: 0.75 },
+    sick_room: { room: "second bedroom", slot: "A", w: 1, d: 0.9, h: 1.9 },
+    med_cabinet: { room: "bathroom", slot: "A", w: 0.6, d: 0.3, h: 0.8, y: 1 }
+  };
+  function buildHome(built2) {
+    const r = mulberry32(hashString("interior:home"));
+    const plan = roomsPlan("house", HOUSE_ROOMS.length, r, {});
+    plan.cat = "house";
+    plan.home = true;
+    plan.dark = false;
+    plan.exposed = null;
+    plan.projects = [];
+    const roomOf = (name) => plan.spots.find((s) => s.label === name);
+    for (const [id, s] of Object.entries(HOME_PROJECT_SLOTS)) {
+      const sp = roomOf(s.room);
+      if (!sp) continue;
+      const a = sp.area;
+      const side = sp.x > 0 ? 1 : -1;
+      const xin = side > 0 ? a.x1 : a.x2;
+      const cx = (a.x1 + a.x2) / 2;
+      let x;
+      let z;
+      if (s.slot === "A" || s.slot === "B") {
+        x = xin + side * (s.w / 2 + 0.15);
+        const gap = s.y ? 0.02 : 0.15;
+        z = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
+      } else if (s.slot === "W") {
+        x = cx + (s.dx || 0) * side;
+        z = a.z1 + s.d / 2 + 0.02;
+      } else {
+        x = cx;
+        z = (a.z1 + a.z2) / 2;
+      }
+      const isBuilt = !!built2(id);
+      const flat = s.slot === "W" || s.slot === "C";
+      const f = { type: "proj", proj: id, built: isBuilt, x, z, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
+      plan.fixtures.push(f);
+      plan.projects.push({ id, x, z, room: s.room, built: isBuilt, y: f.y, h: s.h });
+    }
+    const g = roomOf("garage");
+    if (g) {
+      const a = g.area;
+      plan.fixtures.push({ type: "proj", proj: "home_battery", built: true, x: (a.x1 + a.x2) / 2 + 0.05 * (g.x > 0 ? 1 : -1), z: a.z1 + 0.1, w: 0.5, d: 0.16, h: 0.7, y: 0, zone: g.zone, solid: true });
+    }
+    return plan;
   }
 
   // src/engine/stock.js
@@ -6354,6 +6409,13 @@
       stock = cat.stock;
       title = loc.label;
       zoneName = "room";
+    } else if (loc.kind === "home") {
+      cat = { label: "Home base" };
+      plan = buildHome((id) => built(state, id));
+      zoneList = () => [];
+      stock = 1;
+      title = "Home (Aloha)";
+      zoneName = "room";
     } else return;
     const env = environment(state, "work");
     const night = isNight(state.time);
@@ -6411,8 +6473,12 @@
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
         return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
       },
+      projectInfo: (id) => homeProjectText(state, id, true),
+      // Lamps at home: LED lights need the project built and charge in the battery.
+      homeLamps: loc.kind === "home" ? { led: built(state, "led_lights") && state.home.battery > 0.2, candles: state.home.storage.candles || 0 } : null,
       describe: (n) => {
-        if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
+        if (n.type === "exit") return loc.kind === "home" ? "<kbd>E</kbd> Back to the home panel" : "<kbd>E</kbd> Leave the building <small>back to the map</small>";
+        if (n.type === "project") return homeProjectText(state, n.id, false);
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
           return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
@@ -6444,6 +6510,7 @@
         return { ok, name: it ? itemName(it.item) : "", msg: msgs };
       },
       onSeeZone: (zone) => {
+        if (loc.kind === "home") return;
         perform(state, "action", "see_zone", zone);
         saveGame(state);
       },
@@ -6605,6 +6672,21 @@
       `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
       ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
     ];
+  }
+  function homeProjectText(state2, id, long) {
+    if (id === "home_battery") {
+      const h2 = state2.home;
+      return `Home battery <small>${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels</small>`;
+    }
+    const proj = PROJECTS.find((p) => p.id === id);
+    if (!proj) return "";
+    const st = projectStatus(state2, proj);
+    if (st.built) return `${esc(proj.name)} <small>built \xB7 ${esc(proj.effect || "")}</small>`;
+    const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
+    const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
+    const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
+    if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
+    return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} \xB7 <kbd>E</kbd> details</small>`;
   }
 
   // src/main.js

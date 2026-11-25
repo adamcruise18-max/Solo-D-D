@@ -1008,6 +1008,7 @@ export function listActions(state) {
       const startP = gasStartChance(state);
       add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
     }
+    add('walk_in', 'Walk around your home (first person)', { note: 'see what you built' });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);

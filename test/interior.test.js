@@ -172,3 +172,26 @@ test('some buildings are open to the weather, the same way every time', async ()
   }
   assert.ok(n > 15 && n < 80, `exposed ${n} of 400`);
 });
+
+test('home plan: projects stand in their rooms; built ones are solid; looking works only in the same room', async () => {
+  const { buildHome, nearestSpot, HOME_PROJECT_SLOTS, solidBoxes } = await import('../src/engine/interior.js');
+  const p = buildHome((id) => id === 'wood_stove');
+  assert.equal(p.home, true);
+  assert.equal(p.projects.length, Object.keys(HOME_PROJECT_SLOTS).length);
+  const stove = p.fixtures.find((f) => f.proj === 'wood_stove');
+  const store = p.fixtures.find((f) => f.proj === 'sealed_store');
+  assert.equal(stove.solid, true);
+  assert.equal(store.solid, false, 'not built: only an outline');
+  assert.ok(solidBoxes(p).includes(stove));
+  for (const pr of p.projects) {
+    const a = p.spots.find((s) => s.label === pr.room).area;
+    assert.ok(pr.x > a.x1 && pr.x < a.x2 && pr.z > a.z1 && pr.z < a.z2, `${pr.id} inside its room`);
+  }
+  const sp = p.projects.find((x) => x.id === 'wood_stove');
+  const side = sp.x > 0 ? 1 : -1;
+  const n = nearestSpot(p, sp.x + side * 1.2, sp.z, side > 0 ? Math.PI / 2 : -Math.PI / 2);
+  assert.equal(n.type, 'project');
+  assert.equal(n.id, 'wood_stove');
+  // no search zones at home
+  assert.notEqual(nearestSpot(p, -2.9, -4.3, 0)?.type, 'search');
+});
