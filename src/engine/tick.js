@@ -29,7 +29,7 @@ export function clothingRating(state) {
 export function environment(state, mode, t = state.time) {
   const air = airTemp(state, t);
   const night = isNight(t);
-  if (mode === 'walk') {
+  if (mode === 'walk' || state.location.kind === 'wild') {
     return { outside: true, temp: air, wind: state.weather.wind, precip: !!weatherInfo(state).wetAfter, dark: night, air };
   }
   if (state.location.kind === 'home') {

@@ -248,6 +248,26 @@ request that says which rule change is meant and why.
     4+ days if fed, or at once with antibiotics (`canTreatDog`, `treatDog`).
 - Replay recorded again (only the new `dog` stream moved).
 
+## Hunting and fishing (skills `fishing` and `hunting`)
+
+- Spots: `src/data/wild.js` (real parks, wetlands, rivers inside the map; approximate
+  pins). Location at a spot is `{ kind: 'wild', id }`; it counts as outside
+  (`environment`, pacer `whereNow`). `goToSpot(state, id)`, `spotsNear(state, kind)`.
+- `src/engine/wild.js`:
+  - fishing (2 h): rod, or line and hooks; d20 vs DC 12 with skill, dawn/dusk +2,
+    salmon run +3 (Willamette, spring and fall), cold water −2, small creek −2,
+    hand line −1, frozen ground −2. 1 to 4 fish; cleaning 5 min each (15 with no knife).
+  - hunting (3 h, bow or rifle): find chance from `animalCover`, dawn/dusk, night,
+    scared game; then one shot (rabbit 13, duck/goose 14, deer 16; rifle +3). A
+    rifle shot scares the spot for 24 h (disadvantage, fewer finds). A missed
+    arrow can be lost. Ducks and geese only Oct to Mar. No dogs or cats.
+  - snares: set (30 min, snare wire), check after 12 h (one roll a day, up to 3).
+  - cleaning needs a knife or multitool; with none, 40% of the meat, double time.
+  - meat and fish go to the pack as fresh food (`food.js` spoilage).
+  - XP by use through `practice` (daily cap applies).
+- Odds for buttons: `fishOdds`, `huntOdds` (find % and shot odds).
+- Replay recorded again: new gear in outdoor store and house loot.
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).

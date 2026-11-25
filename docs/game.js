@@ -67,6 +67,13 @@
     matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
     duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
     rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    fishing_rod: { name: "Fishing rod and reel", unit: "pc", weight: 1.5, kind: "tool" },
+    fishing_line: { name: "Fishing line and hooks", unit: "kit", weight: 0.2, kind: "tool" },
+    bow: { name: "Hunting bow", unit: "pc", weight: 4, kind: "tool" },
+    arrows: { name: "Arrows (set of 6)", unit: "set", weight: 0.6, kind: "tool" },
+    rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
+    rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
+    snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -363,6 +370,12 @@
         { id: "matches", w: 4 },
         { id: "book_survival", w: 2 },
         { id: "book_cooking", w: 1 },
+        { id: "fishing_rod", w: 5 },
+        { id: "fishing_line", w: 6 },
+        { id: "bow", w: 1.5 },
+        { id: "arrows", w: 3 },
+        { id: "snare_wire", w: 4 },
+        { id: "rifle_rounds", w: 1 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -459,7 +472,11 @@
         { id: "wool_sweater", w: 3 },
         { id: "cotton_hoodie", w: 4 },
         { id: "fleece_jacket", w: 2 },
-        { id: "windbreaker", w: 1 }
+        { id: "windbreaker", w: 1 },
+        { id: "fishing_rod", w: 1.5 },
+        { id: "fishing_line", w: 1 },
+        { id: "rifle", w: 0.3 },
+        { id: "rifle_rounds", w: 0.4 }
       ]
     }
   };
@@ -718,6 +735,18 @@
       how: "Keep a fire, collect and filter water.",
       perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
       notice: []
+    },
+    fishing: {
+      name: "Fishing",
+      how: "Fish from a river, creek or lake bank.",
+      perLevel: "+1 to fishing rolls per level.",
+      notice: ["", "", "You can read the water: where the fish hold.", "", "", ""]
+    },
+    hunting: {
+      name: "Hunting",
+      how: "Hunt with a bow or rifle, set and check snares.",
+      perLevel: "+1 to shots per level. Snares catch more.",
+      notice: ["", "You notice tracks and droppings on the trails.", "", "You can tell how fresh a track is.", "", ""]
     }
   };
   var LEVEL_XP = [0, 15, 40, 80, 140, 220];
@@ -1618,8 +1647,8 @@
   }
   function whereNow(state2, mode) {
     if (mode === "sleep") return "asleep";
-    if (mode === "walk") return "outside";
     const k = state2.location?.kind;
+    if (mode === "walk" || k === "wild") return "outside";
     if (k === "home") return "home";
     return "inside";
   }
@@ -2172,7 +2201,7 @@
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
     const night = isNight(t);
-    if (mode === "walk") {
+    if (mode === "walk" || state2.location.kind === "wild") {
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {

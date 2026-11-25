@@ -109,6 +109,8 @@ export const CATEGORIES = {
       { id: 'knife', w: 5 }, { id: 'multitool', w: 4 }, { id: 'cooking_pot', w: 4 }, { id: 'water_tablets', w: 6 },
       { id: 'energy_bar', w: 6 }, { id: 'jerky', w: 5 }, { id: 'paper_map', w: 3 }, { id: 'radio', w: 3 }, { id: 'matches', w: 4 },
       { id: 'book_survival', w: 2 }, { id: 'book_cooking', w: 1 },
+      { id: 'fishing_rod', w: 5 }, { id: 'fishing_line', w: 6 }, { id: 'bow', w: 1.5 }, { id: 'arrows', w: 3 },
+      { id: 'snare_wire', w: 4 }, { id: 'rifle_rounds', w: 1 },
       { id: 'thermal_underwear', w: 6 }, { id: 'fleece_jacket', w: 6 }, { id: 'wool_sweater', w: 3 }, { id: 'windbreaker', w: 3 },
     ],
     entryText: 'Racks of jackets and boots. This place has good winter gear.',
@@ -143,6 +145,7 @@ export const CATEGORIES = {
       { id: 'can_opener', w: 2 }, { id: 'cooking_pot', w: 2 }, { id: 'duct_tape', w: 2 }, { id: 'knife', w: 1 }, { id: 'radio', w: 1 },
       { id: 'book_first_aid', w: 0.6 }, { id: 'book_repair', w: 0.6 }, { id: 'book_cooking', w: 0.8 }, { id: 'book_survival', w: 0.4 },
       { id: 'thermal_underwear', w: 2 }, { id: 'wool_sweater', w: 3 }, { id: 'cotton_hoodie', w: 4 }, { id: 'fleece_jacket', w: 2 }, { id: 'windbreaker', w: 1 },
+      { id: 'fishing_rod', w: 1.5 }, { id: 'fishing_line', w: 1 }, { id: 'rifle', w: 0.3 }, { id: 'rifle_rounds', w: 0.4 },
     ],
   },
 };
