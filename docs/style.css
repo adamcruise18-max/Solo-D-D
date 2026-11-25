@@ -418,3 +418,4 @@ ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spaci
 .bg-job.on, .bg-trait.on { outline: 2px solid #e8a33c; background: rgba(232,163,60,.15); }
 .bg-trait:disabled { opacity: .45; }
 .bg-line { margin: 4px 0 6px; }
+.bg-opt { display: flex; gap: 8px; align-items: center; margin: 6px 0 8px; cursor: pointer; }

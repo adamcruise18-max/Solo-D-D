@@ -83,6 +83,11 @@ This is the **first playable version**: a small part of the full game.
 - Build the rain barrels and the filter station. Each night the station filters up to 12 gal of rain water into the clean-water tank (40 gal). You do nothing.
 - The Home base panel shows the barrels, the clean tank and how much the station filters tonight.
 
+### Carry-over bonuses (game option)
+
+- Off by default. Turn it on in the "Who were you?" screen at the start of a run.
+- Deeds over all your runs earn small bonuses (for example: live 30 days, walk 100 miles, search 50 places). You can use up to 3 at a time.
+
 ### Food that spoils
 
 - Cans, dry food and snacks keep. Fresh fish and raw meat spoil: Fresh, then Stale, then Spoiled.

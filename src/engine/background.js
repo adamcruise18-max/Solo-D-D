@@ -3,6 +3,7 @@
 // Traits are point-buy: good traits cost points, bad traits give points. You have FREE_POINTS to start.
 // State: state.player.job = id | null, state.player.traits = [id, ...]. Old saves have neither: no effects.
 import { LEVEL_XP } from './skills.js';
+import { hasLegacy } from './legacy.js';
 
 export const JOBS = {
   nurse: {
@@ -92,17 +93,18 @@ export function xpFactor(state) {
 }
 export function carryMinus(state) { return jobOf(state) === 'nurse' ? 4 : 0; }
 export function walkSpeedFactor(state) { return jobOf(state) === 'roofer' ? 0.9 : 1; }
-export function searchJobFactor(state) { return jobOf(state) === 'fishing_guide' ? 1.1 : 1; }
+export function searchJobFactor(state) { return (jobOf(state) === 'fishing_guide' ? 1.1 : 1) * (hasLegacy(state, 'sharp_eyes') ? 0.95 : 1); }
 export function foodLossFactor(state) { return jobOf(state) === 'line_cook' ? 1.1 : 1; }
 export function sleepGainFactor(state) { return hasTrait(state, 'light_sleeper') ? 0.85 : 1; }
 // Energy used by mode ('walk', 'work', 'heavy', 'rest').
 export function energyUseFactor(state, mode) {
   let f = 1;
   if (mode === 'walk' && jobOf(state) === 'tow_driver') f *= 1.15;
+  if (mode === 'walk' && hasLegacy(state, 'road_legs')) f *= 0.95;
   if ((mode === 'walk' || mode === 'work' || mode === 'heavy') && hasTrait(state, 'asthmatic')) f *= 1.2;
   return f;
 }
-export function dogBondBonus(state) { return hasTrait(state, 'dog_person') ? 20 : 0; }
+export function dogBondBonus(state) { return (hasTrait(state, 'dog_person') ? 20 : 0) + (hasLegacy(state, 'old_friend') ? 10 : 0); }
 
 // Short text for the panel: "Nurse · Fast learner, Light sleeper".
 export function backgroundText(state) {

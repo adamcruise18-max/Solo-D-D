@@ -20,7 +20,8 @@ import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js'
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
 import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
-import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns } from '../engine/save.js';
+import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns, loadLegacy, saveLegacy } from '../engine/save.js';
+import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
 import { createFx } from './fx.js';
 import { PROJECTS } from '../data/projects.js';
@@ -553,6 +554,8 @@ function beginRun(opts) {
 function showBackground(opts) {
   let job = 'nurse';
   let traits = [];
+  const rec = loadLegacy();
+  let legacy = earnedIds(rec).slice(0, MAX_SLOTS);
   const render = (m) => {
     const left = pointsLeft(traits);
     const jobs = Object.entries(JOBS).map(([id, J]) => {
@@ -571,6 +574,7 @@ function showBackground(opts) {
       <h3>Traits <small>(${left} point${left === 1 ? '' : 's'} left; you start with ${FREE_POINTS})</small></h3>
       <p class="hint">Good traits cost points. Bad traits give points.</p>
       <div class="bg-traits">${tr}</div>
+      ${legacyHtml()}
       <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
     m.querySelectorAll('[data-job]').forEach((b) => b.addEventListener('click', () => { job = b.dataset.job; render(m); }));
     m.querySelectorAll('[data-trait]').forEach((b) => b.addEventListener('click', () => {
@@ -584,12 +588,31 @@ function showBackground(opts) {
       }
       render(m);
     }));
+    const opt = m.querySelector('#legacyOn');
+    if (opt) opt.addEventListener('change', () => { rec.enabled = opt.checked; saveLegacy(rec); render(m); });
+    m.querySelectorAll('[data-legacy]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.legacy;
+      legacy = legacy.includes(id) ? legacy.filter((x) => x !== id) : [...legacy, id].slice(0, MAX_SLOTS);
+      render(m);
+    }));
     m.querySelector('#bgGo').addEventListener('click', () => {
       clearGame();
-      state = newGame(undefined, { ...opts, job, traits: validTraits(traits) });
+      state = newGame(undefined, { ...opts, job, traits: validTraits(traits), legacy: rec.enabled ? validLegacy(legacy, rec) : [] });
       closeModal();
       commit(true);
     });
+  };
+  // Carry-over bonuses: a game option, off by default.
+  const legacyHtml = () => {
+    const earned = earnedIds(rec);
+    const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L]) => {
+      const has = earned.includes(id);
+      const on = has && legacy.includes(id);
+      const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
+      return `<button class="bg-trait${on ? ' on' : ''}" data-legacy="${id}" ${!has || full ? 'disabled' : ''}><b>${esc(L.name)}</b> <span class="${has ? 'good' : ''}">${has ? 'earned' : esc(L.progress(rec))}</span><small>${esc(L.deed)}</small><small class="good">${esc(L.bonus)}</small></button>`;
+    }).join('')}</div>` : '';
+    return `<h3>Carry-over bonuses <small>(game option)</small></h3>
+      <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? 'checked' : ''}> Use small bonuses earned in earlier runs</label>${list}`;
   };
   modal('', render);
 }
