@@ -19,7 +19,7 @@ export function setFxEnabled(on) {
 export function createFx(wrap) {
   const layer = document.createElement('div');
   layer.className = 'fx';
-  layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+  layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><div class="fx-haze"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
   wrap.appendChild(layer);
   const canvas = layer.querySelector('canvas');
   const ctx = canvas.getContext('2d');
@@ -120,15 +120,20 @@ export function createFx(wrap) {
     // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
     update({ weather, night, windMph, season }) {
       const windy = weather === 'windstorm' || (windMph || 0) >= 12;
-      const nextKind = weather === 'snow' ? 'snow' : weather === 'rain' || weather === 'heavy_rain' ? 'rain'
+      const nextKind = weather === 'snow' ? 'snow' : weather === 'rain' || weather === 'heavy_rain' || weather === 'ice_storm' ? 'rain'
         : season === 'fall' && windy ? 'leaves' : 'none';
       if (nextKind !== kind) parts = [];
       kind = nextKind;
-      strength = weather === 'heavy_rain' ? 1 : weather === 'rain' ? 0.5 : weather === 'snow' ? 0.8 : nextKind === 'leaves' ? 1 : 0;
+      strength = weather === 'heavy_rain' ? 1 : weather === 'rain' ? 0.5 : weather === 'ice_storm' ? 0.6 : weather === 'snow' ? 0.8 : nextKind === 'leaves' ? 1 : 0;
       for (const s of ['winter', 'spring', 'summer', 'fall']) layer.classList.toggle(`is-${s}`, season === s);
       wind = (windMph || 0) * (weather === 'windstorm' ? 1.5 : 1);
       layer.classList.toggle('is-night', !!night);
       layer.classList.toggle('is-fog', weather === 'fog');
+      // Rare weather: wildfire smoke (orange sky), a heat wave (pale warm haze), an ice storm (cold glaze).
+      // Light tints only: the map stays readable.
+      layer.classList.toggle('is-smoke', weather === 'smoke');
+      layer.classList.toggle('is-heat', weather === 'heat_wave');
+      layer.classList.toggle('is-ice', weather === 'ice_storm');
       layer.classList.toggle('is-storm', weather === 'windstorm' || weather === 'heavy_rain');
       layer.classList.toggle('off', !enabled);
       run();

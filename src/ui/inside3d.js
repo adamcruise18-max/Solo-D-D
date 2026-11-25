@@ -88,11 +88,14 @@ const SKY_PRESETS = {
   noon: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0.2, precip: 'none', outdoorLight: 0.88 },
   dusk: { daylight: 0.6, phase: 'dusk', sunHeight: 0.04, cloud: 0.25, precip: 'none', outdoorLight: 0.51 },
   overcast: { daylight: 1, phase: 'day', sunHeight: 0.7, cloud: 1, precip: 'rain', precipStrength: 0.6, outdoorLight: 0.4 },
+  smoke: { daylight: 1, phase: 'day', sunHeight: 0.6, cloud: 0.4, precip: 'none', fog: 0.5, haze: '#d9822b', outdoorLight: 0.76 },
+  heat: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0, precip: 'none', fog: 0.1, haze: '#f3d9a4', outdoorLight: 1 },
+  ice: { daylight: 1, phase: 'day', sunHeight: 0.5, cloud: 0.95, precip: 'rain', precipStrength: 0.6, fog: 0.2, ice: true, outdoorLight: 0.43 },
   night: { daylight: 0, phase: 'night', sunHeight: 0, cloud: 0.5, precip: 'none', outdoorLight: 0 },
 };
 export function openInside(opts) {
   // ?sky=morning|noon|dusk|overcast|night in the page address forces the light (to compare looks).
-  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night)\b/.exec(location.search || '') || [])[1];
+  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
   if (forceSky) {
     const sc = SKY_PRESETS[forceSky];
     opts = { ...opts, scene: sc, night: sc.daylight === 0, dark: sc.daylight === 0 ? true : opts.dark };

@@ -54,11 +54,15 @@ a { color: var(--accent); }
 .fx-fog { background: radial-gradient(ellipse at 50% 50%, rgba(232, 238, 243, 0) 30%, rgba(232, 238, 243, .55) 75%, rgba(232, 238, 243, .85) 100%);
   opacity: 0; transition: opacity 1.2s; }
 .fx.is-fog .fx-fog { opacity: 1; }
+.fx-haze { opacity: 0; transition: opacity 2s, background 2s; }
+.fx.is-smoke .fx-haze { opacity: 1; background: radial-gradient(ellipse at 50% 40%, rgba(232, 150, 60, .16) 20%, rgba(217, 130, 43, .3) 75%, rgba(200, 110, 40, .42) 100%); }
+.fx.is-heat .fx-haze { opacity: 1; background: radial-gradient(ellipse at 50% 30%, rgba(255, 236, 190, .06), rgba(243, 217, 164, .22) 100%); }
+.fx.is-ice .fx-haze { opacity: 1; background: radial-gradient(ellipse at 50% 50%, rgba(220, 236, 250, 0) 40%, rgba(220, 236, 250, .22) 100%); }
 .fx-grid { background-image: linear-gradient(rgba(25, 45, 65, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(25, 45, 65, .05) 1px, transparent 1px);
   background-size: 72px 72px; }
 .fx-vignette { background: radial-gradient(ellipse at 50% 50%, transparent 58%, rgba(9, 16, 24, .26) 100%); transition: background .8s; }
 .fx.is-storm .fx-vignette { background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(9, 16, 24, .4) 100%); }
-.fx.off .fx-season, .fx.off .fx-night, .fx.off .fx-fog, .fx.off .fx-fall { display: none; }
+.fx.off .fx-season, .fx.off .fx-night, .fx.off .fx-fog, .fx.off .fx-haze, .fx.off .fx-fall { display: none; }
 
 /* ---------- HUD on the map ---------- */
 .hud { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; align-items: center;

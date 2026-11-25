@@ -896,9 +896,12 @@ export function skyLight(sc, night = false) {
   if (sc.precip === 'rain') c.lerp(new Color(0xb4c4d6), 0.35 + 0.4 * ps); // rain: cooler, bluer
   else if (sc.precip === 'snow') c.lerp(new Color(0xe2eaf4), 0.5);
   if (sc.fog) c.lerp(new Color(0xd4d8da), 0.4);
+  if (sc.ice) c.lerp(new Color(0xdbe8f6), 0.4); // ice storm: cold, glassy light
   c.lerp(new Color(0xffb878), golden * 0.85);
+  // smoke or a heat wave: the whole sky takes the haze color (smoke: orange daylight)
+  if (sc.haze) c.lerp(new Color(sc.haze), sc.haze.toLowerCase() === '#d9822b' ? 0.55 : 0.3);
   const level = (0.25 + 0.95 * out) * Math.min(1, day * 1.4);
-  const sky = new Color(0xe9f0f8).lerp(c, 0.55).lerp(new Color(0xf0b890), golden * 0.5).multiplyScalar(0.35 + 0.45 * Math.min(1, level)); // capped: the street still shows at noon
+  const sky = new Color(0xe9f0f8).lerp(c, 0.55).lerp(new Color(0xf0b890), golden * 0.5).lerp(new Color(sc.haze || 0xe9f0f8), sc.haze ? 0.6 : 0).multiplyScalar(0.35 + 0.45 * Math.min(1, level)); // capped: the street still shows at noon
   return { level, color: c.getHex(), sky: sky.getHex(), golden, night: false };
 }
 

@@ -16,6 +16,9 @@ import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vit
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
+import { decayActive } from './decay.js';
+// The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
+const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 // Cook fresh food first (it spoils), then rice or pasta, then cans.
 const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
@@ -326,6 +329,11 @@ function homeAction(state, id) {
       return;
     }
     case 'collect_tap':
+      if (!tapRuns(state)) {
+        h.tapWorks = false;
+        log(state, 'You open the tap. It coughs air, and then nothing. The water pressure is gone here.', 'warn');
+        return;
+      }
       h.rawGal += 2;
       log(state, 'The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.');
       advanceTime(state, 15);
@@ -968,7 +976,7 @@ export function listActions(state) {
     add('drink_tank', 'Drink from the water heater tank', { disabled: h.tankGal < 0.25 && 'The tank is empty', note: `${h.tankGal.toFixed(1)} gal left` });
     if (h.safeGal >= 0.25) add('drink_safe', 'Drink boiled water', { note: `${h.safeGal.toFixed(1)} gal` });
     add('fill_jug', 'Fill a 1 gal jug to carry', { disabled: h.safeGal < 1 && h.tankGal < 1 && 'No clean water' });
-    if (h.tapWorks) add('collect_tap', 'Collect tap water (2 gal, unsafe)');
+    if (tapRuns(state)) add('collect_tap', 'Collect tap water (2 gal, unsafe)');
     if (h.toiletGal > 0) add('collect_toilet', 'Take water from the toilet tanks');
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
