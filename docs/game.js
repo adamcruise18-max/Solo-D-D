@@ -17,6 +17,12 @@
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
     raw_meat: { name: "Raw meat", unit: "lb", weight: 1, kind: "food", cal: 900, portion: 1, needsCooking: true, perish: 2 },
+    // From the garden (engine/garden.js, data/crops.js). Fresh: they spoil.
+    kale: { name: "Kale (bunch)", unit: "bunch", weight: 0.5, kind: "food", cal: 100, portion: 1, perish: 7 },
+    potatoes: { name: "Potatoes (lb)", unit: "lb", weight: 1, kind: "food", cal: 350, portion: 1, needsCooking: true, perish: 60 },
+    green_beans: { name: "Green beans (lb)", unit: "lb", weight: 1, kind: "food", cal: 140, portion: 1, perish: 6 },
+    squash: { name: "Winter squash", unit: "squash", weight: 3, kind: "food", cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+    garlic: { name: "Garlic (head)", unit: "head", weight: 0.1, kind: "food", cal: 60, portion: 1, perish: 120 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
@@ -61,6 +67,14 @@
     matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
     duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
     rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    fishing_rod: { name: "Fishing rod and reel", unit: "pc", weight: 1.5, kind: "tool" },
+    fishing_line: { name: "Fishing line and hooks", unit: "kit", weight: 0.2, kind: "tool" },
+    bow: { name: "Hunting bow", unit: "pc", weight: 4, kind: "tool" },
+    arrows: { name: "Arrows (set of 6)", unit: "set", weight: 0.6, kind: "tool" },
+    rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
+    rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
+    snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
+    phone: { name: "Smartphone (charged)", unit: "pc", weight: 0.4, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -309,6 +323,7 @@
         { id: "rain_barrel", w: 5 },
         { id: "stove_kit", w: 2 },
         { id: "water_filter", w: 3 },
+        { id: "snare_wire", w: 4 },
         { id: "duct_tape", w: 10 },
         { id: "rope", w: 6 },
         { id: "multitool", w: 3 },
@@ -357,6 +372,13 @@
         { id: "matches", w: 4 },
         { id: "book_survival", w: 2 },
         { id: "book_cooking", w: 1 },
+        { id: "fishing_rod", w: 5 },
+        { id: "fishing_line", w: 6 },
+        { id: "bow", w: 4 },
+        { id: "arrows", w: 6 },
+        { id: "snare_wire", w: 4 },
+        { id: "rifle_rounds", w: 1.5 },
+        { id: "rifle", w: 0.5 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -453,7 +475,14 @@
         { id: "wool_sweater", w: 3 },
         { id: "cotton_hoodie", w: 4 },
         { id: "fleece_jacket", w: 2 },
-        { id: "windbreaker", w: 1 }
+        { id: "windbreaker", w: 1 },
+        { id: "fishing_rod", w: 1.5 },
+        { id: "fishing_line", w: 1 },
+        { id: "rifle", w: 0.3 },
+        { id: "rifle_rounds", w: 0.4 },
+        { id: "phone", w: 1.5 },
+        { id: "bow", w: 0.3 },
+        { id: "arrows", w: 0.4 }
       ]
     }
   };
@@ -569,6 +598,10 @@
     const hz = (_a = state2.flags).hazards || (_a.hazards = {});
     hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
   }
+  function hazardOn(state2, id, t = state2.time) {
+    const end = state2.flags?.hazards?.[id];
+    return end != null && t < end;
+  }
   function activeHazards(state2, t = state2.time) {
     const hz = state2.flags?.hazards || {};
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
@@ -607,6 +640,7 @@
       w.snowInches = randInt(state2, 1, 6);
     }
     if (w.type === "clear") w.nextLow -= 5;
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     return w;
   }
   function initWeather(state2) {
@@ -660,7 +694,8 @@
     const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
     if (m < s.rise) {
       const span2 = 1440 - peak + s.rise;
-      return ease(w.prevHigh, w.low, (m + 1440 - peak) / span2);
+      const f = (m + 1440 - peak) / span2;
+      return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
     }
     if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
     const span = 1440 - peak + s.rise;
@@ -708,6 +743,18 @@
       how: "Keep a fire, collect and filter water.",
       perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
       notice: []
+    },
+    fishing: {
+      name: "Fishing",
+      how: "Fish from a river, creek or lake bank.",
+      perLevel: "+1 to fishing rolls per level.",
+      notice: ["", "", "You can read the water: where the fish hold.", "", "", ""]
+    },
+    hunting: {
+      name: "Hunting",
+      how: "Hunt with a bow or rifle, set and check snares.",
+      perLevel: "+1 to shots per level. Snares catch more.",
+      notice: ["", "You notice tracks and droppings on the trails.", "", "You can tell how fresh a track is.", "", ""]
     }
   };
   var LEVEL_XP = [0, 15, 40, 80, 140, 220];
@@ -850,6 +897,16 @@
       requires: ["rain_barrels"],
       hours: 2
     },
+    // ---- Garden ----
+    {
+      id: "garden_beds",
+      wing: "food",
+      name: "Raised garden beds",
+      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).",
+      needs: { scrap_wood: 4, hardware_parts: 1 },
+      tools: [],
+      hours: 6
+    },
     // ---- Heat ----
     {
       id: "insulate_living",
@@ -954,7 +1011,7 @@
       days: [1, 2],
       shape: (w, r) => {
         w.high = Math.min(w.high, 33);
-        w.low = Math.min(w.low, 28);
+        w.nextLow = Math.min(w.nextLow, 28);
         w.wind = 15 + Math.floor(r() * 21);
         delete w.snowInches;
       },
@@ -967,7 +1024,6 @@
       days: [3, 5],
       shape: (w, r) => {
         w.high = 98 + Math.floor(r() * 9);
-        w.low = Math.max(w.low, 62);
         w.nextLow = Math.max(w.nextLow, 64);
         w.wind = Math.floor(r() * 6);
       },
@@ -1013,12 +1069,146 @@
     w.baseType = w.type;
     w.type = spell.id;
     SPELLS[spell.id].shape(w, r);
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
     return spell;
   }
   function spellStartText(id) {
     return SPELLS[id]?.start || "";
   }
+
+  // src/engine/home.js
+  function homeStep(state2, dt, env) {
+    const h2 = state2.home;
+    const air = env.air;
+    let heat = 0;
+    if (h2.fireHours > 0) {
+      heat += fireHeat(state2);
+      h2.fireHours = Math.max(0, h2.fireHours - dt);
+      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    }
+    if (h2.heaterOn) {
+      h2.battery -= 1.5 * dt;
+      heat += 20;
+      if (h2.battery <= 0) {
+        h2.battery = 0;
+        h2.heaterOn = false;
+        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      }
+    }
+    const passive = air + 6;
+    const lw = windowLoss(h2, "living");
+    const target = Math.min(75, passive + heat / lw);
+    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
+    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h2, passive, dt);
+    const m = (state2.time % 1440 + 1440) % 1440;
+    const s = sunFor(state2.time);
+    if (m > s.rise && m < s.set) {
+      const hours = (s.set - s.rise) / 60;
+      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+    }
+    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
+      h2.tapWorks = false;
+      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  var ROOMS = [
+    { id: "living", label: "Living room" },
+    { id: "kitchen", label: "Kitchen" },
+    { id: "bedroom", label: "Bedroom" },
+    { id: "bath", label: "Bathroom" }
+  ];
+  var OUT_RATE = 0.05;
+  var DOOR_OPEN = 0.15;
+  var DOOR_CLOSED = 0.02;
+  var BROKEN = 1.5;
+  var BOARDED = 0.3;
+  function ensureRooms(h2) {
+    if (!h2.rooms) {
+      h2.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+    }
+    if (!h2.windows) h2.windows = {};
+    if (!h2.doorsClosed) h2.doorsClosed = {};
+    return h2;
+  }
+  function windowLoss(h2, room) {
+    const w = h2.windows?.[room];
+    if (!w) return 1;
+    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  }
+  var LIVING_SHARE = 1 / 3;
+  function roomsStep(h2, passive, dt) {
+    ensureRooms(h2);
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kDoor = (h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+      h2.indoorTemp += (r.temp - h2.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+    }
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h2, id);
+      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+      const rate = Math.min(0.9, kOut + kDoor);
+      r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
+    }
+  }
+  function roomTemp(state2, room) {
+    const h2 = state2.home;
+    if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
+    return h2.rooms[room].temp;
+  }
+  function breakWindow(state2, room) {
+    var _a;
+    const h2 = ensureRooms(state2.home);
+    const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
+    w.broken += 1;
+  }
+  var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
+  function sleepSpot(state2) {
+    return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
+  }
+  function sleepTemp(state2) {
+    const spot = sleepSpot(state2);
+    return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  }
+  var WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
+  var WINDOW_ROOMS = ["living", "kitchen", "bedroom", "bath"];
+  function stormWindows(state2) {
+    const p = WINDOW_BREAK[state2.weather?.type];
+    if (!p) return null;
+    const r = stream(state2, "home");
+    if (r() >= p) return null;
+    const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
+    breakWindow(state2, room);
+    const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
+    log(state2, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
+    return room;
+  }
+  function homeDaily(state2) {
+    stormWindows(state2);
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
+  }
+  var homeSystem = {
+    id: "home",
+    label: "Home base",
+    order: 1005,
+    // right after the legacy rules, before the dog: the same order as before
+    version: 1,
+    legacy: true,
+    // state.home was in saves before the engine; newGame() makes it
+    owns: ["home"],
+    // The fire and the battery run out inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
+    daily: (state2) => homeDaily(state2)
+  };
 
   // src/engine/placesdb.js
   var LIST = [];
@@ -1072,6 +1262,12 @@
       const n = Math.round(day / 30.4) - 1;
       log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
+  }
+  var LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
+  function overgrowthWalk(t) {
+    const og = overgrowth(t);
+    if (og <= 0.25) return 1;
+    return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
   }
 
   // src/core/activity.js
@@ -1173,7 +1369,7 @@
 
   // src/core/systems.js
   var HOOKS = ["init", "step", "daily"];
-  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
+  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "effects", "catchUp", ...HOOKS]);
   var CATCH_UP = ["exact", "approx", "event"];
   function defineSystem(sys) {
     if (!sys || typeof sys.id !== "string" || !sys.id) throw new Error("A system needs an id");
@@ -1214,8 +1410,9 @@
     }
     for (const s of list) add(s);
     const snapOthers = (state2, id) => {
+      const allowed = new Set(byId3.get(id)?.effects || []);
       const out = {};
-      for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
+      for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state2[f] ?? null);
       return out;
     };
     function run2(hook, state2, arg, ctx) {
@@ -1291,6 +1488,10 @@
           events?.emit("day.start", { day: d, time: state2.time });
         }
         systems.step(state2, step / 60, ctx);
+        if (state2._stop) {
+          delete state2._stop;
+          break;
+        }
       }
       sendDeath(state2, events);
       return state2;
@@ -1342,6 +1543,33 @@
 
   // src/core/profiler.js
   var FRAME_BUDGET_MS = 1e3 / 30;
+
+  // src/core/changes.js
+  var CHANGE_KINDS = ["taken", "opened", "closed", "emptied", "moved", "damaged", "discovered", "set"];
+  function log2(state2) {
+    state2.world = state2.world || {};
+    state2.world.changes = state2.world.changes || {};
+    return state2.world.changes;
+  }
+  function recordChange(state2, locKey, change) {
+    if (!locKey) throw new Error("A change needs a location key");
+    if (!change || !change.o) throw new Error("A change needs an object id (o)");
+    if (!CHANGE_KINDS.includes(change.k)) throw new Error(`Unknown change kind "${change.k}"`);
+    const list = log2(state2)[locKey] = log2(state2)[locKey] || [];
+    const rec = { o: String(change.o), k: change.k };
+    if (change.v !== void 0) rec.v = change.v;
+    if (state2.time != null) rec.t = Math.round(state2.time);
+    const same = (r) => r.o === rec.o && (r.k === rec.k || ["opened", "closed"].includes(r.k) && ["opened", "closed"].includes(rec.k));
+    const i = list.findIndex(same);
+    if (i >= 0) {
+      const old = list.splice(i, 1)[0];
+      if (rec.k === "set" && old.v && typeof old.v === "object" && rec.v && typeof rec.v === "object") rec.v = { ...old.v, ...rec.v };
+    }
+    list.push(rec);
+    return rec;
+  }
+  var changesFor = (state2, locKey) => state2.world?.changes?.[locKey] || [];
+  var hasChange = (state2, locKey, o, k) => changesFor(state2, locKey).some((r) => r.o === String(o) && r.k === k);
 
   // src/data/events.js
   var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
@@ -1478,8 +1706,8 @@
   }
   function whereNow(state2, mode) {
     if (mode === "sleep") return "asleep";
-    if (mode === "walk") return "outside";
     const k = state2.location?.kind;
+    if (mode === "walk" || k === "wild") return "outside";
     if (k === "home") return "home";
     return "inside";
   }
@@ -1506,7 +1734,7 @@
   }
   function pick(state2, list, rng) {
     const mercy = inTrouble(state2);
-    const w = (e) => e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8;
+    const w = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
     const total = list.reduce((a, e) => a + w(e), 0);
     let r = rng() * total;
     for (const e of list) {
@@ -1528,13 +1756,15 @@
     p.count += 1;
     p.quietHours = 0;
   }
+  var ASLEEP_RATE = 0.4;
   function pacerHour(state2, mode, events = EVENTS) {
     const p = state2.pacer;
     p.tension = Math.min(100, p.tension + RISE_PER_HOUR + (mode === "walk" ? RISE_OUTSIDE : 0));
     p.quietHours = (p.quietHours || 0) + 1;
     const rng = stream(state2, "pacer");
     const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
-    if (rng() >= eventChance(p.tension) && !overdue) return null;
+    const rate = mode === "sleep" ? ASLEEP_RATE : 1;
+    if (rng() >= eventChance(p.tension) * rate && !overdue) return null;
     let list = candidates(state2, mode, events);
     if (overdue) list = list.filter((e2) => e2.size === "small");
     if (!list.length) return null;
@@ -1560,6 +1790,9 @@
     // after the rules: the mercy rule reads this step's vitals
     version: 1,
     owns: ["pacer"],
+    // Event effects (src/data/events.js apply) may change these on purpose:
+    // a roof leak (home), the dog finds a bone (dog).
+    effects: ["home", "dog"],
     // Hour by hour with thresholds: time must be played, not skipped.
     catchUp: "event",
     init: (state2) => initPacer(state2),
@@ -1654,7 +1887,12 @@
     d.food = clamp(d.food - 4 * dt, 0, 100);
     d.water = 80;
     if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.sick) d.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d.health > 0) {
+      feralWarning(state2, d);
+      sniff(state2, d, dt);
+    }
     if (d.health <= 50 && d.warned < 1) {
       d.warned = 1;
       log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
@@ -1669,6 +1907,66 @@
       d.stage = "dead";
       log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
       state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  var SICK_PER_HOUR = 0.25;
+  var FIND_BOND = 40;
+  var FINDS = [
+    ["canned_food", 3],
+    ["jerky", 2],
+    ["snacks", 2],
+    ["dog_food", 1],
+    ["rope", 1],
+    ["gloves", 1],
+    ["wool_socks", 1],
+    ["batteries", 1],
+    ["raw_meat", 1]
+  ];
+  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
+  function dogWarns(state2) {
+    const d = state2.dog;
+    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+  }
+  function feralWarning(state2, d) {
+    if (!dogWarns(state2) || !hazardOn(state2, "feral_dogs")) return;
+    const end = state2.flags.hazards.feral_dogs;
+    if (d.feralWarned === end) return;
+    d.feralWarned = end;
+    log(state2, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+  }
+  function sniff(state2, d, dt) {
+    const loc = state2.location;
+    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    const key = `${loc.kind}:${loc.id}:${Math.floor(state2.time / 1440)}`;
+    if (d.foundAt === key) return;
+    const r = stream(state2, "dog");
+    if (r() >= 0.12 * (d.bond / 100) * dt) return;
+    d.foundAt = key;
+    const total = FINDS.reduce((a, [, w]) => a + w, 0);
+    let x = r() * total;
+    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
+    addItem(state2.carried, id, 1);
+    d.finds = (d.finds || 0) + 1;
+    log(state2, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+  }
+  function dogSickDaily(state2, day) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    const r = stream(state2, "dog");
+    if (d.sick) {
+      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
+        d.sick = null;
+        log(state2, `${d.name} eats with interest again. The sickness is over.`, "good");
+      }
+      return;
+    }
+    const w = state2.weather || {};
+    let p = 0.012;
+    if (d.food < 25) p += 0.03;
+    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (r() < p) {
+      d.sick = { since: day };
+      log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
   }
   function dogBondDaily(state2) {
@@ -1720,119 +2018,20 @@
     daily: (state2, day) => {
       dogBondDaily(state2);
       dogDaily(state2, day);
+      dogSickDaily(state2, day);
     }
   };
 
-  // src/engine/home.js
-  function homeStep(state2, dt, env) {
-    const h2 = state2.home;
-    const air = env.air;
-    let heat = 0;
-    if (h2.fireHours > 0) {
-      heat += fireHeat(state2);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
-    }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
-      heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
-        log(state2, "The home battery is empty. The electric heater stops.", "warn");
-      }
-    }
-    const passive = air + 6;
-    const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    const m = (state2.time % 1440 + 1440) % 1440;
-    const s = sunFor(state2.time);
-    if (m > s.rise && m < s.set) {
-      const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
-    }
-    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
-      const t = state2.weather.type;
-      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
-    }
-    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
-      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
-    }
-  }
-  function homeDaily(state2) {
-    const filtered = runAutoFilter(state2);
-    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
-  }
-  var homeSystem = {
-    id: "home",
-    label: "Home base",
-    order: 1005,
-    // right after the legacy rules, before the dog: the same order as before
-    version: 1,
-    legacy: true,
-    // state.home was in saves before the engine; newGame() makes it
-    owns: ["home"],
-    // The fire and the battery run out inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
-    daily: (state2) => homeDaily(state2)
+  // src/data/crops.js
+  var CROPS = {
+    // Kale overwinters in Portland: sown Feb-Apr or Jul-Oct; after a harvest the plant
+    // grows new leaves (regrow: growth it keeps; up to `cuts` harvests).
+    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8, 9], days: 55, frostF: null, minF: 40, yield: ["kale", 8], regrow: 0.5, cuts: 4 },
+    potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
+    beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
+    squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
+    garlic: { name: "Garlic", plant: [8, 9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
-
-  // src/engine/systems.js
-  var weatherSystem = {
-    id: "weather",
-    label: "Weather",
-    order: 10,
-    version: 1,
-    legacy: true,
-    // state.weather was in saves before the engine
-    owns: ["weather"],
-    // One roll per game day from the shared game rng; nothing changes inside a day.
-    // Then rare weather (ice storm, heat wave, smoke) from its own stream
-    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
-    // so the result is exact.
-    catchUp: "exact",
-    init: (state2) => initWeather(state2),
-    daily: (state2, day) => {
-      const old = state2.weather;
-      rollWeather(state2, day);
-      rollSpell(state2, day, old);
-    }
-  };
-  var legacySystem = {
-    id: "legacy",
-    label: "Rules not yet moved into systems",
-    order: 1e3,
-    version: 1,
-    legacy: true,
-    // Death checks, wounds and illness thresholds happen inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
-    daily: (state2, day) => dailyRollover(state2, day)
-  };
-  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, dogSystem, pacerSystem];
-  var devChecks = false;
-  var cached = null;
-  function gameSystems() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
-  }
-  function gameClock() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
-  }
-  function createGameSystems({ dev = false, events = null } = {}) {
-    const systems = createSystems(GAME_SYSTEMS, { dev });
-    const clock = createClock({ systems, events });
-    return { systems, clock };
-  }
-  function systemVersions() {
-    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
-  }
-  function initNewSystems(state2) {
-    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
-  }
 
   // src/engine/food.js
   var STALE_AT = 0.5;
@@ -1877,6 +2076,120 @@
   function stageLabel(state2, id) {
     const st = stageOf(state2, id);
     return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
+  }
+
+  // src/engine/garden.js
+  var ROT_DAYS = 30;
+  var DRY_PER_DAY = 0.35;
+  var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
+  function initGarden(state2) {
+    state2.garden = { beds: [] };
+  }
+  function garden(state2) {
+    if (!state2.garden) initGarden(state2);
+    return state2.garden;
+  }
+  function dayGrowth(crop, meanF, water) {
+    const c = CROPS[crop];
+    let warm = 0;
+    if (meanF >= c.minF + 15) warm = meanF > 92 ? 0.5 : 1;
+    else if (meanF >= c.minF + 7) warm = 0.7;
+    else if (meanF >= c.minF) warm = 0.3;
+    const wet = water > 0.2 ? 1 : 0.2;
+    return warm * wet / c.days;
+  }
+  function gardenDaily(state2, day) {
+    const g = garden(state2);
+    if (!g.beds.length) return;
+    const w = state2.weather;
+    const mean = (w.high + w.low) / 2;
+    const rained = RAIN.has(w.type);
+    for (const b of g.beds) {
+      if (!b.crop || b.dead) continue;
+      const c = CROPS[b.crop];
+      if (c.frostF != null && w.low <= c.frostF) {
+        b.dead = true;
+        log(state2, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
+        continue;
+      }
+      b.water = rained ? 1 : Math.max(0, b.water - DRY_PER_DAY * (w.type === "heat_wave" ? 1.7 : 1));
+      if (b.growth < 1) {
+        b.growth = Math.min(1, b.growth + dayGrowth(b.crop, mean, b.water));
+        if (b.growth >= 1 - 1e-9) {
+          b.growth = 1;
+          b.ripeDay = day;
+          log(state2, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
+        }
+      } else if (b.ripeDay != null && day - b.ripeDay >= ROT_DAYS) {
+        b.dead = true;
+        log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
+      }
+    }
+  }
+  var gardenSystem = {
+    id: "garden",
+    label: "Garden",
+    order: 1008,
+    // after the home, before the dog
+    version: 1,
+    owns: ["garden"],
+    // One step per day, in order: skipping days must run each day (exact).
+    catchUp: "exact",
+    init: (state2) => initGarden(state2),
+    daily: (state2, day) => gardenDaily(state2, day)
+  };
+
+  // src/engine/systems.js
+  var weatherSystem = {
+    id: "weather",
+    label: "Weather",
+    order: 10,
+    version: 1,
+    legacy: true,
+    // state.weather was in saves before the engine
+    owns: ["weather"],
+    // One roll per game day from the shared game rng; nothing changes inside a day.
+    // Then rare weather (ice storm, heat wave, smoke) from its own stream
+    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
+    // so the result is exact.
+    catchUp: "exact",
+    init: (state2) => initWeather(state2),
+    daily: (state2, day) => {
+      const old = state2.weather;
+      rollWeather(state2, day);
+      rollSpell(state2, day, old);
+    }
+  };
+  var legacySystem = {
+    id: "legacy",
+    label: "Rules not yet moved into systems",
+    order: 1e3,
+    version: 1,
+    legacy: true,
+    // Death checks, wounds and illness thresholds happen inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
+    daily: (state2, day) => dailyRollover(state2, day)
+  };
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, gardenSystem, dogSystem, pacerSystem];
+  var devChecks = false;
+  var cached = null;
+  function gameSystems() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
+  }
+  function gameClock() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
+  }
+  function createGameSystems({ dev = false, events = null } = {}) {
+    const systems = createSystems(GAME_SYSTEMS, { dev });
+    const clock = createClock({ systems, events });
+    return { systems, clock };
+  }
+  function systemVersions() {
+    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
+  }
+  function initNewSystems(state2) {
+    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
   }
 
   // src/engine/clothes.js
@@ -1951,7 +2264,7 @@
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
     const night = isNight(t);
-    if (mode === "walk") {
+    if (mode === "walk" || state2.location.kind === "wild") {
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
@@ -1962,25 +2275,41 @@
       const p = getPlace(state2.location.id);
       if (p && CATEGORIES[p.cat]?.dark) dark = true;
     }
-    return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+    const key = state2.location.kind === "place" || state2.location.kind === "house" ? state2.location.id : null;
+    const leak = !!(key && weatherInfo(state2).wetAfter && decayActive(state2, "roof_leaks", key, t));
+    return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
-    let felt = env.temp + clothingRating(state2);
+    const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state2);
     if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
+    if (env.outside && (state2.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+    felt += ACTIVITY_HEAT[mode] || 0;
     if (mode === "sleep") {
-      if (env.home) felt += 10;
+      if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
       const d = state2.dog;
       if (d.stage === "joined" && d.bond >= 80) felt += 5;
     }
     return felt;
   }
+  var CLOTHES_SHARE = 0.8;
+  var LEAK_WET = 0.25;
+  var WET_OUTSIDE = 8;
+  var ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
+  var WARMTH_CURVE = [[5, -28], [15, -22], [28, -12], [40, -6], [50, -2.5], [60, 2], [72, 10]];
   function warmthRate(felt) {
-    if (felt >= 70) return 10;
-    if (felt >= 55) return 3;
-    if (felt >= 40) return -3;
-    if (felt >= 25) return -7;
-    return -12;
+    const c = WARMTH_CURVE;
+    if (felt <= c[0][0]) return c[0][1];
+    if (felt >= c[c.length - 1][0]) return c[c.length - 1][1];
+    for (let i = 1; i < c.length; i++) {
+      if (felt <= c[i][0]) {
+        const [x0, y0] = c[i - 1];
+        const [x1, y1] = c[i];
+        return y0 + (felt - x0) / (x1 - x0) * (y1 - y0);
+      }
+    }
+    return 0;
   }
   function damage(state2, amount, cause) {
     if (amount <= 0) return;
@@ -1988,9 +2317,51 @@
     state2._damage = state2._damage || {};
     state2._damage[cause] = (state2._damage[cause] || 0) + amount;
   }
-  function advanceTime(state2, minutes, mode = "rest") {
-    if (!(minutes > 0)) return;
-    gameClock().advance(state2, minutes, mode);
+  function advanceTime(state2, minutes, mode = "rest", opts = {}) {
+    if (!(minutes > 0)) return false;
+    if (mode === "walk" || mode !== "sleep" && !opts.stopAtDanger) {
+      gameClock().advance(state2, minutes, mode);
+      return false;
+    }
+    const p = state2.player;
+    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+    const t0 = state2.time;
+    try {
+      gameClock().advance(state2, minutes, mode);
+    } finally {
+      delete state2._sleepFrom;
+    }
+    return !state2.dead && state2.time - t0 < minutes - 0.01;
+  }
+  var WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+  var STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
+  var STOP_TEXT = {
+    water: "You stop. Your mouth is dry and your head pounds. You need water.",
+    food: "You stop, weak with hunger. You need to eat.",
+    warmth: "You stop. You are shaking with cold and your hands do not work. Get warm now.",
+    health: "You stop. You feel worse; this is not the time to go on.",
+    energy: "You stop. You are too tired to go on; you need to rest."
+  };
+  var WAKE_TEXT = {
+    water: "You wake with a dry mouth and a pounding head. You need water now.",
+    food: "You wake, weak and shaking with hunger. You need to eat.",
+    warmth: "You wake up shivering hard. You are too cold to sleep.",
+    health: "You wake in pain. Something is wrong; you feel worse."
+  };
+  function checkWake(state2) {
+    const from = state2._sleepFrom;
+    if (!from || state2.dead) return;
+    const p = state2.player;
+    const asleep = from.mode === "sleep";
+    const lines = asleep ? WAKE_AT : STOP_AT;
+    for (const k of Object.keys(lines)) {
+      if (from[k] >= lines[k] && p[k] < lines[k]) {
+        log(state2, (asleep ? WAKE_TEXT : STOP_TEXT)[k], "danger");
+        state2._stop = true;
+        delete state2._sleepFrom;
+        return;
+      }
+    }
   }
   function tickStep(state2, dt, mode) {
     const p = state2.player;
@@ -2000,7 +2371,7 @@
     const wx = weatherInfo(state2);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if (env.outside && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
     else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
@@ -2040,14 +2411,15 @@
     if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
     if (state2.weather.type === "smoke" && env.outside && !has(state2, "n95")) damage(state2, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
     for (const inj of p.injuries) {
-      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
+      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), "bleeding");
       inj.ageH += dt;
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
       if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
-      if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+      if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        if (chance(state2, inj.infectRisk)) startInfection(state2);
+        const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state2) : inj.infectRisk;
+        if (risk > 0 && chance(state2, risk)) startInfection(state2, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -2056,7 +2428,7 @@
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state2, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
@@ -2070,7 +2442,8 @@
       if (p.illness.stomachH === 0) log(state2, "Your stomach is better now.", "good");
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
-    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+    const treated = !p.illness.infection || p.illness.infection.abxH != null;
+    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
     const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
     if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
@@ -2079,6 +2452,7 @@
       p.lightHours = Math.max(0, p.lightHours - dt);
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
+    checkWake(state2);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
@@ -2114,7 +2488,7 @@
       }
     }
     for (const inj of p.injuries) {
-      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
+      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
     }
   }
   var INJURY_NAMES = {
@@ -2127,18 +2501,22 @@
     small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
     deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
     sprain: { hp: 5, healH: 120, infectRisk: 0 },
-    bite: { hp: 10, healH: 168, infectRisk: 0.4 }
+    // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+    bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 }
   };
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];
     state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
-    damage(state2, d.hp, type === "bite" ? "an animal attack" : "an injury");
-    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state2.player.health - 1)) : d.hp;
+    damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
+    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
   }
-  function startInfection(state2) {
+  var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);
+  var BLEED_FLOOR = 10;
+  function startInfection(state2, from = null) {
     if (state2.player.illness.infection) return;
-    state2.player.illness.infection = { ageH: 0, abxH: null };
+    state2.player.illness.infection = { ageH: 0, abxH: null, from };
     log(state2, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
   }
   function startStomachBug(state2) {
@@ -2560,7 +2938,9 @@
           dry_food: 1,
           flashlight: 1,
           winter_coat: 1,
-          firewood: 3
+          firewood: 3,
+          snare_wire: 1
+          // a coil in the garage (research: common in a suburban garage)
         },
         indoorTemp: 47,
         fireHours: 0,
@@ -2584,6 +2964,10 @@
       places: {},
       houses: {},
       houseAreas: {},
+      wild: {},
+      // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
+      cars: {},
+      // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
       dog: {
         stage: "none",
         arriveDay: 1 + Math.floor(r() * 4),
@@ -2713,7 +3097,7 @@
     if (p.morale < 25) mods.push(["despair", -2]);
     return mods;
   }
-  var RAIN = ["rain", "heavy_rain", "windstorm", "ice_storm"];
+  var RAIN2 = ["rain", "heavy_rain", "windstorm", "ice_storm"];
   function edges(state2, opts = {}) {
     const p = state2.player;
     const adv = [...opts.adv || []];
@@ -2723,7 +3107,7 @@
     if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
     const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
     if (limb && p.painH <= 0) dis.push("injured");
-    if (opts.outside && state2.weather && RAIN.includes(state2.weather.type)) dis.push("rain");
+    if (opts.outside && state2.weather && RAIN2.includes(state2.weather.type)) dis.push("rain");
     if (opts.outside && isNight(state2.time)) dis.push("night");
     if (p.energy < 25) dis.push("very tired");
     const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
@@ -2782,16 +3166,19 @@
     }
     return ps;
   }
+  var SOAKS = /* @__PURE__ */ new Set(["book_first_aid", "book_repair", "book_cooking", "book_survival", "matches", "toilet_paper", "comfort", "paper_map"]);
   function rollZone(state2, key, catId, stock, zone, extraRolls = 0) {
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
     const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
+    const leaking = decayActive(state2, "roof_leaks", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
       if (e.fridge && fridgesGone) continue;
+      if (leaking && SOAKS.has(e.id)) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -2826,11 +3213,31 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
+    const og = overgrowthWalk(t);
+    if (og < 0.99) apply(og, "overgrown streets");
+    for (const h2 of activeHazards(state2, t)) {
+      if (!h2.walk) continue;
+      if (h2.id === "feral_dogs" && dogWarns(state2)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h2.walk, h2.label);
+    }
     return { mph, why };
   }
+  var TREE_DETOUR = 1.3;
+  var TREE_DETOUR_PHONE = 1.1;
+  function roadBlocked(state2, dest) {
+    return !!(dest && dest.id && decayActive(state2, "trees_on_roads", `road:${dest.id}`));
+  }
+  function tripMiles(state2, dest) {
+    const m = routeMiles(state2.pos, dest);
+    return roadBlocked(state2, dest) ? m * (phoneSignal(state2) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
+  }
+  function phoneSignal(state2, pos = state2.pos) {
+    if (!has(state2, "phone")) return false;
+    const cell = `tower:${Math.round(pos.lat * 20)}:${Math.round(pos.lon * 20)}`;
+    return !decayActive(state2, "cell_towers", cell);
+  }
   function estimateTrip(state2, dest) {
-    const miles = routeMiles(state2.pos, dest);
+    const miles = tripMiles(state2, dest);
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
     const overload = bagWeight(state2.carried) > carryLimit(state2);
@@ -2842,8 +3249,14 @@
   }
   function travel(state2, dest, destLabel) {
     const start2 = { ...state2.pos };
-    const total = routeMiles(start2, dest);
+    const total = tripMiles(state2, dest);
     log(state2, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
+    if (roadBlocked(state2, dest)) {
+      const key = `road:${dest.id}`;
+      const seen = hasChange(state2, key, "tree", "set");
+      if (!seen) recordChange(state2, key, { o: "tree", k: "set", v: { blocked: true } });
+      log(state2, phoneSignal(state2) ? "Your phone map shows the road ahead blocked by a fallen tree. You take the way around." : `${seen ? "The fallen tree still blocks the road." : "A big fallen tree lies across the road, with power lines tangled in it."} You go around by the side streets.`, "travel");
+    }
     let done = 0;
     while (done < total - 1e-6 && !state2.dead) {
       const seg = Math.min(1, total - done);
@@ -4347,7 +4760,8 @@
       effects: weatherEffects(state2),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
-      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow) }
+      // The low shown is the real low of the curve (with a cold snap, if one is on).
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow - hazardColder(state2, next2)) }
     };
   }
   function actionTiming(state2, minutes) {
@@ -4471,6 +4885,7 @@
   function parseSave(raw) {
     const st = JSON.parse(raw);
     if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
+    for (const k of ["wild", "cars"]) if (!st[k] || typeof st[k] !== "object") st[k] = {};
     return migrate(st, { systems: gameSystems() });
   }
   function clearGame() {

@@ -21,6 +21,12 @@ export const ITEMS = {
   // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
   fresh_fish: { name: 'Fresh fish', unit: 'fish', weight: 1.5, kind: 'food', cal: 700, portion: 1, needsCooking: true, perish: 2 },
   raw_meat: { name: 'Raw meat', unit: 'lb', weight: 1, kind: 'food', cal: 900, portion: 1, needsCooking: true, perish: 2 },
+  // From the garden (engine/garden.js, data/crops.js). Fresh: they spoil.
+  kale: { name: 'Kale (bunch)', unit: 'bunch', weight: 0.5, kind: 'food', cal: 100, portion: 1, perish: 7 },
+  potatoes: { name: 'Potatoes (lb)', unit: 'lb', weight: 1, kind: 'food', cal: 350, portion: 1, needsCooking: true, perish: 60 },
+  green_beans: { name: 'Green beans (lb)', unit: 'lb', weight: 1, kind: 'food', cal: 140, portion: 1, perish: 6 },
+  squash: { name: 'Winter squash', unit: 'squash', weight: 3, kind: 'food', cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+  garlic: { name: 'Garlic (head)', unit: 'head', weight: 0.1, kind: 'food', cal: 60, portion: 1, perish: 120 },
   oatmeal: { name: 'Oatmeal (canister)', unit: 'can', weight: 2.6, kind: 'food', cal: 4500, portion: 0.1, needsCooking: true },
 
   water_bottle: { name: 'Bottled water (1 gal)', unit: 'gal', weight: 8.3, kind: 'drink', water: 25, portion: 0.25 },
@@ -71,6 +77,14 @@ export const ITEMS = {
   matches: { name: 'Matches', unit: 'box', weight: 0.1, kind: 'misc' },
   duct_tape: { name: 'Duct tape', unit: 'roll', weight: 0.6, kind: 'part' },
   rope: { name: 'Rope (50 ft)', unit: 'coil', weight: 2, kind: 'misc' },
+  fishing_rod: { name: 'Fishing rod and reel', unit: 'pc', weight: 1.5, kind: 'tool' },
+  fishing_line: { name: 'Fishing line and hooks', unit: 'kit', weight: 0.2, kind: 'tool' },
+  bow: { name: 'Hunting bow', unit: 'pc', weight: 4, kind: 'tool' },
+  arrows: { name: 'Arrows (set of 6)', unit: 'set', weight: 0.6, kind: 'tool' },
+  rifle: { name: 'Hunting rifle', unit: 'pc', weight: 8, kind: 'tool' },
+  rifle_rounds: { name: 'Rifle rounds (box of 20)', unit: 'box', weight: 1, kind: 'tool' },
+  snare_wire: { name: 'Snare wire', unit: 'coil', weight: 0.2, kind: 'tool' },
+  phone: { name: 'Smartphone (charged)', unit: 'pc', weight: 0.4, kind: 'tool' },
   knife: { name: 'Folding knife', unit: 'pc', weight: 0.3, kind: 'misc' },
   multitool: { name: 'Multitool', unit: 'pc', weight: 0.5, kind: 'misc' },
   can_opener: { name: 'Can opener', unit: 'pc', weight: 0.2, kind: 'misc' },

@@ -8,6 +8,7 @@
 //   weather                        weather system (only it writes state.weather)
 //   pacer, decay                   the pacer and decay systems (src/engine/pacer.js, decay.js)
 //   home                           the home system (src/engine/home.js) and project actions (base.js)
+//   garden                         the garden system (src/engine/garden.js) and garden actions
 //   dog                            the dog system (src/engine/dog.js)
 //   item pickups                   zoneItems, taken[pid], opened[cid] (PR #9 model)
 //   other place changes            state.world.changes (src/core/changes.js)
@@ -21,6 +22,7 @@ import { pacerSystem } from './pacer.js';
 import { decaySystem } from './decay.js';
 import { dogSystem } from './dog.js';
 import { homeSystem } from './home.js';
+import { gardenSystem } from './garden.js';
 
 export const weatherSystem = {
   id: 'weather',
@@ -54,7 +56,7 @@ export const legacySystem = {
   daily: (state, day) => dailyRollover(state, day),
 };
 
-export const GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, dogSystem, pacerSystem];
+export const GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, gardenSystem, dogSystem, pacerSystem];
 
 // dev: check that no system writes a field another system owns (tests, replay).
 let devChecks = false;

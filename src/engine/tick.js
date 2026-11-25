@@ -5,6 +5,7 @@ import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
 import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
+import { sleepTemp } from './home.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
@@ -15,6 +16,7 @@ import { infectRiskFactor } from './skills.js';
 import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
 import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
+import { decayActive } from './decay.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -28,7 +30,7 @@ export function clothingRating(state) {
 export function environment(state, mode, t = state.time) {
   const air = airTemp(state, t);
   const night = isNight(t);
-  if (mode === 'walk') {
+  if (mode === 'walk' || state.location.kind === 'wild') {
     return { outside: true, temp: air, wind: state.weather.wind, precip: !!weatherInfo(state).wetAfter, dark: night, air };
   }
   if (state.location.kind === 'home') {
@@ -39,14 +41,24 @@ export function environment(state, mode, t = state.time) {
     const p = getPlace(state.location.id);
     if (p && CATEGORIES[p.cat]?.dark) dark = true;
   }
-  return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+  // A leaking roof (decay row roof_leaks) in the rain: cold drips, no shelter warmth.
+  const key = state.location.kind === 'place' || state.location.kind === 'house' ? state.location.id : null;
+  const leak = !!(key && weatherInfo(state).wetAfter && decayActive(state, 'roof_leaks', key, t));
+  return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
 }
 
 export function feltTemp(state, mode, env = environment(state, mode)) {
-  let felt = env.temp + clothingRating(state);
+  // Asleep at home: the room you sleep in (bedroom, or by the fire), not the living room.
+  const sleepHome = mode === 'sleep' && env.home ? sleepTemp(state) : null;
+  // Clothes count at 80%: they slow heat loss, they do not make heat (playtest list 1).
+  let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state);
   if (env.outside) felt -= (env.wind / 10) * 7 * (1 - windBlock(state.player));
+  // Wet through outside: the wind dries you and takes the heat with it.
+  if (env.outside && (state.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+  // Moving makes body heat.
+  felt += ACTIVITY_HEAT[mode] || 0;
   if (mode === 'sleep') {
-    if (env.home) felt += 10; // bed and blankets
+    if (sleepHome) felt += sleepHome.bed; // a bed (+10) or the couch by the fire (+6)
     // The best sleeping gear you have (a sleeping bag, a wool blanket).
     felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state, id)).map((id) => ITEMS[id].sleepWarm));
     const d = state.dog;
@@ -55,12 +67,28 @@ export function feltTemp(state, mode, env = environment(state, mode)) {
   return felt;
 }
 
+export const CLOTHES_SHARE = 0.8;
+export const LEAK_WET = 0.25; // under a leaking roof you get wet at a quarter of the outside rate
+export const WET_OUTSIDE = 8;
+export const ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
+
+// Warmth points per hour from the felt temperature. Retuned (playtest list 1):
+// a cold house in normal clothes now chills you, and a wet, windy walk below
+// freezing with poor gear is a real hypothermia risk in a few hours.
+// Piecewise linear (browser playtest 2: a few degrees colder must matter, also in sleep).
+const WARMTH_CURVE = [[5, -28], [15, -22], [28, -12], [40, -6], [50, -2.5], [60, 2], [72, 10]];
 export function warmthRate(felt) {
-  if (felt >= 70) return 10;
-  if (felt >= 55) return 3;
-  if (felt >= 40) return -3;
-  if (felt >= 25) return -7;
-  return -12;
+  const c = WARMTH_CURVE;
+  if (felt <= c[0][0]) return c[0][1];
+  if (felt >= c[c.length - 1][0]) return c[c.length - 1][1];
+  for (let i = 1; i < c.length; i++) {
+    if (felt <= c[i][0]) {
+      const [x0, y0] = c[i - 1];
+      const [x1, y1] = c[i];
+      return y0 + ((felt - x0) / (x1 - x0)) * (y1 - y0);
+    }
+  }
+  return 0;
 }
 
 function damage(state, amount, cause) {
@@ -74,9 +102,53 @@ function damage(state, amount, cause) {
 // (src/engine/systems.js): steps of at most 10 minutes; at 5 AM each system's
 // daily hook runs before the step. Weather is a system of its own; the rules
 // below still run as one "legacy" system until they move out too.
-export function advanceTime(state, minutes, mode = 'rest') {
-  if (!(minutes > 0)) return; // as before: no time, nothing happens
-  gameClock().advance(state, minutes, mode);
+// Returns true when the action stopped early at a danger line (see checkDanger).
+// Sleep always wakes at a danger line; other modes stop only when the caller
+// asks for it ({ stopAtDanger: true }: fishing, hunting, long work).
+export function advanceTime(state, minutes, mode = 'rest', opts = {}) {
+  if (!(minutes > 0)) return false; // as before: no time, nothing happens
+  // Walking keeps its own rules (you walk on, or fall asleep by a wall at 0 energy).
+  if (mode === 'walk' || (mode !== 'sleep' && !opts.stopAtDanger)) { gameClock().advance(state, minutes, mode); return false; }
+  // Remember the needs at the start, to stop when one crosses a danger line.
+  const p = state.player;
+  state._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+  const t0 = state.time;
+  try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; }
+  return !state.dead && state.time - t0 < minutes - 0.01;
+}
+
+// Auto-wake (browser playtest 1): you wake when a need falls past its danger line
+// during the sleep (not when you went to sleep below it already).
+export const WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+// Awake, long actions (fishing, hunting, work) stop at these lines (browser playtest 2).
+export const STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
+const STOP_TEXT = {
+  water: 'You stop. Your mouth is dry and your head pounds. You need water.',
+  food: 'You stop, weak with hunger. You need to eat.',
+  warmth: 'You stop. You are shaking with cold and your hands do not work. Get warm now.',
+  health: 'You stop. You feel worse; this is not the time to go on.',
+  energy: 'You stop. You are too tired to go on; you need to rest.',
+};
+const WAKE_TEXT = {
+  water: 'You wake with a dry mouth and a pounding head. You need water now.',
+  food: 'You wake, weak and shaking with hunger. You need to eat.',
+  warmth: 'You wake up shivering hard. You are too cold to sleep.',
+  health: 'You wake in pain. Something is wrong; you feel worse.',
+};
+function checkWake(state) {
+  const from = state._sleepFrom;
+  if (!from || state.dead) return;
+  const p = state.player;
+  const asleep = from.mode === 'sleep';
+  const lines = asleep ? WAKE_AT : STOP_AT;
+  for (const k of Object.keys(lines)) {
+    if (from[k] >= lines[k] && p[k] < lines[k]) {
+      log(state, (asleep ? WAKE_TEXT : STOP_TEXT)[k], 'danger');
+      state._stop = true;
+      delete state._sleepFrom; // once a sleep
+      return;
+    }
+  }
 }
 
 // Legacy system: one clock step of the rules that are not systems yet.
@@ -91,7 +163,7 @@ export function tickStep(state, dt, mode) {
   const wx = weatherInfo(state);
   normalizeWorn(p);
   const wasWet = p.wetness >= WET_LIMIT;
-  if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state.weather.type, wx.wetAfter) * dt, 0, 100);
+  if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
   else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state.home.fireHours > 0) * dt, 0, 100);
   p.wet = p.wetness >= WET_LIMIT;
   if (p.wet && !wasWet) log(state, 'Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.', 'warn');
@@ -140,14 +212,15 @@ export function tickStep(state, dt, mode) {
   // Wildfire smoke (rare weather): outside air hurts without an N95 mask.
   if (state.weather.type === 'smoke' && env.outside && !has(state, 'n95')) damage(state, SMOKE_DAMAGE_PER_HOUR * dt, 'smoke');
   for (const inj of p.injuries) {
-    if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, 2 * dt, 'bleeding');
+    if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), 'bleeding');
     inj.ageH += dt;
     let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
     if (sleeping && state.location.kind === 'home' && built(state, 'sick_room')) slow *= 1.5;
     inj.healH -= dt * slow;
-    if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+    if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
       inj.infectRolled = true;
-      if (chance(state, inj.infectRisk)) startInfection(state);
+      const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state) : inj.infectRisk;
+      if (risk > 0 && chance(state, risk)) startInfection(state, inj.type);
     }
   }
   const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -157,7 +230,8 @@ export function tickStep(state, dt, mode) {
   const inf = p.illness.infection;
   if (inf) {
     inf.ageH += dt;
-    if (inf.ageH >= 48) damage(state, 1 * dt, 'infection');
+    // An infected cut never kills; once antibiotics start, the infection does no more harm.
+    if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state, 1 * dt, 'infection');
     if (inf.abxH != null) {
       inf.abxH += dt;
       if (inf.abxH >= 72) {
@@ -173,7 +247,8 @@ export function tickStep(state, dt, mode) {
   if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
 
   // Health refill
-  const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+  const treated = !p.illness.infection || p.illness.infection.abxH != null;
+  const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
   const sickRoom = sleeping && state.location.kind === 'home' && built(state, 'sick_room');
   if (ok) p.health += (sleeping ? (sickRoom ? 1.5 : 1) : 0.25) * dt;
   p.health = Math.min(100, p.health);
@@ -189,6 +264,8 @@ export function tickStep(state, dt, mode) {
 
   // The home and the dog are their own systems now (src/engine/home.js, dog.js),
   // right after these rules.
+
+  checkWake(state);
 
   if (p.health <= 0) {
     p.health = 0;
@@ -236,7 +313,7 @@ export function dailyRollover(state, day) {
 
   // Open wounds can get infected
   for (const inj of p.injuries) {
-    if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state);
+    if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state, inj.type);
   }
 
 }
@@ -249,20 +326,28 @@ const INJURY_DATA = {
   small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
   deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
   sprain: { hp: 5, healH: 120, infectRisk: 0 },
-  bite: { hp: 10, healH: 168, infectRisk: 0.4 },
+  // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+  bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 },
 };
 
 export function addInjury(state, type) {
   const d = INJURY_DATA[type];
   state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false });
-  damage(state, d.hp, type === 'bite' ? 'an animal attack' : 'an injury');
-  log(state, `Injury: ${INJURY_NAMES[type]} (Health −${d.hp}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
+  const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state.player.health - 1)) : d.hp; // a cut never kills
+  damage(state, hp, type === 'bite' ? 'an animal attack' : 'an injury');
+  log(state, `Injury: ${INJURY_NAMES[type]} (Health −${Math.round(hp)}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
   if (state.player.health <= 0) die(state, type === 'bite' ? 'an animal attack' : 'an injury');
 }
 
-export function startInfection(state) {
+// Adam (2026-11-25): cuts never kill. A cut can bleed and get infected, but its
+// damage stops above 0: bleeding stops at 10 health, the cut itself at 1, and an
+// infected cut gives fever (no health refill) but no health loss. Bites still can.
+export const CUTS = new Set(['small_cut', 'deep_cut']);
+export const BLEED_FLOOR = 10;
+
+export function startInfection(state, from = null) {
   if (state.player.illness.infection) return;
-  state.player.illness.infection = { ageH: 0, abxH: null };
+  state.player.illness.infection = { ageH: 0, abxH: null, from };
   log(state, 'A wound is red, hot and swollen. It is infected. You need antibiotics.', 'danger');
 }
 

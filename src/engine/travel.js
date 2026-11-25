@@ -4,11 +4,15 @@ import { advanceTime, addInjury, environment } from './tick.js';
 import { check } from './checks.js';
 import { isNight, isBadWeather } from './world.js';
 import { WEATHER_TYPES } from '../data/climate.js';
-import { HOME, MAP_RADIUS_MILES, bagWeight, carryLimit, hasLight, log, addItem, formatDuration } from './state.js';
+import { HOME, MAP_RADIUS_MILES, bagWeight, carryLimit, hasLight, log, addItem, formatDuration, has } from './state.js';
 import { rollZone } from './loot.js';
 import { itemName } from '../data/items.js';
 import { walkSpeedFactor, energyUseFactor } from './background.js';
 import { activeHazards } from './hazards.js';
+import { decayActive } from './decay.js';
+import { recordChange, hasChange } from '../core/changes.js';
+import { overgrowthWalk } from './season.js';
+import { dogWarns } from './dog.js';
 
 export const ROUTE_FACTOR = 1.25;
 
@@ -38,12 +42,41 @@ export function walkSpeed(state, t = state.time) {
   if (p.energy < 25) apply(0.7, 'exhausted');
   if (p.health < 25) apply(0.7, 'badly hurt');
   if (walkSpeedFactor(state) < 1) apply(walkSpeedFactor(state), 'bad knees');
-  for (const h of activeHazards(state, t)) if (h.walk) apply(h.walk, h.label);
+  const og = overgrowthWalk(t);
+  if (og < 0.99) apply(og, 'overgrown streets');
+  for (const h of activeHazards(state, t)) {
+    if (!h.walk) continue;
+    if (h.id === 'feral_dogs' && dogWarns(state)) apply(0.96, 'loose dogs, your dog warns you early');
+    else apply(h.walk, h.label);
+  }
   return { mph, why };
 }
 
+// Trees across roads (decay row trees_on_roads): the road to a place can be blocked,
+// so the walk is longer. Area: 'road:<place id>' (the last stretch to that place).
+// With a phone signal (decay row cell_towers not yet failed where you are), the map
+// app shows the blocked road before you set out, so the way around is shorter.
+export const TREE_DETOUR = 1.3;
+export const TREE_DETOUR_PHONE = 1.1;
+export function roadBlocked(state, dest) {
+  return !!(dest && dest.id && decayActive(state, 'trees_on_roads', `road:${dest.id}`));
+}
+export function tripMiles(state, dest) {
+  const m = routeMiles(state.pos, dest);
+  return roadBlocked(state, dest) ? m * (phoneSignal(state) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
+}
+
+// A phone with signal: you have a phone, and the towers near you still work
+// (decay row cell_towers, area: a grid cell of about 3 miles). After that, a phone
+// is only a light and a camera.
+export function phoneSignal(state, pos = state.pos) {
+  if (!has(state, 'phone')) return false;
+  const cell = `tower:${Math.round(pos.lat * 20)}:${Math.round(pos.lon * 20)}`;
+  return !decayActive(state, 'cell_towers', cell);
+}
+
 export function estimateTrip(state, dest) {
-  const miles = routeMiles(state.pos, dest);
+  const miles = tripMiles(state, dest);
   const { mph, why } = walkSpeed(state);
   const minutes = (miles / mph) * 60;
   const overload = bagWeight(state.carried) > carryLimit(state);
@@ -58,8 +91,16 @@ function lerp(a, b, f) {
 // Walk to dest ({lat, lon}). Returns true if the player arrived alive.
 export function travel(state, dest, destLabel) {
   const start = { ...state.pos };
-  const total = routeMiles(start, dest);
+  const total = tripMiles(state, dest);
   log(state, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, 'travel');
+  if (roadBlocked(state, dest)) {
+    const key = `road:${dest.id}`;
+    const seen = hasChange(state, key, 'tree', 'set');
+    if (!seen) recordChange(state, key, { o: 'tree', k: 'set', v: { blocked: true } });
+    log(state, phoneSignal(state)
+      ? 'Your phone map shows the road ahead blocked by a fallen tree. You take the way around.'
+      : `${seen ? 'The fallen tree still blocks the road.' : 'A big fallen tree lies across the road, with power lines tangled in it.'} You go around by the side streets.`, 'travel');
+  }
   let done = 0;
   while (done < total - 1e-6 && !state.dead) {
     const seg = Math.min(1, total - done);

@@ -12,6 +12,7 @@
 //     legacy: true,            // its fields were in saves from before the engine
 //                              // (old saves: no init for it; other systems run init)
 //     owns: ['weather'],       // top-level state fields only this system may write
+//     effects: ['home'],       // other systems' fields it may change on purpose (event effects)
 //     catchUp: 'exact',        // how it may skip time (see CATCH_UP below)
 //   }
 //
@@ -20,7 +21,7 @@
 import { withSource } from './activity.js';
 
 const HOOKS = ['init', 'step', 'daily'];
-const KNOWN = new Set(['id', 'order', 'version', 'migrations', 'label', 'legacy', 'owns', 'catchUp', ...HOOKS]);
+const KNOWN = new Set(['id', 'order', 'version', 'migrations', 'label', 'legacy', 'owns', 'effects', 'catchUp', ...HOOKS]);
 
 // Catch-up rule (external review, 1.5). A system must say how it behaves when
 // time is skipped, before reduced or abstract simulation may use it:
@@ -76,9 +77,13 @@ export function createSystems(list = [], { dev = false } = {}) {
 
   for (const s of list) add(s);
 
+  // effects: other systems' fields that this system may change on purpose, as a
+  // declared effect (the event pacer: a roof leak adds rain water to the home).
+  // Any other write to a field another system owns stops the run in dev mode.
   const snapOthers = (state, id) => {
+    const allowed = new Set(byId.get(id)?.effects || []);
     const out = {};
-    for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state[f] ?? null);
+    for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state[f] ?? null);
     return out;
   };
 

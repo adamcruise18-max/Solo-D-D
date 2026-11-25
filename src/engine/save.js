@@ -60,6 +60,8 @@ export function parseSave(raw) {
   if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error('Not a Last Light save file');
   // Upgrade each system's fields. A save from before the engine has no
   // systemVersions: its weather and legacy fields are version 1 already.
+  // Fields added after the first saves (same version; empty means "nothing yet").
+  for (const k of ['wild', 'cars']) if (!st[k] || typeof st[k] !== 'object') st[k] = {};
   return migrate(st, { systems: gameSystems() });
 }
 

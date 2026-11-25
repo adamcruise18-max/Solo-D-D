@@ -13,6 +13,11 @@ import { straightMiles } from '../src/engine/travel.js';
 import { placeState } from '../src/engine/loot.js';
 import { ITEMS } from '../src/data/items.js';
 import { CATEGORIES } from '../src/data/places.js';
+import { bedCount, canPlant, plant, waterGarden, gardenInfo, harvest } from '../src/engine/garden.js';
+import { projectStatus } from '../src/engine/base.js';
+import { PROJECT_BY_ID } from '../src/data/projects.js';
+import { advanceTime } from '../src/engine/tick.js';
+import { spotPressure, spotsNear, goToSpot, spotHere, canFish, fish, huntMethods, hunt, canSetSnare, setSnare, checkSnare } from '../src/engine/wild.js';
 
 // Load the real place list (docs/data/places.js sets window.LL_PLACES).
 export function loadPlaces() {
@@ -117,6 +122,7 @@ function turn(state) {
   if (loc.kind === 'house') { perform(state, 'action', 'leave_house'); return 'leave house'; }
   // At a place.
   eatDrink(state);
+  if (loc.kind === 'wild') return atWild(state);
   const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
   if (isNight(state.time) || p.energy < 25 || heavy || p.health < 40) { perform(state, 'action', 'go_home'); return 'go home'; }
   if (can(state, 'force')) { perform(state, 'action', 'force'); return 'force'; }
@@ -145,17 +151,113 @@ const FOOD_CATS = new Set(['supermarket', 'convenience', 'gas', 'house']);
 const LOW_FOOD_KCAL = 6000;
 
 function smartNextPlace(state, wantFood) {
+  // Near places first; when those are empty, a careful player ranges farther (rested, daylight).
+  return nextPlaceWithin(state, wantFood, 4) || (state.player.energy >= 60 && !isNight(state.time + 4 * 60) ? nextPlaceWithin(state, wantFood, 9) : null);
+}
+
+function nextPlaceWithin(state, wantFood, maxMiles) {
   let best = null;
   for (const pl of allPlaces()) {
     const ps = state.places[pl.id];
     if (ps && (ps.zonesDone >= ps.zones || !ps.unlocked)) continue;
     if (!CATEGORIES[pl.cat]) continue;
     const d = straightMiles(state.pos, pl);
-    if (d > 4) continue;
+    if (d > maxMiles) continue;
     const score = d * (wantFood && !FOOD_CATS.has(pl.cat) ? 3 : 1);
     if (!best || score < best.score) best = { pl, score };
   }
   return best?.pl || null;
+}
+
+// ---------- renewable food for the careful bot: garden, fishing, hunting ----------
+// Projects a careful player builds first, when the parts are at hand.
+const BUILD_ORDER = ['rain_barrels', 'garden_beds', 'filter_station', 'wood_stove', 'insulate_living', 'sealed_store', 'rocket_stove'];
+function buildWork(state) {
+  for (const id of BUILD_ORDER) {
+    const proj = PROJECT_BY_ID[id];
+    if (proj && !state.home.projects?.[id] && projectStatus(state, proj).canWork) { perform(state, 'action', 'build', id); return `build ${id}`; }
+  }
+  return null;
+}
+
+// Keep 2+ gal of safe water: filter or boil the raw water; collect from the tap or toilet tanks.
+function waterWork(state) {
+  const h = state.home;
+  if (h.safeGal >= 2) return null;
+  if (h.rawGal >= 1 && can(state, 'filter_water')) { perform(state, 'action', 'filter_water'); return 'filter'; }
+  if (h.rawGal >= 1 && can(state, 'boil')) { perform(state, 'action', 'boil'); return 'boil'; }
+  if (h.rawGal < 2 && can(state, 'collect_tap')) { perform(state, 'action', 'collect_tap'); return 'tap'; }
+  if (h.rawGal < 2 && can(state, 'collect_toilet')) { perform(state, 'action', 'collect_toilet'); return 'toilet'; }
+  return null;
+}
+
+function gardenWork(state) {
+  if (!bedCount(state)) return null;
+  const info = gardenInfo(state);
+  // The garden actions take no time in the engine; the UI charges it (plant 30, water 15, harvest 30 min).
+  if (info.planted.some((b) => b.ready)) { harvest(state); advanceTime(state, 30); return 'harvest'; }
+  for (const id of info.canSow) if (!canPlant(state, id)) { plant(state, id); advanceTime(state, 30); return `plant ${id}`; }
+  if ((state.garden?.beds || []).some((b) => !b.dead && b.growth < 1 && b.water < 0.3) && waterGarden(state)) { advanceTime(state, 15); return 'water'; }
+  return null;
+}
+
+const hasFishGear = (state) => (state.carried.fishing_rod || state.home.storage.fishing_rod || state.carried.fishing_line || state.home.storage.fishing_line) > 0;
+const wild = new WeakMap(); // tries on this trip
+const WILD_MILES = 5;
+
+// Go out to fish or hunt: daylight, food low-ish, the gear in hand.
+function wildTrip(state) {
+  // Only a short walk, rested, with most of the day left.
+  if (isNight(state.time) || isNight(state.time + 5 * 60) || state.player.energy < 60) return null;
+  if (state.player.health < 60 || state.player.injuries.some((i) => !i.bandaged && i.infectRisk)) return null;
+  const near = (kind) => spotsNear(state, kind).find((x) => x.miles <= WILD_MILES);
+  if (!near('fish') && !near('hunt')) return null;
+  for (const id of ['fishing_rod', 'fishing_line', 'bow', 'arrows', 'rifle', 'rifle_rounds', 'snare_wire', 'knife']) {
+    if ((state.home.storage[id] || 0) > 0 && !(state.carried[id] > 0)) perform(state, 'take', id, 1);
+  }
+  const methods = huntMethods(state);
+  const kinds = [];
+  if (hasFishGear(state)) kinds.push('fish');
+  if (methods.length || state.carried.snare_wire > 0) kinds.push('hunt');
+  for (const kind of kinds) {
+    // Rotate: the least fished spot near, not always the nearest.
+    const spot = spotsNear(state, kind).filter((x) => x.miles <= WILD_MILES).sort((a, b) => spotPressure(state, a.id) - spotPressure(state, b.id) || a.miles - b.miles)[0];
+    if (spot) { wild.set(state, 0); goToSpot(state, spot.id); return `go ${spot.id}`; }
+  }
+  return null;
+}
+
+function atWild(state) {
+  const s = spotHere(state);
+  const n = (wild.get(state) || 0) + 1;
+  wild.set(state, n);
+  if (n > 3 || isNight(state.time) || state.player.energy < 30 || state.player.food < 20) { perform(state, 'action', 'go_home'); return 'go home'; }
+  if (s.kind === 'fish' && !canFish(state)) { fish(state); return 'fish'; }
+  if (s.kind === 'hunt') {
+    const set = state.wild?.snares?.[s.id];
+    if (set != null && state.time - set >= 12 * 60) { checkSnare(state); return 'check snares'; }
+    if (set == null && !canSetSnare(state)) { setSnare(state); return 'snare'; }
+    const m = huntMethods(state);
+    if (m.length) { hunt(state, m.includes('bow') ? 'bow' : m[0]); return 'hunt'; }
+  }
+  perform(state, 'action', 'go_home'); return 'go home';
+}
+
+// Low on food: a food store not yet visited, close by, first; then the houses here
+// (every house had a pantry); then the nearest place that still has houses around it.
+function foodRun(state, pl) {
+  const fresh = pl && FOOD_CATS.has(pl.cat) && pl.cat !== 'house' && !state.places[pl.id] && straightMiles(state.pos, pl) <= 4;
+  if (fresh && pl.id !== state.location.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
+  if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+  if (isNight(state.time + 2 * 60) || state.player.energy < 40) return null;
+  let best = null;
+  for (const p of allPlaces()) {
+    if (!CATEGORIES[p.cat] || (state.houseAreas?.[p.id] || 0) >= 12 || p.id === state.location.id) continue;
+    const d = straightMiles(state.pos, p);
+    if (d <= 9 && (!best || d < best.d)) best = { p, d };
+  }
+  if (best) { perform(state, 'action', 'go_place', best.p.id); return `go ${best.p.id} (houses)`; }
+  return null;
 }
 
 export function smartTurn(state) {
@@ -171,19 +273,25 @@ export function smartTurn(state) {
     if (state.home.indoorTemp < 55 && can(state, 'add_wood')) { perform(state, 'action', 'add_wood'); return 'fire'; }
     if (state.home.indoorTemp < 50 && state.home.fireHours <= 0 && can(state, 'break_furniture')) { perform(state, 'action', 'break_furniture'); return 'furniture'; }
     if (p.food < 50 && can(state, 'cook')) { perform(state, 'action', 'cook'); return 'cook'; }
+    { const w = waterWork(state); if (w) return w; }
+    if (!isNight(state.time)) { const b = buildWork(state); if (b) return b; }
+    if (!isNight(state.time)) { const g = gardenWork(state); if (g) return g; }
+    if ((lowFood || foodKcal(state) < LOW_FOOD_KCAL * 2)) { const w = wildTrip(state); if (w) return w; }
     const spare = Object.keys(state.home.storage).filter((id) => ITEMS[id]?.kind === 'food' && id !== 'formula');
     if (!lowFood && spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
     if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
     if (can(state, 'store_all')) perform(state, 'action', 'store_all');
-    if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     const pl = smartNextPlace(state, lowFood);
+    if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
     if (pl) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
     if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     perform(state, 'action', 'rest'); return 'rest';
   }
   eatDrink(state);
+  if (loc.kind === 'wild') return atWild(state);
   const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
-  const mustGo = isNight(state.time) || heavy || (!starving && (p.energy < 25 || p.health < 40));
+  const needAbx = p.illness.infection && p.illness.infection.abxH == null && !(state.carried.antibiotics > 0) && (state.home.storage.antibiotics || 0) > 0;
+  const mustGo = isNight(state.time) || heavy || needAbx || (!starving && (p.energy < 25 || p.health < 40));
   if (loc.kind === 'house') {
     if (!mustGo && can(state, 'room')) {
       perform(state, 'action', 'room');
@@ -199,8 +307,8 @@ export function smartTurn(state) {
     if (can(state, 'takeall') || Object.keys(placeState(state, { ...allPlaces().find((x) => x.id === loc.id) }).leftovers).length) perform(state, 'takeall');
     return 'search';
   }
-  if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
   const pl = smartNextPlace(state, lowFood);
+  if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
   if (pl && pl.id !== loc.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
   perform(state, 'action', 'go_home'); return 'go home';
 }
@@ -210,7 +318,17 @@ export function playRun(seed, { maxDays = 60, maxTurns = 20000, smart = false, o
   const state = newGame(seed);
   let turns = 0;
   let day = -1;
-  const t = smart ? smartTurn : botTurn;
+  // The careful bot gets the same guard as the replay bot: three turns in a row
+  // that cost no game time become a rest (and count as a loop in the report).
+  let still = 0;
+  const t = !smart ? botTurn : (st) => {
+    const t0 = st.time;
+    const w = smartTurn(st);
+    if (st.time === t0 && !st.dead && w !== 'name dog' && ++still >= 3) { still = 0; loops++; perform(st, 'action', 'rest'); }
+    else if (st.time !== t0) still = 0;
+    return w;
+  };
+  let loops = 0;
   while (!state.dead && dayIndex(state.time) < maxDays && turns < maxTurns) {
     t(state);
     turns++;
@@ -226,6 +344,7 @@ export function playRun(seed, { maxDays = 60, maxTurns = 20000, smart = false, o
     foodKcal: foodKcal(state),
     dog: state.dog.stage,
     turns,
+    loops,
     state,
   };
 }

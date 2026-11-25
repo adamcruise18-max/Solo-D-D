@@ -36,6 +36,18 @@ export const SKILLS = {
     perLevel: 'Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.',
     notice: [],
   },
+  fishing: {
+    name: 'Fishing',
+    how: 'Fish from a river, creek or lake bank.',
+    perLevel: '+1 to fishing rolls per level.',
+    notice: ['', '', 'You can read the water: where the fish hold.', '', '', ''],
+  },
+  hunting: {
+    name: 'Hunting',
+    how: 'Hunt with a bow or rifle, set and check snares.',
+    perLevel: '+1 to shots per level. Snares catch more.',
+    notice: ['', 'You notice tracks and droppings on the trails.', '', 'You can tell how fresh a track is.', '', ''],
+  },
 };
 
 // XP to reach level 1..5.

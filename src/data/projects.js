@@ -38,6 +38,12 @@ export const PROJECTS = [
     effect: 'Each night it filters up to 12 gal of rain water into clean water by itself (tank holds 40 gal). You can also filter 2 gal by hand in 10 min, with no fire or power.',
     needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 }, tools: [], requires: ['rain_barrels'], hours: 2,
   },
+  // ---- Garden ----
+  {
+    id: 'garden_beds', wing: 'food', name: 'Raised garden beds',
+    effect: 'Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).',
+    needs: { scrap_wood: 4, hardware_parts: 1 }, tools: [], hours: 6,
+  },
   // ---- Heat ----
   {
     id: 'insulate_living', wing: 'heat', name: 'Insulate the living room',
