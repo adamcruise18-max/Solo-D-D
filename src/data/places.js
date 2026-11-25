@@ -64,7 +64,7 @@ export const CATEGORIES = {
     label: 'Clinic', color: '#4f9c92', stock: 0.7, zones: 3, zoneMinutes: 20,
     zoneName: 'room', bodies: true,
     loot: [
-      { id: 'first_aid', w: 20 }, { id: 'antibiotics', w: 6 }, { id: 'n95', w: 15 },
+      { id: 'first_aid', w: 20 }, { id: 'antibiotics', w: 3 }, { id: 'n95', w: 15 },
       { id: 'pain_pills', w: 10 }, { id: 'saline', w: 10 }, { id: 'ors', w: 6 },
       { id: 'bandages', w: 15 }, { id: 'ibuprofen', w: 6 }, { id: 'soap', w: 3 },
       { id: 'book_first_aid', w: 1.5 },
@@ -75,7 +75,7 @@ export const CATEGORIES = {
     label: 'Hospital', color: '#7fd1c4', stock: 0.7, zones: 12, zoneMinutes: 30, dark: true,
     zoneName: 'ward', bodies: true, entryMorale: -5,
     loot: [
-      { id: 'first_aid', w: 18 }, { id: 'antibiotics', w: 12 }, { id: 'saline', w: 15 },
+      { id: 'first_aid', w: 18 }, { id: 'antibiotics', w: 6 }, { id: 'saline', w: 15 },
       { id: 'pain_pills', w: 12 }, { id: 'n95', w: 12 }, { id: 'ors', w: 8 }, { id: 'snacks', w: 5 },
       { id: 'bandages', w: 15 }, { id: 'ibuprofen', w: 6 }, { id: 'blanket', w: 4 }, { id: 'sports_drink', w: 3 },
       { id: 'book_first_aid', w: 1 },

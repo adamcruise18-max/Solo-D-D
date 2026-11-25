@@ -54,7 +54,7 @@ export const ITEMS = {
   firewood: { name: 'Firewood bundle', unit: 'bundle', weight: 20, kind: 'fuel' },
   // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
   gas_can: { name: 'Gas can (1 gal)', unit: 'can', weight: 7, kind: 'fuel' },
-  generator: { name: 'Small generator', unit: 'pc', weight: 45, kind: 'tool' },
+  generator: { name: 'Small generator', unit: 'pc', weight: 32, kind: 'tool' },
   propane_1lb: { name: 'Propane cylinder (1 lb)', unit: 'can', weight: 1.5, kind: 'misc' },
   tarp: { name: 'Tarp', unit: 'pc', weight: 3, kind: 'misc' },
   bleach: { name: 'Unscented bleach', unit: 'jug', weight: 8, kind: 'misc' },

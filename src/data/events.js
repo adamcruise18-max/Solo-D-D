@@ -34,7 +34,7 @@ export const EVENTS = [
   { id: 'night_crash', size: 'small', where: 'asleep', months: [3, 99], text: 'A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again.' },
   { id: 'night_owls', size: 'small', where: 'asleep', months: [3, 99], text: 'Owls call to each other outside. You wake, and lie listening until they stop.' },
   { id: 'night_dogs', size: 'medium', where: 'asleep', months: [3, 99], text: 'Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while.' },
-  { id: 'ice_trees_down', size: 'big', where: 'any', months: [3, 99], when: (s) => s.weather?.type === 'ice_storm', apply: (s) => startHazard(s, 'road_blocked', 72), text: 'All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it.' },
+  { id: 'ice_trees_down', size: 'medium', where: 'any', months: [3, 99], when: (s) => s.weather?.type === 'ice_storm', apply: (s) => startHazard(s, 'road_blocked', 72), text: 'All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it.' },
   { id: 'power_line_down', size: 'big', where: 'any', months: [3, 99], apply: (s) => startHazard(s, 'road_blocked', 48), text: 'A loud crack and a crash: a power pole goes down somewhere close. Walking anywhere takes longer for two days.' },
 
   // ---- small ----
@@ -49,7 +49,7 @@ export const EVENTS = [
   // ---- medium ----
   { id: 'feral_dogs', size: 'medium', where: 'outside', months: [3, 99], apply: (s) => startHazard(s, 'feral_dogs', 24), text: 'A pack of loose dogs blocks the street ahead, heads low. You back away and go around. For a day you keep to the side streets (walking is slower).' },
   { id: 'roof_leak', size: 'medium', where: 'home', months: [3, 99], when: raining, apply: (s) => { s.home.rawGal = (s.home.rawGal || 0) + 2; s.home.indoorTemp -= 3; }, text: 'Water drips through the ceiling in the hall. You put a pot under it: 2 gal of rain water to filter, but the house is colder.' },
-  { id: 'gas_smell', size: 'medium', where: 'inside', months: [3, 8], when: inHouse, text: 'A strong smell of gas in this house. You open a window, and you do not light anything in here.' },
+  { id: 'gas_smell', size: 'medium', where: 'inside', months: [3, 14], when: inHouse, text: 'A strong smell of gas in this house. You open a window, and you do not light anything in here.' },
   { id: 'black_ice', size: 'medium', where: 'outside', months: [3, 99], when: (s) => isColdSeason(s) && (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, 'black_ice', 18), text: 'Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts.' },
   { id: 'house_fire_far', size: 'medium', where: 'any', months: [3, 99], when: (s) => !raining(s), text: 'To the south, the sky glows orange under a column of smoke. A house burns there, and the next one catches. The smell reaches you an hour later.' },
 

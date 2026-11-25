@@ -22,7 +22,16 @@ import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from '.
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 // Cook fresh food first (it spoils), then rice or pasta, then cans.
-const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
+const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'oatmeal', 'canned_food'];
+// Rice, pasta and oatmeal cook in water (1/8 gal a meal).
+const COOK_NEEDS_WATER = new Set(['dry_food', 'oatmeal']);
+const cookWater = (h) => (h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal' : null);
+// The first food you can cook now: skip foods that need water when there is none.
+function cookPick(state) {
+  const h = state.home;
+  const water = cookWater(h);
+  return COOK_ORDER().find((f) => ((h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
+}
 import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -391,14 +400,11 @@ function homeAction(state, id) {
       advanceTime(state, 5);
       return;
     case 'cook': {
-      const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+      const food = cookPick(state);
+      if (!food) { log(state, 'You have nothing you can cook now.'); return; }
       const bag = (h.storage[food] || 0) > 0 ? h.storage : state.carried;
       const it = ITEMS[food];
-      if (food === 'dry_food') {
-        const water = h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal' : null;
-        if (!water) { log(state, 'You need water to cook rice or pasta.'); return; }
-        h[water] -= 0.125;
-      }
+      if (COOK_NEEDS_WATER.has(food)) h[cookWater(h)] -= 0.125;
       const how = useHeat(state, 0.5);
       const risk = eatRisk(state, food, true);
       const stage = stageLabel(state, food);
@@ -1010,10 +1016,11 @@ export function listActions(state) {
     }
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
-    const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+    const cookId = cookPick(state);
     const food = !!cookId;
+    const onlyDry = !food && COOK_ORDER().some((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
     const cr = cookId ? eatRisk(state, cookId, true) : 0;
-    add('cook', 'Cook a hot meal', { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` · ${Math.round(cr * 100)}% food poisoning` : ''} · warm and fed ${WARM_FED_HOURS} h` : undefined, risk: cr > 0, disabled: (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
+    add('cook', 'Cook a hot meal', { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` · ${Math.round(cr * 100)}% food poisoning` : ''} · warm and fed ${WARM_FED_HOURS} h` : undefined, risk: cr > 0, disabled: (onlyDry && 'Need water to cook') || (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
     if (p.wet) add('dry_clothes', 'Change into dry clothes');
     if (!h.fridgeOpened) add('fridge', 'Open the fridge');
     if (Object.keys(state.carried).some((k) => k !== 'backpack' && k !== 'flashlight')) add('store_all', 'Put away everything you carry');

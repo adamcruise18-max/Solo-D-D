@@ -97,3 +97,26 @@ test('old saves without project data still work', () => {
   perform(s, 'action', 'build', 'led_lights');
   assert.ok(built(s, 'led_lights'));
 });
+
+test('you can cook oatmeal, and cooking skips water foods when there is no water', () => {
+  const s = rested();
+  for (const k of Object.keys(s.home.storage)) if (ITEMS[k]?.kind === 'food') delete s.home.storage[k];
+  for (const k of Object.keys(s.carried)) if (ITEMS[k]?.kind === 'food') delete s.carried[k];
+  s.home.fireHours = 5;
+  s.home.safeGal = 2;
+  give(s, { oatmeal: 1 });
+  const before = s.home.storage.oatmeal;
+  perform(s, 'action', 'cook');
+  assert.ok(s.home.storage.oatmeal < before, 'oatmeal was cooked');
+  // No water: rice and oatmeal are skipped, the can is cooked.
+  s.home.safeGal = 0; s.home.rawGal = 0; s.home.tankGal = 0;
+  give(s, { dry_food: 1, canned_food: 1 });
+  const t = s.time;
+  perform(s, 'action', 'cook');
+  assert.equal(s.home.storage.dry_food, 1);
+  assert.ok((s.home.storage.canned_food || 0) < 1);
+  assert.ok(s.time > t);
+  // Only water foods and no water: the button says why.
+  delete s.home.storage.canned_food;
+  assert.equal(listActions(s).find((a) => a.id === 'cook').disabled, 'Need water to cook');
+});
