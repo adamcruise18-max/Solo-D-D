@@ -16,6 +16,9 @@ export const ITEMS = {
   instant_noodles: { name: 'Instant noodles', unit: 'pack', weight: 0.2, kind: 'food', cal: 380, portion: 1 },
   chips: { name: 'Bag of chips', unit: 'bag', weight: 0.6, kind: 'food', cal: 1400, portion: 0.5 },
   jerky: { name: 'Beef jerky', unit: 'pack', weight: 0.2, kind: 'food', cal: 400, portion: 0.5 },
+  // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
+  fresh_fish: { name: 'Fresh fish', unit: 'fish', weight: 1.5, kind: 'food', cal: 700, portion: 1, needsCooking: true, perish: 2 },
+  raw_meat: { name: 'Raw meat', unit: 'lb', weight: 1, kind: 'food', cal: 900, portion: 1, needsCooking: true, perish: 2 },
   oatmeal: { name: 'Oatmeal (canister)', unit: 'can', weight: 2.6, kind: 'food', cal: 4500, portion: 0.1, needsCooking: true },
 
   water_bottle: { name: 'Bottled water (1 gal)', unit: 'gal', weight: 8.3, kind: 'drink', water: 25, portion: 0.25 },

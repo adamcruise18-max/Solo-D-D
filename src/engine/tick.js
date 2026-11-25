@@ -11,6 +11,7 @@ import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
 import { infectRiskFactor } from './skills.js';
+import { ageFood } from './food.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -100,7 +101,12 @@ function tickStep(state, dt, mode) {
 
   // Warmth
   const felt = feltTemp(state, mode, env);
-  p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
+  // "Warm and fed" after a hot meal: heat loss is halved for a few hours.
+  let wr = warmthRate(felt);
+  if (p.warmFedH > 0) { if (wr < 0) wr *= 0.5; p.warmFedH = Math.max(0, p.warmFedH - dt); }
+  p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+  // Fresh food spoils, by the temperature where most of it is.
+  ageFood(state, dt, (where) => (where === 'storage' ? state.home.indoorTemp : env.temp));
 
   // Food and water
   const cold = p.warmth < 50;

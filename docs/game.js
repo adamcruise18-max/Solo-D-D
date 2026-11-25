@@ -12,6 +12,9 @@
     instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
     chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
     jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
+    // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
+    fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
+    raw_meat: { name: "Raw meat", unit: "lb", weight: 1, kind: "food", cal: 900, portion: 1, needsCooking: true, perish: 2 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
@@ -1229,6 +1232,51 @@
     };
   }
 
+  // src/engine/food.js
+  var STALE_AT = 0.5;
+  var RISK = { fresh: 0, stale: 0.1, spoiled: 0.5 };
+  var WARM_FED_HOURS = 6;
+  function isPerishable(id) {
+    return !!(ITEMS[id] && ITEMS[id].perish);
+  }
+  function spoilRate(tempF) {
+    if (tempF <= 34) return 0.14;
+    if (tempF >= 75) return 1.5;
+    if (tempF >= 65) return 1 + (tempF - 65) * 0.05;
+    return 0.14 + (tempF - 34) / (65 - 34) * 0.86;
+  }
+  function freshOf(state2) {
+    if (!state2.fresh || typeof state2.fresh !== "object") state2.fresh = {};
+    return state2.fresh;
+  }
+  function stageOf(state2, id) {
+    if (!isPerishable(id)) return "keeps";
+    const s = freshOf(state2)[id] || 0;
+    return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
+  }
+  function ageFood(state2, dt, tempAt) {
+    const f = freshOf(state2);
+    for (const id of Object.keys(ITEMS)) {
+      if (!isPerishable(id)) continue;
+      const c = state2.carried[id] || 0;
+      const st = state2.home && state2.home.storage[id] || 0;
+      if (c + st <= 0) {
+        delete f[id];
+        continue;
+      }
+      const temp = st > c ? tempAt("storage") : tempAt("carried");
+      f[id] = (f[id] || 0) + dt / 24 / ITEMS[id].perish * spoilRate(temp);
+    }
+  }
+  function eatRisk(state2, id, cooked = false) {
+    const r = RISK[stageOf(state2, id)] || 0;
+    return cooked ? r / 2 : r;
+  }
+  function stageLabel(state2, id) {
+    const st = stageOf(state2, id);
+    return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
+  }
+
   // src/engine/clothes.js
   var SLOTS = ["base", "mid", "shell", "hat", "gloves", "boots", "socks"];
   var SLOT_NAMES = { base: "Base layer", mid: "Warm layer", shell: "Shell", hat: "Hat", gloves: "Gloves", boots: "Boots", socks: "Socks" };
@@ -1365,7 +1413,13 @@
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
     if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
     const felt = feltTemp(state2, mode, env);
-    p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
+    let wr = warmthRate(felt);
+    if (p.warmFedH > 0) {
+      if (wr < 0) wr *= 0.5;
+      p.warmFedH = Math.max(0, p.warmFedH - dt);
+    }
+    p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+    ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
     let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
@@ -1916,6 +1970,7 @@
   }
 
   // src/engine/actions.js
+  var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
   var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
@@ -1992,11 +2047,16 @@
           advanceTime(state2, 2);
           return;
         }
+        const risk = eatRisk(state2, id);
         addItem(bag, id, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         if (it.water) addWater(state2, it.water);
         log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
         advanceTime(state2, 15);
+        if (risk > 0 && chance(state2, risk)) {
+          log(state2, "It tasted off. Your stomach turns.", "warn");
+          startStomachBug(state2);
+        }
         return;
       }
       case "drink": {
@@ -2272,7 +2332,7 @@
         advanceTime(state2, 5);
         return;
       case "cook": {
-        const food = ["dry_food", "canned_food"].find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+        const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
         const bag = (h.storage[food] || 0) > 0 ? h.storage : state2.carried;
         const it = ITEMS[food];
         if (food === "dry_food") {
@@ -2284,13 +2344,20 @@
           h[water] -= 0.125;
         }
         const how = useHeat(state2, 0.5);
+        const risk = eatRisk(state2, food, true);
+        const stage = stageLabel(state2, food);
         addItem(bag, food, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         p.warmth = clamp2(p.warmth + 10, 0, 100);
         p.morale = clamp2(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
-        log(state2, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, "good");
+        log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
         advanceTime(state2, 30);
+        if (risk > 0 && chance(state2, risk)) {
+          log(state2, "The food was bad. Your stomach turns.", "warn");
+          startStomachBug(state2);
+        }
         return;
       }
       case "add_wood": {
@@ -2319,6 +2386,7 @@
         return;
       case "dry_clothes":
         p.wet = false;
+        p.wetness = 0;
         p.wetMinutes = 0;
         p.dryMinutes = 0;
         log(state2, "You change into dry clothes and hang the wet ones up.");
@@ -2814,8 +2882,10 @@
       add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
       add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
-      const food = ["dry_food", "canned_food"].some((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
-      add("cook", "Cook a hot meal", { disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
+      const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+      const food = !!cookId;
+      const cr = cookId ? eatRisk(state2, cookId, true) : 0;
+      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
       if (!h.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
@@ -4098,6 +4168,10 @@
     const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
     return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
   }
+  function freshTag(id) {
+    const l = stageLabel(state, id);
+    return l ? ` <small class="fresh-${l.toLowerCase()}">${l}</small>` : "";
+  }
   function clothesHtml() {
     const p = state.player;
     normalizeWorn(p);
@@ -4138,6 +4212,7 @@
     if (p.illness.infection) chips.push(["bad", `Infection${p.illness.infection.abxH != null ? " (on antibiotics)" : ""}`]);
     if (p.illness.stomachH > 0) chips.push(["bad", "Stomach bug"]);
     if (p.painH > 0) chips.push(["ok", "Pain pills"]);
+    if (p.warmFedH > 0) chips.push(["ok", `Warm and fed (${Math.ceil(p.warmFedH)} h)`]);
     const felt = Math.round(feltTemp(state, "rest"));
     chips.push(["", `Feels like ${felt}\xB0F`]);
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
@@ -4167,7 +4242,7 @@
   function itemRow(id, q, from, buttons) {
     const it = ITEMS[id];
     const w = Math.round(it.weight * q * 10) / 10;
-    return `<li><span class="in">${esc(it.name)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
+    return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
   }
   function useButtons(id, from) {
     return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
@@ -4782,7 +4857,7 @@
       const rows = groupedRows(ids, (id) => {
         const it = ITEMS[id];
         const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join("");
-        return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
+        return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
       }) || '<li class="empty">You carry nothing.</li>';
       const here = hereBag(state);
       const hereIds = Object.keys(here);

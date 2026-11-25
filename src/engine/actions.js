@@ -15,6 +15,9 @@ import { getPlace } from './placesdb.js';
 import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vitals.js';
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
+import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
+// Cook fresh food first (it spoils), then rice or pasta, then cans.
+const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
 import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -106,11 +109,13 @@ export function useItem(state, id, verb, from = 'carried') {
         advanceTime(state, 2);
         return;
       }
+      const risk = eatRisk(state, id);
       addItem(bag, id, -it.portion);
       addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       if (it.water) addWater(state, it.water);
       log(state, `You eat: ${it.name}${it.portion < 1 ? ' (one portion)' : ''}.`);
       advanceTime(state, 15);
+      if (risk > 0 && chance(state, risk)) { log(state, 'It tasted off. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
     }
     case 'drink': {
@@ -376,7 +381,7 @@ function homeAction(state, id) {
       advanceTime(state, 5);
       return;
     case 'cook': {
-      const food = ['dry_food', 'canned_food'].find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+      const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
       const bag = (h.storage[food] || 0) > 0 ? h.storage : state.carried;
       const it = ITEMS[food];
       if (food === 'dry_food') {
@@ -385,13 +390,17 @@ function homeAction(state, id) {
         h[water] -= 0.125;
       }
       const how = useHeat(state, 0.5);
+      const risk = eatRisk(state, food, true);
+      const stage = stageLabel(state, food);
       addItem(bag, food, -it.portion);
       addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       p.warmth = clamp(p.warmth + 10, 0, 100);
       p.morale = clamp(p.morale + 5 + cookMoraleBonus(state), 0, 100);
+      p.warmFedH = WARM_FED_HOURS; // "Warm and fed": warmth drops slower for a while
       practice(state, 'cooking', 3);
-      log(state, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, 'good');
+      log(state, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== 'Fresh' ? `, ${stage.toLowerCase()}` : ''}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, 'good');
       advanceTime(state, 30);
+      if (risk > 0 && chance(state, risk)) { log(state, 'The food was bad. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
     }
     case 'add_wood': {
@@ -419,7 +428,7 @@ function homeAction(state, id) {
       advanceTime(state, 1);
       return;
     case 'dry_clothes':
-      p.wet = false; p.wetMinutes = 0; p.dryMinutes = 0;
+      p.wet = false; p.wetness = 0; p.wetMinutes = 0; p.dryMinutes = 0;
       log(state, 'You change into dry clothes and hang the wet ones up.');
       advanceTime(state, 10);
       return;
@@ -970,8 +979,10 @@ export function listActions(state) {
     add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
-    const food = ['dry_food', 'canned_food'].some((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
-    add('cook', 'Cook a hot meal', { disabled: (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
+    const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+    const food = !!cookId;
+    const cr = cookId ? eatRisk(state, cookId, true) : 0;
+    add('cook', 'Cook a hot meal', { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` · ${Math.round(cr * 100)}% food poisoning` : ''} · warm and fed ${WARM_FED_HOURS} h` : undefined, risk: cr > 0, disabled: (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
     if (p.wet) add('dry_clothes', 'Change into dry clothes');
     if (!h.fridgeOpened) add('fridge', 'Open the fridge');
     if (Object.keys(state.carried).some((k) => k !== 'backpack' && k !== 'flashlight')) add('store_all', 'Put away everything you carry');

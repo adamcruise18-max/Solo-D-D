@@ -11,6 +11,7 @@ import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
 import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js';
+import { stageLabel } from '../engine/food.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
@@ -168,6 +169,12 @@ function tripHtml(dest) {
 
 // Skills: level 0..5, a bar to the next level, and what the skill does.
 // Clothes by layer, with the warmth each gives, the wetness and the "feels like" number.
+// Fresh, Stale or Spoiled, for food that spoils.
+function freshTag(id) {
+  const l = stageLabel(state, id);
+  return l ? ` <small class="fresh-${l.toLowerCase()}">${l}</small>` : '';
+}
+
 function clothesHtml() {
   const p = state.player;
   normalizeWorn(p);
@@ -210,6 +217,7 @@ function renderStats() {
   if (p.illness.infection) chips.push(['bad', `Infection${p.illness.infection.abxH != null ? ' (on antibiotics)' : ''}`]);
   if (p.illness.stomachH > 0) chips.push(['bad', 'Stomach bug']);
   if (p.painH > 0) chips.push(['ok', 'Pain pills']);
+  if (p.warmFedH > 0) chips.push(['ok', `Warm and fed (${Math.ceil(p.warmFedH)} h)`]);
   const felt = Math.round(feltTemp(state, 'rest'));
   chips.push(['', `Feels like ${felt}°F`]);
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
@@ -242,7 +250,7 @@ function qtyText(q) {
 function itemRow(id, q, from, buttons) {
   const it = ITEMS[id];
   const w = Math.round(it.weight * q * 10) / 10;
-  return `<li><span class="in">${esc(it.name)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
+  return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
 }
 
 function useButtons(id, from) {
@@ -869,7 +877,7 @@ function insidePanel(name) {
       const it = ITEMS[id];
       const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
         .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
-      return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
+      return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
     }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
     const hereIds = Object.keys(here);

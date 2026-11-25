@@ -72,6 +72,13 @@ This is the **first playable version**: a small part of the full game.
   Clothes dry inside: fast by the fire, slowly in a cold room. Wet clothes show as a risk warning.
 - Clothes come from houses (closets, dressers) and outdoor stores.
 
+### Food that spoils
+
+- Cans, dry food and snacks keep. Fresh fish and raw meat spoil: Fresh, then Stale, then Spoiled.
+- Cold slows spoiling. Food in your storage in winter lasts about 7 times longer than at room temperature.
+- Stale and spoiled food can give you food poisoning. Cooking halves the risk.
+- A hot meal makes you "Warm and fed" for 6 hours: you lose heat half as fast.
+
 ### Skills
 
 - You learn by doing. There are 5 skills with 5 levels each: Scavenging, Tinkering, First aid, Cooking and Survival.

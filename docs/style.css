@@ -406,3 +406,5 @@ ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spaci
 .clothes { margin-top: 8px; font-size: 12px; }
 .clothes summary { cursor: pointer; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; opacity: .8; }
 .inv.wear small { opacity: .65; margin-right: 4px; }
+
+.fresh-fresh { color: #7fc8a9; } .fresh-stale { color: #e3b04b; } .fresh-spoiled { color: #e0675a; }
