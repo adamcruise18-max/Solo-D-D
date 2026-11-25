@@ -16,6 +16,7 @@ import {
   DoubleSide, AdditiveBlending, ACESFilmicToneMapping, PCFSoftShadowMap, PCFShadowMap,
   Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator,
 } from 'three';
+import { STYLE_REAL, sty } from './style.js';
 
 // ---------- small helpers ----------
 const rngFrom = (seed) => {
@@ -223,6 +224,7 @@ function stainBlob(S, variant) {
   return c;
 }
 function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
+  strength *= Math.min(1.6, grimeAmt);
   const { c, rc, w, h } = L;
   const blob = stainBlob(128, Math.floor(rnd() * 3));
   const t = canvas(128);
@@ -252,8 +254,30 @@ function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
 }
 
 // Dark grime blotches from a noise field.
+// Grime by place (Adam, 2026-11-25): homes and kept-up workplaces (stores, offices, clinics) have
+// low to no grime; garages and industrial sites medium; outdoors and buildings open to the weather
+// (a broken window, a collapsed roof) high. ?style=real keeps the old fixed amount.
+export const GRIME = { low: 0.12, medium: 0.6, high: 1.6 };
+const GRIME_BY_CAT = {
+  supermarket: 'low', convenience: 'low', gas: 'low', pharmacy: 'low', clinic: 'low', hospital: 'low',
+  // 'outdoor' is an outdoor-gear store (OSM shop=outdoor), a kept-up shop, not the outdoors.
+  outdoor: 'low', house: 'low', hardware: 'medium', fire: 'medium',
+  // Industrial places for later map categories.
+  warehouse: 'medium', factory: 'medium', auto_repair: 'medium', storage: 'medium', industrial: 'medium',
+  // Outdoor areas (streets, parks, yards) when they get a walkable view.
+  street: 'high', park: 'high', yard: 'high', outside: 'high',
+};
+// The grime level for a building: its category, a garage room, or open to the weather.
+export function grimeLevel(cat, { room = null, exposed = false } = {}) {
+  if (exposed) return 'high';
+  if (room === 'garage') return 'medium';
+  return GRIME_BY_CAT[cat] || 'low';
+}
+let grimeAmt = 1; // set while a surface is drawn
 function grimeField(w, h, rnd, cells = 4) {
-  return fbm(w, h, cells, cells, 5, rnd, 0.55);
+  const f = fbm(w, h, cells, cells, 5, rnd, 0.55);
+  if (grimeAmt !== 1) for (let i = 0; i < f.length; i++) f[i] = 0.45 + (f[i] - 0.45) * grimeAmt;
+  return f;
 }
 
 function makeStoreTile(S, seed) {
@@ -631,8 +655,12 @@ const SURF_CACHE = {};
 // All the shared surface materials. quality 'low' makes smaller textures.
 // Built lazily: a surface is generated the first time it is read (a store only pays for
 // its floor, wall and ceiling). makeSurfaces(q).all() builds them all.
-export function makeSurfaces(quality = 'high') {
-  if (SURF_CACHE[quality]) return SURF_CACHE[quality];
+export function makeSurfaces(quality = 'high', grime = 'low') {
+  if (!GRIME[grime]) grime = 'low';
+  const ck = `${quality}|${grime}`;
+  if (SURF_CACHE[ck]) return SURF_CACHE[ck];
+  const amt = STYLE_REAL ? 1 : GRIME[grime];
+  const g = (fn) => () => { const was = grimeAmt; grimeAmt = amt; try { return fn(); } finally { grimeAmt = was; } };
   const low = quality === 'low';
   const S = low ? 256 : 512;
   const makers = {
@@ -641,21 +669,22 @@ export function makeSurfaces(quality = 'high') {
     woodFloor: () => makeWood(S, 37),
     carpet: () => makeCarpet(low ? 256 : 384, 41),
     concrete: () => makeConcrete(S, 53),
-    drywall: () => makeDrywall(low ? 192 : 384, 61, 0xb4b8aa, 0x3b3a37),
+    drywall: () => makeDrywall(low ? 192 : 384, 61, sty(0xd2c6b0, 0xb4b8aa), sty(0x6a5e50, 0x3b3a37)), // stylized: warm paint
     drywallWarm: () => makeDrywall(low ? 192 : 384, 67, 0xb3a58c, 0xd2ccbe),
     tileWall: () => makeTileWall(S, 71),
     ceilingTile: () => makeCeilingTile(S, 83),
     blockWall: () => makeBlockWall(S, 89),
     plaster: () => makePlaster(low ? 256 : 384, 97),
   };
-  const s = { quality, surfaceFor: (cat, part, room) => surfaceFor(cat, part, room, quality) };
+  const s = { quality, grime, surfaceFor: (cat, part, room) => surfaceFor(cat, part, room, quality, grime) };
   const built = {};
   for (const k of Object.keys(makers)) {
-    Object.defineProperty(s, k, { enumerable: true, get: () => (built[k] ||= makers[k]()) });
+    const make = g(makers[k]);
+    Object.defineProperty(s, k, { enumerable: true, get: () => (built[k] ||= make()) });
   }
   s.names = Object.keys(makers);
   s.all = () => { for (const k of s.names) void s[k]; return s; };
-  SURF_CACHE[quality] = s;
+  SURF_CACHE[ck] = s;
   return s;
 }
 
@@ -679,9 +708,9 @@ const CEIL_BY_CAT = {
 // room (optional) refines houses: 'bathroom' -> tile walls, 'bedroom'/'living room' -> carpet,
 // 'garage' -> concrete. Returns a shared material (made with the quality of the first makeSurfaces call
 // unless quality is given).
-export function surfaceFor(cat, part, room, quality) {
-  const q = quality || (SURF_CACHE.high ? 'high' : SURF_CACHE.low ? 'low' : 'high');
-  const s = makeSurfaces(q);
+export function surfaceFor(cat, part, room, quality, grime) {
+  const q = quality || (Object.keys(SURF_CACHE).some((k) => k.startsWith('high|')) ? 'high' : Object.keys(SURF_CACHE).some((k) => k.startsWith('low|')) ? 'low' : 'high');
+  const s = makeSurfaces(q, grime || grimeLevel(cat, { room }));
   if (room === 'bathroom' && part === 'wall') return s.tileWall;
   if (room === 'bathroom' && part === 'floor') return s.linoleum;
   if (room === 'garage') return part === 'ceiling' ? s.plaster : part === 'wall' ? s.blockWall : s.concrete;
@@ -1291,9 +1320,11 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = high ? PCFSoftShadowMap : PCFShadowMap;
 
-  const bg = dark ? 0x040506 : night ? 0x05070b : 0x3a4148;
+  // Stylized look: warmer, softer greys (the old cold blue-grey on ?style=real).
+  const real = STYLE_REAL;
+  const bg = dark ? 0x040506 : night ? 0x05070b : real ? 0x3a4148 : 0x463f3a;
   scene.background = new Color(bg);
-  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : 0x4a525a, dark ? (night ? 0.085 : 0.065) : night ? 0.07 : 0.035);
+  scene.fog = new FogExp2(dark ? 0x030405 : night ? 0x05070a : real ? 0x4a525a : 0x57504a, dark ? (night ? 0.085 : 0.065) : night ? 0.07 : 0.035);
 
   // A tiny environment map: a dim room with a bright doorway toward +z. Glossy floors,
   // puddles, glass and metal reflect it instead of rendering black.
@@ -1330,10 +1361,10 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   if (opts.fill !== false) {
     // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(0x7a8aa0, 0x1d1813, night ? 0.55 : 0.95)
+      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.55 : 0.95)
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
-        : new HemisphereLight(0xd6dee8, 0x8c877e, 1.5);
+        : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5);
     group.add(fill);
   }
 
