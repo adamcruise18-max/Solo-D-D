@@ -1138,7 +1138,7 @@
     if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
     const s = skillsOf(state2);
     if (!book) {
-      const day = dayIndex(state2.time);
+      const day = dayIndex2(state2.time);
       if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
       const n = (s.today.uses[key] || 0) + 1;
       s.today.uses[key] = n;
@@ -1660,7 +1660,8 @@
         wet: false,
         wetMinutes: 0,
         dryMinutes: 0,
-        worn: { coat: false, hat: false, gloves: false, boots: false, rain: false },
+        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
+        wetness: 0,
         injuries: [],
         illness: { stomachH: 0, infection: null },
         painH: 0,
