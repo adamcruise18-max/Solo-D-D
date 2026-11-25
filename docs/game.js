@@ -74,6 +74,7 @@
     rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
     rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
     snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
+    phone: { name: "Smartphone (charged)", unit: "pc", weight: 0.4, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -322,6 +323,7 @@
         { id: "rain_barrel", w: 5 },
         { id: "stove_kit", w: 2 },
         { id: "water_filter", w: 3 },
+        { id: "snare_wire", w: 4 },
         { id: "duct_tape", w: 10 },
         { id: "rope", w: 6 },
         { id: "multitool", w: 3 },
@@ -372,10 +374,11 @@
         { id: "book_cooking", w: 1 },
         { id: "fishing_rod", w: 5 },
         { id: "fishing_line", w: 6 },
-        { id: "bow", w: 1.5 },
-        { id: "arrows", w: 3 },
+        { id: "bow", w: 4 },
+        { id: "arrows", w: 6 },
         { id: "snare_wire", w: 4 },
-        { id: "rifle_rounds", w: 1 },
+        { id: "rifle_rounds", w: 1.5 },
+        { id: "rifle", w: 0.5 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -476,7 +479,10 @@
         { id: "fishing_rod", w: 1.5 },
         { id: "fishing_line", w: 1 },
         { id: "rifle", w: 0.3 },
-        { id: "rifle_rounds", w: 0.4 }
+        { id: "rifle_rounds", w: 0.4 },
+        { id: "phone", w: 1.5 },
+        { id: "bow", w: 0.3 },
+        { id: "arrows", w: 0.4 }
       ]
     }
   };
@@ -634,6 +640,7 @@
       w.snowInches = randInt(state2, 1, 6);
     }
     if (w.type === "clear") w.nextLow -= 5;
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     return w;
   }
   function initWeather(state2) {
@@ -687,7 +694,8 @@
     const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
     if (m < s.rise) {
       const span2 = 1440 - peak + s.rise;
-      return ease(w.prevHigh, w.low, (m + 1440 - peak) / span2);
+      const f = (m + 1440 - peak) / span2;
+      return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
     }
     if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
     const span = 1440 - peak + s.rise;
@@ -1003,7 +1011,7 @@
       days: [1, 2],
       shape: (w, r) => {
         w.high = Math.min(w.high, 33);
-        w.low = Math.min(w.low, 28);
+        w.nextLow = Math.min(w.nextLow, 28);
         w.wind = 15 + Math.floor(r() * 21);
         delete w.snowInches;
       },
@@ -1016,7 +1024,6 @@
       days: [3, 5],
       shape: (w, r) => {
         w.high = 98 + Math.floor(r() * 9);
-        w.low = Math.max(w.low, 62);
         w.nextLow = Math.max(w.nextLow, 64);
         w.wind = Math.floor(r() * 6);
       },
@@ -1062,6 +1069,7 @@
     w.baseType = w.type;
     w.type = spell.id;
     SPELLS[spell.id].shape(w, r);
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
     return spell;
   }
@@ -1155,6 +1163,12 @@
     if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
     return h2.rooms[room].temp;
   }
+  function breakWindow(state2, room) {
+    var _a;
+    const h2 = ensureRooms(state2.home);
+    const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
+    w.broken += 1;
+  }
   function boardWindow(state2, room) {
     const h2 = ensureRooms(state2.home);
     const w = h2.windows[room];
@@ -1204,7 +1218,21 @@
       })
     };
   }
+  var WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
+  var WINDOW_ROOMS = ["living", "kitchen", "bedroom", "bath"];
+  function stormWindows(state2) {
+    const p = WINDOW_BREAK[state2.weather?.type];
+    if (!p) return null;
+    const r = stream(state2, "home");
+    if (r() >= p) return null;
+    const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
+    breakWindow(state2, room);
+    const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
+    log(state2, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
+    return room;
+  }
   function homeDaily(state2) {
+    stormWindows(state2);
     const filtered = runAutoFilter(state2);
     if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
   }
@@ -1370,7 +1398,7 @@
       begin,
       end,
       line,
-      records: (count = limit) => records.slice(-count),
+      records: (count2 = limit) => records.slice(-count2),
       clear: () => {
         records.length = 0;
         open = null;
@@ -1504,6 +1532,10 @@
           events?.emit("day.start", { day: d, time: state2.time });
         }
         systems.step(state2, step / 60, ctx);
+        if (state2._stop) {
+          delete state2._stop;
+          break;
+        }
       }
       sendDeath(state2, events);
       return state2;
@@ -1555,6 +1587,33 @@
 
   // src/core/profiler.js
   var FRAME_BUDGET_MS = 1e3 / 30;
+
+  // src/core/changes.js
+  var CHANGE_KINDS = ["taken", "opened", "closed", "emptied", "moved", "damaged", "discovered", "set"];
+  function log2(state2) {
+    state2.world = state2.world || {};
+    state2.world.changes = state2.world.changes || {};
+    return state2.world.changes;
+  }
+  function recordChange(state2, locKey, change) {
+    if (!locKey) throw new Error("A change needs a location key");
+    if (!change || !change.o) throw new Error("A change needs an object id (o)");
+    if (!CHANGE_KINDS.includes(change.k)) throw new Error(`Unknown change kind "${change.k}"`);
+    const list = log2(state2)[locKey] = log2(state2)[locKey] || [];
+    const rec = { o: String(change.o), k: change.k };
+    if (change.v !== void 0) rec.v = change.v;
+    if (state2.time != null) rec.t = Math.round(state2.time);
+    const same = (r) => r.o === rec.o && (r.k === rec.k || ["opened", "closed"].includes(r.k) && ["opened", "closed"].includes(rec.k));
+    const i = list.findIndex(same);
+    if (i >= 0) {
+      const old = list.splice(i, 1)[0];
+      if (rec.k === "set" && old.v && typeof old.v === "object" && rec.v && typeof rec.v === "object") rec.v = { ...old.v, ...rec.v };
+    }
+    list.push(rec);
+    return rec;
+  }
+  var changesFor = (state2, locKey) => state2.world?.changes?.[locKey] || [];
+  var hasChange = (state2, locKey, o, k) => changesFor(state2, locKey).some((r) => r.o === String(o) && r.k === k);
 
   // src/data/events.js
   var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
@@ -1719,7 +1778,7 @@
   }
   function pick(state2, list, rng) {
     const mercy = inTrouble(state2);
-    const w = (e) => e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8;
+    const w = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
     const total = list.reduce((a, e) => a + w(e), 0);
     let r = rng() * total;
     for (const e of list) {
@@ -1741,13 +1800,15 @@
     p.count += 1;
     p.quietHours = 0;
   }
+  var ASLEEP_RATE = 0.4;
   function pacerHour(state2, mode, events = EVENTS) {
     const p = state2.pacer;
     p.tension = Math.min(100, p.tension + RISE_PER_HOUR + (mode === "walk" ? RISE_OUTSIDE : 0));
     p.quietHours = (p.quietHours || 0) + 1;
     const rng = stream(state2, "pacer");
     const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
-    if (rng() >= eventChance(p.tension) && !overdue) return null;
+    const rate = mode === "sleep" ? ASLEEP_RATE : 1;
+    if (rng() >= eventChance(p.tension) * rate && !overdue) return null;
     let list = candidates(state2, mode, events);
     if (overdue) list = list.filter((e2) => e2.size === "small");
     if (!list.length) return null;
@@ -2007,11 +2068,13 @@
 
   // src/data/crops.js
   var CROPS = {
-    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8], days: 55, frostF: null, minF: 40, yield: ["kale", 8] },
+    // Kale overwinters in Portland: sown Feb-Apr or Jul-Oct; after a harvest the plant
+    // grows new leaves (regrow: growth it keeps; up to `cuts` harvests).
+    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8, 9], days: 55, frostF: null, minF: 40, yield: ["kale", 8], regrow: 0.5, cuts: 4 },
     potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
     beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
     squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
-    garlic: { name: "Garlic", plant: [9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
+    garlic: { name: "Garlic", plant: [8, 9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
 
   // src/engine/food.js
@@ -2176,7 +2239,12 @@
       addFresh(state2, [state2.home.storage, state2.carried], id, qty, 0);
       addItem(state2.home.storage, id, qty);
       got[id] = (got[id] || 0) + qty;
-      b.dead = true;
+      const c = CROPS[b.crop];
+      b.cuts = (b.cuts || 0) + 1;
+      if (c.regrow && b.cuts < (c.cuts || 1)) {
+        b.growth = c.regrow;
+        b.ripeDay = null;
+      } else b.dead = true;
     }
     g.beds = g.beds.filter((b) => !b.dead);
     log(state2, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
@@ -2355,12 +2423,16 @@
       const p = getPlace(state2.location.id);
       if (p && CATEGORIES[p.cat]?.dark) dark = true;
     }
-    return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+    const key = state2.location.kind === "place" || state2.location.kind === "house" ? state2.location.id : null;
+    const leak = !!(key && weatherInfo(state2).wetAfter && decayActive(state2, "roof_leaks", key, t));
+    return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
     const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
-    let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state2);
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state2);
     if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
+    if (env.outside && (state2.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+    felt += ACTIVITY_HEAT[mode] || 0;
     if (mode === "sleep") {
       if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
@@ -2369,12 +2441,23 @@
     }
     return felt;
   }
+  var CLOTHES_SHARE = 0.8;
+  var LEAK_WET = 0.25;
+  var WET_OUTSIDE = 8;
+  var ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
+  var WARMTH_CURVE = [[5, -28], [15, -22], [28, -12], [40, -6], [50, -2.5], [60, 2], [72, 10]];
   function warmthRate(felt) {
-    if (felt >= 70) return 10;
-    if (felt >= 55) return 3;
-    if (felt >= 40) return -3;
-    if (felt >= 25) return -7;
-    return -12;
+    const c = WARMTH_CURVE;
+    if (felt <= c[0][0]) return c[0][1];
+    if (felt >= c[c.length - 1][0]) return c[c.length - 1][1];
+    for (let i = 1; i < c.length; i++) {
+      if (felt <= c[i][0]) {
+        const [x0, y0] = c[i - 1];
+        const [x1, y1] = c[i];
+        return y0 + (felt - x0) / (x1 - x0) * (y1 - y0);
+      }
+    }
+    return 0;
   }
   function damage(state2, amount, cause) {
     if (amount <= 0) return;
@@ -2382,9 +2465,51 @@
     state2._damage = state2._damage || {};
     state2._damage[cause] = (state2._damage[cause] || 0) + amount;
   }
-  function advanceTime(state2, minutes, mode = "rest") {
-    if (!(minutes > 0)) return;
-    gameClock().advance(state2, minutes, mode);
+  function advanceTime(state2, minutes, mode = "rest", opts = {}) {
+    if (!(minutes > 0)) return false;
+    if (mode === "walk" || mode !== "sleep" && !opts.stopAtDanger) {
+      gameClock().advance(state2, minutes, mode);
+      return false;
+    }
+    const p = state2.player;
+    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+    const t0 = state2.time;
+    try {
+      gameClock().advance(state2, minutes, mode);
+    } finally {
+      delete state2._sleepFrom;
+    }
+    return !state2.dead && state2.time - t0 < minutes - 0.01;
+  }
+  var WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+  var STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
+  var STOP_TEXT = {
+    water: "You stop. Your mouth is dry and your head pounds. You need water.",
+    food: "You stop, weak with hunger. You need to eat.",
+    warmth: "You stop. You are shaking with cold and your hands do not work. Get warm now.",
+    health: "You stop. You feel worse; this is not the time to go on.",
+    energy: "You stop. You are too tired to go on; you need to rest."
+  };
+  var WAKE_TEXT = {
+    water: "You wake with a dry mouth and a pounding head. You need water now.",
+    food: "You wake, weak and shaking with hunger. You need to eat.",
+    warmth: "You wake up shivering hard. You are too cold to sleep.",
+    health: "You wake in pain. Something is wrong; you feel worse."
+  };
+  function checkWake(state2) {
+    const from = state2._sleepFrom;
+    if (!from || state2.dead) return;
+    const p = state2.player;
+    const asleep = from.mode === "sleep";
+    const lines = asleep ? WAKE_AT : STOP_AT;
+    for (const k of Object.keys(lines)) {
+      if (from[k] >= lines[k] && p[k] < lines[k]) {
+        log(state2, (asleep ? WAKE_TEXT : STOP_TEXT)[k], "danger");
+        state2._stop = true;
+        delete state2._sleepFrom;
+        return;
+      }
+    }
   }
   function tickStep(state2, dt, mode) {
     const p = state2.player;
@@ -2394,7 +2519,7 @@
     const wx = weatherInfo(state2);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if (env.outside && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
     else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
@@ -2439,9 +2564,10 @@
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
       if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
-      if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+      if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        if (chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
+        const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state2) : inj.infectRisk;
+        if (risk > 0 && chance(state2, risk)) startInfection(state2, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -2450,7 +2576,7 @@
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state2, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
@@ -2464,7 +2590,8 @@
       if (p.illness.stomachH === 0) log(state2, "Your stomach is better now.", "good");
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
-    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+    const treated = !p.illness.infection || p.illness.infection.abxH != null;
+    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
     const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
     if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
@@ -2473,6 +2600,7 @@
       p.lightHours = Math.max(0, p.lightHours - dt);
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
+    checkWake(state2);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
@@ -2521,7 +2649,8 @@
     small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
     deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
     sprain: { hp: 5, healH: 120, infectRisk: 0 },
-    bite: { hp: 10, healH: 168, infectRisk: 0.4 }
+    // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+    bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 }
   };
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];
@@ -2957,7 +3086,9 @@
           dry_food: 1,
           flashlight: 1,
           winter_coat: 1,
-          firewood: 3
+          firewood: 3,
+          snare_wire: 1
+          // a coil in the garage (research: common in a suburban garage)
         },
         indoorTemp: 47,
         fireHours: 0,
@@ -2981,6 +3112,10 @@
       places: {},
       houses: {},
       houseAreas: {},
+      wild: {},
+      // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
+      cars: {},
+      // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
       dog: {
         stage: "none",
         arriveDay: 1 + Math.floor(r() * 4),
@@ -3179,16 +3314,19 @@
     }
     return ps;
   }
+  var SOAKS = /* @__PURE__ */ new Set(["book_first_aid", "book_repair", "book_cooking", "book_survival", "matches", "toilet_paper", "comfort", "paper_map"]);
   function rollZone(state2, key, catId, stock, zone, extraRolls = 0) {
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
     const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
+    const leaking = decayActive(state2, "roof_leaks", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
       if (e.fridge && fridgesGone) continue;
+      if (leaking && SOAKS.has(e.id)) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -3232,8 +3370,22 @@
     }
     return { mph, why };
   }
+  var TREE_DETOUR = 1.3;
+  var TREE_DETOUR_PHONE = 1.1;
+  function roadBlocked(state2, dest) {
+    return !!(dest && dest.id && decayActive(state2, "trees_on_roads", `road:${dest.id}`));
+  }
+  function tripMiles(state2, dest) {
+    const m = routeMiles(state2.pos, dest);
+    return roadBlocked(state2, dest) ? m * (phoneSignal(state2) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
+  }
+  function phoneSignal(state2, pos = state2.pos) {
+    if (!has(state2, "phone")) return false;
+    const cell = `tower:${Math.round(pos.lat * 20)}:${Math.round(pos.lon * 20)}`;
+    return !decayActive(state2, "cell_towers", cell);
+  }
   function estimateTrip(state2, dest) {
-    const miles = routeMiles(state2.pos, dest);
+    const miles = tripMiles(state2, dest);
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
     const overload = bagWeight(state2.carried) > carryLimit(state2);
@@ -3245,8 +3397,14 @@
   }
   function travel(state2, dest, destLabel) {
     const start2 = { ...state2.pos };
-    const total = routeMiles(start2, dest);
+    const total = tripMiles(state2, dest);
     log(state2, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
+    if (roadBlocked(state2, dest)) {
+      const key = `road:${dest.id}`;
+      const seen = hasChange(state2, key, "tree", "set");
+      if (!seen) recordChange(state2, key, { o: "tree", k: "set", v: { blocked: true } });
+      log(state2, phoneSignal(state2) ? "Your phone map shows the road ahead blocked by a fallen tree. You take the way around." : `${seen ? "The fallen tree still blocks the road." : "A big fallen tree lies across the road, with power lines tangled in it."} You go around by the side streets.`, "travel");
+    }
     let done = 0;
     while (done < total - 1e-6 && !state2.dead) {
       const seg = Math.min(1, total - done);
@@ -3355,7 +3513,7 @@
     tualatin_cook: { name: "Tualatin River at Cook Park", lat: 45.3975, lon: -122.77, kind: "fish", fish: ["largemouth bass", "crappie", "catfish"], quality: 1 },
     fanno_creek: { name: "Fanno Creek", lat: 45.43, lon: -122.774, kind: "fish", fish: ["cutthroat trout"], quality: 0.6 },
     commonwealth_lake: { name: "Commonwealth Lake", lat: 45.5076, lon: -122.799, kind: "fish", fish: ["rainbow trout", "bluegill", "largemouth bass"], quality: 0.8 },
-    willamette_park: { name: "Willamette River at Willamette Park", lat: 45.477, lon: -122.67, kind: "fish", fish: ["smallmouth bass", "walleye"], run: { months: [2, 3, 4, 8, 9], fish: "salmon" }, quality: 1.1 },
+    willamette_park: { name: "Willamette River at Willamette Park", lat: 45.477, lon: -122.67, kind: "fish", fish: ["smallmouth bass", "walleye"], runs: [{ months: [2, 3, 4, 8, 9], fish: "salmon", n: 4 }, { months: [11, 0, 1, 2], fish: "winter steelhead", n: 3 }], quality: 1.1 },
     nature_park: { name: "Tualatin Hills Nature Park", lat: 45.502, lon: -122.837, kind: "hunt", game: ["rabbit", "deer", "duck"] },
     cooper_mountain: { name: "Cooper Mountain Nature Park", lat: 45.451, lon: -122.874, kind: "hunt", game: ["rabbit", "deer"] },
     jackson_bottom: { name: "Jackson Bottom Wetlands", lat: 45.501, lon: -122.989, kind: "hunt", game: ["duck", "goose", "deer", "rabbit"] },
@@ -3384,12 +3542,17 @@
   var SNARE_CHECK_MINUTES = 20;
   var SCARED_HOURS = 24;
   var FISH_DC = 12;
+  var PRESSURE_PER_TRIP = 1;
+  var PRESSURE_RECOVER_PER_DAY = 0.25;
+  var PRESSURE_CATCH = 0.15;
+  var WINTER_CATCH = 0.5;
   var FISH_CLEAN = 5;
   function wildOf(state2) {
     if (!state2.wild || typeof state2.wild !== "object") state2.wild = {};
     const w = state2.wild;
     w.scared || (w.scared = {});
     w.snares || (w.snares = {});
+    w.pressure || (w.pressure = {});
     return w;
   }
   var bags = (state2) => [state2.carried, state2.home.storage];
@@ -3419,6 +3582,16 @@
     log(state2, `You reach ${s.name}. ${s.kind === "fish" ? "The water is high and brown with rain." : "Brush, tall grass and the edge of the trees."}`, "travel");
     return true;
   }
+  function spotPressure(state2, id, t = state2.time) {
+    const e = state2.wild?.pressure?.[id];
+    if (!e) return 0;
+    return Math.max(0, e.p - (t - e.t) / 1440 * PRESSURE_RECOVER_PER_DAY);
+  }
+  function catchFactor(state2, id) {
+    const month = calendar(state2.time).month;
+    const season = [11, 0, 1].includes(month) ? WINTER_CATCH : 1;
+    return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state2, id)) * season;
+  }
   function canFish(state2) {
     const s = spotHere(state2);
     if (!s || s.kind !== "fish") return "Go to a river, creek or lake first";
@@ -3434,11 +3607,13 @@
     const lvl = skillLevel(state2, "fishing");
     if (lvl) mods.push(["fishing skill", lvl]);
     if (dawnOrDusk(state2.time)) mods.push(["dawn or dusk", 2]);
-    const run2 = s.run && s.run.months.includes(month);
-    if (run2) mods.push([`${s.run.fish} run`, 3]);
+    const run2 = (s.runs || []).find((x) => x.months.includes(month)) || null;
+    if (run2) mods.push([`${run2.fish} run`, 3]);
     if ([11, 0, 1].includes(month)) mods.push(["cold water", -2]);
     if ((s.quality ?? 1) < 0.7) mods.push(["small creek", -2]);
     if (!has(state2, "fishing_rod")) mods.push(["hand line", -1]);
+    const pr = Math.round(spotPressure(state2, s.id));
+    if (pr >= 2) mods.push(["fished out", -Math.min(4, pr - 1)]);
     if ((state2.weather?.low ?? 40) <= 30) mods.push(["frozen ground, no worms", -2]);
     return { mods, adv, dis, run: run2, spot: s };
   }
@@ -3454,39 +3629,51 @@
     }
     const f = fishSetup(state2);
     log(state2, `You fish from the bank at ${f.spot.name} for two hours.`);
-    advanceTime(state2, FISH_MINUTES, "rest");
-    if (state2.dead) return { ok: false, fish: 0 };
+    if (advanceTime(state2, FISH_MINUTES, "rest", { stopAtDanger: true }) || state2.dead) return { ok: false, fish: 0, stopped: !state2.dead };
     const r = check(state2, "Fishing", FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
     let n = 0;
     let what = "";
     if (r.success) {
-      if (f.run && chance(state2, 0.4)) {
-        n = 4;
-        what = f.spot.run.fish;
+      const k = catchFactor(state2, f.spot.id);
+      if (f.run && chance(state2, 0.5)) {
+        n = f.run.n;
+        what = f.run.fish;
       } else {
-        n = Math.min(4, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 4)));
+        const base2 = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
+        n = Math.max(1, Math.floor(base2 * k + randInt(state2, 0, 99) / 100));
         what = f.spot.fish[randInt(state2, 0, f.spot.fish.length - 1)];
       }
       const clean = (hasKnife(state2) ? FISH_CLEAN : 15) * n;
       advanceTime(state2, clean, "rest");
       addFresh(state2, bags(state2), "fresh_fish", n, 0);
       addItem(state2.carried, "fresh_fish", n);
-      log(state2, n === 4 && what === f.spot.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state2) ? "" : ", slow with no knife"}).`, "good");
+      log(state2, what === f.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state2) ? "" : ", slow with no knife"}).`, "good");
     } else log(state2, "Nothing bites. You wind in the line.");
+    const w = wildOf(state2);
+    w.pressure[f.spot.id] = { p: spotPressure(state2, f.spot.id) + PRESSURE_PER_TRIP, t: state2.time };
     practice(state2, "fishing", r.success ? 4 : 2);
     return { ok: r.success, fish: n, what };
   }
+  var count = (state2, id) => (state2.carried[id] || 0) + (state2.home.storage[id] || 0);
+  function arrowsLeft(state2) {
+    return (state2.wild?.arrows || 0) + 6 * count(state2, "arrows");
+  }
+  function roundsLeft(state2) {
+    return (state2.wild?.rounds || 0) + 20 * count(state2, "rifle_rounds");
+  }
+  var canBow = (state2) => has(state2, "bow") && arrowsLeft(state2) > 0;
+  var canRifle = (state2) => has(state2, "rifle") && roundsLeft(state2) > 0;
   function huntMethods(state2) {
     const m = [];
-    if (hasAll(state2, GEAR.bow)) m.push("bow");
-    if (hasAll(state2, GEAR.rifle)) m.push("rifle");
+    if (canBow(state2)) m.push("bow");
+    if (canRifle(state2)) m.push("rifle");
     return m;
   }
   function canHunt(state2, method) {
     const s = spotHere(state2);
     if (!s || s.kind !== "hunt") return "Go to a park, wetland or the edge of the woods first";
-    if (method === "bow" && !hasAll(state2, GEAR.bow)) return "You need a bow and arrows";
-    if (method === "rifle" && !hasAll(state2, GEAR.rifle)) return "You need a rifle and rounds";
+    if (method === "bow" && !canBow(state2)) return "You need a bow and arrows";
+    if (method === "rifle" && !canRifle(state2)) return "You need a rifle and rounds";
     if (method !== "bow" && method !== "rifle") return "Hunt with a bow or a rifle";
     return null;
   }
@@ -3544,7 +3731,6 @@
       w.arrows = 6;
     }
     w.arrows--;
-    if (w.arrows === 0) w.arrows = null;
   }
   function takeMeat(state2, g, spoil = 0) {
     const knife = hasKnife(state2);
@@ -3565,8 +3751,7 @@
     const s = spotHere(state2);
     log(state2, `You move slowly through ${s.name} with the ${method}, and wait.`);
     const findP = findChance(state2);
-    advanceTime(state2, HUNT_MINUTES, "work");
-    if (state2.dead) return { ok: false };
+    if (advanceTime(state2, HUNT_MINUTES, "work", { stopAtDanger: true }) || state2.dead) return { ok: false, stopped: !state2.dead };
     const list = gameHere(state2);
     if (!list.length || !chance(state2, findP)) {
       log(state2, isScared(state2) ? "Nothing moves. The game here is still wary after the shot." : "You see tracks and droppings, but no animal comes in range.");
@@ -5179,7 +5364,8 @@
       effects: weatherEffects(state2),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
-      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow) }
+      // The low shown is the real low of the curve (with a cold snap, if one is on).
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow - hazardColder(state2, next2)) }
     };
   }
   function actionTiming(state2, minutes) {
@@ -5303,6 +5489,7 @@
   function parseSave(raw) {
     const st = JSON.parse(raw);
     if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
+    for (const k of ["wild", "cars"]) if (!st[k] || typeof st[k] !== "object") st[k] = {};
     return migrate(st, { systems: gameSystems() });
   }
   function clearGame() {

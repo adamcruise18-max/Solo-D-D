@@ -125,7 +125,13 @@ export function harvest(state) {
     addFresh(state, [state.home.storage, state.carried], id, qty, 0);
     addItem(state.home.storage, id, qty);
     got[id] = (got[id] || 0) + qty;
-    b.dead = true; // the bed is free again
+    const c = CROPS[b.crop];
+    b.cuts = (b.cuts || 0) + 1;
+    if (c.regrow && b.cuts < (c.cuts || 1)) {
+      // Leaves grow back: the plant stays, part grown.
+      b.growth = c.regrow;
+      b.ripeDay = null;
+    } else b.dead = true; // the bed is free again
   }
   g.beds = g.beds.filter((b) => !b.dead);
   log(state, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace('_', ' ')}`).join(', ')}. It goes into storage.`, 'good');

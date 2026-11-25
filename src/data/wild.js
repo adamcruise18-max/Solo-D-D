@@ -3,14 +3,15 @@
 // approximate (park centers or a bank access), good enough for the map pin.
 // Henry Hagg Lake is about 16 miles out (past the edge), so it is not here.
 //
-// fish: what bites there. run: months (0 = January) with a salmon or steelhead run.
+// fish: what bites there. runs: months (0 = January) with a salmon or steelhead run,
+// and how many fish of meat one big fish counts as (n).
 // game: animals you can hunt there. No dogs or cats are ever game.
 export const SPOTS = {
   tualatin_rood: { name: 'Tualatin River at Rood Bridge Park', lat: 45.4905, lon: -122.9505, kind: 'fish', fish: ['largemouth bass', 'catfish', 'cutthroat trout'], quality: 1 },
   tualatin_cook: { name: 'Tualatin River at Cook Park', lat: 45.3975, lon: -122.77, kind: 'fish', fish: ['largemouth bass', 'crappie', 'catfish'], quality: 1 },
   fanno_creek: { name: 'Fanno Creek', lat: 45.43, lon: -122.774, kind: 'fish', fish: ['cutthroat trout'], quality: 0.6 },
   commonwealth_lake: { name: 'Commonwealth Lake', lat: 45.5076, lon: -122.799, kind: 'fish', fish: ['rainbow trout', 'bluegill', 'largemouth bass'], quality: 0.8 },
-  willamette_park: { name: 'Willamette River at Willamette Park', lat: 45.477, lon: -122.67, kind: 'fish', fish: ['smallmouth bass', 'walleye'], run: { months: [2, 3, 4, 8, 9], fish: 'salmon' }, quality: 1.1 },
+  willamette_park: { name: 'Willamette River at Willamette Park', lat: 45.477, lon: -122.67, kind: 'fish', fish: ['smallmouth bass', 'walleye'], runs: [{ months: [2, 3, 4, 8, 9], fish: 'salmon', n: 4 }, { months: [11, 0, 1, 2], fish: 'winter steelhead', n: 3 }], quality: 1.1 },
   nature_park: { name: 'Tualatin Hills Nature Park', lat: 45.502, lon: -122.837, kind: 'hunt', game: ['rabbit', 'deer', 'duck'] },
   cooper_mountain: { name: 'Cooper Mountain Nature Park', lat: 45.451, lon: -122.874, kind: 'hunt', game: ['rabbit', 'deer'] },
   jackson_bottom: { name: 'Jackson Bottom Wetlands', lat: 45.501, lon: -122.989, kind: 'hunt', game: ['duck', 'goose', 'deer', 'rabbit'] },

@@ -24,6 +24,11 @@ export const SNARE_SET_MINUTES = 30;
 export const SNARE_CHECK_MINUTES = 20;
 export const SCARED_HOURS = 24; // a rifle shot scares the game at that spot for a day
 export const FISH_DC = 12;
+// Spot pressure (research): each trip fishes a spot down; it recovers in 2 to 3 weeks.
+export const PRESSURE_PER_TRIP = 1;
+export const PRESSURE_RECOVER_PER_DAY = 0.25; // 4 trips in a week take about 16 days to recover
+export const PRESSURE_CATCH = 0.15; // catch drops 15% per pressure point
+export const WINTER_CATCH = 0.5; // December to February: fish are slow and deep
 const FISH_CLEAN = 5; // minutes a fish with a knife
 
 function wildOf(state) {
@@ -31,6 +36,7 @@ function wildOf(state) {
   const w = state.wild;
   w.scared ||= {};
   w.snares ||= {};
+  w.pressure ||= {};
   return w;
 }
 
@@ -73,6 +79,20 @@ export function goToSpot(state, id) {
 }
 
 // ---------- fishing ----------
+// Pressure now at a spot: { [spotId]: { p, t } } recovers with time since the last trip.
+export function spotPressure(state, id, t = state.time) {
+  const e = state.wild?.pressure?.[id];
+  if (!e) return 0;
+  return Math.max(0, e.p - ((t - e.t) / 1440) * PRESSURE_RECOVER_PER_DAY);
+}
+
+// Share of a normal catch: pressure and winter.
+export function catchFactor(state, id) {
+  const month = calendar(state.time).month;
+  const season = [11, 0, 1].includes(month) ? WINTER_CATCH : 1;
+  return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state, id)) * season;
+}
+
 export function canFish(state) {
   const s = spotHere(state);
   if (!s || s.kind !== 'fish') return 'Go to a river, creek or lake first';
@@ -89,11 +109,13 @@ function fishSetup(state) {
   const lvl = skillLevel(state, 'fishing');
   if (lvl) mods.push(['fishing skill', lvl]);
   if (dawnOrDusk(state.time)) mods.push(['dawn or dusk', 2]);
-  const run = s.run && s.run.months.includes(month);
-  if (run) mods.push([`${s.run.fish} run`, 3]);
+  const run = (s.runs || []).find((x) => x.months.includes(month)) || null;
+  if (run) mods.push([`${run.fish} run`, 3]);
   if ([11, 0, 1].includes(month)) mods.push(['cold water', -2]);
   if ((s.quality ?? 1) < 0.7) mods.push(['small creek', -2]);
   if (!has(state, 'fishing_rod')) mods.push(['hand line', -1]);
+  const pr = Math.round(spotPressure(state, s.id));
+  if (pr >= 2) mods.push(['fished out', -Math.min(4, pr - 1)]);
   if ((state.weather?.low ?? 40) <= 30) mods.push(['frozen ground, no worms', -2]);
   return { mods, adv, dis, run, spot: s };
 }
@@ -109,42 +131,53 @@ export function fish(state) {
   if (why) { log(state, why + '.'); return { ok: false, fish: 0 }; }
   const f = fishSetup(state);
   log(state, `You fish from the bank at ${f.spot.name} for two hours.`);
-  advanceTime(state, FISH_MINUTES, 'rest');
-  if (state.dead) return { ok: false, fish: 0 };
+  if (advanceTime(state, FISH_MINUTES, 'rest', { stopAtDanger: true }) || state.dead) return { ok: false, fish: 0, stopped: !state.dead };
   const r = check(state, 'Fishing', FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
   let n = 0;
   let what = '';
   if (r.success) {
-    if (f.run && chance(state, 0.4)) { n = 4; what = f.spot.run.fish; }
+    const k = catchFactor(state, f.spot.id);
+    if (f.run && chance(state, 0.5)) { n = f.run.n; what = f.run.fish; }
     else {
-      n = Math.min(4, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 4)));
+      // 1 to 3 fish by the roll, times the catch factor (at least 1 on a success).
+      const base = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
+      n = Math.max(1, Math.floor(base * k + randInt(state, 0, 99) / 100));
       what = f.spot.fish[randInt(state, 0, f.spot.fish.length - 1)];
     }
     const clean = (hasKnife(state) ? FISH_CLEAN : 15) * n;
     advanceTime(state, clean, 'rest');
     addFresh(state, bags(state), 'fresh_fish', n, 0);
     addItem(state.carried, 'fresh_fish', n);
-    log(state, n === 4 && what === f.spot.run?.fish
+    log(state, what === f.run?.fish
       ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).`
       : `You catch ${n} ${what}. You clean ${n > 1 ? 'them' : 'it'} on the bank (${clean} min${hasKnife(state) ? '' : ', slow with no knife'}).`, 'good');
   } else log(state, 'Nothing bites. You wind in the line.');
+  const w = wildOf(state);
+  w.pressure[f.spot.id] = { p: spotPressure(state, f.spot.id) + PRESSURE_PER_TRIP, t: state.time };
   practice(state, 'fishing', r.success ? 4 : 2);
   return { ok: r.success, fish: n, what };
 }
 
 // ---------- hunting ----------
+// Arrows and rounds left: the open set or box (state.wild) plus the closed ones.
+const count = (state, id) => (state.carried[id] || 0) + (state.home.storage[id] || 0);
+export function arrowsLeft(state) { return (state.wild?.arrows || 0) + 6 * count(state, 'arrows'); }
+export function roundsLeft(state) { return (state.wild?.rounds || 0) + 20 * count(state, 'rifle_rounds'); }
+const canBow = (state) => has(state, 'bow') && arrowsLeft(state) > 0;
+const canRifle = (state) => has(state, 'rifle') && roundsLeft(state) > 0;
+
 export function huntMethods(state) {
   const m = [];
-  if (hasAll(state, GEAR.bow)) m.push('bow');
-  if (hasAll(state, GEAR.rifle)) m.push('rifle');
+  if (canBow(state)) m.push('bow');
+  if (canRifle(state)) m.push('rifle');
   return m;
 }
 
 export function canHunt(state, method) {
   const s = spotHere(state);
   if (!s || s.kind !== 'hunt') return 'Go to a park, wetland or the edge of the woods first';
-  if (method === 'bow' && !hasAll(state, GEAR.bow)) return 'You need a bow and arrows';
-  if (method === 'rifle' && !hasAll(state, GEAR.rifle)) return 'You need a rifle and rounds';
+  if (method === 'bow' && !canBow(state)) return 'You need a bow and arrows';
+  if (method === 'rifle' && !canRifle(state)) return 'You need a rifle and rounds';
   if (method !== 'bow' && method !== 'rifle') return 'Hunt with a bow or a rifle';
   return null;
 }
@@ -209,7 +242,6 @@ function loseArrow(state) {
   const w = wildOf(state);
   if (!(w.arrows > 0)) { useOne(state, 'arrows'); w.arrows = 6; }
   w.arrows--;
-  if (w.arrows === 0) w.arrows = null; // the set is used up (the next one opens on the next loss)
 }
 
 // Clean the animal and take the meat. A knife is needed for a clean job; with no
@@ -232,8 +264,7 @@ export function hunt(state, method) {
   const s = spotHere(state);
   log(state, `You move slowly through ${s.name} with the ${method}, and wait.`);
   const findP = findChance(state);
-  advanceTime(state, HUNT_MINUTES, 'work');
-  if (state.dead) return { ok: false };
+  if (advanceTime(state, HUNT_MINUTES, 'work', { stopAtDanger: true }) || state.dead) return { ok: false, stopped: !state.dead };
   const list = gameHere(state);
   if (!list.length || !chance(state, findP)) {
     log(state, isScared(state) ? 'Nothing moves. The game here is still wary after the shot.' : 'You see tracks and droppings, but no animal comes in range.');

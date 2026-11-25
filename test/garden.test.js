@@ -70,3 +70,17 @@ test('garden: watering uses rain barrel water', () => {
   assert.equal(waterGarden(s), 1);
   assert.equal(s.home.rawGal, raw - 2);
 });
+
+test('garden: kale grows back after a harvest (up to 4 cuts); the garage has snare wire', () => {
+  const s = withBeds(56);
+  s.garden.beds.push({ crop: 'kale', day: 0, growth: 1, water: 1, ripeDay: 5, dead: false });
+  for (let i = 1; i <= 3; i++) {
+    assert.equal(harvest(s).kale, 8);
+    assert.equal(s.garden.beds.length, 1, `cut ${i}: the plant stays`);
+    assert.equal(s.garden.beds[0].growth, 0.5);
+    s.garden.beds[0].growth = 1;
+  }
+  assert.equal(harvest(s).kale, 8);
+  assert.equal(s.garden.beds.length, 0, 'after 4 cuts the bed is free');
+  assert.equal(newGame(1).home.storage.snare_wire, 1);
+});

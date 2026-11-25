@@ -33,6 +33,9 @@ function finishDay(state, w, month) {
     w.snowInches = randInt(state, 1, 6);
   }
   if (w.type === 'clear') w.nextLow -= 5;
+  // The night after a day is not warmer than the day's high: the "low tonight"
+  // shown is then the real low of the curve.
+  w.nextLow = Math.min(w.nextLow, w.high - 3);
   return w;
 }
 
@@ -93,9 +96,12 @@ function baseAirTemp(state, t) {
   const peak = 15 * 60;
   const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
   if (m < s.rise) {
-    // Night before sunrise: from yesterday's high to today's low.
+    // Night before sunrise: from yesterday's high to this morning's low. The weather
+    // rolls at 5 AM, so before 5 AM the record is still yesterday's, and this morning's
+    // low is its nextLow (the forecast "low tonight"). One smooth curve over midnight.
     const span = 1440 - peak + s.rise;
-    return ease(w.prevHigh, w.low, (m + 1440 - peak) / span);
+    const f = (m + 1440 - peak) / span;
+    return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
   }
   if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
   const span = 1440 - peak + s.rise;

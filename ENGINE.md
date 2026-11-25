@@ -268,6 +268,50 @@ request that says which rule change is meant and why.
 - Odds for buttons: `fishOdds`, `huntOdds` (find % and shot odds).
 - Replay recorded again: new gear in outdoor store and house loot.
 
+## Year sim tuning (research, 2026-11-25)
+
+- Fishing spot pressure: each trip adds 1 (`state.wild.pressure[spot]`), recovering
+  0.25 a day; catch × (1 − 0.15 × pressure), and −1 to −4 on the roll ("fished out").
+  Winter (Dec to Feb) halves the catch; a salmon run is a salmon half the time.
+  Catch is 1 to 3 fish by the roll. A skilled angler who rotates spots gets about
+  500 kcal an hour at the bank, about 300 with the walk.
+- Hunting gear: more bows and arrows in outdoor stores, a few in houses; snare wire in
+  hardware stores.
+- Bites: 25% infection if open for 6 h, 10% even if bandaged in time.
+
+## Browser playtest 1 fixes
+
+- Temperature curve (`world.js` `baseAirTemp`): before 5 AM the weather record is still
+  yesterday's, so the night eases from its high to its `nextLow` (no jump at midnight).
+  Rare spells no longer change this morning's low (no jump at 5 AM). The night low is
+  never above the day's high − 3, so "Low tonight" (`preview.js`, with a cold snap) is
+  the real low.
+- Auto-wake (`tick.js`): sleep ends early when water < 15, food < 10, warmth < 30 or
+  health < 30 is crossed during the sleep (one line in the journal). The clock
+  (`src/core/clock.js`) stops an action when a rule sets `state._stop`.
+
+## Playtest list 1 fixes (research, 700 bot runs)
+
+- Antibiotics: once a course starts (`infection.abxH`), the infection does no more
+  damage and health refills again (it took health until cured before).
+- Cold retune (`tick.js`): clothes count at 80% (`CLOTHES_SHARE`), walking +8°F and
+  work +6°F of body heat (`ACTIVITY_HEAT`), wet through outside −8°F (`WET_OUTSIDE`),
+  new `warmthRate` bands down to −28/h. Week 1 with no fire in normal clothes now
+  drops warmth to about 36; a soaked ice-storm walk in only a down coat loses about
+  10 warmth an hour; full gear with a rain jacket stays warm.
+- Pacer: events are 0.4x as likely asleep (`ASLEEP_RATE`); an event may carry its own
+  weight factor `w` (events.js).
+- Decay rows with rule effects:
+  - `roof_leaks` (area = place or house key): paper items (`SOAKS`) are gone from the
+    loot; in the rain you get damp inside (25% of outside rate) and it is 1°F over
+    the air, not 5°F.
+  - `trees_on_roads` (area `road:<place id>`): the walk there is 1.3x longer (1.1x
+    with a phone signal); the first time, a world change `road:<id>` / `tree` is recorded.
+  - `cell_towers` (area: grid cell of about 3 miles): `phoneSignal(state)` with a
+    `phone` item. After that, a phone is only a light and a camera (UI).
+- Tools: the careful bot gets the same idle guard as the replay bot, goes home for
+  antibiotics; `sim` reports stuck runs (turn limit) instead of "alive".
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).
@@ -329,3 +373,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
    as one ten-day advance. Each system now declares `catchUp`.
 4. A small diagnostics overlay (frame ms, sections, memory) behind a key, with the
    pick-up items thread, which owns the 3D view.
+
+## Browser playtest 2 fixes
+
+- **Ammo:** `arrowsLeft` / `roundsLeft` count the open set or box (`state.wild.arrows`, `state.wild.rounds`) plus the closed ones. A box of `rifle_rounds` is 20 shots, a set of `arrows` is 6. The rifle and bow work until the last shot.
+- **Storm windows:** `stormWindows(state)` in home.js runs in the home daily hook. On a windstorm (8%), ice storm (10%) or heavy rain (1%) night it breaks one window (stream `home`) and logs a line.
+- **Cold sleep:** `warmthRate` uses the piecewise curve `WARMTH_CURVE` (5 °F: −28/h to 72 °F: +10/h), so a cold bedroom costs much more warmth than a warm one.
+- **Danger stop:** `advanceTime(state, min, mode, { stopAtDanger: true })` ends the action when a need crosses a `STOP_AT` line (water 15, food 10, warmth 25, health 30, energy 10) and returns true, with a journal line. Sleep always does this (`WAKE_AT`). Fishing and hunting pass the flag; other calls do not, so plain rest and the tests run as before.
+- **Save shape:** `newGame` has `wild: {}` and `cars: {}` (cars are owned by the builder's engine/cars.js). `parseSave` adds empty ones to older saves.
