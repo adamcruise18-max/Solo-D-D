@@ -33,6 +33,8 @@ import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostic
 import { homeHeat } from '../engine/home.js';
 import { gardenInfo, canPlant } from '../engine/garden.js';
 import { CROPS } from '../data/crops.js';
+import { SPOTS, GAME } from '../data/wild.js';
+import { gameHere } from '../engine/wild.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
@@ -81,6 +83,7 @@ export async function start() {
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
     + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span>'
+    + '<span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
     mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
@@ -297,6 +300,7 @@ function renderLocation() {
     const p = getPlace(loc.id);
     sub = CATEGORIES[p.cat].label;
   } else if (loc.kind === 'home') sub = 'Your house. One story, a fireplace, solar panels and a home battery.';
+  else if (loc.kind === 'wild') sub = wildSub(SPOTS[loc.id]);
   else sub = 'A house. Search it room by room.';
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
@@ -478,6 +482,14 @@ function showPlacePopup(id, lngLat) {
     const atHome = state.location.kind === 'home';
     html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
       : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+  } else if (id.startsWith('wild:')) {
+    const sid = id.slice(5);
+    const sp = SPOTS[sid];
+    pos = sp;
+    const here = state.location.kind === 'wild' && state.location.id === sid;
+    const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
+    html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === 'fish' ? 'Fishing' : 'Hunting'} · ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      ${here ? '<p><i>You are here.</i></p>' : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
   } else {
     const p = getPlace(id);
     pos = p;
@@ -497,16 +509,30 @@ function showPlacePopup(id, lngLat) {
     popup.remove();
     travelTo(e.currentTarget.dataset.goplace);
   });
+  el.querySelector('[data-gowild]')?.addEventListener('click', (e) => {
+    popup.remove();
+    travelTo(`wild:${e.currentTarget.dataset.gowild}`);
+  });
   el.querySelector('[data-gohome]')?.addEventListener('click', () => {
     popup.remove();
     travelTo('__home');
   });
 }
 
+// One line on what lives at a fishing or hunting spot (now, when you stand there).
+function wildSub(sp) {
+  if (!sp) return '';
+  if (sp.kind === 'fish') return `Fish here: ${sp.fish.join(', ')}.${sp.run ? ` A ${sp.run.fish} run comes in some months.` : ''}`;
+  const here = state.location.kind === 'wild' && SPOTS[state.location.id] === sp;
+  const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
+  return `Game here${here ? ' now' : ''}: ${now.length ? now.join(', ') : 'none this time of year'}.`;
+}
+
 function travelTo(id) {
   if (state.dead) return;
   if (state.location.kind === 'house') perform(state, 'action', 'leave_house');
   if (id === '__home') perform(state, 'action', 'go_home');
+  else if (id.startsWith('wild:')) perform(state, 'action', 'go_spot', id.slice(5));
   else perform(state, 'action', 'go_place', id);
   if (state.dead) recordRun(state);
   commit(true);

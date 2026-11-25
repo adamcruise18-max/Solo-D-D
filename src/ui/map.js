@@ -6,6 +6,7 @@ import { winterizeStyle, seasonPaint } from './winter-style.js';
 import { detailFeatures, addDetailIcons, DETAIL_INFO } from './details.js';
 import { seasonOf, overgrowth } from '../engine/season.js';
 import { legacyMarks } from '../engine/goals.js';
+import { SPOTS } from '../data/wild.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -153,6 +154,16 @@ export async function createMap(container, { places, onPlaceClick }) {
   youEl.title = 'You';
   youEl.innerHTML = '<i></i>';
   const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+
+  // Fishing and hunting spots: a small pin each (fish = blue hook, hunt = green track).
+  for (const [id, sp] of Object.entries(SPOTS)) {
+    const el = document.createElement('div');
+    el.className = `marker-wild ${sp.kind}`;
+    el.title = `${sp.name} (${sp.kind === 'fish' ? 'fishing' : 'hunting'})`;
+    el.innerHTML = `<span>${sp.kind === 'fish' ? '≈' : '⋀'}</span>`;
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); onPlaceClick(`wild:${id}`, null); });
+    new maplibregl.Marker({ element: el }).setLngLat([sp.lon, sp.lat]).addTo(map);
+  }
 
   // Legacy marks: painted signs at places (one small marker each), lit window and capsule on home.
   const signMarkers = new Map();

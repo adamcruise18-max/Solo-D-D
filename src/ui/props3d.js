@@ -1244,6 +1244,61 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.022, 0.022, 0.02, 12), M.blackPl, 0.06, 0.205, 0);
     add(g, gBox(0.12, 0.09, 0.002), tmat(frontTex({ t: 'GASOLINE', s: '1 GAL  SAFETY CAN', n: 'FLAMMABLE  KEEP AWAY FROM FLAME', b: '#f1c21b', f: '#111', a: '#c8281e', p: 'flame' }, 256, 192), 0.6), 0, 0.06, 0.061);
   },
+  fishing_rod(g) {
+    // two-piece rod lying down: cork grip, reel, thin blank, tip guide
+    const H = Math.PI / 2;
+    add(g, gCyl(0.012, 0.014, 0.2, 10), col(0xb8875a, 0.85), 0.42, 0.014, 0, 0, 0, H);
+    add(g, gCyl(0.004, 0.009, 0.72, 8), col(0x1f3b5a, 0.35, 0.2), 0.22, 0.014, 0, 0, 0, H);
+    add(g, gCyl(0.028, 0.028, 0.03, 14), col(0x2b2d30, 0.4, 0.4), 0.31, 0.03, 0, 0, 0, 0);
+    add(g, gCyl(0.02, 0.02, 0.032, 12), M.chrome, 0.31, 0.03, 0, 0, 0, 0);
+    for (const x of [0.05, -0.15, -0.33]) add(g, gTorus(0.008, 0.0015, 4, 10), M.chrome, x, 0.026, 0, 0, H, 0);
+  },
+  fishing_line(g) {
+    // small clear tackle box with a spool of line and a card of hooks
+    add(g, gRBox(0.12, 0.03, 0.08, 0.008), mat('tackle', { color: 0x9fc6d8, roughness: 0.2, transparent: true, opacity: 0.55 }));
+    add(g, gCyl(0.025, 0.025, 0.02, 14), col(0x3fae6a, 0.4), -0.025, 0.004, 0);
+    add(g, gBox(0.035, 0.002, 0.05), col(0xe8e4da, 0.8), 0.03, 0.006, 0);
+  },
+  bow(g) {
+    // recurve bow lying flat, with its string (built upright, then laid down)
+    const R = 0.55, arc = Math.PI * 0.62, half = arc / 2;
+    const ex = R * Math.sin(half), ey = R * Math.cos(half);
+    const b = new THREE.Group();
+    add(b, gTorus(R, 0.012, 6, 24, arc), col(0x6b4325, 0.55), 0, 0, 0, 0, 0, Math.PI / 2 - half);
+    add(b, gBox(0.12, 0.03, 0.03), col(0x2b2b2b, 0.8), -0.06, R - 0.015, -0.015);
+    add(b, gCyl(0.0015, 0.0015, ex * 2, 4), col(0xe8e2d0, 0.9), ex, ey, 0, 0, 0, Math.PI / 2);
+    b.rotation.x = -Math.PI / 2;
+    b.position.set(0, 0.012, (R + ey) / 2);
+    g.add(b);
+  },
+  arrows(g) {
+    // six arrows in a bundle, with a band
+    for (let i = 0; i < 6; i++) {
+      const z = (i - 2.5) * 0.012;
+      add(g, gCyl(0.004, 0.004, 0.7, 6), col(0x8a6a44, 0.6), 0.35, 0.005 + (i % 2) * 0.006, z, 0, 0, Math.PI / 2);
+      add(g, gBox(0.07, 0.012, 0.002), col(i % 3 ? 0xe2c23a : 0xd8d8d8, 0.8), 0.31, 0.012 + (i % 2) * 0.006, z);
+      add(g, gCyl(0.0, 0.006, 0.03, 6), M.steel, -0.35, 0.005 + (i % 2) * 0.006, z, 0, 0, Math.PI / 2);
+    }
+    add(g, gBox(0.012, 0.02, 0.08), col(0x2b2b2b, 0.8), 0, 0, 0);
+  },
+  rifle(g) {
+    // stylized hunting rifle lying on its side: wood stock, dark barrel and scope
+    const wood = col(0x7a4a28, 0.5);
+    add(g, gRBox(0.42, 0.035, 0.11, 0.02), wood, 0.2, 0, 0);
+    add(g, gRBox(0.24, 0.03, 0.05, 0.012), wood, -0.12, 0.005, 0.02);
+    add(g, gCyl(0.011, 0.011, 0.55, 10), col(0x232528, 0.35, 0.5), 0.0, 0.03, 0.035, 0, 0, Math.PI / 2);
+    add(g, gCyl(0.018, 0.018, 0.24, 12), col(0x1a1b1d, 0.35, 0.4), 0.18, 0.03, 0.0, 0, 0, Math.PI / 2);
+  },
+  rifle_rounds(g) {
+    // small card box of rounds (made-up label)
+    add(g, gBox(0.1, 0.035, 0.07), col(0x3d5a2a, 0.75));
+    add(g, gBox(0.08, 0.002, 0.05), tmat(frontTex({ t: 'RIFLE ROUNDS', s: '20 CT  HUNTING', n: 'KEEP AWAY FROM CHILDREN', b: '#e9dfc2', f: '#2a2a2a', a: '#3d5a2a' }, 256, 160), 0.7), 0, 0.035, 0);
+  },
+  snare_wire(g) {
+    // a coil of thin wire
+    const wire = col(0xa9a39a, 0.35, 0.6);
+    for (let i = 0; i < 4; i++) add(g, gTorus(0.05 - i * 0.002, 0.0018, 4, 20), wire, 0, 0.003 + i * 0.003, 0, Math.PI / 2, 0, 0);
+  },
   generator(g) {
     // small open-frame generator: tube frame, tank, engine, panel
     const frame = col(0x2a2a2c, 0.45, 0.3);

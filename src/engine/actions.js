@@ -20,6 +20,7 @@ import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 import { plant, waterGarden, harvest } from './garden.js';
 import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
+import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -47,6 +48,7 @@ export function locationLabel(state) {
   if (loc.kind === 'home') return 'Home (Aloha)';
   if (loc.kind === 'place') return getPlace(loc.id)?.name || 'Unknown place';
   if (loc.kind === 'house') return loc.label;
+  if (loc.kind === 'wild') return spotHere(state)?.name || 'Outside';
   return '';
 }
 
@@ -1053,8 +1055,34 @@ export function listActions(state) {
     add('walk_in', 'Walk inside (first person)', { note: 'look for loot yourself' });
     add('leave_house', 'Leave the house');
   }
+  if (loc.kind === 'wild') {
+    const spot = spotHere(state);
+    if (spot?.kind === 'fish') {
+      const why = canFish(state);
+      add('fish', `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? undefined : oddsText(fishOdds(state)) });
+    }
+    if (spot?.kind === 'hunt') {
+      const methods = huntMethods(state);
+      if (!methods.length) add('hunt_bow', `Hunt (${HUNT_MINUTES / 60} h)`, { disabled: 'You need a bow and arrows, or a rifle and rounds' });
+      for (const m of methods) {
+        const o = huntOdds(state, m);
+        const why = canHunt(state, m);
+        add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game · ${o.shot.pct}% hit a ${o.animal}${m === 'rifle' ? ' · loud' : ''}${isScared(state) ? ' · game is wary' : ''}`, risk: m === 'rifle' });
+      }
+      const w = state.wild?.snares?.[spot.id];
+      if (w != null) {
+        const hours = (state.time - w) / 60;
+        add('check_snare', 'Check your snares', { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
+        add('take_snare', 'Take up your snares');
+      } else if (spot.game?.includes('rabbit')) {
+        const why = canSetSnare(state);
+        add('set_snare', 'Set snares for rabbits (30 min)', { disabled: why, note: why ? undefined : 'check after a night' });
+      }
+    }
+    add('go_home', 'Walk home');
+  }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : state.location.kind === 'wild' ? 'Sleep here on the ground…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
     if (loc.kind === 'home') add('dog_follow', state.dog.withPlayer ? `${state.dog.name}: stay home` : `${state.dog.name}: come with me`);
@@ -1114,6 +1142,13 @@ export function doAction(state, id, arg) {
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
+    case 'go_spot': return goToSpot(state, arg);
+    case 'fish': return fish(state);
+    case 'hunt_bow': return hunt(state, 'bow');
+    case 'hunt_rifle': return hunt(state, 'rifle');
+    case 'set_snare': return setSnare(state);
+    case 'check_snare': return checkSnare(state);
+    case 'take_snare': return takeUpSnare(state);
     case 'play_dog': return playWithDog(state);
     case 'dog_follow': return toggleDogFollow(state);
     case 'build': return workOnProject(state, arg);
