@@ -16,6 +16,7 @@ import { JOBS, TRAITS, FREE_POINTS, pointsLeft, backgroundText, validTraits } fr
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
+import { sceneEnv } from '../engine/scene.js';
 import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -776,6 +777,10 @@ async function walkInside() {
     subtitle: `${cat.label} · inside`,
     dark: env.dark,
     night,
+    // Game time and weather for the light, sky and sound (src/engine/scene.js).
+    // scene: at the time you go in; getScene(): now (time passes while inside).
+    scene: sceneEnv(state),
+    getScene: () => sceneEnv(state),
     stock,
     hasFlashlight: () => (state.carried.flashlight || 0) > 0,
     isLightOn: () => hasLight(state),

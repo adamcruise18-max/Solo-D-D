@@ -875,7 +875,7 @@ function prismTexture() {
 // precipStrength, fog, outdoorLight). Without sc (old callers) the old fixed look is kept.
 // Returns level (how strong daylight at an opening is: about 1.2 clear noon, 0.5 overcast,
 // 0 night), color (the daylight color), sky (what you see through an opening) and golden (0..1).
-const NIGHT_SKY = { level: 0, color: 0x8197bb, sky: 0x24324a, golden: 0, night: true };
+const NIGHT_SKY = { level: 0, color: 0x8197bb, sky: 0x161b24, golden: 0, night: true };
 export function skyLight(sc, night = false) {
   if (!sc) return night ? NIGHT_SKY : { level: 1, color: 0xdce8ff, sky: 0xe9f0f8, golden: 0, night: false };
   const day = sc.daylight ?? (night ? 0 : 1);
@@ -892,7 +892,7 @@ export function skyLight(sc, night = false) {
   if (sc.fog) c.lerp(new Color(0xd4d8da), 0.4);
   c.lerp(new Color(0xffb878), golden * 0.85);
   const level = (0.25 + 0.95 * out) * Math.min(1, day * 1.4);
-  const sky = new Color(0xe9f0f8).lerp(c, 0.55).lerp(new Color(0xf0b890), golden * 0.5).multiplyScalar(0.45 + 0.55 * Math.min(1, level));
+  const sky = new Color(0xe9f0f8).lerp(c, 0.55).lerp(new Color(0xf0b890), golden * 0.5).multiplyScalar(0.35 + 0.45 * Math.min(1, level)); // capped: the street still shows at noon
   return { level, color: c.getHex(), sky: sky.getHex(), golden, night: false };
 }
 
@@ -1608,7 +1608,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     g.add(shaft);
     // soft halo around the bright opening (fake bloom), seen from inside
     const haloMat = keep(new MeshBasicMaterial({
-      map: haloTexture(), color: color, transparent: true, opacity: nightLight ? 0.25 : 0.55 * Math.min(1.1, 0.35 + 0.65 * k),
+      map: haloTexture(), color: color, transparent: true, opacity: nightLight ? 0.16 : 0.42 * Math.min(1, 0.35 + 0.65 * k),
       blending: AdditiveBlending, depthWrite: false, fog: false, side: DoubleSide,
     }));
     const halo = new Mesh(new PlaneGeometry(w + 2.2, hgt + 1.6), haloMat);
@@ -1617,11 +1617,11 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     g.add(halo);
     if (o.sky !== false) {
       // what you see through the opening: bright overcast sky and snow (not tone mapped, so it glows)
-      const skyMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x24324a : sky.sky, toneMapped: false, fog: false }));
+      const skyMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x161b24 : sky.sky, toneMapped: false, fog: false }));
       const skyM = new Mesh(new PlaneGeometry(w + 6, hgt + 4), skyMat);
       skyM.position.set(0, hgt / 2 + 1, 2.4);
       skyM.rotation.y = Math.PI;
-      const snowMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x3c4a60 : 0xc9d2dc, fog: false }));
+      const snowMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x262a32 : new Color(0xc9d2dc).multiplyScalar(0.9), fog: false }));
       const snowG = new Mesh(new PlaneGeometry(w + 6, 2.3), snowMat);
       snowG.rotation.x = -Math.PI / 2;
       snowG.position.set(0, 0.005, 1.25);

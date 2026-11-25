@@ -313,11 +313,11 @@ export function openInside(opts) {
     if (plan.windows === 'front' && lrnd() < 0.7) lk.addBrokenGlass((lrnd() < 0.5 ? -1 : 1) * (3 + lrnd() * (W / 2 - 5)), -0.8, 1.3);
   }
   // Outside, seen through the door: snow and grey sky
-  const outside = new Mesh(new PlaneGeometry(6, 4), new MeshBasicMaterial({ color: opts.night ? 0x1a2433 : daySky.sky }));
+  const outside = new Mesh(new PlaneGeometry(6, 4), new MeshBasicMaterial({ color: opts.night ? 0x141920 : daySky.sky }));
   outside.position.set(0, 2, 2.5);
   outside.rotation.y = Math.PI;
   scene.add(outside);
-  const snow = new Mesh(new PlaneGeometry(6, 3), new MeshBasicMaterial({ color: opts.night ? 0x3a4656 : 0xf4f6f8 }));
+  const snow = new Mesh(new PlaneGeometry(6, 3), new MeshBasicMaterial({ color: opts.night ? 0x262a32 : 0xdfe3e6 }));
   snow.rotation.x = -Math.PI / 2;
   snow.position.set(0, 0.01, 1.4);
   scene.add(snow);
