@@ -338,6 +338,28 @@ export function openInside(opts) {
     }
   }
 
+  // Room windows (houses, clinics): each room with an outer side wall gets a window there,
+  // where no tall furniture stands (Adam: houses had no windows and were too dark).
+  const roomWindows = [];
+  if (plan.windows === 'rooms') {
+    for (const sp of plan.spots) {
+      const a = sp.area;
+      if (!a) continue;
+      const xo = Math.abs(a.x1) > Math.abs(a.x2) ? a.x1 : a.x2;
+      if (Math.abs(Math.abs(xo) - W / 2) > 0.3) continue; // not on an outer wall
+      const side = Math.sign(xo);
+      const face = xo - side * 0.1; // inside face of the wall
+      const z1 = Math.min(a.z1, a.z2); const z2 = Math.max(a.z1, a.z2);
+      const zc = (z1 + z2) / 2; const RD = z2 - z1;
+      const tall = plan.fixtures.filter((f) => f.solid && f.h > 0.95 && Math.abs(f.x - face) < (f.w / 2 + 0.8));
+      const cands = [zc, zc + RD / 4, zc - RD / 4, zc + RD / 8, zc - RD / 8];
+      const wz = cands.find((z) => !tall.some((f) => Math.abs(z - f.z) < f.d / 2 + 0.75));
+      if (wz == null) continue;
+      roomWindows.push({ x: face, z: wz, side, label: sp.label });
+      lk.addSideWindow(face, wz, sp.label === 'bathroom' ? 0.7 : 1.3, side, { sill: sp.label === 'bathroom' ? 1.3 : 0.9, h: sp.label === 'bathroom' ? 0.7 : 1.25 });
+    }
+  }
+
   // Static decor (fixtures, debris, props, covered bodies) goes here; it is merged by material
   // after the scene is built, so hundreds of small meshes become a few draw calls.
   const statics = new Group();
@@ -382,7 +404,10 @@ export function openInside(opts) {
       if (!f.tipped && f.type !== 'clothes') {
         // Detailed products on both faces (props3d.js): one shelf-fill group per face and aisle.
         for (const side of [-1, 1]) {
-          const zone = side < 0 ? f.leftZone : f.rightZone;
+          // The outer face of the first and last row (toward a side wall) has no aisle of its
+          // own; stock it too (Adam: empty shelves at the store ends), and let it empty with
+          // the aisle on its other face.
+          const zone = (side < 0 ? f.leftZone : f.rightZone) ?? (side < 0 ? f.rightZone : f.leftZone);
           if (zone == null) continue;
           shelfFaces.push({ f, side, zone, group: null, done: null });
         }
@@ -392,7 +417,7 @@ export function openInside(opts) {
         for (const lvl of levels) {
           for (let zz = -f.d / 2 + 0.3; zz < f.d / 2 - 0.2; zz += 0.34) {
             for (const side of [-1, 1]) {
-              const zone = side < 0 ? f.leftZone : f.rightZone;
+              const zone = (side < 0 ? f.leftZone : f.rightZone) ?? (side < 0 ? f.rightZone : f.leftZone);
               if (zone == null) continue;
               shelfSlots.push({ x: f.x + side * 0.27, y: lvl, z: f.z + zz, zone, clothes: f.type === 'clothes' });
             }
@@ -514,6 +539,16 @@ export function openInside(opts) {
   }
   refreshProducts();
 
+  // ---------- no clipping (Adam's playtest, item 4) ----------
+  // Every loose thing (debris, props, boxes, loot) takes a round footprint with a height range.
+  // A new thing goes where nothing else stands; if no place is free it is left out (props) or
+  // moved a little (loot).
+  const occ = [];
+  const occupied = (x, z, r, y0 = 0, y1 = 2) => occ.some((o) => Math.hypot(o.x - x, o.z - z) < o.r + r && y0 < o.y1 && o.y0 < y1);
+  const occupy = (x, z, r, y0 = 0, y1 = 2) => { occ.push({ x, z, r, y0, y1 }); };
+  const footR = (g, fallback = 0.2) => Math.max(0.05, Math.min(1.2, (g && g.userData && g.userData.radius) || fallback));
+  const footH = (g, fallback = 0.3) => (g && g.userData && g.userData.height) || fallback;
+
   // ---------- debris, carts, bodies ----------
   const debrisMats = {
     box: new MeshStandardMaterial({ color: 0x9c7b52, roughness: 1 }),
@@ -524,6 +559,12 @@ export function openInside(opts) {
   for (const d of plan.debris) {
     let m;
     const dseed = hashString(`${opts.title}:d:${d.x.toFixed(2)}:${d.z.toFixed(2)}`);
+    {
+      const dr = d.kind === 'cart' ? 0.5 : d.kind === 'paper' ? 0.2 : Math.max(0.15, (d.s || 0.3) * 0.8);
+      const flatD = d.kind === 'paper';
+      if (!flatD && occupied(d.x, d.z, dr, 0, 1)) continue;
+      if (!flatD) occupy(d.x, d.z, dr, 0, d.kind === 'cart' ? 1 : (d.s || 0.4) * 1.5);
+    }
     if (d.kind === 'box') { m = makeProp(d.s > 0.35 ? 'box_stack' : 'cardboard_box', dseed); m.position.set(d.x, 0, d.z); m.rotation.y = d.rot || 0; statics.add(m); continue; }
     if (d.kind === 'cart') { m = makeProp(lrnd() < 0.7 ? 'shopping_cart' : 'basket', dseed); m.position.set(d.x, 0, d.z); m.rotation.set(0, d.rot || 0, 0); statics.add(m); continue; }
     if (d.kind === 'paper') { m = makeProp('paper_scatter', dseed); m.position.set(d.x, 0, d.z); m.rotation.y = d.rot || 0; statics.add(m); continue; }
@@ -553,7 +594,7 @@ export function openInside(opts) {
     const solid = solidBoxes(plan, { counter: true });
     const taken = [];
     const free = (x, z, rad) => !solid.some((b) => Math.abs(x - b.x) < b.w / 2 + rad && Math.abs(z - b.z) < b.d / 2 + rad)
-      && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad)
+      && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad) && !occupied(x, z, rad)
       && x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad;
     // area: limit to one room ({x1,x2,z1,z2}); the default is the whole building.
     // Lower 3D quality leaves out some clutter props: 2 in 5 on Low, 1 in 5 on Medium.
@@ -587,6 +628,7 @@ export function openInside(opts) {
         g.traverse((o) => { if (o.isMesh) { o.castShadow = rad > 0.25; o.receiveShadow = true; } });
         statics.add(g);
         taken.push([x, z, rad]);
+        occupy(x, z, rad, 0, footH(g, 1));
         return g;
       }
       return null;
@@ -615,8 +657,8 @@ export function openInside(opts) {
         garage: [['box_stack', 1, true], ['cardboard_box', 2], ['trash_bag', 1], ['traffic_cone', 1]],
       };
       const WALL_SETS = {
-        kitchen: ['wall_clock', 'curtain'], 'living room': ['wall_frame', 'wall_frame', 'curtain'], bedroom: ['wall_frame', 'curtain'],
-        'second bedroom': ['wall_frame', 'curtain'], bathroom: [], garage: [],
+        kitchen: ['wall_clock'], 'living room': ['wall_frame', 'wall_frame'], bedroom: ['wall_frame'],
+        'second bedroom': ['wall_frame'], bathroom: [], garage: [],
       };
       for (const sp of plan.spots) {
         if (!sp.area) continue;
@@ -627,19 +669,41 @@ export function openInside(opts) {
           if (!PROP_KINDS.includes(kind)) return;
           const g = makeProp(kind, Math.floor(lrnd() * 1e6));
           const back = i % 2 === 0;
-          const x = A.x1 + 0.6 + lrnd() * Math.max(0, A.x2 - A.x1 - 1.2);
-          g.position.set(x, kind === 'curtain' ? 0.9 : 1.45, back ? A.z1 + 0.09 : A.z2 - 0.09);
+          const wz = back ? A.z1 + 0.09 : A.z2 - 0.09;
+          const wr = kind === 'curtain' ? 0.75 : 0.4;
+          const wy = kind === 'curtain' ? 0.9 : 1.45;
+          let x = null;
+          for (let k = 0; k < 10 && x == null; k++) {
+            const tx = A.x1 + 0.6 + lrnd() * Math.max(0, A.x2 - A.x1 - 1.2);
+            if (!occupied(tx, wz, wr, wy, wy + 1.4)) x = tx;
+          }
+          if (x == null) return;
+          occupy(x, wz, wr, wy, wy + 1.4);
+          g.position.set(x, wy, wz);
           g.rotation.y = back ? 0 : Math.PI;
           statics.add(g);
         });
       }
+      // Curtains hang at the windows (not on blank walls).
+      for (const wdw of roomWindows) {
+        if (!PROP_KINDS.includes('curtain') || wdw.label === 'bathroom' || wdw.label === 'garage') continue;
+        const g = makeProp('curtain', Math.floor(lrnd() * 1e6));
+        g.position.set(wdw.x - wdw.side * 0.1, 0.9, wdw.z);
+        g.rotation.y = wdw.side < 0 ? Math.PI / 2 : -Math.PI / 2;
+        statics.add(g);
+      }
       // Things on tables: mail, dishes. Chairs around the table if the model has none.
       for (const f of plan.fixtures) {
         if (f.type !== 'table') continue;
-        for (const [kind, dx] of [['mail_pile', -0.25], ['dish_stack', 0.25], ['magazine', 0], ['old_phone', 0.05]]) {
+        for (const [kind, dx] of [['mail_pile', -0.3], ['dish_stack', 0.3], ['magazine', 0], ['old_phone', 0.12]]) {
           if (!PROP_KINDS.includes(kind) || lrnd() < 0.3) continue;
           const g = makeProp(kind, Math.floor(lrnd() * 1e6));
-          g.position.set(f.x + dx, f.h, f.z + (lrnd() - 0.5) * 0.4);
+          const tx = f.x + dx;
+          const tz = f.z + (lrnd() - 0.5) * 0.4;
+          const tr = footR(g, 0.12);
+          if (occupied(tx, tz, tr, f.h, f.h + 0.3)) continue;
+          occupy(tx, tz, tr, f.h, f.h + footH(g, 0.1));
+          g.position.set(tx, f.h, tz);
           g.rotation.y = lrnd() * Math.PI;
           statics.add(g);
         }
@@ -647,8 +711,8 @@ export function openInside(opts) {
     } else for (const [kind, n, wall] of SETS[plan.cat] || SETS.house) for (let i = 0; i < n; i++) place(kind, !!wall);
     // On top of fixtures: registers on checkouts, things on kitchen counters.
     for (const f of plan.fixtures) {
-      if (f.type === 'checkout') { const g = makeProp('register', Math.floor(f.x * 100)); g.position.set(f.x, f.h, f.z - f.d / 4); g.rotation.y = Math.PI / 2; statics.add(g); }
-      if (f.type === 'counter' && plan.cat === 'house') { const g = makeProp('kitchen_counter_items', Math.floor(f.z * 100)); g.position.set(f.x, f.h, f.z); statics.add(g); }
+      if (f.type === 'checkout') { const g = makeProp('register', Math.floor(f.x * 100)); g.position.set(f.x, f.h, f.z - f.d / 4); g.rotation.y = Math.PI / 2; statics.add(g); occupy(f.x, f.z - f.d / 4, footR(g, 0.3), f.h, f.h + 0.4); }
+      if (f.type === 'counter' && plan.cat === 'house') { const g = makeProp('kitchen_counter_items', Math.floor(f.z * 100)); g.position.set(f.x, f.h, f.z); statics.add(g); occupy(f.x, f.z, footR(g, 0.4), f.h, f.h + 0.4); }
     }
   }
 
@@ -728,6 +792,22 @@ export function openInside(opts) {
   // Each item from the engine gets a place: on a shelf face in its aisle, or on furniture / the floor in its room.
   const itemObjs = new Map(); // pid -> { it, obj, x, y, z }
   const solidNow = () => solidBoxes(plan, { counter: true });
+  // Move a loot spot a little until nothing else stands there (same height band).
+  // Items on a shelf board slide along the board; on the floor or a table they move in a circle.
+  function freeSpot(p, it, rad, h) {
+    const r = mulberry32(hashString(`free:${it.pid}:${opts.title}`));
+    const onShelf = plan.kind === 'hall' && p.y > 0.05;
+    const solid = solidNow();
+    const inSolid = (x, z) => p.y < 0.05 && solid.some((b) => Math.abs(x - b.x) < b.w / 2 + rad * 0.6 && Math.abs(z - b.z) < b.d / 2 + rad * 0.6);
+    let q = { ...p };
+    for (let i = 0; i < 14 && (occupied(q.x, q.z, rad, q.y, q.y + h) || inSolid(q.x, q.z)); i++) {
+      const step = 0.18 + i * 0.07;
+      if (onShelf) q = { ...p, z: p.z + (i % 2 ? 1 : -1) * step };
+      else { const a = r() * Math.PI * 2; q = { ...p, x: p.x + Math.cos(a) * step, z: p.z + Math.sin(a) * step }; }
+    }
+    occupy(q.x, q.z, rad, q.y, q.y + h);
+    return q;
+  }
   function placeFor(it) {
     const r = mulberry32(hashString(`place:${it.pid}:${opts.title}`));
     const spot = plan.spots.find((p) => p.zone === it.zone);
@@ -778,7 +858,7 @@ export function openInside(opts) {
     for (let i = 0; i < 16; i++) {
       const x = plan.kind === 'hall' ? spot.x + (r() - 0.5) * Math.max(0.2, a.x2 - a.x1 - 1.4) : a.x1 + 0.5 + r() * (a.x2 - a.x1 - 1);
       const z = a.z1 + 0.8 + r() * (a.z2 - a.z1 - 1.6);
-      if (!boxes.some((b) => Math.abs(x - b.x) < b.w / 2 + 0.3 && Math.abs(z - b.z) < b.d / 2 + 0.3)) return { x, z, rot: r() * Math.PI };
+      if (!boxes.some((b) => Math.abs(x - b.x) < b.w / 2 + 0.3 && Math.abs(z - b.z) < b.d / 2 + 0.3) && !occupied(x, z, 0.35, 0, 0.5)) return { x, z, rot: r() * Math.PI };
     }
     return null;
   }
@@ -792,6 +872,7 @@ export function openInside(opts) {
     obj.rotation.y = p.rot;
     scene.add(obj);
     const h = obj.userData.height || 0.35;
+    occupy(p.x, p.z, obj.userData.radius || 0.3, 0, h);
     const c = { cid, zone, obj, x: p.x, y: h / 2, z: p.z, r: obj.userData.radius || 0.3, opened: opts.isOpened(cid), container: true };
     if (c.opened) openLook(c);
     containers.set(cid, c);
@@ -851,8 +932,8 @@ export function openInside(opts) {
           p = { x: c.x + Math.cos(k) * (c.r + 0.15), y: 0, z: c.z + Math.sin(k) * (c.r + 0.15) };
         }
       }
-      p = p || placeFor(it);
       const obj = makeItemModel(it.item, hashString(it.pid));
+      p = freeSpot(p || placeFor(it), it, footR(obj, 0.12), footH(obj, 0.2));
       obj.position.set(p.x, p.y, p.z);
       obj.rotation.y = (hashString(it.pid) % 628) / 100;
       // Loot is a little brighter than the room, so the eye finds it.
@@ -1703,7 +1784,15 @@ export function openInside(opts) {
   frame.n = 0;
   requestAnimationFrame(frame);
   // For automated tests: move the player.
-  window.__llInside = { scene, renderer, plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
+  const clipReport = () => {
+    let n = 0;
+    for (let i = 0; i < occ.length; i++) for (let j = i + 1; j < occ.length; j++) {
+      const a = occ[i]; const b = occ[j];
+      if (Math.hypot(a.x - b.x, a.z - b.z) < (a.r + b.r) * 0.8 && a.y0 < b.y1 && b.y0 < a.y1) n++;
+    }
+    return { things: occ.length, overlaps: n };
+  };
+  window.__llInside = { clipReport, scene, renderer, plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
   return { close: () => leave() };
 }
