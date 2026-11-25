@@ -279,6 +279,17 @@ request that says which rule change is meant and why.
   hardware stores.
 - Bites: 25% infection if open for 6 h, 10% even if bandaged in time.
 
+## Browser playtest 1 fixes
+
+- Temperature curve (`world.js` `baseAirTemp`): before 5 AM the weather record is still
+  yesterday's, so the night eases from its high to its `nextLow` (no jump at midnight).
+  Rare spells no longer change this morning's low (no jump at 5 AM). The night low is
+  never above the day's high − 3, so "Low tonight" (`preview.js`, with a cold snap) is
+  the real low.
+- Auto-wake (`tick.js`): sleep ends early when water < 15, food < 10, warmth < 30 or
+  health < 30 is crossed during the sleep (one line in the journal). The clock
+  (`src/core/clock.js`) stops an action when a rule sets `state._stop`.
+
 ## Playtest list 1 fixes (research, 700 bot runs)
 
 - Antibiotics: once a course starts (`infection.abxH`), the infection does no more
@@ -362,3 +373,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
    as one ten-day advance. Each system now declares `catchUp`.
 4. A small diagnostics overlay (frame ms, sections, memory) behind a key, with the
    pick-up items thread, which owns the 3D view.
+
+## Browser playtest 2 fixes
+
+- **Ammo:** `arrowsLeft` / `roundsLeft` count the open set or box (`state.wild.arrows`, `state.wild.rounds`) plus the closed ones. A box of `rifle_rounds` is 20 shots, a set of `arrows` is 6. The rifle and bow work until the last shot.
+- **Storm windows:** `stormWindows(state)` in home.js runs in the home daily hook. On a windstorm (8%), ice storm (10%) or heavy rain (1%) night it breaks one window (stream `home`) and logs a line.
+- **Cold sleep:** `warmthRate` uses the piecewise curve `WARMTH_CURVE` (5 °F: −28/h to 72 °F: +10/h), so a cold bedroom costs much more warmth than a warm one.
+- **Danger stop:** `advanceTime(state, min, mode, { stopAtDanger: true })` ends the action when a need crosses a `STOP_AT` line (water 15, food 10, warmth 25, health 30, energy 10) and returns true, with a journal line. Sleep always does this (`WAKE_AT`). Fishing and hunting pass the flag; other calls do not, so plain rest and the tests run as before.
+- **Save shape:** `newGame` has `wild: {}` and `cars: {}` (cars are owned by the builder's engine/cars.js). `parseSave` adds empty ones to older saves.

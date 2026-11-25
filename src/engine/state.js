@@ -60,6 +60,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
       storage: {
         formula: 4, saline: 2, first_aid: 1, antibiotics: 1, pain_pills: 1,
         canned_food: 6, snacks: 1, dry_food: 1, flashlight: 1, winter_coat: 1, firewood: 3,
+        snare_wire: 1, // a coil in the garage (research: common in a suburban garage)
       },
       indoorTemp: 47,
       fireHours: 0,
@@ -80,6 +81,8 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     places: {},
     houses: {},
     houseAreas: {},
+    wild: {}, // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
+    cars: {}, // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
     dog: {
       stage: 'none',
       arriveDay: 1 + Math.floor(r() * 4), // day 2 to 5

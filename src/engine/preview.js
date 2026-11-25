@@ -12,7 +12,7 @@ import { estimateTrip } from './travel.js';
 import { environment, feltTemp } from './tick.js';
 import { wetGainPerHour, WET_LIMIT } from './clothes.js';
 import { gameDay } from '../core/clock.js';
-import { activeHazards } from './hazards.js';
+import { activeHazards, hazardColder } from './hazards.js';
 
 const DAY_START = 300; // 5 AM
 
@@ -66,7 +66,8 @@ export function weatherOutlook(state, t = state.time) {
     effects: weatherEffects(state),
     // The next weather change: the weather rolls once a day at 5 AM.
     // Tomorrow's low is known now (it is the end of today's temperature curve).
-    next: { at: next, atText: formatClock(next), inMinutes: Math.round(next - t), lowF: Math.round(w.nextLow) },
+    // The low shown is the real low of the curve (with a cold snap, if one is on).
+    next: { at: next, atText: formatClock(next), inMinutes: Math.round(next - t), lowF: Math.round(w.nextLow - hazardColder(state, next)) },
   };
 }
 

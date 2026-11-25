@@ -74,14 +74,15 @@ test('fishing: spot pressure lowers the odds and recovers in 2 to 3 weeks; winte
   assert.equal(catchFactor(w, 'commonwealth_lake'), 0.5);
 });
 
-test('fishing: a salmon run month on the Willamette gives better odds', () => {
-  const winter = at('willamette_park');
-  winter.carried.fishing_rod = 1;
-  const spring = at('willamette_park');
-  spring.carried.fishing_rod = 1;
-  spring.time = 140 * 1440 + 8 * 60; // April
-  assert.ok(fishOdds(spring).pct > fishOdds(winter).pct);
-  assert.ok(fishOdds(spring).mods.some(([n]) => /run/.test(n)));
+test('fishing: Willamette runs (spring and fall salmon, winter steelhead) give better odds', () => {
+  const mk = (day) => { const s = at('willamette_park'); s.carried.fishing_rod = 1; s.time = day * 1440 + 8 * 60; return s; };
+  const winter = mk(10); // early December
+  const spring = mk(140); // April
+  const summer = mk(220); // early July: no run
+  assert.ok(fishOdds(spring).mods.some(([n]) => /salmon run/.test(n)));
+  assert.ok(fishOdds(winter).mods.some(([n]) => /steelhead run/.test(n)));
+  assert.ok(!fishOdds(summer).mods.some(([n]) => /run/.test(n)));
+  assert.ok(fishOdds(spring).pct > fishOdds(summer).pct);
 });
 
 test('hunting: needs a hunt spot and a bow or rifle; ducks only in their months', () => {
@@ -138,4 +139,33 @@ test('snares: set, wait a night, check; rabbits now and then', () => {
     rabbits += checkSnare(s).rabbits || 0;
   }
   assert.ok(rabbits >= 2 && rabbits <= 9, `${rabbits} rabbits in 10 nights`);
+});
+
+test('playtest 2: the rifle and bow work again after the first shot; a box gives 20 rounds', async () => {
+  const { roundsLeft, arrowsLeft, huntMethods } = await import('../src/engine/wild.js');
+  const s = at('cooper_mountain', 62, 7);
+  s.carried.rifle = 1; s.carried.rifle_rounds = 1; s.carried.bow = 1; s.carried.arrows = 1;
+  assert.equal(roundsLeft(s), 20);
+  assert.equal(arrowsLeft(s), 6);
+  let shots = 0;
+  for (let i = 0; i < 4 && !s.dead; i++) {
+    s.player.food = s.player.water = s.player.warmth = s.player.energy = s.player.health = 90;
+    s.wild.scared = {};
+    if (!huntMethods(s).includes('rifle')) break;
+    hunt(s, 'rifle'); shots++;
+  }
+  assert.equal(shots, 4, 'four hunts with one box');
+  assert.ok(roundsLeft(s) >= 16 && roundsLeft(s) < 20);
+  assert.ok(huntMethods(s).includes('bow'));
+});
+
+test('playtest 2: a long hunt stops at a danger line with a journal line', () => {
+  const s = at('cooper_mountain', 63, 7);
+  s.carried.bow = 1; s.carried.arrows = 1;
+  s.player.water = 16; // will cross 15 in the 3 hours
+  const t0 = s.time;
+  const r = hunt(s, 'bow');
+  assert.equal(r.stopped, true);
+  assert.ok(s.time - t0 < 180);
+  assert.match(s.log.map((l) => l.text || l).join('\n'), /You stop\. Your mouth is dry/);
 });

@@ -88,3 +88,85 @@ test('trees on roads: a blocked road is a longer walk, shorter with a phone sign
   travel(s, dest(on), 'the store');
   assert.ok(hasChange(s, `road:${on}`, 'tree', 'set'));
 });
+
+import { airTemp } from '../src/engine/world.js';
+import { weatherSystem } from '../src/engine/systems.js';
+
+test('temperature: a smooth curve (no jump at midnight or 5 AM); the night low is the forecast low', () => {
+  for (const seed of [81, 82, 83]) {
+    const s = newGame(seed);
+    let prev = null;
+    let forecast = null; // "low tonight", read in the evening
+    let nightMin = Infinity;
+    const t0 = Math.ceil(s.time / 10) * 10;
+    for (let t = t0; t < t0 + 60 * 1440; t += 10) {
+      const m = t % 1440;
+      if (m === 300) weatherSystem.daily(s, Math.floor(t / 1440)); // 5 AM: the weather rolls
+      if (m === 18 * 60) { forecast = s.weather.nextLow; nightMin = Infinity; }
+      const a = airTemp(s, t);
+      if (forecast != null && (m >= 18 * 60 || m < 11 * 60)) nightMin = Math.min(nightMin, a);
+      if (m === 11 * 60 && forecast != null) assert.ok(Math.abs(nightMin - forecast) <= 1, `seed ${seed} day ${Math.floor(t / 1440)}: night min ${nightMin.toFixed(1)} vs forecast ${forecast}`);
+      if (prev != null) assert.ok(Math.abs(a - prev) < 2.5, `seed ${seed} t ${t} (${m} min): ${prev.toFixed(1)} -> ${a.toFixed(1)}`);
+      prev = a;
+    }
+  }
+});
+
+import { advanceTime, WAKE_AT } from '../src/engine/tick.js';
+
+test('sleep: you wake when water falls past the danger line, not hours later', () => {
+  const s = newGame(84);
+  s.player.water = WAKE_AT.water + 3;
+  s.player.food = s.player.warmth = s.player.health = 90;
+  const t0 = s.time;
+  advanceTime(s, 8 * 60, 'sleep');
+  assert.ok(!s.dead);
+  assert.ok(s.time - t0 < 8 * 60, `slept ${(s.time - t0) / 60} h`);
+  assert.ok(s.player.water < WAKE_AT.water);
+  assert.match(s.log[s.log.length - 1].text, /dry mouth/);
+  assert.equal(s._sleepFrom, undefined);
+  assert.equal(s._stop, undefined);
+  // Already below the line: the sleep goes on (no wake loop).
+  const t1 = s.time;
+  advanceTime(s, 60, 'sleep');
+  assert.equal(s.time - t1, 60);
+});
+
+test('save shape: newGame has wild and cars; an old save without them loads with empty ones', async () => {
+  const { newGame } = await import('../src/engine/state.js');
+  const { parseSave } = await import('../src/engine/save.js');
+  const st = newGame(7);
+  assert.deepEqual(st.wild, {});
+  assert.deepEqual(st.cars, {});
+  const old = JSON.parse(JSON.stringify(st));
+  delete old.wild; delete old.cars;
+  const back = parseSave(JSON.stringify(old));
+  assert.deepEqual(back.wild, {});
+  assert.deepEqual(back.cars, {});
+});
+
+test('playtest 2: a storm night can break a window (stream "home"); calm nights never do', async () => {
+  const { stormWindows } = await import('../src/engine/home.js');
+  let broke = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const s = newGame(seed);
+    s.weather.type = 'clear';
+    assert.equal(stormWindows(s), null);
+    s.weather.type = 'windstorm';
+    if (stormWindows(s)) { broke++; assert.ok(Object.values(s.home.windows).some((w) => w.broken > 0)); }
+  }
+  assert.ok(broke > 4 && broke < 40, `broke ${broke} of 200`);
+});
+
+test('playtest 2: sleeping in a cold room costs much more warmth than a warm one', async () => {
+  const { advanceTime } = await import('../src/engine/tick.js');
+  const run = (temp) => {
+    const s = newGame(81); fed(s); s.player.warmth = 70;
+    s.home.indoorTemp = temp; s.home.fireHours = 0; s.home.heaterOn = false;
+    const before = s.player.warmth;
+    advanceTime(s, 60, 'sleep');
+    return before - s.player.warmth;
+  };
+  const cold = run(30), warm = run(60);
+  assert.ok(cold > warm + 5, `cold ${cold} warm ${warm}`);
+});

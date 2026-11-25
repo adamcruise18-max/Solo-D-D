@@ -151,13 +151,18 @@ const FOOD_CATS = new Set(['supermarket', 'convenience', 'gas', 'house']);
 const LOW_FOOD_KCAL = 6000;
 
 function smartNextPlace(state, wantFood) {
+  // Near places first; when those are empty, a careful player ranges farther (rested, daylight).
+  return nextPlaceWithin(state, wantFood, 4) || (state.player.energy >= 60 && !isNight(state.time + 4 * 60) ? nextPlaceWithin(state, wantFood, 9) : null);
+}
+
+function nextPlaceWithin(state, wantFood, maxMiles) {
   let best = null;
   for (const pl of allPlaces()) {
     const ps = state.places[pl.id];
     if (ps && (ps.zonesDone >= ps.zones || !ps.unlocked)) continue;
     if (!CATEGORIES[pl.cat]) continue;
     const d = straightMiles(state.pos, pl);
-    if (d > 4) continue;
+    if (d > maxMiles) continue;
     const score = d * (wantFood && !FOOD_CATS.has(pl.cat) ? 3 : 1);
     if (!best || score < best.score) best = { pl, score };
   }
@@ -238,6 +243,23 @@ function atWild(state) {
   perform(state, 'action', 'go_home'); return 'go home';
 }
 
+// Low on food: a food store not yet visited, close by, first; then the houses here
+// (every house had a pantry); then the nearest place that still has houses around it.
+function foodRun(state, pl) {
+  const fresh = pl && FOOD_CATS.has(pl.cat) && pl.cat !== 'house' && !state.places[pl.id] && straightMiles(state.pos, pl) <= 4;
+  if (fresh && pl.id !== state.location.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
+  if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+  if (isNight(state.time + 2 * 60) || state.player.energy < 40) return null;
+  let best = null;
+  for (const p of allPlaces()) {
+    if (!CATEGORIES[p.cat] || (state.houseAreas?.[p.id] || 0) >= 12 || p.id === state.location.id) continue;
+    const d = straightMiles(state.pos, p);
+    if (d <= 9 && (!best || d < best.d)) best = { p, d };
+  }
+  if (best) { perform(state, 'action', 'go_place', best.p.id); return `go ${best.p.id} (houses)`; }
+  return null;
+}
+
 export function smartTurn(state) {
   const p = state.player;
   if (treat(state)) return 'treat';
@@ -259,8 +281,8 @@ export function smartTurn(state) {
     if (!lowFood && spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
     if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
     if (can(state, 'store_all')) perform(state, 'action', 'store_all');
-    if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     const pl = smartNextPlace(state, lowFood);
+    if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
     if (pl) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
     if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     perform(state, 'action', 'rest'); return 'rest';
@@ -285,8 +307,8 @@ export function smartTurn(state) {
     if (can(state, 'takeall') || Object.keys(placeState(state, { ...allPlaces().find((x) => x.id === loc.id) }).leftovers).length) perform(state, 'takeall');
     return 'search';
   }
-  if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
   const pl = smartNextPlace(state, lowFood);
+  if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
   if (pl && pl.id !== loc.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
   perform(state, 'action', 'go_home'); return 'go home';
 }
