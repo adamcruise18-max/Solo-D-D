@@ -3866,6 +3866,7 @@ function gBoxW(w, h, d) {
 }
 function tex1m(key, px, draw) { return ctex('fx|' + key, px, px, draw, { repeat: [1, 1] }); }
 function dust(c, w, h, r, amt = 1) {
+  if (TOON) amt *= 0.35; // stylized look: clean, lightly worn fixtures (Adam's reference sheets)
   grime(c, w, h, r, amt);
   // fine settled dust
   for (let i = 0; i < 1500 * amt; i++) { c.fillStyle = `rgba(200,190,170,${0.04 + r() * 0.06})`; c.fillRect(r() * w, r() * h, 1.5, 1.5); }
@@ -3907,14 +3908,14 @@ const FX = {
   enamel(key = 'w', base = '#e9e8e2') {
     return mat('fxenamel' + key, { map: tex1m('enamel' + key, 256, (c, w, h, r) => {
       c.fillStyle = base; c.fillRect(0, 0, w, h);
-      for (let i = 0; i < 18; i++) { const x = r() * w; const g2 = c.createLinearGradient(0, 0, 0, h); g2.addColorStop(0, 'rgba(120,100,60,0)'); g2.addColorStop(1, `rgba(120,100,60,${0.05 + r() * 0.08})`); c.fillStyle = g2; c.fillRect(x, r() * h * 0.5, 2 + r() * 4, h); }
+      for (let i = 0; i < 18; i++) { const x = r() * w; const g2 = c.createLinearGradient(0, 0, 0, h); g2.addColorStop(0, 'rgba(120,100,60,0)'); g2.addColorStop(1, `rgba(120,100,60,${(0.05 + r() * 0.08) * (TOON ? 0.3 : 1)})`); c.fillStyle = g2; c.fillRect(x, r() * h * 0.5, 2 + r() * 4, h); }
       dust(c, w, h, r, 1);
     }), roughness: 0.3 });
   },
   painted(color) {
     return mat('fxpaint' + color, { map: tex1m('paint' + color, 256, (c, w, h, r) => {
       noiseFill(c, w, h, r, color, 0.04, 1500, 2);
-      for (let i = 0; i < 25; i++) { c.fillStyle = 'rgba(60,50,40,0.25)'; c.beginPath(); c.ellipse(r() * w, r() * h, 1 + r() * 4, 1 + r() * 2, r() * 3, 0, TAU); c.fill(); }
+      for (let i = 0; i < 25; i++) { c.fillStyle = `rgba(60,50,40,${TOON ? 0.06 : 0.25})`; c.beginPath(); c.ellipse(r() * w, r() * h, 1 + r() * 4, 1 + r() * 2, r() * 3, 0, TAU); c.fill(); }
       dust(c, w, h, r, 1);
     }), roughness: 0.55, metalness: 0.05 });
   },

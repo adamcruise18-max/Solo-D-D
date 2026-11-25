@@ -480,9 +480,9 @@ function makeDrywall(S, seed, paintHex, baseHex) {
       o[3] = 0.85; o[4] = 0.55;
       return;
     }
-    const m = (mot[i] - 0.5) * 22;
+    const m = (mot[i] - 0.5) * (STYLE_REAL ? 22 : 10 + 12 * Math.min(1, grimeAmt));
     const low = clamp01(1 - (fromFloor - basePx) / dirtBand); // dirt near the floor
-    const d = low * low * (0.4 + mot[i] * 0.6) * (grimeAmt < 0.05 ? 0.2 : 1);
+    const d = low * low * (0.4 + mot[i] * 0.6) * (grimeAmt < 0.05 ? 0.2 : STYLE_REAL ? 1 : Math.min(1, 0.25 + grimeAmt));
     o[0] = p[0] + m - d * 60; o[1] = p[1] + m - d * 62; o[2] = p[2] + m - d * 66;
     o[3] = 0.5 + peel[i] * 0.06;
     o[4] = 0.78 + d * 0.15;
@@ -491,6 +491,9 @@ function makeDrywall(S, seed, paintHex, baseHex) {
   // A kept-up home (grime 'clean'): no stains, drips, scuffs or chips (same random draws).
   const clean = grimeAmt < 0.05;
   if (clean) { c.globalAlpha = 0; L.hc.globalAlpha = 0; }
+  // Stylized look (Adam's reference sheets: clean, soft surfaces): the marks follow the grime
+  // level, so a lived-in house shows only faint ones. ?style=real keeps them full.
+  else if (!STYLE_REAL) { c.globalAlpha = Math.min(1, grimeAmt * 1.2); L.hc.globalAlpha = c.globalAlpha; }
   // water stains with drip trails from above
   for (let k = 0; k < 2; k++) {
     const x = rnd() * W;
@@ -646,7 +649,7 @@ function makePlaster(S, seed, hex = 0xc4c0b6) {
   const fine = noiseField(S, S, S / 3, S / 3, rnd);
   const p = rgb(hex);
   paint(L, (i, x, y, o) => {
-    const v = (n[i] - 0.5) * 20;
+    const v = (n[i] - 0.5) * (STYLE_REAL ? 20 : 12);
     o[0] = p[0] + v; o[1] = p[1] + v; o[2] = p[2] + v;
     o[3] = 0.5 + fine[i] * 0.15;
     o[4] = 0.92;
@@ -675,11 +678,11 @@ export function makeSurfaces(quality = 'high', grime = 'low') {
     carpet: () => makeCarpet(low ? 256 : 384, 41),
     concrete: () => makeConcrete(S, 53),
     drywall: () => makeDrywall(low ? 192 : 384, 61, sty(0xd2c6b0, 0xb4b8aa), sty(0x6a5e50, 0x3b3a37)), // stylized: warm paint
-    drywallWarm: () => makeDrywall(low ? 192 : 384, 67, 0xb3a58c, 0xd2ccbe),
+    drywallWarm: () => makeDrywall(low ? 192 : 384, 67, sty(0xdcc9a8, 0xb3a58c), sty(0xeee6d8, 0xd2ccbe)), // stylized: warm cream paint, white base
     tileWall: () => makeTileWall(S, 71),
     ceilingTile: () => makeCeilingTile(S, 83),
     blockWall: () => makeBlockWall(S, 89),
-    plaster: () => makePlaster(low ? 256 : 384, 97),
+    plaster: () => makePlaster(low ? 256 : 384, 97, sty(0xe4dccd, 0xc4c0b6)),
   };
   const s = { quality, grime, surfaceFor: (cat, part, room) => surfaceFor(cat, part, room, quality, grime) };
   const built = {};
@@ -1422,9 +1425,9 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     const roomGeo = new BoxGeometry(10, 4, 10);
     const colors = [];
     const pos = roomGeo.attributes.position;
-    const wallC = new Color(dim ? 0x15181c : 0x6a6e72);
+    const wallC = new Color(dim ? (real ? 0x15181c : 0x1e1913) : real ? 0x6a6e72 : 0x7a6e60);
     const floorC = new Color(dim ? 0x0c0b0a : 0x40392f);
-    const ceilC = new Color(dim ? 0x0a0b0d : 0x8a8e92);
+    const ceilC = new Color(dim ? (real ? 0x0a0b0d : 0x16130f) : real ? 0x8a8e92 : 0x9a9082);
     for (let i = 0; i < pos.count; i++) {
       const y = pos.getY(i);
       const c = y > 1 ? ceilC : y < -1 ? floorC : wallC;
@@ -1448,7 +1451,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   if (opts.fill !== false) {
     // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.12 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
+      ? new HemisphereLight(real ? 0x7a8aa0 : 0xd2bfa4, real ? 0x1d1813 : 0x6a5640, night ? 0.12 : (real ? 0.95 : 1.15) * (0.4 + 0.6 * Math.min(1, dayK)))
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
         : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5 * (0.35 + 0.65 * Math.min(1, dayK)));

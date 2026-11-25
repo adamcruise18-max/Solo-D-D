@@ -500,7 +500,8 @@
         { id: "rifle_rounds", w: 0.4 },
         { id: "phone", w: 1.5 },
         { id: "bow", w: 0.3 },
-        { id: "arrows", w: 0.4 }
+        { id: "arrows", w: 0.4 },
+        { id: "backpack", w: 1 }
       ]
     }
   };
@@ -4368,7 +4369,7 @@
       inj.bandaged = true;
       inj.healH *= bandageHealFactor(state2);
       practice(state2, "first_aid", 3);
-      log(state2, `You clean and bandage the ${INJURY_NAMES[inj.type].toLowerCase()}.`, "good");
+      log(state2, `You clean and bandage the ${injuryName(inj).toLowerCase()}.`, "good");
       advanceTime(state2, 15);
       return;
     }
@@ -4737,7 +4738,7 @@
       practice(state2, "tinkering", 4);
     } else {
       practice(state2, "tinkering", 2);
-      if (chance(state2, 0.3)) addInjury(state2, "sprain");
+      if (chance(state2, 0.3)) addInjury(state2, "sprain", { part: "ankle" });
     }
   }
   function openCounter(state2) {
@@ -4765,7 +4766,7 @@
     let m = base2 * searchTimeFactor(state2) * searchJobFactor(state2);
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
-    if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
+    m /= injuryFactor(state2, "hand");
     const extra = Math.max(0, bagWeight(state2.carried) - 10);
     m *= 1 + Math.floor(extra / 10) * 0.1;
     return m;
@@ -7238,7 +7239,7 @@
     const chips = riskChips();
     if (p.weak) chips.push(["warn", `Weak (Energy max ${p.energyMax})`]);
     if (p.wet) chips.push(["bad", "Wet"]);
-    for (const i of p.injuries) chips.push(["bad", `${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`]);
+    for (const i of p.injuries) chips.push(["bad", `${injuryName(i)}${i.bandaged ? " (bandaged)" : ""}`]);
     if (p.illness.infection) chips.push(["bad", `Infection${p.illness.infection.abxH != null ? " (on antibiotics)" : ""}`]);
     if (p.illness.stomachH > 0) chips.push(["bad", "Stomach bug"]);
     if (p.painH > 0) chips.push(["ok", "Pain pills"]);
@@ -8091,7 +8092,7 @@
     if (name === "character") {
       const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc(r.text)}</div>`).join("");
       const notes = [];
-      for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? " (bandaged)" : ""}`);
+      for (const i of p.injuries) notes.push(`${injuryName(i)}${i.bandaged ? " (bandaged)" : ""}`);
       if (p.illness.infection) notes.push("Infection");
       if (p.illness.stomachH > 0) notes.push("Stomach bug");
       if (p.wet) notes.push("Wet");

@@ -5,7 +5,7 @@ import {
   newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight, log,
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
-import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
+import { feltTemp, injuryName, environment } from '../engine/tick.js';
 import { forceOpts, listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
 import { buildInterior, buildHome } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
@@ -300,7 +300,7 @@ function renderStats() {
   const chips = riskChips();
   if (p.weak) chips.push(['warn', `Weak (Energy max ${p.energyMax})`]);
   if (p.wet) chips.push(['bad', 'Wet']);
-  for (const i of p.injuries) chips.push(['bad', `${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`]);
+  for (const i of p.injuries) chips.push(['bad', `${injuryName(i)}${i.bandaged ? ' (bandaged)' : ''}`]);
   if (p.illness.infection) chips.push(['bad', `Infection${p.illness.infection.abxH != null ? ' (on antibiotics)' : ''}`]);
   if (p.illness.stomachH > 0) chips.push(['bad', 'Stomach bug']);
   if (p.painH > 0) chips.push(['ok', 'Pain pills']);
@@ -1173,7 +1173,7 @@ function insidePanel(name) {
     const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')
       + risks(state).map((r) => `<div class="risk-line">⚠ ${esc(r.text)}</div>`).join('');
     const notes = [];
-    for (const i of p.injuries) notes.push(`${INJURY_NAMES[i.type]}${i.bandaged ? ' (bandaged)' : ''}`);
+    for (const i of p.injuries) notes.push(`${injuryName(i)}${i.bandaged ? ' (bandaged)' : ''}`);
     if (p.illness.infection) notes.push('Infection');
     if (p.illness.stomachH > 0) notes.push('Stomach bug');
     if (p.wet) notes.push('Wet');
