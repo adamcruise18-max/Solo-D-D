@@ -3,7 +3,7 @@
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
-import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from './world.js';
+import { airTemp, isNight, sunFor, solarToday, weatherInfo } from './world.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
@@ -11,6 +11,7 @@ import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
 import { infectRiskFactor } from './skills.js';
+import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
 import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';

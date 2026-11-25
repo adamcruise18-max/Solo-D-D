@@ -54,6 +54,8 @@ try {
     // The intro shows after the map loads: wait for it, do not guess a time.
     await page.locator('#startBtn').waitFor({ timeout: 20000 });
     await page.locator('#startBtn').click();
+    // "Who were you?": keep the default job and no traits.
+    await page.locator('#bgGo').click();
     await page.locator('[data-act="sleep"]').first().waitFor({ timeout: 10000 });
     const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lastlight.save.v1') || 'null'));
     const before = await read();
