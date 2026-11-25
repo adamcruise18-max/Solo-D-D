@@ -160,3 +160,15 @@ test('opening a container costs time once and is saved', async () => {
   assert.equal(s.time, t1);
   assert.equal(openContainer(s, 'x; bad'), false);
 });
+
+test('some buildings are open to the weather, the same way every time', async () => {
+  const { buildInterior } = await import('../src/engine/interior.js');
+  let n = 0;
+  for (let i = 0; i < 400; i++) {
+    const a = buildInterior('supermarket', 'k' + i, 8);
+    const b = buildInterior('supermarket', 'k' + i, 8);
+    assert.deepEqual(a.exposed, b.exposed);
+    if (a.exposed) { n++; assert.ok(['window', 'roof'].includes(a.exposed.kind)); }
+  }
+  assert.ok(n > 15 && n < 80, `exposed ${n} of 400`);
+});
