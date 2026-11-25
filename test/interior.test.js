@@ -144,3 +144,19 @@ test('items behind a locked counter stay until the gate opens', async () => {
   assert.equal(pickUp(s, pid), false);
   assert.ok(!(ps.taken || []).includes(pid));
 });
+
+test('opening a container costs time once and is saved', async () => {
+  const { openContainer, openedContainers } = await import('../src/engine/actions.js');
+  setPlaces([{ id: 'c7', name: 'Store', cat: 'supermarket', lat: 45.5, lon: -122.8 }]);
+  const s = newGame(31);
+  s.location = { kind: 'place', id: 'c7' };
+  perform(s, 'action', 'search', 0);
+  const t0 = s.time;
+  perform(s, 'action', 'open_container', 'c3');
+  assert.ok(s.time > t0);
+  assert.deepEqual(openedContainers(s), ['c3']);
+  const t1 = s.time;
+  assert.equal(openContainer(s, 'c3'), false);
+  assert.equal(s.time, t1);
+  assert.equal(openContainer(s, 'x; bad'), false);
+});

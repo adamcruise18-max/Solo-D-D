@@ -347,7 +347,7 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 #inside .in-map text { fill: var(--muted); font-size: .9px; font-family: var(--cond); }
 #inside .in-stance { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 4px 12px; background: var(--glass); border: 1px solid var(--line-2);
   font: 600 12px/1.3 var(--cond); letter-spacing: .15em; text-transform: uppercase; color: var(--signal); pointer-events: none; }
-#inside .in-debug { position: absolute; left: 12px; bottom: 34px; font: 12px/1.3 ui-monospace, monospace; color: #9fe; background: rgba(0,0,0,.5); padding: 3px 6px; pointer-events: none; }
+#inside .in-debug { position: absolute; left: 12px; bottom: 34px; font: 12px/1.35 ui-monospace, monospace; color: #9fe; background: rgba(0,0,0,.6); padding: 4px 8px; pointer-events: none; white-space: pre; }
 #inside .in-tbtns { position: absolute; right: 12px; bottom: 178px; display: flex; flex-direction: column; gap: 6px; }
 #inside .in-tbtns button { width: 74px; padding: 8px 0; background: var(--glass); font: 600 12px var(--cond); letter-spacing: .1em; }
 #inside .in-tbtns { top: 64px; bottom: auto; }
@@ -380,3 +380,21 @@ ul.items li.grp, ul.inv li.grp { list-style: none; font-size: 10px; letter-spaci
 .journal .jday b, #inside .jday b { color: var(--accent, #56c2d6); font-weight: 600; }
 .journal .jday p, #inside .jday p { margin: 2px 0; }
 .journal .jday ul, #inside .jday ul { margin: 2px 0 0 14px; padding: 0; color: var(--muted, #9aa4ad); }
+
+/* Skills (learned by doing and from books) */
+.skills { margin-top: 8px; font-size: 12px; }
+.skills summary { cursor: pointer; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; opacity: .8; }
+.skill { display: grid; grid-template-columns: 80px 16px 1fr auto; gap: 2px 6px; align-items: center; margin: 4px 0; }
+.skill .lv { font-weight: 700; text-align: center; }
+.skill .bar { height: 5px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+.skill .bar i { display: block; height: 100%; background: #7fc8a9; }
+.skill .sn { opacity: .7; font-size: 11px; }
+.skill .sh { grid-column: 1 / -1; opacity: .6; font-size: 11px; }
+
+#inside .in-notice { position: absolute; left: 50%; bottom: calc(22% - 34px); transform: translateX(-50%); font-size: 12px; color: #cfe7da; opacity: .85; text-shadow: 0 1px 2px #000; pointer-events: none; white-space: nowrap; }
+@media (max-width: 700px) { #inside .in-notice { bottom: calc(30% - 34px); } }
+
+/* Clothes by layer */
+.clothes { margin-top: 8px; font-size: 12px; }
+.clothes summary { cursor: pointer; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; opacity: .8; }
+.inv.wear small { opacity: .65; margin-right: 4px; }

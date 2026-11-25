@@ -7,21 +7,36 @@
     snacks: { name: "Snacks (crackers, bars)", unit: "pack", weight: 0.5, kind: "food", cal: 600, portion: 0.5 },
     formula: { name: "Liquid nutrition bag", unit: "bag", weight: 1, kind: "food", cal: 250, water: 8, portion: 1 },
     dog_food: { name: "Dog food bag", unit: "bag", weight: 15, kind: "dogfood", portion: 1 / 15 },
+    energy_bar: { name: "Energy bar", unit: "bar", weight: 0.15, kind: "food", cal: 250, portion: 1 },
+    canned_fruit: { name: "Canned fruit", unit: "can", weight: 1, kind: "food", cal: 300, water: 6, portion: 1 },
+    instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
+    chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
+    jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
+    oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
     ors: { name: "Oral rehydration salts", unit: "pack", weight: 0.1, kind: "med", med: "ors", portion: 1 },
+    soda: { name: "Soda (2 liter)", unit: "bottle", weight: 4.6, kind: "drink", water: 25, portion: 0.5 },
+    sports_drink: { name: "Sports drink", unit: "bottle", weight: 1.8, kind: "drink", water: 20, portion: 1 },
     first_aid: { name: "First aid kit", unit: "kit", weight: 1, kind: "med", med: "bandage", portion: 0.2 },
     antibiotics: { name: "Antibiotics (one course)", unit: "course", weight: 0.1, kind: "med", med: "antibiotics", portion: 1 },
     pain_pills: { name: "Pain pills", unit: "bottle", weight: 0.2, kind: "med", med: "pain", portion: 0.1 },
+    bandages: { name: "Bandages and gauze", unit: "box", weight: 0.3, kind: "med", med: "bandage", portion: 0.25 },
+    ibuprofen: { name: "Ibuprofen", unit: "bottle", weight: 0.2, kind: "med", med: "pain", portion: 0.1 },
     flashlight: { name: "Flashlight", unit: "pc", weight: 0.5, kind: "tool" },
     batteries: { name: "Batteries (1 set)", unit: "set", weight: 0.2, kind: "batteries", portion: 1 },
     pry_bar: { name: "Pry bar", unit: "pc", weight: 3, kind: "tool" },
     backpack: { name: "Backpack", unit: "pc", weight: 1, kind: "tool" },
-    winter_coat: { name: "Winter coat", unit: "pc", weight: 3, kind: "wear", slot: "coat" },
-    winter_hat: { name: "Winter hat", unit: "pc", weight: 0.3, kind: "wear", slot: "hat" },
-    gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves" },
-    boots: { name: "Winter boots", unit: "pair", weight: 2.5, kind: "wear", slot: "boots" },
-    rain_jacket: { name: "Rain jacket", unit: "pc", weight: 1, kind: "wear", slot: "rain" },
+    winter_coat: { name: "Winter coat (down)", unit: "pc", weight: 3, kind: "wear", slot: "mid", warmth: 18, wind: 0.5, wetWarm: false, short: "winter coat" },
+    winter_hat: { name: "Winter hat (wool)", unit: "pc", weight: 0.3, kind: "wear", slot: "hat", warmth: 4, wetWarm: true, short: "hat" },
+    gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves", warmth: 3, wetWarm: false, short: "gloves" },
+    boots: { name: "Winter boots", unit: "pair", weight: 2.5, kind: "wear", slot: "boots", warmth: 4, wetWarm: true, short: "boots" },
+    rain_jacket: { name: "Rain jacket", unit: "pc", weight: 1, kind: "wear", slot: "shell", warmth: 3, wind: 0.8, wetWarm: true, waterproof: true, short: "rain jacket" },
+    thermal_underwear: { name: "Thermal underwear (synthetic)", unit: "set", weight: 0.5, kind: "wear", slot: "base", warmth: 6, wetWarm: true, short: "thermals" },
+    fleece_jacket: { name: "Fleece jacket", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 10, wind: 0.2, wetWarm: true, short: "fleece" },
+    wool_sweater: { name: "Wool sweater", unit: "pc", weight: 1.2, kind: "wear", slot: "mid", warmth: 9, wind: 0.2, wetWarm: true, short: "wool sweater" },
+    cotton_hoodie: { name: "Cotton hoodie", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 6, wind: 0.1, wetWarm: false, short: "hoodie" },
+    windbreaker: { name: "Windbreaker", unit: "pc", weight: 0.6, kind: "wear", slot: "shell", warmth: 2, wind: 0.7, wetWarm: true, short: "windbreaker" },
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
@@ -31,7 +46,33 @@
     flea_spray: { name: "Flea spray", unit: "can", weight: 1, kind: "misc" },
     seeds: { name: "Seed packet", unit: "pack", weight: 0.05, kind: "misc" },
     lighter: { name: "Lighter", unit: "pc", weight: 0.05, kind: "misc" },
-    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort" },
+    comfort: { name: "Book or deck of cards", unit: "pc", weight: 1, kind: "comfort", comfortText: "You read and play cards for a while. Your mind is calmer." },
+    radio: { name: "Hand-crank radio", unit: "pc", weight: 1.2, kind: "comfort", comfortText: "You turn the crank and scan the bands. Only static and an old emergency loop. Still, a voice helps." },
+    // Supplies with no use of their own yet (more uses come with crafting and home projects).
+    candles: { name: "Candles", unit: "box", weight: 0.8, kind: "comfort", portion: 0.1, comfortText: "You light a candle and sit by the small flame for a while. The dark feels less heavy." },
+    matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
+    duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
+    rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
+    multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
+    can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
+    cooking_pot: { name: "Cooking pot", unit: "pc", weight: 2, kind: "misc" },
+    blanket: { name: "Wool blanket", unit: "pc", weight: 3, kind: "misc", sleepWarm: 8 },
+    sleeping_bag: { name: "Sleeping bag (winter)", unit: "pc", weight: 4, kind: "misc", sleepWarm: 15 },
+    hand_warmers: { name: "Hand warmers", unit: "pair", weight: 0.1, kind: "warm", warmth: 15, portion: 1 },
+    wool_socks: { name: "Wool socks", unit: "pair", weight: 0.2, kind: "wear", slot: "socks", warmth: 2, wetWarm: true, short: "wool socks" },
+    trash_bags: { name: "Trash bags (box)", unit: "box", weight: 1, kind: "misc" },
+    paper_map: { name: "Paper map of Portland", unit: "pc", weight: 0.2, kind: "misc" },
+    toilet_paper: { name: "Toilet paper", unit: "roll", weight: 0.3, kind: "misc" },
+    soap: { name: "Bar of soap", unit: "bar", weight: 0.25, kind: "comfort", portion: 0.1, comfortText: "You wash with soap and cold water. You feel more like yourself." },
+    toothpaste: { name: "Toothpaste", unit: "tube", weight: 0.25, kind: "misc" },
+    water_tablets: { name: "Water purification tablets", unit: "pack", weight: 0.05, kind: "misc", portion: 0.1 },
+    vitamins: { name: "Vitamins", unit: "bottle", weight: 0.3, kind: "misc" },
+    // Books teach a skill once (kind 'book', skill: a key of SKILLS in engine/skills.js).
+    book_first_aid: { name: "First-aid handbook", unit: "pc", weight: 0.8, kind: "book", skill: "first_aid" },
+    book_repair: { name: "Home repair manual", unit: "pc", weight: 1, kind: "book", skill: "tinkering" },
+    book_cooking: { name: "Camp cooking book", unit: "pc", weight: 0.8, kind: "book", skill: "cooking" },
+    book_survival: { name: "Wilderness survival guide", unit: "pc", weight: 0.8, kind: "book", skill: "survival" },
     // Parts for home base projects (kind 'part': no use on their own).
     toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
     scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
@@ -71,7 +112,24 @@
         { id: "pain_pills", w: 3 },
         { id: "flea_spray", w: 2 },
         { id: "lighter", w: 3 },
-        { id: "comfort", w: 2 }
+        { id: "comfort", w: 2 },
+        { id: "canned_fruit", w: 8 },
+        { id: "instant_noodles", w: 8 },
+        { id: "chips", w: 5 },
+        { id: "oatmeal", w: 5 },
+        { id: "soda", w: 4 },
+        { id: "sports_drink", w: 4 },
+        { id: "candles", w: 2 },
+        { id: "matches", w: 2 },
+        { id: "trash_bags", w: 2 },
+        { id: "toilet_paper", w: 3 },
+        { id: "soap", w: 2 },
+        { id: "toothpaste", w: 2 },
+        { id: "can_opener", w: 1 },
+        { id: "cooking_pot", w: 1 },
+        { id: "vitamins", w: 1 },
+        { id: "book_cooking", w: 0.6 },
+        { id: "cotton_hoodie", w: 0.8 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
     },
@@ -88,7 +146,16 @@
         { id: "canned_food", w: 10 },
         { id: "batteries", w: 12 },
         { id: "lighter", w: 12 },
-        { id: "pain_pills", w: 5 }
+        { id: "pain_pills", w: 5 },
+        { id: "energy_bar", w: 10 },
+        { id: "jerky", w: 8 },
+        { id: "chips", w: 10 },
+        { id: "soda", w: 8 },
+        { id: "sports_drink", w: 6 },
+        { id: "instant_noodles", w: 5 },
+        { id: "matches", w: 3 },
+        { id: "ibuprofen", w: 3 },
+        { id: "hand_warmers", w: 2 }
       ],
       entryText: "The glass door is broken. Shelves are half empty."
     },
@@ -108,7 +175,15 @@
         { id: "tarp", w: 3 },
         { id: "wiring", w: 4 },
         { id: "pipe_fittings", w: 3 },
-        { id: "metal_bin", w: 3 }
+        { id: "metal_bin", w: 3 },
+        { id: "energy_bar", w: 8 },
+        { id: "jerky", w: 8 },
+        { id: "chips", w: 8 },
+        { id: "soda", w: 6 },
+        { id: "sports_drink", w: 5 },
+        { id: "duct_tape", w: 3 },
+        { id: "paper_map", w: 4 },
+        { id: "hand_warmers", w: 2 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -130,7 +205,18 @@
         { id: "water_bottle", w: 6 },
         { id: "n95", w: 8 },
         { id: "batteries", w: 6 },
-        { id: "flea_spray", w: 3 }
+        { id: "flea_spray", w: 3 },
+        { id: "bandages", w: 12 },
+        { id: "ibuprofen", w: 10 },
+        { id: "vitamins", w: 5 },
+        { id: "sports_drink", w: 4 },
+        { id: "energy_bar", w: 4 },
+        { id: "soap", w: 3 },
+        { id: "toothpaste", w: 3 },
+        { id: "toilet_paper", w: 3 },
+        { id: "water_tablets", w: 2 },
+        { id: "hand_warmers", w: 2 },
+        { id: "book_first_aid", w: 1.5 }
       ],
       entryText: "The store is dark. The pharmacy counter at the back has a metal gate."
     },
@@ -148,7 +234,11 @@
         { id: "n95", w: 15 },
         { id: "pain_pills", w: 10 },
         { id: "saline", w: 10 },
-        { id: "ors", w: 6 }
+        { id: "ors", w: 6 },
+        { id: "bandages", w: 15 },
+        { id: "ibuprofen", w: 6 },
+        { id: "soap", w: 3 },
+        { id: "book_first_aid", w: 1.5 }
       ],
       entryText: "Notices about the outbreak cover the door."
     },
@@ -169,7 +259,12 @@
         { id: "pain_pills", w: 12 },
         { id: "n95", w: 12 },
         { id: "ors", w: 8 },
-        { id: "snacks", w: 5 }
+        { id: "snacks", w: 5 },
+        { id: "bandages", w: 15 },
+        { id: "ibuprofen", w: 6 },
+        { id: "blanket", w: 4 },
+        { id: "sports_drink", w: 3 },
+        { id: "book_first_aid", w: 1 }
       ],
       entryText: "The hospital is dark and silent. Many people came here at the end."
     },
@@ -202,7 +297,16 @@
         { id: "metal_bin", w: 6 },
         { id: "rain_barrel", w: 5 },
         { id: "stove_kit", w: 2 },
-        { id: "water_filter", w: 3 }
+        { id: "water_filter", w: 3 },
+        { id: "duct_tape", w: 10 },
+        { id: "rope", w: 6 },
+        { id: "multitool", w: 3 },
+        { id: "knife", w: 3 },
+        { id: "candles", w: 3 },
+        { id: "matches", w: 3 },
+        { id: "trash_bags", w: 5 },
+        { id: "radio", w: 2 },
+        { id: "book_repair", w: 1.5 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -224,7 +328,26 @@
         { id: "flashlight", w: 6 },
         { id: "snacks", w: 6 },
         { id: "backpack", w: 3 },
-        { id: "plastic_sheet", w: 6 }
+        { id: "plastic_sheet", w: 6 },
+        { id: "sleeping_bag", w: 6 },
+        { id: "wool_socks", w: 8 },
+        { id: "hand_warmers", w: 8 },
+        { id: "rope", w: 6 },
+        { id: "knife", w: 5 },
+        { id: "multitool", w: 4 },
+        { id: "cooking_pot", w: 4 },
+        { id: "water_tablets", w: 6 },
+        { id: "energy_bar", w: 6 },
+        { id: "jerky", w: 5 },
+        { id: "paper_map", w: 3 },
+        { id: "radio", w: 3 },
+        { id: "matches", w: 4 },
+        { id: "book_survival", w: 2 },
+        { id: "book_cooking", w: 1 },
+        { id: "thermal_underwear", w: 6 },
+        { id: "fleece_jacket", w: 6 },
+        { id: "wool_sweater", w: 3 },
+        { id: "windbreaker", w: 3 }
       ],
       entryText: "Racks of jackets and boots. This place has good winter gear."
     },
@@ -244,7 +367,15 @@
         { id: "batteries", w: 8 },
         { id: "water_bottle", w: 10 },
         { id: "gloves", w: 6 },
-        { id: "toolkit", w: 8 }
+        { id: "toolkit", w: 8 },
+        { id: "bandages", w: 12 },
+        { id: "blanket", w: 6 },
+        { id: "rope", w: 6 },
+        { id: "radio", w: 3 },
+        { id: "energy_bar", w: 6 },
+        { id: "book_first_aid", w: 1 },
+        { id: "book_survival", w: 0.5 },
+        { id: "thermal_underwear", w: 1 }
       ],
       entryText: "The engine bay is empty. The crews went out on calls and did not come back."
     },
@@ -279,7 +410,35 @@
         { id: "pipe_fittings", w: 2 },
         { id: "metal_bin", w: 2 },
         { id: "rain_barrel", w: 1 },
-        { id: "battery_module", w: 0.6 }
+        { id: "battery_module", w: 0.6 },
+        { id: "canned_fruit", w: 5 },
+        { id: "instant_noodles", w: 4 },
+        { id: "oatmeal", w: 3 },
+        { id: "chips", w: 3 },
+        { id: "soda", w: 3 },
+        { id: "bandages", w: 3 },
+        { id: "ibuprofen", w: 3 },
+        { id: "candles", w: 4 },
+        { id: "matches", w: 3 },
+        { id: "blanket", w: 4 },
+        { id: "wool_socks", w: 3 },
+        { id: "toilet_paper", w: 4 },
+        { id: "soap", w: 3 },
+        { id: "toothpaste", w: 2 },
+        { id: "can_opener", w: 2 },
+        { id: "cooking_pot", w: 2 },
+        { id: "duct_tape", w: 2 },
+        { id: "knife", w: 1 },
+        { id: "radio", w: 1 },
+        { id: "book_first_aid", w: 0.6 },
+        { id: "book_repair", w: 0.6 },
+        { id: "book_cooking", w: 0.8 },
+        { id: "book_survival", w: 0.4 },
+        { id: "thermal_underwear", w: 2 },
+        { id: "wool_sweater", w: 3 },
+        { id: "cotton_hoodie", w: 4 },
+        { id: "fleece_jacket", w: 2 },
+        { id: "windbreaker", w: 1 }
       ]
     }
   };
@@ -921,15 +1080,197 @@
     return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
   }
 
+  // src/engine/skills.js
+  var SKILLS = {
+    scavenging: {
+      name: "Scavenging",
+      how: "Take items, search shelves and rooms, open boxes.",
+      perLevel: "Searches take 8% less time per level.",
+      notice: ["", "You notice how many items are near you.", "You hear how many items are in a closed box.", "You notice items a little further away.", "", "You see loot from far away."]
+    },
+    tinkering: {
+      name: "Tinkering",
+      how: "Force doors and gates, break furniture for wood.",
+      perLevel: "+1 to force doors and gates per level.",
+      notice: []
+    },
+    first_aid: {
+      name: "First aid",
+      how: "Bandage wounds, treat illness.",
+      perLevel: "A bandaged wound heals 8% faster per level. Wound infection risk is 10% lower per level.",
+      notice: []
+    },
+    cooking: {
+      name: "Cooking",
+      how: "Cook hot meals, boil and treat water.",
+      perLevel: "Hot meals give +1 morale per level. Boiling takes 10% less time per level.",
+      notice: []
+    },
+    survival: {
+      name: "Survival",
+      how: "Keep a fire, collect and filter water.",
+      perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
+      notice: []
+    }
+  };
+  var LEVEL_XP = [0, 15, 40, 80, 140, 220];
+  var MAX_LEVEL = 5;
+  var BOOK_XP = 25;
+  var READ_MINUTES = 120;
+  function skillsOf(state2) {
+    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
+    const s = state2.skills;
+    if (!s.xp || typeof s.xp !== "object") s.xp = {};
+    if (!Array.isArray(s.books)) s.books = [];
+    return s;
+  }
+  function levelFor(xp) {
+    let lvl = 0;
+    for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
+    return lvl;
+  }
+  function skillLevel(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    return levelFor(xp);
+  }
+  var DAILY_FULL = 20;
+  function practice(state2, key, amount = 1, { book = false } = {}) {
+    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
+    const s = skillsOf(state2);
+    if (!book) {
+      const day = dayIndex(state2.time);
+      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
+      const n = (s.today.uses[key] || 0) + 1;
+      s.today.uses[key] = n;
+      if (n > DAILY_FULL) amount /= 2;
+    }
+    const before = levelFor(s.xp[key] || 0);
+    s.xp[key] = (s.xp[key] || 0) + amount;
+    const after = levelFor(s.xp[key]);
+    if (after > before) {
+      const sk = SKILLS[key];
+      const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
+      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
+    }
+    return after;
+  }
+  function skillProgress(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    const lvl = levelFor(xp);
+    if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
+    const lo = LEVEL_XP[lvl];
+    const hi = LEVEL_XP[lvl + 1];
+    return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
+  }
+  function allSkills(state2) {
+    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
+  }
+  function hasRead(state2, bookId) {
+    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
+  }
+  function searchTimeFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "scavenging");
+  }
+  function forceBonus(state2) {
+    const l = skillLevel(state2, "tinkering");
+    return l ? [["tinkering", l]] : [];
+  }
+  function bandageHealFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "first_aid");
+  }
+  function infectRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "first_aid");
+  }
+  function cookMoraleBonus(state2) {
+    return skillLevel(state2, "cooking");
+  }
+  function boilTimeFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "cooking");
+  }
+  function fireBonusFactor(state2) {
+    return 1 + 0.06 * skillLevel(state2, "survival");
+  }
+  function rawWaterRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "survival");
+  }
+  function noticeOf(state2) {
+    const l = skillLevel(state2, "scavenging");
+    return {
+      level: l,
+      countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
+      boxCount: l >= 2,
+      lootGlow: l >= 5 ? 1 : l >= 3 ? 0.5 : 0
+    };
+  }
+
+  // src/engine/clothes.js
+  var SLOTS = ["base", "mid", "shell", "hat", "gloves", "boots", "socks"];
+  var SLOT_NAMES = { base: "Base layer", mid: "Warm layer", shell: "Shell", hat: "Hat", gloves: "Gloves", boots: "Boots", socks: "Socks" };
+  var NORMAL_CLOTHES = { warmth: 10, wind: 0.1, wetWarm: false };
+  var OLD = { coat: ["mid", "winter_coat"], rain: ["shell", "rain_jacket"], hat: ["hat", "winter_hat"], gloves: ["gloves", "gloves"], boots: ["boots", "boots"], socks: ["socks", "wool_socks"] };
+  var WET_LIMIT = 50;
+  function normalizeWorn(p) {
+    const w = p.worn || {};
+    if (!w._v) {
+      const next = { _v: 2 };
+      for (const s of SLOTS) next[s] = false;
+      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next[slot] = id;
+      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next[s] = w[s];
+      p.worn = next;
+    }
+    if (typeof p.wetness !== "number") p.wetness = p.wet ? 80 : 0;
+    return p.worn;
+  }
+  function wornItems(p) {
+    const w = normalizeWorn(p);
+    return SLOTS.filter((s) => w[s]).map((s) => ({ slot: s, id: w[s], it: ITEMS[w[s]] }));
+  }
+  function clothingWarmth(p) {
+    const wet = Math.min(1, (p.wetness ?? (p.wet ? 80 : 0)) / 100);
+    const part = (warmth, wetWarm) => warmth * (wetWarm ? 1 - 0.15 * wet : 1 - 0.5 * wet);
+    let r = part(NORMAL_CLOTHES.warmth, false);
+    for (const { it } of wornItems(p)) r += part(it.warmth || 0, !!it.wetWarm);
+    return r;
+  }
+  function windBlock(p) {
+    return Math.max(NORMAL_CLOTHES.wind, ...wornItems(p).map(({ it }) => it.wind || 0));
+  }
+  function wetGainPerHour(p, weatherType, wetAfter) {
+    if (!wetAfter) return 0;
+    const base2 = WET_LIMIT / wetAfter * 60;
+    const shell = wornItems(p).find(({ slot }) => slot === "shell");
+    if (shell && shell.it.waterproof) return base2 * (weatherType === "heavy_rain" ? 0.4 : 0.1);
+    return base2;
+  }
+  function dryPerHour(temp, byFire) {
+    if (byFire) return 40;
+    if (temp >= 55) return 15;
+    if (temp >= 40) return 6;
+    return 2;
+  }
+  function putOn(p, id) {
+    const it = ITEMS[id];
+    if (!it || it.kind !== "wear" || !SLOTS.includes(it.slot)) return null;
+    const w = normalizeWorn(p);
+    const old = w[it.slot] || null;
+    w[it.slot] = id;
+    return old;
+  }
+  function takeOff(p, slot) {
+    const w = normalizeWorn(p);
+    const old = w[slot] || null;
+    w[slot] = false;
+    return old;
+  }
+  function wornText(p) {
+    const list = wornItems(p).map(({ it }) => it.short || it.name.toLowerCase());
+    return list.length ? list.join(", ") : "normal clothes";
+  }
+
   // src/engine/tick.js
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
-    const w = state2.player.worn;
-    let r = 10;
-    if (w.coat && w.hat && w.gloves && w.boots) r = 40;
-    else if (w.coat) r = 25 + (w.hat ? 3 : 0) + (w.gloves ? 3 : 0) + (w.boots ? 3 : 0);
-    if (state2.player.wet) r /= 2;
-    return r;
+    return clothingWarmth(state2.player);
   }
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
@@ -949,9 +1290,10 @@
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
     let felt = env.temp + clothingRating(state2);
-    if (env.outside) felt -= env.wind / 10 * 5;
+    if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
     if (mode === "sleep") {
       if (env.home) felt += 10;
+      felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
       const d = state2.dog;
       if (d.stage === "joined" && d.bond >= 80) felt += 5;
     }
@@ -980,23 +1322,13 @@
     const sleeping = mode === "sleep";
     const working = mode === "walk" || mode === "work" || mode === "heavy";
     const wx = weatherInfo(state2);
-    if (env.outside && wx.wetAfter && !(p.worn.rain && state2.weather.type !== "heavy_rain")) {
-      p.wetMinutes += dt * 60;
-      if (!p.wet && p.wetMinutes >= wx.wetAfter) {
-        p.wet = true;
-        log(state2, "Your clothes are wet through. Wet clothes keep only half the heat.", "warn");
-      }
-    } else if (p.wet && !env.outside && env.temp >= 55) {
-      p.dryMinutes += dt * 60;
-      if (p.dryMinutes >= 240) {
-        p.wet = false;
-        p.wetMinutes = 0;
-        p.dryMinutes = 0;
-        log(state2, "Your clothes are dry again.");
-      }
-    } else if (!env.outside) {
-      p.wetMinutes = 0;
-    }
+    normalizeWorn(p);
+    const wasWet = p.wetness >= WET_LIMIT;
+    if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
+    p.wet = p.wetness >= WET_LIMIT;
+    if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
+    if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
     const felt = feltTemp(state2, mode, env);
     p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
     const cold = p.warmth < 50;
@@ -1206,7 +1538,7 @@
   };
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];
-    state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk, infectRolled: false });
+    state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
     damage(state2, d.hp, type === "bite" ? "an animal attack" : "an injury");
     log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
@@ -1494,40 +1826,59 @@
   function standardMods(state2, { outside = false } = {}) {
     const p = state2.player;
     const mods = [];
-    if (p.energy < 50) mods.push(["tired", -2]);
+    if (p.energy < 50 && p.energy >= 25) mods.push(["tired", -2]);
     if (p.water < 25) mods.push(["very thirsty", -2]);
     if (p.warmth < 25) mods.push(["hypothermia", -3]);
     if (p.health < 25) mods.push(["badly hurt", -3]);
     if (p.morale < 25) mods.push(["despair", -2]);
-    const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
-    if (limb && p.painH <= 0) mods.push(["injured", -3]);
-    if (outside && !isNight(state2.time)) mods.push(["daylight", 1]);
     return mods;
+  }
+  var RAIN = ["rain", "heavy_rain", "windstorm"];
+  function edges(state2, opts = {}) {
+    const p = state2.player;
+    const adv = [...opts.adv || []];
+    const dis = [...opts.dis || []];
+    if (opts.outside && !isNight(state2.time)) adv.push("daylight");
+    const d = state2.dog;
+    if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
+    const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
+    if (limb && p.painH <= 0) dis.push("injured");
+    if (opts.outside && state2.weather && RAIN.includes(state2.weather.type)) dis.push("rain");
+    if (opts.outside && isNight(state2.time)) dis.push("night");
+    if (p.energy < 25) dis.push("very tired");
+    const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
+    return { mode, adv, dis };
   }
   function check(state2, label, dc, extraMods = [], opts = {}) {
     const mods = [...standardMods(state2, opts), ...extraMods];
-    if (opts.outside && isNight(state2.time)) dc += 3;
-    const roll = randInt(state2, 1, 20);
+    const e = edges(state2, opts);
+    const a = randInt(state2, 1, 20);
+    const b = e.mode === "normal" ? a : randInt(state2, 1, 20);
+    const roll = e.mode === "adv" ? Math.max(a, b) : e.mode === "dis" ? Math.min(a, b) : a;
     const total = roll + mods.reduce((s, m) => s + m[1], 0);
     const success = roll === 20 ? true : roll === 1 ? false : total >= dc;
     const modText = mods.map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"} ${Math.abs(v)} (${n})`).join("");
+    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b}]` : "";
     const note = roll === 20 ? " natural 20!" : roll === 1 ? " natural 1!" : "";
-    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
-    return { roll, total, dc, success };
+    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${edgeText}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
+    return { roll, total, dc, success, mode: e.mode };
   }
   function odds(state2, dc, extraMods = [], opts = {}) {
     const mods = [...standardMods(state2, opts), ...extraMods];
-    if (opts.outside && isNight(state2.time)) dc += 3;
+    const e = edges(state2, opts);
     const sum = mods.reduce((s, m) => s + m[1], 0);
     let ok = 0;
     for (let roll = 1; roll <= 20; roll++) if (roll === 20 || roll !== 1 && roll + sum >= dc) ok += 1;
-    return { dc, mods, sum, pct: ok * 5 };
+    const p1 = ok / 20;
+    const p = e.mode === "adv" ? 1 - (1 - p1) ** 2 : e.mode === "dis" ? p1 * p1 : p1;
+    return { dc, mods, sum, pct: Math.round(p * 100), mode: e.mode, adv: e.adv, dis: e.dis };
   }
   function oddsText(o) {
     const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
     const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
-    return `d20${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
+    const edge = o.mode === "adv" ? ` adv. (${o.adv.join(", ")})` : o.mode === "dis" ? ` disadv. (${o.dis.join(", ")})` : "";
+    return `d20${edge}${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
   }
 
   // src/engine/status.js
@@ -1594,6 +1945,7 @@
       const h = (p.warmth - 25) / -rate;
       out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
     }
+    if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
     if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
     if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
     return out;
@@ -1826,6 +2178,8 @@
     if (it.kind === "wear") uses.push({ verb: "wear", label: "Wear" });
     if (it.kind === "batteries") uses.push({ verb: "batteries", label: "Put in flashlight" });
     if (it.kind === "comfort") uses.push({ verb: "comfort", label: "Use" });
+    if (it.kind === "warm") uses.push({ verb: "warm", label: "Use" });
+    if (it.kind === "book") uses.push({ verb: "read", label: hasRead(state2, id) ? "Read again" : "Read", note: `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}` });
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
     return uses;
@@ -1860,14 +2214,10 @@
       case "med":
         return useMed(state2, id, bag);
       case "wear": {
-        const slot = it.slot;
-        if (p.worn[slot]) {
-          log(state2, `You already wear a ${it.name.toLowerCase()}.`);
-          return;
-        }
         addItem(bag, id, -1);
-        p.worn[slot] = true;
-        log(state2, `You put on the ${it.name.toLowerCase()}.`);
+        const old = putOn(p, id);
+        if (old) addItem(bag, old, 1);
+        log(state2, old ? `You take off the ${itemName(old).toLowerCase()} and put on the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`);
         advanceTime(state2, 3);
         return;
       }
@@ -1890,17 +2240,49 @@
         }
         p.lastComfortDay = day;
         p.morale = clamp2(p.morale + 5, 0, 100);
-        log(state2, "You read and play cards for a while. Your mind is calmer.", "good");
+        if (it.portion) addItem(bag, id, -it.portion);
+        log(state2, it.comfortText || "You rest your mind for a while.", "good");
         advanceTime(state2, 60);
+        return;
+      }
+      case "warm": {
+        addItem(bag, id, -1);
+        p.warmth = clamp2(p.warmth + it.warmth, 0, 100);
+        log(state2, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
+        advanceTime(state2, 1);
         return;
       }
       case "feeddog":
         return feedDog(state2, id, bag);
+      case "read":
+        return readBook(state2, id);
       default:
     }
   }
   function has2(state2, id) {
     return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  }
+  function readBook(state2, id) {
+    const it = ITEMS[id];
+    if (!it || it.kind !== "book") return false;
+    const env = environment(state2, "work");
+    if (env.dark && !hasLight(state2)) {
+      log(state2, "It is too dark to read. Use a light.");
+      return false;
+    }
+    const s = skillsOf(state2);
+    const first = !s.books.includes(id);
+    advanceTime(state2, READ_MINUTES);
+    if (state2.dead) return true;
+    if (first) {
+      s.books.push(id);
+      log(state2, `You read the ${it.name.toLowerCase()} and take notes.`, "good");
+      practice(state2, it.skill, BOOK_XP, { book: true });
+    } else {
+      log(state2, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
+      state2.player.morale = clamp2(state2.player.morale + 2, 0, 100);
+    }
+    return true;
   }
   function useMed(state2, id, bag) {
     const p = state2.player;
@@ -1915,6 +2297,8 @@
       const inj = open[0];
       addItem(bag, id, -it.portion);
       inj.bandaged = true;
+      inj.healH *= bandageHealFactor(state2);
+      practice(state2, "first_aid", 3);
       log(state2, `You clean and bandage the ${INJURY_NAMES[inj.type].toLowerCase()}.`, "good");
       advanceTime(state2, 15);
       return;
@@ -1931,6 +2315,7 @@
       }
       addItem(bag, id, -1);
       inf.abxH = 0;
+      practice(state2, "first_aid", 2);
       log(state2, "You start a 3-day course of antibiotics.", "good");
       advanceTime(state2, 2);
       return;
@@ -1949,6 +2334,7 @@
       }
       addItem(bag, id, -1);
       p.illness.stomachH = Math.min(p.illness.stomachH, 24);
+      practice(state2, "first_aid", 2);
       addWater(state2, WATER_PER_QUART / 2);
       log(state2, "You drink the rehydration salts. You feel a little better.", "good");
       advanceTime(state2, 5);
@@ -2039,6 +2425,7 @@
         h.rawGal += 2;
         log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
         advanceTime(state2, 15);
+        practice(state2, "survival", 1);
         return;
       case "collect_toilet":
         h.rawGal += h.toiletGal;
@@ -2051,7 +2438,7 @@
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state2, 5);
-        if (chance(state2, RAW_WATER_SICK)) startStomachBug(state2);
+        if (chance(state2, RAW_WATER_SICK * rawWaterRiskFactor(state2))) startStomachBug(state2);
         return;
       case "boil": {
         const how = useHeat(state2, 0.4);
@@ -2059,7 +2446,19 @@
         h.rawGal -= g;
         h.safeGal += g;
         log(state2, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
-        advanceTime(state2, 20);
+        advanceTime(state2, Math.round(20 * boilTimeFactor(state2)));
+        practice(state2, "cooking", 2);
+        return;
+      }
+      case "purify": {
+        const bag = (state2.carried.water_tablets || 0) > 0 ? state2.carried : h.storage;
+        const g = Math.min(1, h.rawGal);
+        addItem(bag, "water_tablets", -ITEMS.water_tablets.portion);
+        h.rawGal -= g;
+        h.safeGal += g;
+        log(state2, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
+        advanceTime(state2, 30);
+        practice(state2, "cooking", 1);
         return;
       }
       case "filter_water": {
@@ -2068,6 +2467,7 @@
         h.safeGal += g;
         log(state2, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
         advanceTime(state2, 10);
+        practice(state2, "survival", 1);
         return;
       }
       case "drink_safe":
@@ -2092,7 +2492,8 @@
         addItem(bag, food, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         p.warmth = clamp2(p.warmth + 10, 0, 100);
-        p.morale = clamp2(p.morale + 5, 0, 100);
+        p.morale = clamp2(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        practice(state2, "cooking", 3);
         log(state2, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, "good");
         advanceTime(state2, 30);
         return;
@@ -2101,11 +2502,12 @@
         const bag = (h.storage.firewood || 0) > 0 ? h.storage : state2.carried;
         addItem(bag, "firewood", -1);
         const lit = h.fireHours > 0;
-        const per = fireHoursPerBundle(state2);
+        const per = Math.round(fireHoursPerBundle(state2) * fireBonusFactor(state2) * 10) / 10;
         const where = built(state2, "wood_stove") ? "wood stove" : "fireplace";
         h.fireHours += per;
         log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
+        practice(state2, "survival", lit ? 1 : 2);
         return;
       }
       case "break_furniture":
@@ -2113,6 +2515,7 @@
         addItem(h.storage, "firewood", 1);
         log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
         advanceTime(state2, 60, "heavy");
+        practice(state2, "tinkering", 2);
         return;
       case "heater":
         h.heaterOn = !h.heaterOn;
@@ -2216,6 +2619,9 @@
     }
     if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
   }
+  function forceOpts(state2) {
+    return has2(state2, "toolkit") ? { adv: ["tool kit"] } : {};
+  }
   function forceEntry(state2) {
     const place = getPlace(state2.location.id);
     const ps = placeState(state2, place);
@@ -2227,10 +2633,14 @@
     }
     state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
     advanceTime(state2, 5, "heavy");
-    if (check(state2, "Kick open the locked door", 12).success) {
+    if (check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
       ps.unlocked = true;
       log(state2, "The door breaks open.");
-    } else if (chance(state2, 0.3)) addInjury(state2, "sprain");
+      practice(state2, "tinkering", 4);
+    } else {
+      practice(state2, "tinkering", 2);
+      if (chance(state2, 0.3)) addInjury(state2, "sprain");
+    }
   }
   function openCounter(state2) {
     const place = getPlace(state2.location.id);
@@ -2243,14 +2653,18 @@
       return;
     }
     advanceTime(state2, 10, "heavy");
-    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc).success) {
+    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc, forceBonus(state2), forceOpts(state2)).success) {
       ps.counterOpen = true;
       log(state2, "The gate bends open.");
-    } else if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+      practice(state2, "tinkering", 4);
+    } else {
+      practice(state2, "tinkering", 2);
+      if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+    }
   }
   function searchMinutes(state2, base2, dark) {
     const p = state2.player;
-    let m = base2;
+    let m = base2 * searchTimeFactor(state2);
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
@@ -2374,6 +2788,7 @@
     ctx.holder.taken.push(pid);
     addItem(state2.carried, it.item, 1);
     log(state2, `You take: ${itemName(it.item)}.`);
+    practice(state2, "scavenging", 1);
     if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
       markZoneDone(ctx, zone);
       state2.stats.zonesSearched += 1;
@@ -2390,6 +2805,25 @@
       state2.stats.zonesSearched += 1;
       log(state2, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
     }
+  }
+  var CONTAINER_MINUTES = 1;
+  function openContainer(state2, cid) {
+    const ctx = zoneCtx(state2);
+    if (!ctx || typeof cid !== "string" || !/^c\d+$/.test(cid)) return false;
+    const h = ctx.holder;
+    h.opened || (h.opened = []);
+    if (h.opened.includes(cid)) return false;
+    const env = environment(state2, "work");
+    advanceTime(state2, CONTAINER_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
+    if (state2.dead) return true;
+    h.opened.push(cid);
+    log(state2, "You open it and look inside.");
+    practice(state2, "scavenging", 1);
+    return true;
+  }
+  function openedContainers(state2) {
+    const ctx = zoneCtx(state2);
+    return ctx ? (ctx.holder.opened || []).slice() : [];
   }
   function searchZone(state2, index) {
     const ctx = zoneCtx(state2);
@@ -2416,6 +2850,7 @@
     markZoneDone(ctx, zone);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
+    practice(state2, "scavenging", 2);
     reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
     state2.lastFound = found;
     return true;
@@ -2501,7 +2936,7 @@
         advanceTime(state2, 2);
       } else {
         state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
-        if (!check(state2, "Kick open the locked door", 12).success) {
+        if (!check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
           log(state2, "The door holds. You break a window and climb in.");
           if (chance(state2, 0.25)) addInjury(state2, "small_cut");
         }
@@ -2535,6 +2970,7 @@
     markZoneDone(ctx, room);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
+    practice(state2, "scavenging", 2);
     reportFound(state2, found, HOUSE_ROOMS[room]);
     state2.lastFound = found;
     return true;
@@ -2576,6 +3012,7 @@
       if (h.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
         if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
+        if (has2(state2, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
         add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
@@ -2598,10 +3035,10 @@
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
       const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
       else if (ps.zonesDone < ps.zones) {
         if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
         } else {
           const env = environment(state2, "work");
           const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
@@ -2628,6 +3065,14 @@
     }
     return acts;
   }
+  function takeOffSlot(state2, slot) {
+    const old = takeOff(state2.player, slot);
+    if (!old) return false;
+    addItem(state2.carried, old, 1);
+    log(state2, `You take off the ${itemName(old).toLowerCase()}.`);
+    advanceTime(state2, 2);
+    return true;
+  }
   function doAction(state2, id, arg) {
     if (state2.dead) return;
     switch (id) {
@@ -2653,6 +3098,10 @@
         return pickUp(state2, arg);
       case "see_zone":
         return seeZone(state2, Number(arg));
+      case "open_container":
+        return openContainer(state2, String(arg));
+      case "take_off":
+        return takeOffSlot(state2, String(arg));
       case "leave_house":
         return leaveHouse(state2);
       case "go_home":
@@ -2730,6 +3179,7 @@
       const cx = x + SHELF / 2;
       const tipped = cat !== "gas" && cat !== "convenience" && r() < 0.08;
       plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === "clothes" ? 1.5 : 2, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
+      if (cfg.fixture === "shelf" && !tipped) plan.fixtures.push({ type: "endcap", x: cx, z: rowZ + cfg.len / 2 + 0.28, w: SHELF, d: 0.55, h: 1.7, solid: true });
       if (i < aisles) {
         const ax = cx + SHELF / 2 + AISLE / 2;
         plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
@@ -3783,6 +4233,36 @@
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
   }
+  function clothesHtml() {
+    const p = state.player;
+    normalizeWorn(p);
+    const rows = SLOTS.map((sl) => {
+      const id = p.worn[sl];
+      const it = id && ITEMS[id];
+      const tags = it ? [`+${it.warmth || 0}\xB0F`, it.wind ? `wind ${Math.round(it.wind * 100)}%` : "", it.waterproof ? "waterproof" : "", it.wetWarm ? "warm when wet" : "cold when wet"].filter(Boolean).join(" \xB7 ") : "";
+      return `<li><span>${esc(SLOT_NAMES[sl])}</span><span class="q">${it ? esc(it.name) : "\u2014"}</span><span class="b">${it ? `<small>${esc(tags)}</small> <button class="small" data-use="${sl}" data-verb="take_off">Take off</button>` : ""}</span></li>`;
+    }).join("");
+    const out = environment(state, "walk");
+    const feltOut = Math.round(feltTemp(state, "walk", out));
+    return `<h5>Clothes</h5><ul class="inv wear">${rows}</ul>
+    <p class="hint">Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F here \xB7 ${feltOut}\xB0F outside now \xB7 Wet ${Math.round(p.wetness || 0)}%${p.wet ? " (wet through: cotton and down lose heat)" : ""}</p>`;
+  }
+  var skillsOpen = false;
+  var clothesOpen = false;
+  document.addEventListener("toggle", (e) => {
+    if (!e.target.classList) return;
+    if (e.target.classList.contains("skills")) skillsOpen = e.target.open;
+    if (e.target.classList.contains("clothes")) clothesOpen = e.target.open;
+  }, true);
+  function skillsHtml(open) {
+    const rows = allSkills(state).map((k) => {
+      const sk = SKILLS[k.key];
+      const next = k.next == null ? "max level" : `${k.next} xp to level ${k.level + 1}`;
+      return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
+    }).join("");
+    const read = (state.skills && state.skills.books || []).length;
+    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
+  }
   function renderStats() {
     const p = state.player;
     const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("");
@@ -3796,9 +4276,9 @@
     const felt = Math.round(feltTemp(state, "rest"));
     chips.push(["", `Feels like ${felt}\xB0F`]);
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
-    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
-    chips.push(["", `Wearing: ${worn.length ? worn.join(", ") : "normal clothes"}`]);
-    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div>`;
+    if (p.wetness >= 10) chips.push([p.wetness >= 50 ? "bad" : "warn", `Wet ${Math.round(p.wetness)}%`]);
+    chips.push(["", `Wearing: ${wornText(p)}`]);
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
   }
   function renderLocation() {
     const loc = state.location;
@@ -3834,7 +4314,8 @@
     ["Light and tools", ["tool", "batteries"]],
     ["Clothes", ["wear"]],
     ["Fuel and parts", ["fuel", "part"]],
-    ["Other", ["misc", "comfort"]]
+    ["Books", ["book"]],
+    ["Other", ["misc", "comfort", "warm"]]
   ];
   function groupOf(id) {
     const k = ITEMS[id] ? ITEMS[id].kind : "misc";
@@ -4279,6 +4760,7 @@
       stock,
       hasFlashlight: () => (state.carried.flashlight || 0) > 0,
       isLightOn: () => hasLight(state),
+      lightHours: () => state.player.lightHours,
       toggleLight: () => {
         const n0 = state.log.length;
         act("action", "flashlight");
@@ -4288,7 +4770,8 @@
       panel: (name) => insidePanel(name),
       useItem: (id, verb) => {
         const n0 = state.log.length;
-        act("use", id, verb, "carried");
+        if (verb === "take_off") act("action", "take_off", id);
+        else act("use", id, verb, "carried");
         return state.log.slice(n0).map((e) => e.text).join(" ");
       },
       quickUse: (action) => {
@@ -4317,7 +4800,7 @@
         if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
+          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
         }
         const e = environment(state, "work");
         return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;
@@ -4348,6 +4831,15 @@
       onSeeZone: (zone) => {
         perform(state, "action", "see_zone", zone);
         saveGame(state);
+      },
+      isOpened: (cid) => openedContainers(state).includes(cid),
+      notice: () => noticeOf(state),
+      onOpenContainer: (cid) => {
+        perform(state, "action", "open_container", cid);
+        if (state.dead) recordRun(state);
+        saveGame(state);
+        render();
+        return !state.dead && openedContainers(state).includes(cid);
       },
       describeItem: (it, near, touch) => {
         const def = ITEMS[it.item];
@@ -4439,10 +4931,10 @@
       if (p.illness.infection) notes.push("Infection");
       if (p.illness.stomachH > 0) notes.push("Stomach bug");
       if (p.wet) notes.push("Wet");
-      const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: "coat", hat: "hat", gloves: "gloves", boots: "boots", rain: "rain jacket" })[k]);
       return `<h4>Character</h4>${rows}
       <p class="hint">${notes.length ? esc(notes.join(" \xB7 ")) : "No injuries or illness."}</p>
-      <p class="hint">Wearing: ${esc(worn.length ? worn.join(", ") : "normal clothes")} \xB7 Feels like ${Math.round(feltTemp(state, "rest"))}\xB0F</p>`;
+      ${clothesHtml()}
+      ${skillsHtml(true)}`;
     }
     if (name === "journal") {
       const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex2(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
@@ -4461,7 +4953,8 @@
         if (b.dataset.act === "sleep") return showSleep();
         if (b.dataset.act === "walk_in") return walkInside2();
         act("action", b.dataset.act);
-      } else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
+      } else if (b.dataset.use && b.dataset.verb === "take_off") act("action", "take_off", b.dataset.use);
+      else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
       else if (b.dataset.take) act("take", b.dataset.take);
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);

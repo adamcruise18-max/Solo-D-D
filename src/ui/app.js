@@ -6,9 +6,11 @@ import {
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
-import { listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems } from '../engine/actions.js';
+import { forceOpts, listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
 import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
+import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
+import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
@@ -147,6 +149,40 @@ function renderHeader() {
     <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
 }
 
+// Skills: level 0..5, a bar to the next level, and what the skill does.
+// Clothes by layer, with the warmth each gives, the wetness and the "feels like" number.
+function clothesHtml() {
+  const p = state.player;
+  normalizeWorn(p);
+  const rows = SLOTS.map((sl) => {
+    const id = p.worn[sl];
+    const it = id && ITEMS[id];
+    const tags = it ? [`+${it.warmth || 0}°F`, it.wind ? `wind ${Math.round(it.wind * 100)}%` : '', it.waterproof ? 'waterproof' : '', it.wetWarm ? 'warm when wet' : 'cold when wet'].filter(Boolean).join(' · ') : '';
+    return `<li><span>${esc(SLOT_NAMES[sl])}</span><span class="q">${it ? esc(it.name) : '—'}</span><span class="b">${it ? `<small>${esc(tags)}</small> <button class="small" data-use="${sl}" data-verb="take_off">Take off</button>` : ''}</span></li>`;
+  }).join('');
+  const out = environment(state, 'walk');
+  const feltOut = Math.round(feltTemp(state, 'walk', out));
+  return `<h5>Clothes</h5><ul class="inv wear">${rows}</ul>
+    <p class="hint">Feels like ${Math.round(feltTemp(state, 'rest'))}°F here · ${feltOut}°F outside now · Wet ${Math.round(p.wetness || 0)}%${p.wet ? ' (wet through: cotton and down lose heat)' : ''}</p>`;
+}
+
+let skillsOpen = false;
+let clothesOpen = false;
+document.addEventListener('toggle', (e) => {
+  if (!e.target.classList) return;
+  if (e.target.classList.contains('skills')) skillsOpen = e.target.open;
+  if (e.target.classList.contains('clothes')) clothesOpen = e.target.open;
+}, true);
+function skillsHtml(open) {
+  const rows = allSkills(state).map((k) => {
+    const sk = SKILLS[k.key];
+    const next = k.next == null ? 'max level' : `${k.next} xp to level ${k.level + 1}`;
+    return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
+  }).join('');
+  const read = (state.skills && state.skills.books || []).length;
+  return `<details class="skills"${open || skillsOpen ? ' open' : ''}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ''}.</p></details>`;
+}
+
 function renderStats() {
   const p = state.player;
   const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('');
@@ -160,9 +196,9 @@ function renderStats() {
   const felt = Math.round(feltTemp(state, 'rest'));
   chips.push(['', `Feels like ${felt}°F`]);
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
-  const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
-  chips.push(['', `Wearing: ${worn.length ? worn.join(', ') : 'normal clothes'}`]);
-  $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>`;
+  if (p.wetness >= 10) chips.push([p.wetness >= 50 ? 'bad' : 'warn', `Wet ${Math.round(p.wetness)}%`]);
+  chips.push(['', `Wearing: ${wornText(p)}`]);
+  $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>` + `<details class="clothes"${clothesOpen ? ' open' : ''}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
 }
 
 function renderLocation() {
@@ -200,7 +236,7 @@ function useButtons(id, from) {
 const KIND_GROUPS = [
   ['Food', ['food', 'dogfood']], ['Water', ['drink']], ['Medicine', ['med']],
   ['Light and tools', ['tool', 'batteries']], ['Clothes', ['wear']],
-  ['Fuel and parts', ['fuel', 'part']], ['Other', ['misc', 'comfort']],
+  ['Fuel and parts', ['fuel', 'part']], ['Books', ['book']], ['Other', ['misc', 'comfort', 'warm']],
 ];
 function groupOf(id) {
   const k = ITEMS[id] ? ITEMS[id].kind : 'misc';
@@ -651,6 +687,7 @@ async function walkInside() {
     stock,
     hasFlashlight: () => (state.carried.flashlight || 0) > 0,
     isLightOn: () => hasLight(state),
+    lightHours: () => state.player.lightHours,
     toggleLight: () => {
       const n0 = state.log.length;
       act('action', 'flashlight');
@@ -660,7 +697,8 @@ async function walkInside() {
     panel: (name) => insidePanel(name),
     useItem: (id, verb) => {
       const n0 = state.log.length;
-      act('use', id, verb, 'carried');
+      if (verb === 'take_off') act('action', 'take_off', id);
+      else act('use', id, verb, 'carried');
       return state.log.slice(n0).map((e) => e.text).join(' ');
     },
     quickUse: (action) => {
@@ -690,7 +728,7 @@ async function walkInside() {
       if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
       if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc)))}</small>`;
+        return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
       }
       const e = environment(state, 'work');
       return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? ' · dark, no light: 2 min an item' : ''}</small>`;
@@ -719,6 +757,15 @@ async function walkInside() {
       return { ok, name: it ? itemName(it.item) : '', msg: msgs };
     },
     onSeeZone: (zone) => { perform(state, 'action', 'see_zone', zone); saveGame(state); },
+    isOpened: (cid) => openedContainers(state).includes(cid),
+    notice: () => noticeOf(state),
+    onOpenContainer: (cid) => {
+      perform(state, 'action', 'open_container', cid);
+      if (state.dead) recordRun(state);
+      saveGame(state);
+      render();
+      return !state.dead && openedContainers(state).includes(cid);
+    },
     describeItem: (it, near, touch) => {
       const def = ITEMS[it.item];
       const need = projectNeeds()[it.item];
@@ -820,10 +867,10 @@ function insidePanel(name) {
     if (p.illness.infection) notes.push('Infection');
     if (p.illness.stomachH > 0) notes.push('Stomach bug');
     if (p.wet) notes.push('Wet');
-    const worn = Object.entries(p.worn).filter(([, v]) => v).map(([k]) => ({ coat: 'coat', hat: 'hat', gloves: 'gloves', boots: 'boots', rain: 'rain jacket' }[k]));
     return `<h4>Character</h4>${rows}
       <p class="hint">${notes.length ? esc(notes.join(' · ')) : 'No injuries or illness.'}</p>
-      <p class="hint">Wearing: ${esc(worn.length ? worn.join(', ') : 'normal clothes')} · Feels like ${Math.round(feltTemp(state, 'rest'))}°F</p>`;
+      ${clothesHtml()}
+      ${skillsHtml(true)}`;
   }
   if (name === 'journal') {
     const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join('');
@@ -844,7 +891,8 @@ function bindEvents() {
       if (b.dataset.act === 'sleep') return showSleep();
       if (b.dataset.act === 'walk_in') return walkInside();
       act('action', b.dataset.act);
-    } else if (b.dataset.use) act('use', b.dataset.use, b.dataset.verb, b.dataset.from);
+    } else if (b.dataset.use && b.dataset.verb === 'take_off') act('action', 'take_off', b.dataset.use);
+    else if (b.dataset.use) act('use', b.dataset.use, b.dataset.verb, b.dataset.from);
     else if (b.dataset.take) act('take', b.dataset.take);
     else if (b.dataset.takeall) act('takeall');
     else if (b.dataset.drop) act('drop', b.dataset.drop);
