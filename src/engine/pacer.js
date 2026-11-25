@@ -73,7 +73,8 @@ export function candidates(state, mode, events = EVENTS) {
 // Pick an event. Big events are rarer, and half as likely again in the mercy case.
 function pick(state, list, rng) {
   const mercy = inTrouble(state);
-  const w = (e) => (e.size === 'big' ? (mercy ? 0.5 : 1) : e.size === 'medium' ? 3 : 8);
+  // An event may carry its own weight factor w (events.js); 1 when it has none.
+  const w = (e) => (e.size === 'big' ? (mercy ? 0.5 : 1) : e.size === 'medium' ? 3 : 8) * (e.w ?? 1);
   const total = list.reduce((a, e) => a + w(e), 0);
   let r = rng() * total;
   for (const e of list) { r -= w(e); if (r < 0) return e; }
@@ -94,6 +95,8 @@ function fire(state, e, rng, mode) {
   p.quietHours = 0;
 }
 
+export const ASLEEP_RATE = 0.4;
+
 // One game hour of the pacer.
 export function pacerHour(state, mode, events = EVENTS) {
   const p = state.pacer;
@@ -101,7 +104,9 @@ export function pacerHour(state, mode, events = EVENTS) {
   p.quietHours = (p.quietHours || 0) + 1;
   const rng = stream(state, 'pacer');
   const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
-  if (rng() >= eventChance(p.tension) && !overdue) return null;
+  // Asleep, events are rarer (playtest list 1: they were 46% of all events).
+  const rate = mode === 'sleep' ? ASLEEP_RATE : 1;
+  if (rng() >= eventChance(p.tension) * rate && !overdue) return null;
   let list = candidates(state, mode, events);
   if (overdue) list = list.filter((e) => e.size === 'small'); // a quiet stretch ends softly
   if (!list.length) return null;

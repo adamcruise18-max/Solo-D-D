@@ -146,6 +146,7 @@ export const CATEGORIES = {
       { id: 'book_first_aid', w: 0.6 }, { id: 'book_repair', w: 0.6 }, { id: 'book_cooking', w: 0.8 }, { id: 'book_survival', w: 0.4 },
       { id: 'thermal_underwear', w: 2 }, { id: 'wool_sweater', w: 3 }, { id: 'cotton_hoodie', w: 4 }, { id: 'fleece_jacket', w: 2 }, { id: 'windbreaker', w: 1 },
       { id: 'fishing_rod', w: 1.5 }, { id: 'fishing_line', w: 1 }, { id: 'rifle', w: 0.3 }, { id: 'rifle_rounds', w: 0.4 },
+      { id: 'phone', w: 1.5 },
     ],
   },
 };

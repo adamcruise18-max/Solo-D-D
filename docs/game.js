@@ -74,6 +74,7 @@
     rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
     rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
     snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
+    phone: { name: "Smartphone (charged)", unit: "pc", weight: 0.4, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -476,7 +477,8 @@
         { id: "fishing_rod", w: 1.5 },
         { id: "fishing_line", w: 1 },
         { id: "rifle", w: 0.3 },
-        { id: "rifle_rounds", w: 0.4 }
+        { id: "rifle_rounds", w: 0.4 },
+        { id: "phone", w: 1.5 }
       ]
     }
   };
@@ -1512,6 +1514,33 @@
   // src/core/profiler.js
   var FRAME_BUDGET_MS = 1e3 / 30;
 
+  // src/core/changes.js
+  var CHANGE_KINDS = ["taken", "opened", "closed", "emptied", "moved", "damaged", "discovered", "set"];
+  function log2(state2) {
+    state2.world = state2.world || {};
+    state2.world.changes = state2.world.changes || {};
+    return state2.world.changes;
+  }
+  function recordChange(state2, locKey, change) {
+    if (!locKey) throw new Error("A change needs a location key");
+    if (!change || !change.o) throw new Error("A change needs an object id (o)");
+    if (!CHANGE_KINDS.includes(change.k)) throw new Error(`Unknown change kind "${change.k}"`);
+    const list = log2(state2)[locKey] = log2(state2)[locKey] || [];
+    const rec = { o: String(change.o), k: change.k };
+    if (change.v !== void 0) rec.v = change.v;
+    if (state2.time != null) rec.t = Math.round(state2.time);
+    const same = (r) => r.o === rec.o && (r.k === rec.k || ["opened", "closed"].includes(r.k) && ["opened", "closed"].includes(rec.k));
+    const i = list.findIndex(same);
+    if (i >= 0) {
+      const old = list.splice(i, 1)[0];
+      if (rec.k === "set" && old.v && typeof old.v === "object" && rec.v && typeof rec.v === "object") rec.v = { ...old.v, ...rec.v };
+    }
+    list.push(rec);
+    return rec;
+  }
+  var changesFor = (state2, locKey) => state2.world?.changes?.[locKey] || [];
+  var hasChange = (state2, locKey, o, k) => changesFor(state2, locKey).some((r) => r.o === String(o) && r.k === k);
+
   // src/data/events.js
   var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
   var dogWithYou = (s) => s.dog?.stage === "joined";
@@ -1675,7 +1704,7 @@
   }
   function pick(state2, list, rng) {
     const mercy = inTrouble(state2);
-    const w = (e) => e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8;
+    const w = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
     const total = list.reduce((a, e) => a + w(e), 0);
     let r = rng() * total;
     for (const e of list) {
@@ -1697,13 +1726,15 @@
     p.count += 1;
     p.quietHours = 0;
   }
+  var ASLEEP_RATE = 0.4;
   function pacerHour(state2, mode, events = EVENTS) {
     const p = state2.pacer;
     p.tension = Math.min(100, p.tension + RISE_PER_HOUR + (mode === "walk" ? RISE_OUTSIDE : 0));
     p.quietHours = (p.quietHours || 0) + 1;
     const rng = stream(state2, "pacer");
     const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
-    if (rng() >= eventChance(p.tension) && !overdue) return null;
+    const rate = mode === "sleep" ? ASLEEP_RATE : 1;
+    if (rng() >= eventChance(p.tension) * rate && !overdue) return null;
     let list = candidates(state2, mode, events);
     if (overdue) list = list.filter((e2) => e2.size === "small");
     if (!list.length) return null;
@@ -2212,12 +2243,16 @@
       const p = getPlace(state2.location.id);
       if (p && CATEGORIES[p.cat]?.dark) dark = true;
     }
-    return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+    const key = state2.location.kind === "place" || state2.location.kind === "house" ? state2.location.id : null;
+    const leak = !!(key && weatherInfo(state2).wetAfter && decayActive(state2, "roof_leaks", key, t));
+    return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
     const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
-    let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state2);
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state2);
     if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
+    if (env.outside && (state2.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+    felt += ACTIVITY_HEAT[mode] || 0;
     if (mode === "sleep") {
       if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
@@ -2226,12 +2261,18 @@
     }
     return felt;
   }
+  var CLOTHES_SHARE = 0.8;
+  var LEAK_WET = 0.25;
+  var WET_OUTSIDE = 8;
+  var ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
   function warmthRate(felt) {
-    if (felt >= 70) return 10;
-    if (felt >= 55) return 3;
-    if (felt >= 40) return -3;
-    if (felt >= 25) return -7;
-    return -12;
+    if (felt >= 72) return 10;
+    if (felt >= 60) return 3;
+    if (felt >= 50) return -2;
+    if (felt >= 40) return -5;
+    if (felt >= 28) return -10;
+    if (felt >= 15) return -18;
+    return -28;
   }
   function damage(state2, amount, cause) {
     if (amount <= 0) return;
@@ -2251,7 +2292,7 @@
     const wx = weatherInfo(state2);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if (env.outside && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
     else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
@@ -2307,7 +2348,7 @@
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state2, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
@@ -2321,7 +2362,8 @@
       if (p.illness.stomachH === 0) log(state2, "Your stomach is better now.", "good");
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
-    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+    const treated = !p.illness.infection || p.illness.infection.abxH != null;
+    const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
     const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
     if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
@@ -3036,16 +3078,19 @@
     }
     return ps;
   }
+  var SOAKS = /* @__PURE__ */ new Set(["book_first_aid", "book_repair", "book_cooking", "book_survival", "matches", "toilet_paper", "comfort", "paper_map"]);
   function rollZone(state2, key, catId, stock, zone, extraRolls = 0) {
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
     const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
+    const leaking = decayActive(state2, "roof_leaks", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
       if (e.fridge && fridgesGone) continue;
+      if (leaking && SOAKS.has(e.id)) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -3089,8 +3134,22 @@
     }
     return { mph, why };
   }
+  var TREE_DETOUR = 1.3;
+  var TREE_DETOUR_PHONE = 1.1;
+  function roadBlocked(state2, dest) {
+    return !!(dest && dest.id && decayActive(state2, "trees_on_roads", `road:${dest.id}`));
+  }
+  function tripMiles(state2, dest) {
+    const m = routeMiles(state2.pos, dest);
+    return roadBlocked(state2, dest) ? m * (phoneSignal(state2) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
+  }
+  function phoneSignal(state2, pos = state2.pos) {
+    if (!has(state2, "phone")) return false;
+    const cell = `tower:${Math.round(pos.lat * 20)}:${Math.round(pos.lon * 20)}`;
+    return !decayActive(state2, "cell_towers", cell);
+  }
   function estimateTrip(state2, dest) {
-    const miles = routeMiles(state2.pos, dest);
+    const miles = tripMiles(state2, dest);
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
     const overload = bagWeight(state2.carried) > carryLimit(state2);
@@ -3102,8 +3161,14 @@
   }
   function travel(state2, dest, destLabel) {
     const start2 = { ...state2.pos };
-    const total = routeMiles(start2, dest);
+    const total = tripMiles(state2, dest);
     log(state2, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
+    if (roadBlocked(state2, dest)) {
+      const key = `road:${dest.id}`;
+      const seen = hasChange(state2, key, "tree", "set");
+      if (!seen) recordChange(state2, key, { o: "tree", k: "set", v: { blocked: true } });
+      log(state2, phoneSignal(state2) ? "Your phone map shows the road ahead blocked by a fallen tree. You take the way around." : `${seen ? "The fallen tree still blocks the road." : "A big fallen tree lies across the road, with power lines tangled in it."} You go around by the side streets.`, "travel");
+    }
     let done = 0;
     while (done < total - 1e-6 && !state2.dead) {
       const seg = Math.min(1, total - done);

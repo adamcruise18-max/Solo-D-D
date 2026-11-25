@@ -183,7 +183,8 @@ export function smartTurn(state) {
   }
   eatDrink(state);
   const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
-  const mustGo = isNight(state.time) || heavy || (!starving && (p.energy < 25 || p.health < 40));
+  const needAbx = p.illness.infection && p.illness.infection.abxH == null && !(state.carried.antibiotics > 0) && (state.home.storage.antibiotics || 0) > 0;
+  const mustGo = isNight(state.time) || heavy || needAbx || (!starving && (p.energy < 25 || p.health < 40));
   if (loc.kind === 'house') {
     if (!mustGo && can(state, 'room')) {
       perform(state, 'action', 'room');
@@ -210,7 +211,17 @@ export function playRun(seed, { maxDays = 60, maxTurns = 20000, smart = false, o
   const state = newGame(seed);
   let turns = 0;
   let day = -1;
-  const t = smart ? smartTurn : botTurn;
+  // The careful bot gets the same guard as the replay bot: three turns in a row
+  // that cost no game time become a rest (and count as a loop in the report).
+  let still = 0;
+  const t = !smart ? botTurn : (st) => {
+    const t0 = st.time;
+    const w = smartTurn(st);
+    if (st.time === t0 && !st.dead && w !== 'name dog' && ++still >= 3) { still = 0; loops++; perform(st, 'action', 'rest'); }
+    else if (st.time !== t0) still = 0;
+    return w;
+  };
+  let loops = 0;
   while (!state.dead && dayIndex(state.time) < maxDays && turns < maxTurns) {
     t(state);
     turns++;
@@ -226,6 +237,7 @@ export function playRun(seed, { maxDays = 60, maxTurns = 20000, smart = false, o
     foodKcal: foodKcal(state),
     dog: state.dog.stage,
     turns,
+    loops,
     state,
   };
 }
