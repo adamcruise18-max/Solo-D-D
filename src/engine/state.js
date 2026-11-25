@@ -6,6 +6,7 @@ import { initWeather } from './world.js';
 import { applyBackground, carryMinus } from './background.js';
 import { applyLegacy } from './legacy.js';
 import { systemVersions, initNewSystems } from './systems.js';
+import { activity } from './activity.js';
 
 export const SAVE_VERSION = 1;
 export const START_MINUTE = 9 * 60 + 5; // Day 1, 9:05 AM
@@ -180,7 +181,9 @@ export function hasLight(state) {
 
 // ---------- log ----------
 export function log(state, text, kind = 'info') {
-  state.log.push({ t: state.time, text, kind });
+  const entry = { t: state.time, text, kind };
+  state.log.push(entry);
+  activity.line(state, entry); // diagnostics: which action and system wrote it (not saved)
   if (state.log.length > 300) state.log.splice(0, state.log.length - 300);
   journalNote(state, text, kind);
 }
