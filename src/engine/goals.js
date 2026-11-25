@@ -2,9 +2,10 @@
 // src/data/legacy-goals.js. Steps are checked from the game state: the first time a
 // step's check is true, it is done for good (one journal line, a little morale).
 //
-// State: state.player.goals = { picked: [goalId], done: { goalId: [stepId] }, changedDay }
+// State: state.player.goals = { picked: [goalId], done: { goalId: [stepId] }, changedDay,
+//   since: { goalId: { day, miles, places, houses, books } } (when each goal was chosen) }
 // (created on first use, so old saves need no migration).
-import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
+import { GOALS, GOAL_KINDS, goalCounters } from '../data/legacy-goals.js';
 import { gameDay } from '../core/clock.js';
 import { log } from './state.js';
 
@@ -18,7 +19,8 @@ export const goalById = (id) => byId.get(id);
 
 export function ensureGoals(state) {
   const p = state.player;
-  if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null };
+  if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null, since: {} };
+  p.goals.since ||= {};
   return p.goals;
 }
 
@@ -38,6 +40,9 @@ export function pickGoal(state, id) {
   if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
   g.picked.push(id);
   g.done[id] ||= [];
+  // Count from now: day-count steps and 'more after you choose this' steps start here
+  // (also when a goal put aside is taken up again).
+  g.since[id] = { day: gameDay(state.time), ...goalCounters(state) };
   log(state, `You choose a goal: ${byId.get(id).title}. ${byId.get(id).why}`, 'story');
   checkGoals(state); // steps already true count at once
   return null;
@@ -63,10 +68,12 @@ export function checkGoals(state) {
     const goal = byId.get(id);
     if (!goal) continue;
     const done = (g.done[id] ||= []);
+    const since = g.since?.[id] || { day: gameDay(state.time), ...goalCounters(state) };
+    const c = { days: gameDay(state.time) - since.day, since };
     for (const st of goal.steps) {
       if (done.includes(st.id)) continue;
       let ok = false;
-      try { ok = !!st.check(state); } catch { ok = false; }
+      try { ok = !!st.check(state, c); } catch { ok = false; }
       if (!ok) continue;
       done.push(st.id);
       state.player.morale = Math.min(100, state.player.morale + STEP_MORALE);

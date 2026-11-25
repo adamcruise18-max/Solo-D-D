@@ -4895,7 +4895,10 @@
   var stored = (s, id) => s.home?.storage?.[id] || 0;
   var storedAny = (s, ids) => ids.reduce((a, id) => a + stored(s, id), 0);
   var BOOKS = ["book_first_aid", "book_repair", "book_cooking", "book_survival"];
-  var dayNow = (s) => gameDay(s.time);
+  var booksAt = (s) => storedAny(s, BOOKS);
+  function goalCounters(s) {
+    return { miles: s.stats?.miles || 0, places: s.stats?.placesSearched || 0, houses: s.stats?.housesSearched || 0, books: booksAt(s) };
+  }
   var GOAL_KINDS = {
     preserve: { label: "Preserve", hint: "Keep something alive or safe for later." },
     repair: { label: "Repair", hint: "Make something work again." },
@@ -4913,7 +4916,8 @@
         { id: "seeds_5", text: "Store 5 packets of seeds", check: (s) => stored(s, "seeds") >= 5 },
         { id: "dry_store", text: "Build the sealed food store (dry, safe from mice)", check: (s) => built(s, "sealed_store") },
         { id: "seeds_12", text: "Store 12 packets of seeds", check: (s) => stored(s, "seeds") >= 12 },
-        { id: "water_for_bed", text: "Have a rain barrel system to water a test bed", check: (s) => built(s, "rain_barrels") }
+        { id: "water_for_bed", text: "Have a rain barrel system to water a test bed", check: (s) => built(s, "rain_barrels") },
+        { id: "seed_keep", text: "Keep the seeds dry in the sealed store for 30 days after you choose this", check: (s, c) => c.days >= 30 && built(s, "sealed_store") && stored(s, "seeds") >= 5 }
       ],
       epilogue: {
         none: "The seed packets stayed in the stores, and the mice found them.",
@@ -4931,7 +4935,7 @@
         { id: "books_4", text: "Have 4 books on the shelf at home", check: (s) => storedAny(s, BOOKS) >= 4 },
         { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b) => stored(s, b) >= 1) },
         { id: "dry_room", text: "Insulate the living room to keep the shelf dry", check: (s) => built(s, "insulate_living") },
-        { id: "books_10", text: "Have 10 books on the shelf", check: (s) => storedAny(s, BOOKS) >= 10 }
+        { id: "books_more", text: "Bring home 6 more books after you choose this", check: (s, c) => booksAt(s) - c.since.books >= 6 }
       ],
       epilogue: {
         none: "The libraries stood open to the rain, and the books swelled and fell apart.",
@@ -4949,7 +4953,7 @@
         { id: "dog_food_5", text: "Store 5 bags of dog food at home", check: (s) => stored(s, "dog_food") >= 5 },
         { id: "flea_spray", text: "Keep flea spray at home", check: (s) => stored(s, "flea_spray") >= 1 },
         { id: "bond_80", text: "Earn the dog\u2019s full trust (bond 80)", check: (s) => s.dog?.stage === "joined" && s.dog.bond >= 80 },
-        { id: "dog_60_days", text: "Keep the dog alive and with you for 60 days", check: (s) => s.dog?.stage === "joined" && dayNow(s) >= 60 }
+        { id: "dog_60_days", text: "Keep the dog fed and with you for 60 days after you choose this", check: (s, c) => s.dog?.stage === "joined" && c.days >= 60 }
       ],
       epilogue: {
         none: "The dogs of the city went wild, and then went quiet.",
@@ -4966,7 +4970,8 @@
         { id: "battery_module", text: "Bring home a battery module", check: (s) => stored(s, "battery_module") >= 1 },
         { id: "led", text: "Build LED lights on the battery", check: (s) => built(s, "led_lights") },
         { id: "second_battery", text: "Build a second battery", check: (s) => built(s, "second_battery") },
-        { id: "candles_10", text: "Store 10 candles for the nights the battery is empty", check: (s) => stored(s, "candles") >= 10 }
+        { id: "candles_10", text: "Store 10 candles for the nights the battery is empty", check: (s) => stored(s, "candles") >= 10 },
+        { id: "lit_30", text: "Keep the window lit for 30 nights after you choose this", check: (s, c) => c.days >= 30 && built(s, "led_lights") }
       ],
       epilogue: {
         none: "At night the whole city was dark, to the last house.",
@@ -4983,7 +4988,8 @@
         { id: "barrels", text: "Build the rain barrel system", check: (s) => built(s, "rain_barrels") },
         { id: "filter", text: "Build the water filter station", check: (s) => built(s, "filter_station") },
         { id: "safe_20", text: "Have 20 gal of safe water in store", check: (s) => (s.home?.safeGal || 0) >= 20 },
-        { id: "tablets", text: "Store 3 packs of water tablets for later", check: (s) => stored(s, "water_tablets") >= 3 }
+        { id: "tablets", text: "Store 3 packs of water tablets for later", check: (s) => stored(s, "water_tablets") >= 3 },
+        { id: "water_30", text: "Keep 20 gal of safe water ready for 30 days after you choose this", check: (s, c) => c.days >= 30 && (s.home?.safeGal || 0) >= 20 }
       ],
       epilogue: {
         none: "The taps went dry, and the rain ran into the drains.",
@@ -5000,7 +5006,8 @@
         { id: "radio_home", text: "Bring a radio home", check: (s) => stored(s, "radio") >= 1 },
         { id: "radio_parts", text: "Store wiring and hardware parts for repairs", check: (s) => stored(s, "wiring") >= 1 && stored(s, "hardware_parts") >= 1 },
         { id: "radio_power", text: "Build LED lights on the battery (the radio runs on it too)", check: (s) => built(s, "led_lights") },
-        { id: "radio_batteries", text: "Store 4 sets of batteries for the radio", check: (s) => stored(s, "batteries") >= 4 }
+        { id: "radio_batteries", text: "Store 4 sets of batteries for the radio", check: (s) => stored(s, "batteries") >= 4 },
+        { id: "radio_30", text: "Listen each evening for 30 days after you choose this", check: (s, c) => c.days >= 30 && stored(s, "radio") >= 1 }
       ],
       epilogue: {
         none: "The air was only static, on every band.",
@@ -5018,8 +5025,8 @@
         { id: "places_10", text: "Search 10 places", check: (s) => (s.stats?.placesSearched || 0) >= 10 },
         { id: "map_carried", text: "Keep a paper map with you to mark", check: (s) => (s.carried?.paper_map || 0) >= 1 || stored(s, "paper_map") >= 1 },
         { id: "miles_50", text: "Walk 50 miles", check: (s) => (s.stats?.miles || 0) >= 50 },
-        { id: "places_40", text: "Search 40 places", check: (s) => (s.stats?.placesSearched || 0) >= 40 },
-        { id: "houses_20", text: "Search 20 houses", check: (s) => (s.stats?.housesSearched || 0) >= 20 }
+        { id: "places_more", text: "Search 15 more places after you choose this", check: (s, c) => (s.stats?.placesSearched || 0) - c.since.places >= 15 },
+        { id: "houses_more", text: "Search 10 more houses after you choose this", check: (s, c) => (s.stats?.housesSearched || 0) - c.since.houses >= 10 }
       ],
       epilogue: {
         none: "Nobody knew any more which stores still had food.",
@@ -5033,11 +5040,11 @@
       title: "Weather record",
       why: "Write down every day. Someone may need to know the seasons here.",
       steps: [
-        { id: "days_14", text: "Keep the record for 14 days", check: (s) => dayNow(s) >= 14 },
-        { id: "days_30", text: "Keep the record for 30 days", check: (s) => dayNow(s) >= 30 },
-        { id: "first_snow", text: "Live through a day of snow", check: (s) => s.weather?.type === "snow" },
-        { id: "days_90", text: "Keep the record for 90 days", check: (s) => dayNow(s) >= 90 },
-        { id: "days_365", text: "Keep the record for a full year", check: (s) => dayNow(s) >= 365 }
+        { id: "days_14", text: "Keep the record for 14 days", check: (s, c) => c.days >= 14 },
+        { id: "days_30", text: "Keep the record for 30 days", check: (s, c) => c.days >= 30 },
+        { id: "first_snow", text: "Record a day of snow", check: (s, c) => c.days >= 0 && s.weather?.type === "snow" },
+        { id: "days_90", text: "Keep the record for 90 days", check: (s, c) => c.days >= 90 },
+        { id: "days_365", text: "Keep the record for a full year", check: (s, c) => c.days >= 365 }
       ],
       epilogue: {
         none: "Nobody wrote down the weather any more.",
@@ -5056,7 +5063,8 @@
         { id: "tc_book", text: "Keep a book for it", check: (s) => storedAny(s, BOOKS) >= 1 },
         { id: "tc_radio", text: "Keep a radio for it", check: (s) => stored(s, "radio") >= 1 },
         { id: "tc_map", text: "Keep a paper map for it", check: (s) => stored(s, "paper_map") >= 1 },
-        { id: "tc_seal", text: "Store plastic sheet and duct tape to seal it", check: (s) => stored(s, "plastic_sheet") >= 1 && stored(s, "duct_tape") >= 1 }
+        { id: "tc_seal", text: "Store plastic sheet and duct tape to seal it", check: (s) => stored(s, "plastic_sheet") >= 1 && stored(s, "duct_tape") >= 1 },
+        { id: "tc_bury", text: "Seal and bury it, at least 7 days after you choose this", check: (s, c) => c.days >= 7 && ["metal_bin", "comfort", "radio", "paper_map", "plastic_sheet", "duct_tape"].every((id) => stored(s, id) >= 1) && booksAt(s) >= 1 }
       ],
       epilogue: {
         none: "The small things of daily life were lost with everything else.",
@@ -5073,7 +5081,7 @@
         { id: "mw_tools", text: "Keep a toolkit and scrap wood for sign boards", check: (s) => stored(s, "toolkit") >= 1 && stored(s, "scrap_wood") >= 2 },
         { id: "mw_water", text: "Know where water is: build the filter station", check: (s) => built(s, "filter_station") },
         { id: "mw_places", text: "Search 20 places, so the signs say what is left", check: (s) => (s.stats?.placesSearched || 0) >= 20 },
-        { id: "mw_miles", text: "Walk 30 miles to put the signs up across the city", check: (s) => (s.stats?.miles || 0) >= 30 }
+        { id: "mw_miles", text: "Walk 20 miles after you choose this, putting the signs up", check: (s, c) => (s.stats?.miles || 0) - c.since.miles >= 20 }
       ],
       epilogue: {
         none: "The streets gave no advice to anyone.",
@@ -5090,8 +5098,10 @@
   var STEP_MORALE = 3;
   var byId2 = new Map(GOALS.map((g) => [g.id, g]));
   function ensureGoals(state2) {
+    var _a;
     const p = state2.player;
-    if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null };
+    if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null, since: {} };
+    (_a = p.goals).since || (_a.since = {});
     return p.goals;
   }
   var boardOpen = (state2) => gameDay(state2.time) >= BOARD_OPENS_DAY;
@@ -5108,6 +5118,7 @@
     if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
     g.picked.push(id);
     (_a = g.done)[id] || (_a[id] = []);
+    g.since[id] = { day: gameDay(state2.time), ...goalCounters(state2) };
     log(state2, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
     checkGoals(state2);
     return null;
@@ -5130,11 +5141,13 @@
       const goal = byId2.get(id);
       if (!goal) continue;
       const done = (_a = g.done)[id] || (_a[id] = []);
+      const since = g.since?.[id] || { day: gameDay(state2.time), ...goalCounters(state2) };
+      const c = { days: gameDay(state2.time) - since.day, since };
       for (const st of goal.steps) {
         if (done.includes(st.id)) continue;
         let ok = false;
         try {
-          ok = !!st.check(state2);
+          ok = !!st.check(state2, c);
         } catch {
           ok = false;
         }

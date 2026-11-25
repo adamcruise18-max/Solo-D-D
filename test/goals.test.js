@@ -21,7 +21,7 @@ test('goals: data is valid, and every item and project named exists', () => {
     assert.ok(g.steps.length >= 4 && g.steps.length <= 10, g.id);
     assert.ok(g.epilogue.none && g.epilogue.some && g.epilogue.all, g.id);
     const s = newGame(1);
-    for (const st of g.steps) st.check(s); // runs on a new game
+    for (const st of g.steps) st.check(s, { days: 0, since: { miles: 0, places: 0, houses: 0, books: 0 } }); // runs on a new game
   }
   for (const k of Object.keys(GOAL_KINDS)) assert.ok(GOALS.some((g) => g.kind === k), k);
 });
@@ -57,4 +57,28 @@ test('goals: steps count once, give morale, and keep after a drop; epilogue line
   pickGoal(s, 'radio');
   ep = epilogue(s);
   assert.equal(ep.find((e) => e.id === 'radio').line, GOALS.find((g) => g.id === 'radio').epilogue.none);
+});
+
+test('goals: day counts and the last steps start when the goal is chosen', () => {
+  const s = newGame(4);
+  day(s, 100);
+  pickGoal(s, 'weather_record');
+  assert.equal((s.player.goals.done.weather_record || []).length, 0, 'nothing done at once on day 100');
+  day(s, 114);
+  checkGoals(s);
+  assert.deepEqual(s.player.goals.done.weather_record, ['days_14']);
+  // every goal ends with a step that only counts work after choosing it
+  for (const g of GOALS) {
+    const last = g.steps[g.steps.length - 1];
+    assert.ok(/after you choose this|for \d+ days|for a full year/.test(last.text), `${g.id}: ${last.text}`);
+  }
+  // atlas: places searched before choosing do not count for the last steps
+  const t = newGame(5);
+  day(t, BOARD_OPENS_DAY);
+  t.stats.placesSearched = 50; t.stats.housesSearched = 30;
+  pickGoal(t, 'city_atlas');
+  assert.ok(!t.player.goals.done.city_atlas.includes('places_more'));
+  t.stats.placesSearched = 65;
+  checkGoals(t);
+  assert.ok(t.player.goals.done.city_atlas.includes('places_more'));
 });
