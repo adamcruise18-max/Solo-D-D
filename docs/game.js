@@ -67,6 +67,13 @@
     matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
     duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
     rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    fishing_rod: { name: "Fishing rod and reel", unit: "pc", weight: 1.5, kind: "tool" },
+    fishing_line: { name: "Fishing line and hooks", unit: "kit", weight: 0.2, kind: "tool" },
+    bow: { name: "Hunting bow", unit: "pc", weight: 4, kind: "tool" },
+    arrows: { name: "Arrows (set of 6)", unit: "set", weight: 0.6, kind: "tool" },
+    rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
+    rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
+    snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -363,6 +370,12 @@
         { id: "matches", w: 4 },
         { id: "book_survival", w: 2 },
         { id: "book_cooking", w: 1 },
+        { id: "fishing_rod", w: 5 },
+        { id: "fishing_line", w: 6 },
+        { id: "bow", w: 1.5 },
+        { id: "arrows", w: 3 },
+        { id: "snare_wire", w: 4 },
+        { id: "rifle_rounds", w: 1 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -459,7 +472,11 @@
         { id: "wool_sweater", w: 3 },
         { id: "cotton_hoodie", w: 4 },
         { id: "fleece_jacket", w: 2 },
-        { id: "windbreaker", w: 1 }
+        { id: "windbreaker", w: 1 },
+        { id: "fishing_rod", w: 1.5 },
+        { id: "fishing_line", w: 1 },
+        { id: "rifle", w: 0.3 },
+        { id: "rifle_rounds", w: 0.4 }
       ]
     }
   };
@@ -574,6 +591,10 @@
     clearOldHazards(state2);
     const hz = (_a = state2.flags).hazards || (_a.hazards = {});
     hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
+  }
+  function hazardOn(state2, id, t = state2.time) {
+    const end = state2.flags?.hazards?.[id];
+    return end != null && t < end;
   }
   function activeHazards(state2, t = state2.time) {
     const hz = state2.flags?.hazards || {};
@@ -714,6 +735,18 @@
       how: "Keep a fire, collect and filter water.",
       perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
       notice: []
+    },
+    fishing: {
+      name: "Fishing",
+      how: "Fish from a river, creek or lake bank.",
+      perLevel: "+1 to fishing rolls per level.",
+      notice: ["", "", "You can read the water: where the fish hold.", "", "", ""]
+    },
+    hunting: {
+      name: "Hunting",
+      how: "Hunt with a bow or rifle, set and check snares.",
+      perLevel: "+1 to shots per level. Snares catch more.",
+      notice: ["", "You notice tracks and droppings on the trails.", "", "You can tell how fresh a track is.", "", ""]
     }
   };
   var LEVEL_XP = [0, 15, 40, 80, 140, 220];
@@ -1243,6 +1276,12 @@
       log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
   }
+  var LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
+  function overgrowthWalk(t) {
+    const og = overgrowth(t);
+    if (og <= 0.25) return 1;
+    return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
+  }
 
   // src/core/activity.js
   var source = { sys: null, hook: null };
@@ -1649,8 +1688,8 @@
   }
   function whereNow(state2, mode) {
     if (mode === "sleep") return "asleep";
-    if (mode === "walk") return "outside";
     const k = state2.location?.kind;
+    if (mode === "walk" || k === "wild") return "outside";
     if (k === "home") return "home";
     return "inside";
   }
@@ -1828,7 +1867,12 @@
     d.food = clamp(d.food - 4 * dt, 0, 100);
     d.water = 80;
     if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.sick) d.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d.health > 0) {
+      feralWarning(state2, d);
+      sniff(state2, d, dt);
+    }
     if (d.health <= 50 && d.warned < 1) {
       d.warned = 1;
       log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
@@ -1843,6 +1887,66 @@
       d.stage = "dead";
       log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
       state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  var SICK_PER_HOUR = 0.25;
+  var FIND_BOND = 40;
+  var FINDS = [
+    ["canned_food", 3],
+    ["jerky", 2],
+    ["snacks", 2],
+    ["dog_food", 1],
+    ["rope", 1],
+    ["gloves", 1],
+    ["wool_socks", 1],
+    ["batteries", 1],
+    ["raw_meat", 1]
+  ];
+  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
+  function dogWarns(state2) {
+    const d = state2.dog;
+    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+  }
+  function feralWarning(state2, d) {
+    if (!dogWarns(state2) || !hazardOn(state2, "feral_dogs")) return;
+    const end = state2.flags.hazards.feral_dogs;
+    if (d.feralWarned === end) return;
+    d.feralWarned = end;
+    log(state2, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+  }
+  function sniff(state2, d, dt) {
+    const loc = state2.location;
+    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    const key = `${loc.kind}:${loc.id}:${Math.floor(state2.time / 1440)}`;
+    if (d.foundAt === key) return;
+    const r = stream(state2, "dog");
+    if (r() >= 0.12 * (d.bond / 100) * dt) return;
+    d.foundAt = key;
+    const total = FINDS.reduce((a, [, w]) => a + w, 0);
+    let x = r() * total;
+    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
+    addItem(state2.carried, id, 1);
+    d.finds = (d.finds || 0) + 1;
+    log(state2, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+  }
+  function dogSickDaily(state2, day) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    const r = stream(state2, "dog");
+    if (d.sick) {
+      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
+        d.sick = null;
+        log(state2, `${d.name} eats with interest again. The sickness is over.`, "good");
+      }
+      return;
+    }
+    const w = state2.weather || {};
+    let p = 0.012;
+    if (d.food < 25) p += 0.03;
+    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (r() < p) {
+      d.sick = { since: day };
+      log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
   }
   function dogBondDaily(state2) {
@@ -1894,6 +1998,7 @@
     daily: (state2, day) => {
       dogBondDaily(state2);
       dogDaily(state2, day);
+      dogSickDaily(state2, day);
     }
   };
 
@@ -2236,7 +2341,7 @@
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
     const night = isNight(t);
-    if (mode === "walk") {
+    if (mode === "walk" || state2.location.kind === "wild") {
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
@@ -3115,7 +3220,13 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
+    const og = overgrowthWalk(t);
+    if (og < 0.99) apply(og, "overgrown streets");
+    for (const h2 of activeHazards(state2, t)) {
+      if (!h2.walk) continue;
+      if (h2.id === "feral_dogs" && dogWarns(state2)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h2.walk, h2.label);
+    }
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
