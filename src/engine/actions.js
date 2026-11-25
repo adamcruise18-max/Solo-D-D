@@ -15,6 +15,7 @@ import { getPlace } from './placesdb.js';
 import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vitals.js';
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
+import { dogBondBonus, searchJobFactor } from './background.js';
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 // Cook fresh food first (it spoils), then rice or pasta, then cans.
 const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
@@ -465,7 +466,7 @@ function feedStray(state) {
   if (days >= 3) {
     d.stage = 'joined';
     d.food = 70;
-    d.bond = 30;
+    d.bond = 30 + dogBondBonus(state);
     log(state, 'The dog walks past you, into the house, and lies down near the fireplace. It stays.', 'good');
     state.pendingPrompt = 'name_dog';
   } else if (days === 1) {
@@ -572,7 +573,7 @@ export function openCounter(state) {
 
 export function searchMinutes(state, base, dark) {
   const p = state.player;
-  let m = base * searchTimeFactor(state);
+  let m = base * searchTimeFactor(state) * searchJobFactor(state);
   if (dark && !hasLight(state)) m *= 2;
   if (p.water < 25) m *= 1.25;
   if (p.injuries.some((i) => i.type === 'sprain')) m *= 1.3;

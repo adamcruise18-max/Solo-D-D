@@ -72,6 +72,12 @@ This is the **first playable version**: a small part of the full game.
   Clothes dry inside: fast by the fire, slowly in a cold room. Wet clothes show as a risk warning.
 - Clothes come from houses (closets, dressers) and outdoor stores.
 
+### Who were you?
+
+- At the start of a run you pick a past job: nurse, tow-truck driver, fishing guide, line cook or roofer.
+- Each job gives start skill levels, one item at home and one real weakness. No job is better than the others.
+- Traits use points. You start with 1. Good traits (Fast learner, Dog person) cost points; bad traits (Slow learner, Light sleeper, Asthmatic) give points.
+
 ### Food that spoils
 
 - Cans, dry food and snacks keep. Fresh fish and raw meat spoil: Fresh, then Stale, then Spoiled.

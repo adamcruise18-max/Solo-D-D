@@ -629,6 +629,241 @@
     return CLIMATE[month].solar * WEATHER_TYPES[state2.weather.type].solar;
   }
 
+  // src/engine/skills.js
+  var SKILLS = {
+    scavenging: {
+      name: "Scavenging",
+      how: "Take items, search shelves and rooms, open boxes.",
+      perLevel: "Searches take 8% less time per level.",
+      notice: ["", "You notice how many items are near you.", "You hear how many items are in a closed box.", "You notice items a little further away.", "", "You see loot from far away."]
+    },
+    tinkering: {
+      name: "Tinkering",
+      how: "Force doors and gates, break furniture for wood.",
+      perLevel: "+1 to force doors and gates per level.",
+      notice: []
+    },
+    first_aid: {
+      name: "First aid",
+      how: "Bandage wounds, treat illness.",
+      perLevel: "A bandaged wound heals 8% faster per level. Wound infection risk is 10% lower per level.",
+      notice: []
+    },
+    cooking: {
+      name: "Cooking",
+      how: "Cook hot meals, boil and treat water.",
+      perLevel: "Hot meals give +1 morale per level. Boiling takes 10% less time per level.",
+      notice: []
+    },
+    survival: {
+      name: "Survival",
+      how: "Keep a fire, collect and filter water.",
+      perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
+      notice: []
+    }
+  };
+  var LEVEL_XP = [0, 15, 40, 80, 140, 220];
+  var MAX_LEVEL = 5;
+  var BOOK_XP = 25;
+  var READ_MINUTES = 120;
+  function skillsOf(state2) {
+    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
+    const s = state2.skills;
+    if (!s.xp || typeof s.xp !== "object") s.xp = {};
+    if (!Array.isArray(s.books)) s.books = [];
+    return s;
+  }
+  function levelFor(xp) {
+    let lvl = 0;
+    for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
+    return lvl;
+  }
+  function skillLevel(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    return levelFor(xp);
+  }
+  var DAILY_FULL = 20;
+  function practice(state2, key, amount = 1, { book = false } = {}) {
+    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
+    const s = skillsOf(state2);
+    if (!book) {
+      const day = dayIndex(state2.time);
+      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
+      const n = (s.today.uses[key] || 0) + 1;
+      s.today.uses[key] = n;
+      if (n > DAILY_FULL) amount /= 2;
+    }
+    amount *= xpFactor(state2);
+    const before = levelFor(s.xp[key] || 0);
+    s.xp[key] = (s.xp[key] || 0) + amount;
+    const after = levelFor(s.xp[key]);
+    if (after > before) {
+      const sk = SKILLS[key];
+      const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
+      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
+    }
+    return after;
+  }
+  function skillProgress(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    const lvl = levelFor(xp);
+    if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
+    const lo = LEVEL_XP[lvl];
+    const hi = LEVEL_XP[lvl + 1];
+    return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
+  }
+  function allSkills(state2) {
+    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
+  }
+  function hasRead(state2, bookId) {
+    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
+  }
+  function searchTimeFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "scavenging");
+  }
+  function forceBonus(state2) {
+    const l = skillLevel(state2, "tinkering");
+    return l ? [["tinkering", l]] : [];
+  }
+  function bandageHealFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "first_aid");
+  }
+  function infectRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "first_aid");
+  }
+  function cookMoraleBonus(state2) {
+    return skillLevel(state2, "cooking");
+  }
+  function boilTimeFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "cooking");
+  }
+  function fireBonusFactor(state2) {
+    return 1 + 0.06 * skillLevel(state2, "survival");
+  }
+  function rawWaterRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "survival");
+  }
+  function noticeOf(state2) {
+    const l = skillLevel(state2, "scavenging");
+    return {
+      level: l,
+      countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
+      boxCount: l >= 2,
+      lootGlow: l >= 5 ? 1 : l >= 3 ? 0.5 : 0
+    };
+  }
+
+  // src/engine/background.js
+  var JOBS = {
+    nurse: {
+      name: "Nurse",
+      text: "Twelve years on a hospital ward.",
+      skills: { first_aid: 2 },
+      item: ["bandages", 2],
+      weakness: "Bad back from lifting patients: you carry 4 lb less."
+    },
+    tow_driver: {
+      name: "Tow-truck driver",
+      text: "You pulled cars out of ditches on Highway 26.",
+      skills: { tinkering: 2 },
+      item: ["pry_bar", 1],
+      weakness: "Years in a truck cab: walking uses 15% more energy."
+    },
+    fishing_guide: {
+      name: "Fishing guide",
+      text: "You took clients out on the Willamette and the Sandy.",
+      skills: { survival: 2 },
+      item: ["water_filter", 1],
+      weakness: "Not at home in town: searching takes 10% longer."
+    },
+    line_cook: {
+      name: "Line cook",
+      text: "Ten years on the grill in a busy Portland kitchen.",
+      skills: { cooking: 2 },
+      item: ["knife", 1],
+      weakness: "Big appetite: you get hungry 10% faster."
+    },
+    roofer: {
+      name: "Roofer",
+      text: "You put roofs on houses all over Washington County.",
+      skills: { tinkering: 1, scavenging: 1 },
+      item: ["tarp", 1],
+      weakness: "Bad knees from ladders: you walk 10% slower."
+    }
+  };
+  var FREE_POINTS = 1;
+  var TRAITS = {
+    fast_learner: { name: "Fast learner", cost: 2, text: "+30% skill xp.", not: ["slow_learner"] },
+    dog_person: { name: "Dog person", cost: 1, text: "A dog finds you on day 2 and trusts you sooner." },
+    slow_learner: { name: "Slow learner", cost: -2, text: "\u221230% skill xp.", not: ["fast_learner"] },
+    light_sleeper: { name: "Light sleeper", cost: -1, text: "Sleep gives 15% less energy." },
+    asthmatic: { name: "Asthmatic", cost: -2, text: "Walking and hard work use 20% more energy." }
+  };
+  function jobOf(state2) {
+    return state2.player && JOBS[state2.player.job] ? state2.player.job : null;
+  }
+  function hasTrait(state2, id) {
+    return !!(state2.player && Array.isArray(state2.player.traits) && state2.player.traits.includes(id));
+  }
+  function pointsLeft(traits) {
+    return FREE_POINTS - traits.reduce((n, t) => n + (TRAITS[t] ? TRAITS[t].cost : 0), 0);
+  }
+  function validTraits(traits) {
+    const out = [];
+    for (const t of traits || []) {
+      if (!TRAITS[t] || out.includes(t)) continue;
+      if ((TRAITS[t].not || []).some((x) => out.includes(x))) continue;
+      out.push(t);
+    }
+    return pointsLeft(out) >= 0 ? out : [];
+  }
+  function applyBackground(state2, job, traits) {
+    const p = state2.player;
+    p.job = JOBS[job] ? job : null;
+    p.traits = validTraits(traits);
+    if (p.job) {
+      const J = JOBS[p.job];
+      if (!state2.skills) state2.skills = { xp: {}, books: [] };
+      for (const [k, lvl] of Object.entries(J.skills)) state2.skills.xp[k] = Math.max(state2.skills.xp[k] || 0, LEVEL_XP[lvl]);
+      const [id, n] = J.item;
+      state2.home.storage[id] = (state2.home.storage[id] || 0) + n;
+    }
+    if (p.traits.includes("dog_person")) state2.dog.arriveDay = 1;
+  }
+  function xpFactor(state2) {
+    return hasTrait(state2, "fast_learner") ? 1.3 : hasTrait(state2, "slow_learner") ? 0.7 : 1;
+  }
+  function carryMinus(state2) {
+    return jobOf(state2) === "nurse" ? 4 : 0;
+  }
+  function walkSpeedFactor(state2) {
+    return jobOf(state2) === "roofer" ? 0.9 : 1;
+  }
+  function searchJobFactor(state2) {
+    return jobOf(state2) === "fishing_guide" ? 1.1 : 1;
+  }
+  function foodLossFactor(state2) {
+    return jobOf(state2) === "line_cook" ? 1.1 : 1;
+  }
+  function sleepGainFactor(state2) {
+    return hasTrait(state2, "light_sleeper") ? 0.85 : 1;
+  }
+  function energyUseFactor(state2, mode) {
+    let f = 1;
+    if (mode === "walk" && jobOf(state2) === "tow_driver") f *= 1.15;
+    if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state2, "asthmatic")) f *= 1.2;
+    return f;
+  }
+  function dogBondBonus(state2) {
+    return hasTrait(state2, "dog_person") ? 20 : 0;
+  }
+  function backgroundText(state2) {
+    const j = jobOf(state2);
+    const t = (state2.player.traits || []).filter((x) => TRAITS[x]).map((x) => TRAITS[x].name);
+    if (!j && !t.length) return "";
+    return [j ? JOBS[j].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
+  }
+
   // src/engine/state.js
   var SAVE_VERSION = 1;
   var START_MINUTE = 9 * 60 + 5;
@@ -738,6 +973,7 @@
       pendingPrompt: null
     };
     initWeather(state2);
+    applyBackground(state2, opts.job, opts.traits);
     if (opts.homeLabel) log(state2, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
     log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
     log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
@@ -785,6 +1021,7 @@
     let lim = state2.carried.backpack ? 30 : 10;
     if (state2.player.weak) lim *= 0.5;
     if (state2.player.food < 25) lim *= 0.9;
+    lim -= carryMinus(state2) * (state2.player.weak ? 0.5 : 1);
     return Math.round(lim);
   }
   function has(state2, id) {
@@ -1109,129 +1346,6 @@
     return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
   }
 
-  // src/engine/skills.js
-  var SKILLS = {
-    scavenging: {
-      name: "Scavenging",
-      how: "Take items, search shelves and rooms, open boxes.",
-      perLevel: "Searches take 8% less time per level.",
-      notice: ["", "You notice how many items are near you.", "You hear how many items are in a closed box.", "You notice items a little further away.", "", "You see loot from far away."]
-    },
-    tinkering: {
-      name: "Tinkering",
-      how: "Force doors and gates, break furniture for wood.",
-      perLevel: "+1 to force doors and gates per level.",
-      notice: []
-    },
-    first_aid: {
-      name: "First aid",
-      how: "Bandage wounds, treat illness.",
-      perLevel: "A bandaged wound heals 8% faster per level. Wound infection risk is 10% lower per level.",
-      notice: []
-    },
-    cooking: {
-      name: "Cooking",
-      how: "Cook hot meals, boil and treat water.",
-      perLevel: "Hot meals give +1 morale per level. Boiling takes 10% less time per level.",
-      notice: []
-    },
-    survival: {
-      name: "Survival",
-      how: "Keep a fire, collect and filter water.",
-      perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
-      notice: []
-    }
-  };
-  var LEVEL_XP = [0, 15, 40, 80, 140, 220];
-  var MAX_LEVEL = 5;
-  var BOOK_XP = 25;
-  var READ_MINUTES = 120;
-  function skillsOf(state2) {
-    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
-    const s = state2.skills;
-    if (!s.xp || typeof s.xp !== "object") s.xp = {};
-    if (!Array.isArray(s.books)) s.books = [];
-    return s;
-  }
-  function levelFor(xp) {
-    let lvl = 0;
-    for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
-    return lvl;
-  }
-  function skillLevel(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
-    return levelFor(xp);
-  }
-  var DAILY_FULL = 20;
-  function practice(state2, key, amount = 1, { book = false } = {}) {
-    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
-    const s = skillsOf(state2);
-    if (!book) {
-      const day = dayIndex(state2.time);
-      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
-      const n = (s.today.uses[key] || 0) + 1;
-      s.today.uses[key] = n;
-      if (n > DAILY_FULL) amount /= 2;
-    }
-    const before = levelFor(s.xp[key] || 0);
-    s.xp[key] = (s.xp[key] || 0) + amount;
-    const after = levelFor(s.xp[key]);
-    if (after > before) {
-      const sk = SKILLS[key];
-      const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
-      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
-    }
-    return after;
-  }
-  function skillProgress(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
-    const lvl = levelFor(xp);
-    if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
-    const lo = LEVEL_XP[lvl];
-    const hi = LEVEL_XP[lvl + 1];
-    return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
-  }
-  function allSkills(state2) {
-    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
-  }
-  function hasRead(state2, bookId) {
-    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
-  }
-  function searchTimeFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "scavenging");
-  }
-  function forceBonus(state2) {
-    const l = skillLevel(state2, "tinkering");
-    return l ? [["tinkering", l]] : [];
-  }
-  function bandageHealFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "first_aid");
-  }
-  function infectRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "first_aid");
-  }
-  function cookMoraleBonus(state2) {
-    return skillLevel(state2, "cooking");
-  }
-  function boilTimeFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "cooking");
-  }
-  function fireBonusFactor(state2) {
-    return 1 + 0.06 * skillLevel(state2, "survival");
-  }
-  function rawWaterRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "survival");
-  }
-  function noticeOf(state2) {
-    const l = skillLevel(state2, "scavenging");
-    return {
-      level: l,
-      countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
-      boxCount: l >= 2,
-      lootGlow: l >= 5 ? 1 : l >= 3 ? 0.5 : 0
-    };
-  }
-
   // src/engine/food.js
   var STALE_AT = 0.5;
   var RISK = { fresh: 0, stale: 0.1, spoiled: 0.5 };
@@ -1422,7 +1536,7 @@
     ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
-    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state2);
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
     p.food = clamp(p.food - foodLoss * dt, 0, 100);
@@ -1432,10 +1546,12 @@
       if (p.morale < 50) gain *= 0.75;
       if (p.health < 50) gain *= 0.75;
       if (p.food < 25) gain *= 0.75;
+      gain *= sleepGainFactor(state2);
       p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
+      loss *= energyUseFactor(state2, mode);
       if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
       p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
     }
@@ -1862,6 +1978,7 @@
     if (p.warmth < 25) apply(0.8, "hypothermia");
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
+    if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -1869,7 +1986,7 @@
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
     const overload = bagWeight(state2.carried) > carryLimit(state2);
-    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1);
+    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state2, "walk");
     return { miles, minutes, energy, mph, why };
   }
   function lerp(a, b, f) {
@@ -2426,7 +2543,7 @@
     if (days >= 3) {
       d.stage = "joined";
       d.food = 70;
-      d.bond = 30;
+      d.bond = 30 + dogBondBonus(state2);
       log(state2, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
       state2.pendingPrompt = "name_dog";
     } else if (days === 1) {
@@ -2527,7 +2644,7 @@
   }
   function searchMinutes(state2, base2, dark) {
     const p = state2.player;
-    let m = base2 * searchTimeFactor(state2);
+    let m = base2 * searchTimeFactor(state2) * searchJobFactor(state2);
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
@@ -4200,7 +4317,8 @@
       return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
     }).join("");
     const read = (state.skills && state.skills.books || []).length;
-    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
+    const bg = backgroundText(state);
+    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
   }
   function renderStats() {
     const p = state.player;
@@ -4456,9 +4574,7 @@
     </ul>
     <button class="primary" id="startBtn">Wake up</button>`, (m) => {
       m.querySelector("#startBtn").addEventListener("click", () => {
-        state = newGame();
-        closeModal();
-        commit(true);
+        showBackground({});
       });
     });
   }
@@ -4532,10 +4648,52 @@
     return bestD < 0.3 ? `near ${best.name}` : `${bestD.toFixed(1)} mi from ${best.name}`;
   }
   function beginRun(opts) {
-    clearGame();
-    state = newGame(void 0, opts);
-    closeModal();
-    commit(true);
+    showBackground(opts);
+  }
+  function showBackground(opts) {
+    let job = "nurse";
+    let traits = [];
+    const render2 = (m) => {
+      const left = pointsLeft(traits);
+      const jobs = Object.entries(JOBS).map(([id, J]) => {
+        const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
+        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc(J.name)}</b><small>${esc(J.text)}</small>
+        <small class="good">${esc(sk)} \xB7 starts with ${esc(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc(J.weakness)}</small></button>`;
+      }).join("");
+      const tr = Object.entries(TRAITS).map(([id, T2]) => {
+        const on = traits.includes(id);
+        const blocked = !on && ((T2.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
+        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc(T2.text)}</small></button>`;
+      }).join("");
+      m.querySelector(".box").innerHTML = `<h2>Who were you?</h2>
+      <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
+      <div class="bg-jobs">${jobs}</div>
+      <h3>Traits <small>(${left} point${left === 1 ? "" : "s"} left; you start with ${FREE_POINTS})</small></h3>
+      <p class="hint">Good traits cost points. Bad traits give points.</p>
+      <div class="bg-traits">${tr}</div>
+      <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
+      m.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", () => {
+        job = b.dataset.job;
+        render2(m);
+      }));
+      m.querySelectorAll("[data-trait]").forEach((b) => b.addEventListener("click", () => {
+        const id = b.dataset.trait;
+        traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+        while (pointsLeft(traits) < 0) {
+          const good = traits.filter((x) => TRAITS[x].cost > 0);
+          if (!good.length) break;
+          traits = traits.filter((x) => x !== good[good.length - 1]);
+        }
+        render2(m);
+      }));
+      m.querySelector("#bgGo").addEventListener("click", () => {
+        clearGame();
+        state = newGame(void 0, { ...opts, job, traits: validTraits(traits) });
+        closeModal();
+        commit(true);
+      });
+    };
+    modal("", render2);
   }
   var picking = false;
   function pickStart() {

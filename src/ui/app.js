@@ -12,6 +12,7 @@ import { odds, oddsText } from '../engine/checks.js';
 import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
 import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js';
 import { stageLabel } from '../engine/food.js';
+import { JOBS, TRAITS, FREE_POINTS, pointsLeft, backgroundText, validTraits } from '../engine/background.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
@@ -204,7 +205,8 @@ function skillsHtml(open) {
     return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
   }).join('');
   const read = (state.skills && state.skills.books || []).length;
-  return `<details class="skills"${open || skillsOpen ? ' open' : ''}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ''}.</p></details>`;
+  const bg = backgroundText(state);
+  return `<details class="skills"${open || skillsOpen ? ' open' : ''}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ''}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ''}.</p></details>`;
 }
 
 function renderStats() {
@@ -469,9 +471,7 @@ function showIntro() {
     </ul>
     <button class="primary" id="startBtn">Wake up</button>`, (m) => {
     m.querySelector('#startBtn').addEventListener('click', () => {
-      state = newGame();
-      closeModal();
-      commit(true);
+      showBackground({});
     });
   });
 }
@@ -545,10 +545,52 @@ function nearLabel(pos) {
 }
 
 function beginRun(opts) {
-  clearGame();
-  state = newGame(undefined, opts);
-  closeModal();
-  commit(true);
+  showBackground(opts);
+}
+
+// "Who were you?" Pick a past job and traits, then the run starts.
+function showBackground(opts) {
+  let job = 'nurse';
+  let traits = [];
+  const render = (m) => {
+    const left = pointsLeft(traits);
+    const jobs = Object.entries(JOBS).map(([id, J]) => {
+      const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(', ');
+      return `<button class="bg-job${id === job ? ' on' : ''}" data-job="${id}"><b>${esc(J.name)}</b><small>${esc(J.text)}</small>
+        <small class="good">${esc(sk)} · starts with ${esc(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` ×${J.item[1]}` : ''}</small><small class="bad">${esc(J.weakness)}</small></button>`;
+    }).join('');
+    const tr = Object.entries(TRAITS).map(([id, T]) => {
+      const on = traits.includes(id);
+      const blocked = !on && ((T.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
+      return `<button class="bg-trait${on ? ' on' : ''}" data-trait="${id}" ${blocked ? 'disabled' : ''}><b>${esc(T.name)}</b> <span class="${T.cost > 0 ? 'bad' : 'good'}">${T.cost > 0 ? `costs ${T.cost}` : `gives ${-T.cost}`}</span><small>${esc(T.text)}</small></button>`;
+    }).join('');
+    m.querySelector('.box').innerHTML = `<h2>Who were you?</h2>
+      <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
+      <div class="bg-jobs">${jobs}</div>
+      <h3>Traits <small>(${left} point${left === 1 ? '' : 's'} left; you start with ${FREE_POINTS})</small></h3>
+      <p class="hint">Good traits cost points. Bad traits give points.</p>
+      <div class="bg-traits">${tr}</div>
+      <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
+    m.querySelectorAll('[data-job]').forEach((b) => b.addEventListener('click', () => { job = b.dataset.job; render(m); }));
+    m.querySelectorAll('[data-trait]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.trait;
+      traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+      // Taking off a bad trait can leave too few points: drop good traits until it fits.
+      while (pointsLeft(traits) < 0) {
+        const good = traits.filter((x) => TRAITS[x].cost > 0);
+        if (!good.length) break;
+        traits = traits.filter((x) => x !== good[good.length - 1]);
+      }
+      render(m);
+    }));
+    m.querySelector('#bgGo').addEventListener('click', () => {
+      clearGame();
+      state = newGame(undefined, { ...opts, job, traits: validTraits(traits) });
+      closeModal();
+      commit(true);
+    });
+  };
+  modal('', render);
 }
 
 let picking = false;

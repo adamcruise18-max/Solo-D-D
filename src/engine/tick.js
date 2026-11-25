@@ -12,6 +12,7 @@ import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
 import { infectRiskFactor } from './skills.js';
 import { ageFood } from './food.js';
+import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -111,7 +112,7 @@ function tickStep(state, dt, mode) {
   // Food and water
   const cold = p.warmth < 50;
   const pace = working ? V.WORK_FACTOR : sleeping ? V.SLEEP_FACTOR : 1;
-  let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+  let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state);
   let waterLoss = V.WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
   if (felt > 90 && working) waterLoss *= 2;
   p.food = clamp(p.food - foodLoss * dt, 0, 100);
@@ -123,10 +124,12 @@ function tickStep(state, dt, mode) {
     if (p.morale < 50) gain *= 0.75;
     if (p.health < 50) gain *= 0.75;
     if (p.food < 25) gain *= 0.75;
+    gain *= sleepGainFactor(state);
     p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
   } else {
     let loss = V.ENERGY_LOSS[mode] || V.ENERGY_LOSS.rest;
     if (cold) loss *= 1.5;
+    loss *= energyUseFactor(state, mode);
     if (mode === 'walk' && bagWeight(state.carried) > carryLimit(state)) loss *= 1.5;
     p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
   }
