@@ -88,11 +88,14 @@ const SKY_PRESETS = {
   noon: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0.2, precip: 'none', outdoorLight: 0.88 },
   dusk: { daylight: 0.6, phase: 'dusk', sunHeight: 0.04, cloud: 0.25, precip: 'none', outdoorLight: 0.51 },
   overcast: { daylight: 1, phase: 'day', sunHeight: 0.7, cloud: 1, precip: 'rain', precipStrength: 0.6, outdoorLight: 0.4 },
+  smoke: { daylight: 1, phase: 'day', sunHeight: 0.6, cloud: 0.4, precip: 'none', fog: 0.5, haze: '#d9822b', outdoorLight: 0.76 },
+  heat: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0, precip: 'none', fog: 0.1, haze: '#f3d9a4', outdoorLight: 1 },
+  ice: { daylight: 1, phase: 'day', sunHeight: 0.5, cloud: 0.95, precip: 'rain', precipStrength: 0.6, fog: 0.2, ice: true, outdoorLight: 0.43 },
   night: { daylight: 0, phase: 'night', sunHeight: 0, cloud: 0.5, precip: 'none', outdoorLight: 0 },
 };
 export function openInside(opts) {
   // ?sky=morning|noon|dusk|overcast|night in the page address forces the light (to compare looks).
-  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night)\b/.exec(location.search || '') || [])[1];
+  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
   if (forceSky) {
     const sc = SKY_PRESETS[forceSky];
     opts = { ...opts, scene: sc, night: sc.daylight === 0, dark: sc.daylight === 0 ? true : opts.dark };
@@ -863,7 +866,13 @@ export function openInside(opts) {
   // Diagnostics overlay (F3 or `): FPS, frame ms, ms per part of the frame, renderer counts and
   // an estimate of GPU memory. Off by default; updates 4 times a second. Budget: 33.3 ms (30 FPS).
   const diag = {
-    acc: { game: 0, look: 0, cull: 0, render: 0 }, n: 0, worst: 0, last: 0, mb: 0, mbAt: -1e9,
+    acc: { game: 0, look: 0, cull: 0, render: 0 }, n: 0, worst: 0, last: 0, mb: 0, mbAt: -1e9, game: [], gameAt: -1e9,
+    // Game systems, random streams and the last actions (engine diagnostics), once a second.
+    gameLines(now) {
+      if (!opts.gameDiag) return [];
+      if (now - this.gameAt > 1000) { this.gameAt = now; try { this.game = ['', ...opts.gameDiag()]; } catch (e) { this.game = ['', `diagnostics: ${e.message}`]; } }
+      return this.game;
+    },
     sample(dt, parts) {
       for (const k in parts) this.acc[k] += parts[k];
       this.n += 1;
@@ -880,6 +889,7 @@ export function openInside(opts) {
         `game ${avg('game')}  light ${avg('look')}  cull ${avg('cull')}  render ${avg('render')} ms (CPU)`,
         `${ri.render.calls} calls  ${(ri.render.triangles / 1000).toFixed(0)}k tris  ${ri.memory.geometries} geo  ${ri.memory.textures} tex  ~${this.mb.toFixed(0)} MB`,
         `x ${pos.x.toFixed(1)}  z ${pos.z.toFixed(1)}  yaw ${(yaw * 57.3 % 360).toFixed(0)}°  ${stance}  ${itemObjs.size} items`,
+        ...this.gameLines(now),
       ].join('\n');
       this.acc = { game: 0, look: 0, cull: 0, render: 0 }; this.n = 0; this.worst = 0;
     },
@@ -1200,6 +1210,7 @@ export function openInside(opts) {
 
   function close(died, why) {
     if (closed) return;
+    if (debugOn) opts.onDebug?.(false); // stop the deep activity log when the view closes
     closed = true;
     cancelHold();
     if (document.pointerLockElement === canvas) document.exitPointerLock();
@@ -1236,7 +1247,7 @@ export function openInside(opts) {
         return interact();
       case 'quicksave': return quickSave();
       case 'quickload': return quickLoad();
-      case 'debug': debugOn = !debugOn; $('.in-debug').hidden = !debugOn; diag.last = 0; diag.mbAt = -1e9; return null;
+      case 'debug': debugOn = !debugOn; $('.in-debug').hidden = !debugOn; diag.last = 0; diag.mbAt = -1e9; diag.gameAt = -1e9; opts.onDebug?.(debugOn); return null;
       case 'ping': return ping();
       default:
         if (!k.ready) notYet(k);

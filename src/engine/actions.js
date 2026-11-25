@@ -16,6 +16,10 @@ import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vit
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
+import { decayActive } from './decay.js';
+import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
+// The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
+const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 // Cook fresh food first (it spoils), then rice or pasta, then cans.
 const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
@@ -140,8 +144,8 @@ export function useItem(state, id, verb, from = 'carried') {
     case 'batteries': {
       if (!has(state, 'flashlight')) { log(state, 'You need a flashlight first.'); return; }
       addItem(bag, id, -1);
-      p.lightHours = 10;
-      log(state, 'You put new batteries in the flashlight (10 h of light).');
+      p.lightHours = batteryHours(state);
+      log(state, p.lightHours >= 10 ? 'You put new batteries in the flashlight (10 h of light).' : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
       advanceTime(state, 2);
       return;
     }
@@ -225,8 +229,8 @@ function useMed(state, id, bag) {
   }
   if (it.med === 'pain') {
     addItem(bag, id, -it.portion);
-    p.painH = painPillHours(state);
-    log(state, `You take pain pills. The pain is less for ${p.painH} hours.`);
+    p.painH = Math.max(1, Math.round(painPillHours(state) * medicineFactor(state)));
+    log(state, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state) < 0.95 ? ' They are past their date and work less well.' : ''}`);
     advanceTime(state, 2);
     return;
   }
@@ -326,6 +330,11 @@ function homeAction(state, id) {
       return;
     }
     case 'collect_tap':
+      if (!tapRuns(state)) {
+        h.tapWorks = false;
+        log(state, 'You open the tap. It coughs air, and then nothing. The water pressure is gone here.', 'warn');
+        return;
+      }
       h.rawGal += 2;
       log(state, 'The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.');
       advanceTime(state, 15);
@@ -414,6 +423,22 @@ function homeAction(state, id) {
       log(state, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, 'good');
       advanceTime(state, lit ? 5 : 15);
       practice(state, 'survival', lit ? 1 : 2);
+      return;
+    }
+    case 'run_generator': {
+      const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state.carried;
+      addItem(bag, 'gas_can', -1);
+      advanceTime(state, 120, 'work');
+      if (state.dead) return;
+      if (!chance(state, gasStartChance(state))) {
+        log(state, 'You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.', 'warn');
+        p.morale = clamp(p.morale - 2, 0, 100);
+        return;
+      }
+      const kwh = Math.min(GEN_KWH_PER_GAL, h.batteryMax - h.battery);
+      h.battery += kwh;
+      log(state, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, 'good');
+      practice(state, 'tinkering', 1);
       return;
     }
     case 'break_furniture':
@@ -968,7 +993,7 @@ export function listActions(state) {
     add('drink_tank', 'Drink from the water heater tank', { disabled: h.tankGal < 0.25 && 'The tank is empty', note: `${h.tankGal.toFixed(1)} gal left` });
     if (h.safeGal >= 0.25) add('drink_safe', 'Drink boiled water', { note: `${h.safeGal.toFixed(1)} gal` });
     add('fill_jug', 'Fill a 1 gal jug to carry', { disabled: h.safeGal < 1 && h.tankGal < 1 && 'No clean water' });
-    if (h.tapWorks) add('collect_tap', 'Collect tap water (2 gal, unsafe)');
+    if (tapRuns(state)) add('collect_tap', 'Collect tap water (2 gal, unsafe)');
     if (h.toiletGal > 0) add('collect_toilet', 'Take water from the toilet tanks');
     if (h.rawGal > 0) {
       add('boil', 'Boil 1 gal of water', { disabled: !canHeat(state, 0.4) && 'Light a fire or charge the battery', note: `${h.rawGal.toFixed(1)} gal unsafe` });
@@ -978,6 +1003,11 @@ export function listActions(state) {
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);
     add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
+    if (has(state, 'generator')) {
+      const gas = (h.storage.gas_can || 0) + (state.carried.gas_can || 0);
+      const startP = gasStartChance(state);
+      add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
+    }
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);

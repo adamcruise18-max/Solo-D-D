@@ -15,6 +15,8 @@ export const ITEMS = {
   canned_fruit: { name: 'Canned fruit', unit: 'can', weight: 1, kind: 'food', cal: 300, water: 6, portion: 1 },
   instant_noodles: { name: 'Instant noodles', unit: 'pack', weight: 0.2, kind: 'food', cal: 380, portion: 1 },
   chips: { name: 'Bag of chips', unit: 'bag', weight: 0.6, kind: 'food', cal: 1400, portion: 0.5 },
+  // From store cold cases, only until the store's fridges fail (decay row store_fridges).
+  waxed_cheese: { name: 'Waxed hard cheese', unit: 'block', weight: 1, kind: 'food', cal: 1600, portion: 0.25 },
   jerky: { name: 'Beef jerky', unit: 'pack', weight: 0.2, kind: 'food', cal: 400, portion: 0.5 },
   // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
   fresh_fish: { name: 'Fresh fish', unit: 'fish', weight: 1.5, kind: 'food', cal: 700, portion: 1, needsCooking: true, perish: 2 },
@@ -50,6 +52,9 @@ export const ITEMS = {
   windbreaker: { name: 'Windbreaker', unit: 'pc', weight: 0.6, kind: 'wear', slot: 'shell', warmth: 2, wind: 0.7, wetWarm: true, short: 'windbreaker' },
 
   firewood: { name: 'Firewood bundle', unit: 'bundle', weight: 20, kind: 'fuel' },
+  // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
+  gas_can: { name: 'Gas can (1 gal)', unit: 'can', weight: 7, kind: 'fuel' },
+  generator: { name: 'Small generator', unit: 'pc', weight: 45, kind: 'tool' },
   propane_1lb: { name: 'Propane cylinder (1 lb)', unit: 'can', weight: 1.5, kind: 'misc' },
   tarp: { name: 'Tarp', unit: 'pc', weight: 3, kind: 'misc' },
   bleach: { name: 'Unscented bleach', unit: 'jug', weight: 8, kind: 'misc' },

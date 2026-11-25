@@ -12,6 +12,7 @@ import { estimateTrip } from './travel.js';
 import { environment, feltTemp } from './tick.js';
 import { wetGainPerHour, WET_LIMIT } from './clothes.js';
 import { gameDay } from '../core/clock.js';
+import { activeHazards } from './hazards.js';
 
 const DAY_START = 300; // 5 AM
 
@@ -36,6 +37,12 @@ export function weatherEffects(state) {
   const chill = Math.round(feltTemp(state, 'walk', { ...env, wind: 0 }) - feltTemp(state, 'walk', env));
   if (chill >= 3) {
     out.push({ id: 'wind', text: `Wind ${w.wind} mph: outside it feels ${chill} °F colder.`, level: w.wind >= 30 ? 'danger' : 'warn' });
+  }
+  // Short hazards from events: slower walking, a cold snap.
+  for (const h of activeHazards(state)) {
+    const left = formatDuration(h.endsAt - state.time);
+    if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} (about ${left} more).`, level: 'warn' });
+    if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} °F colder (about ${left} more).`, level: 'danger' });
   }
   return out;
 }

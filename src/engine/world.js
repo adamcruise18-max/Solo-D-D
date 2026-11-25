@@ -2,6 +2,7 @@
 import { CLIMATE, WEATHER_TYPES } from '../data/climate.js';
 import { sunTimes } from '../sun.js';
 import { rand, randInt } from '../rng.js';
+import { hazardColder } from './hazards.js';
 
 const dayOf = (t) => Math.floor(t / 1440);
 
@@ -82,6 +83,10 @@ export function isNight(t) {
 
 // Air temperature: low at sunrise, high at 3 PM, then down to the next low.
 export function airTemp(state, t) {
+  return baseAirTemp(state, t) - hazardColder(state, t);
+}
+
+function baseAirTemp(state, t) {
   const w = state.weather;
   const m = ((t % 1440) + 1440) % 1440;
   const s = sunFor(t);

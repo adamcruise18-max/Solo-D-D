@@ -11,6 +11,8 @@
     canned_fruit: { name: "Canned fruit", unit: "can", weight: 1, kind: "food", cal: 300, water: 6, portion: 1 },
     instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
     chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
+    // From store cold cases, only until the store's fridges fail (decay row store_fridges).
+    waxed_cheese: { name: "Waxed hard cheese", unit: "block", weight: 1, kind: "food", cal: 1600, portion: 0.25 },
     jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
@@ -41,6 +43,9 @@
     cotton_hoodie: { name: "Cotton hoodie", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 6, wind: 0.1, wetWarm: false, short: "hoodie" },
     windbreaker: { name: "Windbreaker", unit: "pc", weight: 0.6, kind: "wear", slot: "shell", warmth: 2, wind: 0.7, wetWarm: true, short: "windbreaker" },
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
+    // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
+    gas_can: { name: "Gas can (1 gal)", unit: "can", weight: 7, kind: "fuel" },
+    generator: { name: "Small generator", unit: "pc", weight: 45, kind: "tool" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
     bleach: { name: "Unscented bleach", unit: "jug", weight: 8, kind: "misc" },
@@ -132,6 +137,7 @@
         { id: "cooking_pot", w: 1 },
         { id: "vitamins", w: 1 },
         { id: "book_cooking", w: 0.6 },
+        { id: "waxed_cheese", w: 5, fridge: true },
         { id: "cotton_hoodie", w: 0.8 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
@@ -158,7 +164,8 @@
         { id: "instant_noodles", w: 5 },
         { id: "matches", w: 3 },
         { id: "ibuprofen", w: 3 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "waxed_cheese", w: 3, fridge: true }
       ],
       entryText: "The glass door is broken. Shelves are half empty."
     },
@@ -186,7 +193,8 @@
         { id: "sports_drink", w: 5 },
         { id: "duct_tape", w: 3 },
         { id: "paper_map", w: 4 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "gas_can", w: 6 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -309,7 +317,9 @@
         { id: "matches", w: 3 },
         { id: "trash_bags", w: 5 },
         { id: "radio", w: 2 },
-        { id: "book_repair", w: 1.5 }
+        { id: "book_repair", w: 1.5 },
+        { id: "gas_can", w: 3 },
+        { id: "generator", w: 1.2 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -414,6 +424,8 @@
         { id: "metal_bin", w: 2 },
         { id: "rain_barrel", w: 1 },
         { id: "battery_module", w: 0.6 },
+        { id: "gas_can", w: 1.5 },
+        { id: "generator", w: 0.4 },
         { id: "canned_fruit", w: 5 },
         { id: "instant_noodles", w: 4 },
         { id: "oatmeal", w: 3 },
@@ -541,6 +553,35 @@
     smoke: { label: "Wildfire smoke", solar: 0.4 }
   };
 
+  // src/engine/hazards.js
+  var HAZARDS = {
+    feral_dogs: { label: "loose dogs, you take side streets", walk: 0.9 },
+    black_ice: { label: "black ice", walk: 0.8 },
+    road_blocked: { label: "fallen trees and lines on the roads", walk: 0.9 },
+    flood: { label: "flooded low streets", walk: 0.85 },
+    cold_snap: { label: "cold snap", colder: 12 }
+  };
+  function startHazard(state2, id, hours) {
+    var _a;
+    if (!HAZARDS[id]) throw new Error(`Unknown hazard "${id}"`);
+    state2.flags || (state2.flags = {});
+    clearOldHazards(state2);
+    const hz = (_a = state2.flags).hazards || (_a.hazards = {});
+    hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
+  }
+  function activeHazards(state2, t = state2.time) {
+    const hz = state2.flags?.hazards || {};
+    return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
+  }
+  function hazardColder(state2, t = state2.time) {
+    return activeHazards(state2, t).reduce((a, h2) => a + (h2.colder || 0), 0);
+  }
+  function clearOldHazards(state2) {
+    const hz = state2.flags?.hazards;
+    if (!hz) return;
+    for (const id of Object.keys(hz)) if (state2.time >= hz[id]) delete hz[id];
+  }
+
   // src/engine/world.js
   var dayOf = (t) => Math.floor(t / 1440);
   function monthOfDay(day) {
@@ -609,6 +650,9 @@
     return m < s.rise || m > s.set;
   }
   function airTemp(state2, t) {
+    return baseAirTemp(state2, t) - hazardColder(state2, t);
+  }
+  function baseAirTemp(state2, t) {
     const w = state2.weather;
     const m = (t % 1440 + 1440) % 1440;
     const s = sunFor(t);
@@ -1300,9 +1344,16 @@
   var FRAME_BUDGET_MS = 1e3 / 30;
 
   // src/data/events.js
+  var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
+  var dogWithYou = (s) => s.dog?.stage === "joined";
+  var inHouse = (s) => s.location?.kind === "house";
+  var calMonth = (s) => new Date(Date.UTC(2026, 10, 24) + Math.floor(s.time / 1440) * 864e5).getUTCMonth();
+  var isWinter = (s) => [11, 0, 1].includes(calMonth(s));
+  var isColdSeason = (s) => [10, 11, 0, 1, 2].includes(calMonth(s));
+  var isRainySeason = (s) => [9, 10, 11, 0, 1, 2, 3].includes(calMonth(s));
   var EVENTS = [
     { id: "geese", size: "small", where: "outside", months: [3, 99], text: "A long line of geese flies over, very low and loud. Then it is quiet again." },
-    { id: "frost_windows", size: "small", where: "home", months: [3, 6], text: "Frost makes ferns on the inside of the windows." },
+    { id: "frost_windows", size: "small", where: "home", months: [3, 99], when: isColdSeason, text: "Frost makes ferns on the inside of the windows." },
     { id: "car_alarm_dies", size: "small", where: "any", months: [3, 5], text: "Far away, a car alarm that has cried for days goes weak, then stops." },
     { id: "shelf_falls", size: "small", where: "inside", months: [3, 99], text: "Somewhere in the building, a shelf gives way with a crash. You hold still until the dust settles." },
     { id: "wind_chimes", size: "small", where: "home", months: [3, 99], text: "A neighbor\u2019s wind chimes ring in the wind. For a moment it sounds like a normal street." },
@@ -1312,8 +1363,31 @@
     { id: "night_crash", size: "small", where: "asleep", months: [3, 99], text: "A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again." },
     { id: "night_owls", size: "small", where: "asleep", months: [3, 99], text: "Owls call to each other outside. You wake, and lie listening until they stop." },
     { id: "night_dogs", size: "medium", where: "asleep", months: [3, 99], text: "Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while." },
-    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
-    { id: "power_line_down", size: "big", where: "any", months: [3, 99], text: "A loud crack and a crash: a power pole goes down somewhere close. The street will be blocked." }
+    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", apply: (s) => startHazard(s, "road_blocked", 72), text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
+    { id: "power_line_down", size: "big", where: "any", months: [3, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A loud crack and a crash: a power pole goes down somewhere close. Walking anywhere takes longer for two days." },
+    // ---- small ----
+    { id: "dog_bone", size: "small", where: "home", months: [3, 99], when: dogWithYou, apply: (s) => {
+      s.dog.bond = Math.min(100, s.dog.bond + 3);
+    }, text: "The dog comes in proud, with an old bone from a yard. It lies at your feet to chew it. (Bond +3)" },
+    { id: "pipe_burst", size: "small", where: "inside", months: [3, 99], when: isColdSeason, text: "A pipe has burst somewhere above. Water runs down a wall and across the floor. You step around it." },
+    { id: "crows_porch", size: "small", where: "outside", months: [3, 99], text: "Crows gather on a porch down the street. You know what they found there, and you do not look." },
+    { id: "cat_watches", size: "small", where: "outside", months: [3, 99], text: "A thin cat watches you from under a car. When you stop, it is gone." },
+    { id: "rain_gutter", size: "small", where: "home", months: [3, 99], when: raining, text: "Rain pours over a blocked gutter in a sheet. It is loud, and somehow it helps." },
+    { id: "radio_static", size: "small", where: "home", months: [3, 99], text: "You try the old radio again. Only static on every band. You turn it off." },
+    { id: "deer_street", size: "small", where: "outside", months: [4, 99], text: "Two deer stand in the middle of the road, eating the grass in the cracks. They look at you, then walk away slowly." },
+    // ---- medium ----
+    { id: "feral_dogs", size: "medium", where: "outside", months: [3, 99], apply: (s) => startHazard(s, "feral_dogs", 24), text: "A pack of loose dogs blocks the street ahead, heads low. You back away and go around. For a day you keep to the side streets (walking is slower)." },
+    { id: "roof_leak", size: "medium", where: "home", months: [3, 99], when: raining, apply: (s) => {
+      s.home.rawGal = (s.home.rawGal || 0) + 2;
+      s.home.indoorTemp -= 3;
+    }, text: "Water drips through the ceiling in the hall. You put a pot under it: 2 gal of rain water to filter, but the house is colder." },
+    { id: "gas_smell", size: "medium", where: "inside", months: [3, 8], when: inHouse, text: "A strong smell of gas in this house. You open a window, and you do not light anything in here." },
+    { id: "black_ice", size: "medium", where: "outside", months: [3, 99], when: (s) => isColdSeason(s) && (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, "black_ice", 18), text: "Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts." },
+    { id: "house_fire_far", size: "medium", where: "any", months: [3, 99], when: (s) => !raining(s), text: "To the south, the sky glows orange under a column of smoke. A house burns there, and the next one catches. The smell reaches you an hour later." },
+    // ---- big ----
+    { id: "cold_snap", size: "big", where: "any", months: [3, 99], when: isWinter, apply: (s) => startHazard(s, "cold_snap", 72), text: "The air turns hard and dry. A cold snap from the north: the next three days are about 12 \xB0F colder. Keep the fire going." },
+    { id: "flood_low_streets", size: "big", where: "any", months: [3, 99], when: (s) => isRainySeason(s) && s.weather?.type === "heavy_rain", apply: (s) => startHazard(s, "flood", 24), text: "The creeks are over their banks. Low streets are under brown water, and you must go around them for a day." },
+    { id: "bridge_debris", size: "big", where: "outside", months: [4, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A pile-up of cars and a fallen sign block an overpass. You must find other ways for a while." }
   ];
 
   // src/engine/status.js
@@ -1468,6 +1542,17 @@
     fire(state2, e, rng, mode);
     return e;
   }
+  function pacerInfo(state2) {
+    const p = state2.pacer || {};
+    return {
+      tension: Math.round(p.tension || 0),
+      chancePerHour: eventChance(p.tension || 0),
+      lastEventDay: p.lastEventDay ?? null,
+      lastBigDay: p.lastBigDay ?? null,
+      events: p.count || 0,
+      month: monthOf(state2.time)
+    };
+  }
   var pacerSystem = {
     id: "pacer",
     label: "Event pacer",
@@ -1504,6 +1589,22 @@
   // src/engine/decay.js
   var byId = new Map(DECAY.map((r) => [r.id, r]));
   var monthStartDay = (m) => (m - START_MONTH) * 30;
+  function failDay(state2, row, area) {
+    const u = ((hashString(`${state2.seed}:decay:${row.id}:${area}`) >>> 0) + 0.5) / 4294967296;
+    const wait = row.chanceByDay >= 1 ? 0 : Math.floor(Math.log(u) / Math.log(1 - row.chanceByDay));
+    return Math.max(0, monthStartDay(row.month)) + wait;
+  }
+  function decayActive(state2, id, area, t = state2.time) {
+    const row = byId.get(id);
+    if (!row) throw new Error(`Unknown decay row "${id}"`);
+    return gameDay(t) >= failDay(state2, row, area);
+  }
+  function decayShare(state2, id, t = state2.time) {
+    const row = byId.get(id);
+    if (!row) throw new Error(`Unknown decay row "${id}"`);
+    const days = gameDay(t) - monthStartDay(row.month) + 1;
+    return days <= 0 ? 0 : 1 - (1 - row.chanceByDay) ** days;
+  }
   function initDecay(state2) {
     state2.decay = { started: {} };
   }
@@ -1518,6 +1619,19 @@
       st[row.id] = day;
       log(state2, row.text, row.kind || "story");
     }
+  }
+  function decayInfo(state2, t = state2.time) {
+    const day = gameDay(t);
+    const started = state2.decay?.started || {};
+    const next2 = DECAY.filter((r) => started[r.id] == null).map((r) => {
+      const k = r.chanceByDay >= 0.02 ? 1 : Math.ceil(Math.log(0.98) / Math.log(1 - r.chanceByDay));
+      return { id: r.id, day: Math.max(day, monthStartDay(r.month) + k - 1) };
+    }).sort((a, b) => a.day - b.day)[0] || null;
+    return {
+      shown: Object.keys(started),
+      next: next2,
+      shares: Object.fromEntries(DECAY.map((r) => [r.id, Math.round(decayShare(state2, r.id, t) * 100) / 100]))
+    };
   }
   var decaySystem = {
     id: "decay",
@@ -2672,10 +2786,12 @@
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
+    const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
+      if (e.fridge && fridgesGone) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -2710,6 +2826,7 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
+    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -2817,7 +2934,20 @@
     return `${est.miles.toFixed(1)} mi \xB7 about ${formatDuration(est.minutes)} \xB7 Energy \u2212${Math.round(est.energy)}`;
   }
 
+  // src/engine/breakdown.js
+  function batteryHours(state2) {
+    return Math.max(3, Math.round(10 * (1 - 0.7 * decayShare(state2, "battery_drain"))));
+  }
+  function medicineFactor(state2) {
+    return 1 - 0.3 * decayShare(state2, "old_medicine");
+  }
+  function gasStartChance(state2) {
+    return 1 - 0.7 * decayShare(state2, "stale_gas");
+  }
+  var GEN_KWH_PER_GAL = 3;
+
   // src/engine/actions.js
+  var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
   var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source2(state2, from) {
@@ -2930,8 +3060,8 @@
           return;
         }
         addItem(bag, id, -1);
-        p.lightHours = 10;
-        log(state2, "You put new batteries in the flashlight (10 h of light).");
+        p.lightHours = batteryHours(state2);
+        log(state2, p.lightHours >= 10 ? "You put new batteries in the flashlight (10 h of light)." : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
         advanceTime(state2, 2);
         return;
       }
@@ -3025,8 +3155,8 @@
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = painPillHours(state2);
-      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.`);
+      p.painH = Math.max(1, Math.round(painPillHours(state2) * medicineFactor(state2)));
+      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state2) < 0.95 ? " They are past their date and work less well." : ""}`);
       advanceTime(state2, 2);
       return;
     }
@@ -3125,6 +3255,11 @@
         return;
       }
       case "collect_tap":
+        if (!tapRuns(state2)) {
+          h2.tapWorks = false;
+          log(state2, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
+          return;
+        }
         h2.rawGal += 2;
         log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
         advanceTime(state2, 15);
@@ -3218,6 +3353,22 @@
         log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         practice(state2, "survival", lit ? 1 : 2);
+        return;
+      }
+      case "run_generator": {
+        const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
+        addItem(bag, "gas_can", -1);
+        advanceTime(state2, 120, "work");
+        if (state2.dead) return;
+        if (!chance(state2, gasStartChance(state2))) {
+          log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
+          p.morale = clamp3(p.morale - 2, 0, 100);
+          return;
+        }
+        const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
+        h2.battery += kwh;
+        log(state2, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
+        practice(state2, "tinkering", 1);
         return;
       }
       case "break_furniture":
@@ -3718,7 +3869,7 @@
       add("drink_tank", "Drink from the water heater tank", { disabled: h2.tankGal < 0.25 && "The tank is empty", note: `${h2.tankGal.toFixed(1)} gal left` });
       if (h2.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h2.safeGal.toFixed(1)} gal` });
       add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h2.safeGal < 1 && h2.tankGal < 1 && "No clean water" });
-      if (h2.tapWorks) add("collect_tap", "Collect tap water (2 gal, unsafe)");
+      if (tapRuns(state2)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
       if (h2.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
       if (h2.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h2.rawGal.toFixed(1)} gal unsafe` });
@@ -3728,6 +3879,11 @@
       }
       const fuel = (h2.storage.firewood || 0) + (state2.carried.firewood || 0);
       add("add_wood", h2.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      if (has2(state2, "generator")) {
+        const gas = (h2.storage.gas_can || 0) + (state2.carried.gas_can || 0);
+        const startP = gasStartChance(state2);
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+      }
       if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
       add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
       const cookId = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
@@ -4166,6 +4322,11 @@
     const chill = Math.round(feltTemp(state2, "walk", { ...env, wind: 0 }) - feltTemp(state2, "walk", env));
     if (chill >= 3) {
       out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
+    }
+    for (const h2 of activeHazards(state2)) {
+      const left = formatDuration(h2.endsAt - state2.time);
+      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} (about ${left} more).`, level: "warn" });
+      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder (about ${left} more).`, level: "danger" });
     }
     return out;
   }
@@ -4922,7 +5083,7 @@
   function createFx(wrap) {
     const layer = document.createElement("div");
     layer.className = "fx";
-    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><div class="fx-haze"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
     wrap.appendChild(layer);
     const canvas2 = layer.querySelector("canvas");
     const ctx = canvas2.getContext("2d");
@@ -5016,14 +5177,17 @@
       // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
       update({ weather, night, windMph, season }) {
         const windy = weather === "windstorm" || (windMph || 0) >= 12;
-        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" ? "rain" : season === "fall" && windy ? "leaves" : "none";
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" || weather === "ice_storm" ? "rain" : season === "fall" && windy ? "leaves" : "none";
         if (nextKind !== kind) parts = [];
         kind = nextKind;
-        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "ice_storm" ? 0.6 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
         for (const s of ["winter", "spring", "summer", "fall"]) layer.classList.toggle(`is-${s}`, season === s);
         wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
         layer.classList.toggle("is-night", !!night);
         layer.classList.toggle("is-fog", weather === "fog");
+        layer.classList.toggle("is-smoke", weather === "smoke");
+        layer.classList.toggle("is-heat", weather === "heat_wave");
+        layer.classList.toggle("is-ice", weather === "ice_storm");
         layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
         layer.classList.toggle("off", !enabled);
         run2();
@@ -5325,6 +5489,48 @@
       const line = done === 0 ? goal.epilogue.none : done === total ? goal.epilogue.all : goal.epilogue.some;
       return { id, title: goal.title, kind: GOAL_KINDS[goal.kind].label, done, total, line };
     });
+  }
+
+  // src/engine/diagnostics.js
+  function diagnostics(state2, { records = 20 } = {}) {
+    const w = state2.weather || {};
+    let saveBytes = null;
+    try {
+      saveBytes = JSON.stringify(state2).length;
+    } catch {
+    }
+    return {
+      day: dayIndex(state2.time) + 1,
+      time: state2.time,
+      weather: {
+        type: w.type,
+        label: weatherInfo(state2)?.label || w.type,
+        high: Math.round(w.high),
+        low: Math.round(w.low),
+        wind: w.wind,
+        spell: w.spell ? { id: w.spell.id, daysLeft: w.spell.daysLeft } : null,
+        baseType: w.baseType || w.type
+      },
+      pacer: pacerInfo(state2),
+      decay: decayInfo(state2),
+      systems: gameSystems().list().map((s) => ({ id: s.id, order: s.order, version: s.version, saved: state2.systemVersions?.[s.id] ?? null, catchUp: s.catchUp || null })),
+      rng: { shared: state2.rngState, streams: { ...state2.rngStreams || {} } },
+      saveBytes,
+      deep: activity.isDeep(),
+      activity: activity.records(records)
+    };
+  }
+  function setDeepActivity(on) {
+    activity.setDeep(on);
+  }
+  function activityText(r) {
+    const head = `#${r.n} ${r.action} (${r.minutes} min)`;
+    const rng = r.rng ? [r.rng.shared ? "game rng" : null, ...r.rng.streams].filter(Boolean).join(", ") : "";
+    const out = [head];
+    for (const l of r.lines) out.push(`  [${l.sys ? `${l.sys}.${l.hook}` : "action"}] ${l.text}`);
+    if (rng) out.push(`  rng: ${rng}`);
+    if (r.changed) out.push(`  changed: ${r.changed.join(", ") || "(none)"}`);
+    return out.join("\n");
   }
 
   // src/ui/app.js
@@ -6156,6 +6362,9 @@
       isDone: (z) => zoneList().includes(z),
       isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
       isDead: () => !!state.dead,
+      // F3: engine diagnostics (systems, random streams, last actions with changed paths).
+      onDebug: (on) => setDeepActivity(on),
+      gameDiag: () => diagText(state),
       getStatus: () => {
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
@@ -6342,6 +6551,20 @@
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });
+  }
+  function diagText(state2) {
+    const d = diagnostics(state2, { records: 3 });
+    const w = d.weather;
+    const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join("  ");
+    const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(" ");
+    return [
+      `day ${d.day}  ${w.label} ${w.low}-${w.high}\xB0F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ""}`,
+      `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
+      `breakdown: ${shares || "none yet"}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ""}`,
+      `systems: ${d.systems.map((x) => x.id).join(" ")}`,
+      `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
+      ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
+    ];
   }
 
   // src/main.js

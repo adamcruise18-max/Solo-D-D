@@ -1228,6 +1228,34 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.008, 0.008, 0.012, 8), M.brass, 0, 0.225, 0);
     add(g, gCyl(0.052, 0.052, 0.012, 18, true), col(0x1d4a20, 0.6), 0, 0, 0);
   },
+  waxed_cheese(g, r) {
+    // a round of hard cheese in red wax, one wedge cut (stylized)
+    const wax = col(pick(r, [0xc4221c, 0xb8301e, 0xd8a82a]), 0.35);
+    add(g, gCyl(0.07, 0.07, 0.06, 20), wax, 0, 0, 0);
+    add(g, gCyl(0.071, 0.071, 0.004, 20), col(0x7a1410, 0.4), 0, 0.058, 0);
+    add(g, gBox(0.07, 0.003, 0.05), tmat(frontTex({ t: 'AGED CHEDDAR', s: 'WAXED  KEEP COOL', b: '#f4ecd2', f: '#7a1410', a: '#c4221c' }, 256, 160), 0.7), 0, 0.062, 0);
+  },
+  gas_can(g) {
+    // red plastic 1 gal can with a spout
+    const red = col(0xc8281e, 0.42);
+    add(g, gRBox(0.2, 0.22, 0.12, 0.03), red);
+    add(g, gBox(0.12, 0.03, 0.03), red, -0.03, 0.215, 0);
+    add(g, gCyl(0.014, 0.018, 0.12, 10), col(0x1d1e20, 0.5), 0.06, 0.21, 0, 0, 0, -0.7);
+    add(g, gCyl(0.022, 0.022, 0.02, 12), M.blackPl, 0.06, 0.205, 0);
+    add(g, gBox(0.12, 0.09, 0.002), tmat(frontTex({ t: 'GASOLINE', s: '1 GAL  SAFETY CAN', n: 'FLAMMABLE  KEEP AWAY FROM FLAME', b: '#f1c21b', f: '#111', a: '#c8281e', p: 'flame' }, 256, 192), 0.6), 0, 0.06, 0.061);
+  },
+  generator(g) {
+    // small open-frame generator: tube frame, tank, engine, panel
+    const frame = col(0x2a2a2c, 0.45, 0.3);
+    for (const x of [-0.25, 0.25]) for (const z of [-0.18, 0.18]) add(g, gCyl(0.014, 0.014, 0.42, 8), frame, x, 0, z);
+    for (const z of [-0.18, 0.18]) for (const y of [0.02, 0.42]) add(g, gCyl(0.014, 0.014, 0.5, 8), frame, 0.25, y, z, 0, 0, Math.PI / 2);
+    add(g, gRBox(0.36, 0.1, 0.3, 0.04), col(0xe0a41e, 0.35), 0, 0.31, 0);
+    add(g, gCyl(0.03, 0.03, 0.02, 12), M.blackPl, 0.1, 0.42, 0);
+    add(g, gRBox(0.2, 0.18, 0.2, 0.03), M.darkMetal, -0.08, 0.03, 0);
+    add(g, gCyl(0.05, 0.05, 0.08, 14), M.steel, 0.2, 0.1, 0.05, 0, 0, Math.PI / 2);
+    add(g, gBox(0.12, 0.12, 0.004), tmat(frontTex({ t: 'GENERATOR', s: '2000 W  120 V', n: 'OUTDOOR USE ONLY  CARBON MONOXIDE', b: '#f4f1ea', f: '#111', a: '#e0a41e' }, 256, 256), 0.5), 0.12, 0.06, 0.12);
+    add(g, gBox(0.14, 0.14, 0.05), M.greyPl, 0.12, 0.055, 0.07);
+  },
   tarp(g, r) {
     const color = pick(r, ['#2a5ab8', '#6a7a3a', '#a85a1a']);
     const t = tmat(ctex('tarp' + color, 128, 128, (c, w, h, rr) => { noiseFill(c, w, h, rr, color, 0.08, 1200, 1); c.strokeStyle = 'rgba(255,255,255,0.12)'; for (let i = 0; i < w; i += 4) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } grime(c, w, h, rr, 0.6); }, { repeat: [3, 3] }), 0.55);
