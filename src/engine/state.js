@@ -202,7 +202,7 @@ function journalNote(state, text, kind) {
     d = { day, places: [], taken: 0, searched: 0, events: [] };
     state.journal.push(d);
   }
-  const arrive = /^You arrive at (.+)\.$/.exec(text);
+  const arrive = /^You arrive at (.+)\.$/.exec(text) || /^You reach ([^.]+)\./.exec(text); // places and wild spots
   if (arrive) { if (!d.places.includes(arrive[1])) d.places.push(arrive[1]); return; }
   if (/^You walk to a house/.test(text)) { if (!d.places.includes('a house')) d.places.push('a house'); return; }
   if (/^You take: /.test(text)) { d.taken += 1; return; }

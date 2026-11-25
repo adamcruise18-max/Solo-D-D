@@ -197,8 +197,26 @@ export function stormWindows(state) {
   return room;
 }
 
+// Playtest 3: warn when the stored water runs low after the tap stops
+// (once at each level; a refill above the level arms it again).
+export const WATER_WARN = [10, 3];
+export function waterWarning(state) {
+  const h = state.home;
+  if (h.tapWorks) return null;
+  const gal = (h.tankGal || 0) + (h.safeGal || 0);
+  const lvl = WATER_WARN.filter((x) => gal < x).pop() ?? null; // the lowest level passed
+  if (lvl == null) { delete h.waterWarned; return null; }
+  if (h.waterWarned != null && h.waterWarned <= lvl) return null;
+  h.waterWarned = lvl;
+  log(state, lvl <= 3
+    ? `Only ${gal.toFixed(1)} gal of clean water left. Find water today: rain, a creek to boil, or bottles in stores.`
+    : `The stored water is getting low (${gal.toFixed(1)} gal). Rain barrels and a filter would keep it full.`, lvl <= 3 ? 'danger' : 'warn');
+  return lvl;
+}
+
 export function homeDaily(state) {
   stormWindows(state);
+  waterWarning(state);
   const filtered = runAutoFilter(state);
   if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
 }

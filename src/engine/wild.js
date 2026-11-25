@@ -68,13 +68,24 @@ export function spotHere(state) {
   return loc && loc.kind === 'wild' ? { id: loc.id, ...SPOTS[loc.id] } : null;
 }
 
+// What the water looks like on arrival: from the weather and the month.
+export function waterText(state) {
+  const w = state.weather || {};
+  const month = new Date(Date.UTC(2026, 10, 24) + Math.floor(state.time / 1440) * 86400000).getUTCMonth();
+  if (w.type === 'rain' || w.type === 'heavy_rain' || w.type === 'windstorm') return 'The water is high and brown with rain.';
+  if (w.type === 'snow' || w.low <= 28) return 'Thin ice at the edges; the water is slow and dark.';
+  if (month >= 6 && month <= 8) return 'The water is low and clear. Fish hold in the shade.';
+  if (month >= 3 && month <= 5) return 'The water runs fast and green with spring melt.';
+  return 'The water runs cold and grey-green.';
+}
+
 // Walk to a spot. The location is { kind: 'wild', id } (outside: tick.js environment).
 export function goToSpot(state, id) {
   const s = SPOTS[id];
   if (!s) { log(state, 'No such place.'); return false; }
   if (!travel(state, s, s.name)) return false;
   state.location = { kind: 'wild', id };
-  log(state, `You reach ${s.name}. ${s.kind === 'fish' ? 'The water is high and brown with rain.' : 'Brush, tall grass and the edge of the trees.'}`, 'travel');
+  log(state, `You reach ${s.name}. ${s.kind === 'fish' ? waterText(state) : 'Brush, tall grass and the edge of the trees.'}`, 'travel');
   return true;
 }
 

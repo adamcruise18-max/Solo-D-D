@@ -654,6 +654,11 @@
     if ((w.type === "rain" || w.type === "heavy_rain") && w.low <= 32 && (month === 11 || month <= 1)) {
       w.type = "snow";
       w.snowInches = randInt(state2, 1, 6);
+    } else if (w.type === "snow") {
+      if (w.low > 34 || !(month === 11 || month <= 1)) {
+        w.type = "rain";
+        delete w.snowInches;
+      } else if (w.snowInches == null) w.snowInches = randInt(state2, 1, 6);
     }
     if (w.type === "clear") w.nextLow -= 5;
     w.nextLow = Math.min(w.nextLow, w.high - 3);
@@ -1247,8 +1252,24 @@
     log(state2, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
     return room;
   }
+  var WATER_WARN = [10, 3];
+  function waterWarning(state2) {
+    const h2 = state2.home;
+    if (h2.tapWorks) return null;
+    const gal = (h2.tankGal || 0) + (h2.safeGal || 0);
+    const lvl = WATER_WARN.filter((x) => gal < x).pop() ?? null;
+    if (lvl == null) {
+      delete h2.waterWarned;
+      return null;
+    }
+    if (h2.waterWarned != null && h2.waterWarned <= lvl) return null;
+    h2.waterWarned = lvl;
+    log(state2, lvl <= 3 ? `Only ${gal.toFixed(1)} gal of clean water left. Find water today: rain, a creek to boil, or bottles in stores.` : `The stored water is getting low (${gal.toFixed(1)} gal). Rain barrels and a filter would keep it full.`, lvl <= 3 ? "danger" : "warn");
+    return lvl;
+  }
   function homeDaily(state2) {
     stormWindows(state2);
+    waterWarning(state2);
     const filtered = runAutoFilter(state2);
     if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
   }
@@ -2663,8 +2684,9 @@
     p.morale = clamp2(p.morale, 0, 100);
     if (p.weak) {
       if (p.weakGoodHours >= 12) {
+        const before = p.energyMax;
         p.energyMax = Math.min(100, p.energyMax + 2);
-        log(state2, "Your body is a little stronger today.", "good");
+        if (Math.floor(p.energyMax / 10) > Math.floor(before / 10) && p.energyMax < 100) log(state2, `Your body is stronger: you can do more before you tire (${p.energyMax} of 100).`, "good");
       }
       p.weakGoodHours = 0;
       if (p.energyMax >= 100) {
@@ -3253,7 +3275,7 @@
       d = { day, places: [], taken: 0, searched: 0, events: [] };
       state2.journal.push(d);
     }
-    const arrive = /^You arrive at (.+)\.$/.exec(text);
+    const arrive = /^You arrive at (.+)\.$/.exec(text) || /^You reach ([^.]+)\./.exec(text);
     if (arrive) {
       if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
       return;
@@ -3751,6 +3773,15 @@
     const loc = state2.location;
     return loc && loc.kind === "wild" ? { id: loc.id, ...SPOTS[loc.id] } : null;
   }
+  function waterText(state2) {
+    const w = state2.weather || {};
+    const month = new Date(Date.UTC(2026, 10, 24) + Math.floor(state2.time / 1440) * 864e5).getUTCMonth();
+    if (w.type === "rain" || w.type === "heavy_rain" || w.type === "windstorm") return "The water is high and brown with rain.";
+    if (w.type === "snow" || w.low <= 28) return "Thin ice at the edges; the water is slow and dark.";
+    if (month >= 6 && month <= 8) return "The water is low and clear. Fish hold in the shade.";
+    if (month >= 3 && month <= 5) return "The water runs fast and green with spring melt.";
+    return "The water runs cold and grey-green.";
+  }
   function goToSpot(state2, id) {
     const s = SPOTS[id];
     if (!s) {
@@ -3759,7 +3790,7 @@
     }
     if (!travel(state2, s, s.name)) return false;
     state2.location = { kind: "wild", id };
-    log(state2, `You reach ${s.name}. ${s.kind === "fish" ? "The water is high and brown with rain." : "Brush, tall grass and the edge of the trees."}`, "travel");
+    log(state2, `You reach ${s.name}. ${s.kind === "fish" ? waterText(state2) : "Brush, tall grass and the edge of the trees."}`, "travel");
     return true;
   }
   function spotPressure(state2, id, t = state2.time) {
