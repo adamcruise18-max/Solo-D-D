@@ -82,3 +82,25 @@ test('goals: day counts and the last steps start when the goal is chosen', () =>
   checkGoals(t);
   assert.ok(t.player.goals.done.city_atlas.includes('places_more'));
 });
+
+test('legacy marks: signs at new places while the goal runs; lit window at night', async () => {
+  const { legacyMarks, MAX_SIGNS } = await import('../src/engine/goals.js');
+  const s = newGame(31);
+  s.time += 8 * 24 * 60;
+  assert.equal(pickGoal(s, 'message_wall'), null);
+  s.location = { kind: 'place', id: 'pX' };
+  checkGoals(s);
+  assert.deepEqual(legacyMarks(s).signs, [], 'no sign without the tools');
+  s.home.storage.toolkit = 1; s.home.storage.scrap_wood = 2;
+  checkGoals(s);
+  checkGoals(s);
+  assert.deepEqual(legacyMarks(s).signs, ['pX'], 'one sign per place');
+  assert.ok(MAX_SIGNS >= 10);
+  s.player.goals.done.light_on_hill = ['battery_module', 'led'];
+  s.home.battery = 5;
+  const night = s.time - (s.time % 1440) + 23 * 60;
+  s.time = night;
+  assert.equal(legacyMarks(s).litWindow, true);
+  s.time = night - 11 * 60; // noon
+  assert.equal(legacyMarks(s).litWindow, false);
+});

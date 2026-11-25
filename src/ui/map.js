@@ -5,6 +5,7 @@ import { HOME, MAP_RADIUS_MILES } from '../engine/state.js';
 import { winterizeStyle, seasonPaint } from './winter-style.js';
 import { detailFeatures, addDetailIcons, DETAIL_INFO } from './details.js';
 import { seasonOf, overgrowth } from '../engine/season.js';
+import { legacyMarks } from '../engine/goals.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -153,6 +154,26 @@ export async function createMap(container, { places, onPlaceClick }) {
   youEl.innerHTML = '<i></i>';
   const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
+  // Legacy marks: painted signs at places (one small marker each), lit window and capsule on home.
+  const signMarkers = new Map();
+  function applyMarks(state, list) {
+    const m = legacyMarks(state);
+    homeEl.classList.toggle('lit', m.litWindow);
+    homeEl.classList.toggle('capsule', m.capsule);
+    homeEl.title = ['Home', m.litWindow && 'the window is lit', m.capsule && 'a time capsule is buried here'].filter(Boolean).join(' · ');
+    if (signMarkers.size === m.signs.length) return;
+    const byId = new Map(list.map((p) => [p.id, p]));
+    for (const id of m.signs) {
+      if (signMarkers.has(id)) continue;
+      const p = byId.get(id);
+      if (!p) continue;
+      const el = document.createElement('div');
+      el.className = 'marker-sign';
+      el.title = 'Your painted sign';
+      signMarkers.set(id, new maplibregl.Marker({ element: el, offset: [12, -12] }).setLngLat([p.lon, p.lat]).addTo(map));
+    }
+  }
+
   let seasonKey = '';
   function applySeason(t) {
     const season = seasonOf(t);
@@ -177,6 +198,7 @@ export async function createMap(container, { places, onPlaceClick }) {
       homeMarker.setLngLat([h.lon, h.lat]);
       youEl.classList.toggle('at-home', state.location.kind === 'home');
       homeEl.classList.toggle('here', state.location.kind === 'home');
+      applyMarks(state, list);
     },
     flyTo(pos) {
       map.easeTo({ center: [pos.lon, pos.lat], duration: 800 });

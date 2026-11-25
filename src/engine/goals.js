@@ -3,10 +3,12 @@
 // step's check is true, it is done for good (one journal line, a little morale).
 //
 // State: state.player.goals = { picked: [goalId], done: { goalId: [stepId] }, changedDay,
-//   since: { goalId: { day, miles, places, houses, books } } (when each goal was chosen) }
+//   since: { goalId: { day, miles, places, houses, books } } (when each goal was chosen),
+//   signs: [placeId] (painted signs, for the map) }
 // (created on first use, so old saves need no migration).
 import { GOALS, GOAL_KINDS, goalCounters } from '../data/legacy-goals.js';
 import { gameDay } from '../core/clock.js';
+import { isNight } from './world.js';
 import { log } from './state.js';
 
 export const MAX_GOALS = 3;
@@ -63,6 +65,7 @@ export function dropGoal(state, id) {
 export function checkGoals(state) {
   const g = state.player.goals;
   if (!g || !g.picked.length || state.dead) return [];
+  paintSign(state);
   const now = [];
   for (const id of g.picked) {
     const goal = byId.get(id);
@@ -83,6 +86,34 @@ export function checkGoals(state) {
     }
   }
   return now;
+}
+
+// Marks in the world (shown on the map):
+// - litWindow: "Light in the window" has its LED lights and it is night with battery left.
+// - signs: places where you painted a sign ("Signs for later"), as place ids.
+// - capsule: the time capsule is buried at home.
+export const MAX_SIGNS = 40;
+export function legacyMarks(state) {
+  const g = state.player.goals;
+  const done = (id, step) => !!g?.done?.[id]?.includes(step);
+  return {
+    litWindow: done('light_on_hill', 'led') && isNight(state.time) && (state.home?.battery || 0) > 0.2,
+    signs: g?.signs || [],
+    capsule: done('time_capsule', 'tc_bury'),
+  };
+}
+
+// While "Signs for later" is chosen and you have the tools, you paint a sign at each
+// new place you visit (once per place). Called from checkGoals.
+function paintSign(state) {
+  const g = state.player.goals;
+  if (!g.picked.includes('message_wall') || !g.done.message_wall?.includes('mw_tools')) return;
+  const loc = state.location;
+  if (!loc || loc.kind !== 'place') return;
+  g.signs ||= [];
+  if (g.signs.includes(loc.id) || g.signs.length >= MAX_SIGNS) return;
+  g.signs.push(loc.id);
+  log(state, 'You paint a sign by the door: where to find water, and what is left here.', 'story');
 }
 
 export function goalProgress(state, id) {
