@@ -8,7 +8,7 @@ import {
   Vector3, Matrix4, BufferGeometry, Float32BufferAttribute, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
-import { setupLook, surfaceFor, worldUV, pickQuality } from './look3d.js';
+import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
@@ -150,7 +150,12 @@ export function openInside(opts) {
   applyLight();
 
   // ---------- building ----------
-  const surf = (part) => surfaceFor(plan.cat, part, null, quality);
+  // Grime by place: low in kept-up stores and homes, medium in garages and industrial sites,
+  // high where the building is open to the weather (plan.exposed: a broken window or a collapsed roof).
+  // ?grime=low|medium|high in the page address forces a level (to compare looks).
+  const forceGrime = typeof location !== 'undefined' && (/[?&]grime=(low|medium|high)\b/.exec(location.search || '') || [])[1];
+  const grime = forceGrime || grimeLevel(plan.cat, { exposed: !!plan.exposed });
+  const surf = (part) => surfaceFor(plan.cat, part, null, quality, grime);
   const floor = new Mesh(new PlaneGeometry(W, D), surf('floor'));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0, -D / 2);

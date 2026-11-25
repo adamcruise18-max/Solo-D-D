@@ -29,6 +29,12 @@ function hashStr(s) {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
+// Art style: 'toon' = the stylized look (clean colors, soft rounded shapes, no grime, no fine print),
+// as in Adam's reference sheets. Add ?style=real to the page address to see the older realistic look.
+// Rounded boxes cost about 9 times the triangles. Shelf stock (hundreds of small far boxes) stays square.
+let ROUND = true;
+function squareOnly(fn) { const was = ROUND; ROUND = false; try { return fn(); } finally { ROUND = was; } }
+export const TOON = !(typeof location !== 'undefined' && /[?&]style=real\b/.test(location.search || ''));
 const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const TAU = Math.PI * 2;
 
@@ -81,6 +87,7 @@ function txt(ctx, s, x, y, size, o = {}) {
 }
 // rows of grey bars that read as fine print from any distance
 function finePrint(ctx, x, y, w, rows, lh, rnd, color = 'rgba(0,0,0,0.55)') {
+  if (TOON) return; // the stylized look has no tiny text
   ctx.fillStyle = color;
   for (let i = 0; i < rows; i++) {
     let cx = x;
@@ -93,6 +100,7 @@ function finePrint(ctx, x, y, w, rows, lh, rnd, color = 'rgba(0,0,0,0.55)') {
   }
 }
 function barcode(ctx, x, y, w, h, rnd) {
+  if (TOON) return;
   ctx.fillStyle = '#fff';
   ctx.fillRect(x - w * 0.06, y - h * 0.06, w * 1.12, h * 1.3);
   ctx.fillStyle = '#000';
@@ -107,6 +115,7 @@ function barcode(ctx, x, y, w, h, rnd) {
   finePrint(ctx, x + w * 0.1, y + h * 1.06, w * 0.8, 1, h * 0.18, rnd, '#000');
 }
 function nutrition(ctx, x, y, w, h, rnd) {
+  if (TOON) return;
   ctx.fillStyle = '#fff';
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#000';
@@ -126,6 +135,7 @@ function nutrition(ctx, x, y, w, h, rnd) {
 }
 // dust, scuffs and stains: the store has been shut for three months
 function grime(ctx, w, h, rnd, amt = 1) {
+  if (TOON) return; // clean, painted surfaces
   for (let i = 0; i < 260 * amt; i++) {
     ctx.fillStyle = rnd() < 0.5 ? `rgba(70,60,45,${0.05 + rnd() * 0.08})` : `rgba(255,255,255,${0.04 + rnd() * 0.06})`;
     const s = 1 + rnd() * 2.5;
@@ -149,6 +159,7 @@ function grime(ctx, w, h, rnd, amt = 1) {
   }
 }
 function noiseFill(ctx, w, h, rnd, base, spread, n = 4000, size = 2) {
+  if (TOON) { spread *= 0.25; n = Math.round(n / 3); size *= 1.5; }
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, w, h);
   for (let i = 0; i < n; i++) {
@@ -394,6 +405,9 @@ function drawSide(ctx, w, h, L, rnd) {
 
 // ---------- geometry ----------
 function gBox(w, h, d) {
+  // Stylized: every box gets soft, rounded edges.
+  // Thin parts (cards, labels, panels under 4 cm) stay plain boxes: rounding them costs triangles for nothing.
+  if (TOON && ROUND && Math.min(w, h, d) >= 0.04) return gRBox(w, h, d, Math.min(w, h, d) * 0.16);
   return cached(GEO, `box${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0));
 }
 function gCyl(rt, rb, h, seg = 16, open = false) {
@@ -425,7 +439,14 @@ function gRBox(w, h, d, r) {
     const ix = hx - rr, iy = hy - rr, iz = hz - rr;
     const v = new THREE.Vector3(), q = new THREE.Vector3();
     const snap = (val, half, inner) => (Math.abs(Math.abs(val) - half / 3) < 1e-6 ? Math.sign(val) * inner : val);
+    const uv = g.attributes.uv;
     for (let i = 0; i < p.count; i++) {
+      // UVs follow the moved vertices, so labels are not stretched near the rounded edges.
+      const nx = n.getX(i), ny = n.getY(i), nz = n.getZ(i);
+      const X = snap(p.getX(i), hx, ix) / w, Y = snap(p.getY(i), hy, iy) / h, Z = snap(p.getZ(i), hz, iz) / d;
+      if (Math.abs(nz) > 0.5) uv.setXY(i, 0.5 + X * Math.sign(nz), 0.5 + Y);
+      else if (Math.abs(nx) > 0.5) uv.setXY(i, 0.5 - Z * Math.sign(nx), 0.5 + Y);
+      else uv.setXY(i, 0.5 + X, 0.5 - Z * Math.sign(ny));
       v.set(snap(p.getX(i), hx, ix), snap(p.getY(i), hy, iy), snap(p.getZ(i), hz, iz));
       q.set(THREE.MathUtils.clamp(v.x, -ix, ix), THREE.MathUtils.clamp(v.y, -iy, iy), THREE.MathUtils.clamp(v.z, -iz, iz));
       const dir = v.clone().sub(q);
@@ -466,7 +487,36 @@ function gExtrude(key, shapeFn, depth, bevel = 0.001) {
 
 // ---------- materials ----------
 function mat(key, p) {
-  return cached(MAT, key, () => new THREE.MeshStandardMaterial(p));
+  return cached(MAT, key, () => {
+    const m = new THREE.MeshStandardMaterial(stylize(p));
+    if (TOON) softRim(m);
+    return m;
+  });
+}
+// Stylized soft rim: edges that turn away from you glow a little in the object's own color,
+// so shapes read clearly and look painted, as in the reference sheets. One shared shader variant.
+function softRim(m) {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float llRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.5);
+      totalEmissiveRadiance += diffuseColor.rgb * (0.06 + 0.32 * llRim);`);
+  };
+  m.customProgramCacheKey = () => 'llSoftRim';
+}
+// Stylized materials: a soft, painted look. Metal is satin, not mirror; plain colors are a little richer.
+function stylize(p) {
+  if (!TOON) return p;
+  const q = { ...p };
+  if (!q.transparent) q.roughness = Math.min(0.85, Math.max(0.45, (q.roughness ?? 0.7) * 0.7 + 0.22));
+  if (q.metalness) q.metalness = Math.min(0.35, q.metalness * 0.55);
+  if (q.color !== undefined && !q.map) {
+    const c = new THREE.Color(q.color);
+    const hsl = {};
+    c.getHSL(hsl);
+    c.setHSL(hsl.h, Math.min(1, hsl.s * 1.18), Math.min(0.92, hsl.l * 1.04));
+    q.color = c;
+  }
+  return q;
 }
 function col(hex, rough = 0.7, metal = 0) {
   return mat(`c${hex}|${rough}|${metal}`, { color: hex, roughness: rough, metalness: metal });
@@ -2157,6 +2207,9 @@ function stockLevels(merger, kind, r, length, levels, fill, FRONT = 0.385, BACK 
 // edge at x = 0.4 (products face +x). `levels` are the y heights of the shelf boards.
 // A looted shelf (low fill) also leaves some items on the floor in front of it (x 0.45 .. 1.3, y = 0).
 export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 0.9, 1.3], fill = 0.7, seed = 0) {
+  return squareOnly(() => shelfFill(kind, length, levels, fill, seed));
+}
+function shelfFill(kind, length, levels, fill, seed) {
   if (!CATALOG[kind]) kind = 'grocery';
   const r = rng(hashStr(kind) ^ Math.imul((seed | 0) + 7, 2654435761));
   fill = THREE.MathUtils.clamp(fill, 0, 1);
@@ -2186,6 +2239,9 @@ export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 
 // opts.sign: 0 SALE, 1 SEASONAL, 2 BACK TO SCHOOL, 3 CLEARANCE (default random); opts.unit = false
 // leaves out the metal unit (stock and sign only).
 export function makeEndcap(kind = 'grocery', width = 1.2, height = 1.9, fill = 0.6, seed = 0, depth = 0.55, opts = {}) {
+  return squareOnly(() => endcap(kind, width, height, fill, seed, depth, opts));
+}
+function endcap(kind, width, height, fill, seed, depth, opts) {
   if (!CATALOG[kind]) kind = 'grocery';
   const r = rng(hashStr('endcap' + kind) ^ Math.imul((seed | 0) + 13, 2654435761));
   fill = THREE.MathUtils.clamp(fill, 0, 1);
