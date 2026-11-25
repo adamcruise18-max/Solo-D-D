@@ -468,3 +468,7 @@ b.ok, b.warn, b.bad { background: none; }
 .marker-wild { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 system-ui, sans-serif; cursor: pointer; border: 2px solid #0d1218; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
 .marker-wild.fish { background: #4aa3d8; color: #0d1218; }
 .marker-wild.hunt { background: #7fae5a; color: #0d1218; }
+/* Sleep dialog and trip warnings */
+.warn-line { color: #e3b04b; margin: 6px 0; font-size: 13px; }
+#modal .row button.risky { border-color: #c96a3a; }
+#modal .row button.risky small { color: #e3a06b; }

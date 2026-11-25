@@ -222,7 +222,9 @@ function placesGeo(list, placeStates) {
     type: 'FeatureCollection',
     features: list.map((p) => {
       const ps = placeStates[p.id];
-      const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+      // Searched with items left behind (pack was full) stays amber, not grey.
+      const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+      const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
       return {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
