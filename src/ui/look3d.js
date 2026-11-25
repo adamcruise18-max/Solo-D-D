@@ -14,9 +14,10 @@ import {
   MeshStandardMaterial, MeshBasicMaterial, SpriteMaterial, ShaderMaterial,
   CanvasTexture, RepeatWrapping, ClampToEdgeWrapping, SRGBColorSpace, NoColorSpace, LinearMipmapLinearFilter,
   DoubleSide, AdditiveBlending, ACESFilmicToneMapping, PCFSoftShadowMap, PCFShadowMap,
-  Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator,
+  Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator, InstancedMesh, Matrix4,
 } from 'three';
 import { STYLE_REAL, sty } from './style.js';
+import { resolveQuality } from './quality.js';
 
 // ---------- small helpers ----------
 const rngFrom = (seed) => {
@@ -769,11 +770,16 @@ export function worldUV(mesh) {
 }
 
 // ---------- quality ----------
+// The quality to use: ?q= in the page address, else the Game menu choice (src/ui/quality.js),
+// else in Auto a guess from the device (lowered after slow frame rates).
 export function pickQuality() {
   try {
     const q = new URLSearchParams(location.search).get('q');
-    if (q === 'low' || q === 'high') return q;
+    if (q === 'low' || q === 'medium' || q === 'high') return q;
   } catch { /* no location */ }
+  return resolveQuality(deviceQuality());
+}
+function deviceQuality() {
   try {
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     const mobile = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent || '');
@@ -867,6 +873,75 @@ function prismTexture() {
   const t = new CanvasTexture(c);
   t.colorSpace = SRGBColorSpace;
   TEX.prism = t;
+  return t;
+}
+
+// ---------- light from the game clock and weather ----------
+// sc: the scene values from src/engine/scene.js (daylight, phase, sunHeight, cloud, precip,
+// precipStrength, fog, outdoorLight). Without sc (old callers) the old fixed look is kept.
+// Returns level (how strong daylight at an opening is: about 1.2 clear noon, 0.5 overcast,
+// 0 night), color (the daylight color), sky (what you see through an opening) and golden (0..1).
+const NIGHT_SKY = { level: 0, color: 0x8197bb, sky: 0x161b24, golden: 0, night: true };
+export function skyLight(sc, night = false) {
+  if (!sc) return night ? NIGHT_SKY : { level: 1, color: 0xdce8ff, sky: 0xe9f0f8, golden: 0, night: false };
+  const day = sc.daylight ?? (night ? 0 : 1);
+  if (day <= 0.03) return NIGHT_SKY;
+  const cloud = Math.max(0, Math.min(1, sc.cloud ?? 0.6));
+  const out = sc.outdoorLight ?? day * (1 - 0.6 * cloud);
+  const sunH = sc.sunHeight ?? 0.5;
+  // low sun: warm. Clouds hide most of the warmth.
+  const golden = Math.max(0, Math.min(1, 1 - sunH / 0.4)) * (1 - 0.7 * cloud) * Math.min(1, day * 1.5);
+  const c = new Color(0xf2efe8).lerp(new Color(0xcfd6de), cloud);
+  const ps = Math.max(0, Math.min(1, sc.precipStrength ?? (sc.precip && sc.precip !== 'none' ? 0.6 : 0)));
+  if (sc.precip === 'rain') c.lerp(new Color(0xb4c4d6), 0.35 + 0.4 * ps); // rain: cooler, bluer
+  else if (sc.precip === 'snow') c.lerp(new Color(0xe2eaf4), 0.5);
+  if (sc.fog) c.lerp(new Color(0xd4d8da), 0.4);
+  c.lerp(new Color(0xffb878), golden * 0.85);
+  const level = (0.25 + 0.95 * out) * Math.min(1, day * 1.4);
+  const sky = new Color(0xe9f0f8).lerp(c, 0.55).lerp(new Color(0xf0b890), golden * 0.5).multiplyScalar(0.35 + 0.45 * Math.min(1, level)); // capped: the street still shows at noon
+  return { level, color: c.getHex(), sky: sky.getHex(), golden, night: false };
+}
+
+// Soft dark blob for contact shadows under furniture (rounded rectangle, dark in the middle).
+function blobTexture() {
+  if (TEX.blob) return TEX.blob;
+  const S = 64;
+  const c = canvas(S);
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const dx = Math.max(0, Math.abs((x + 0.5) / S - 0.5) - 0.2) / 0.3;
+    const dy = Math.max(0, Math.abs((y + 0.5) / S - 0.5) - 0.2) / 0.3;
+    const d = Math.min(1, Math.hypot(dx, dy));
+    const p = (y * S + x) * 4;
+    img.data[p] = img.data[p + 1] = img.data[p + 2] = 0;
+    img.data[p + 3] = (1 - d) ** 1.6 * 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new CanvasTexture(c);
+  TEX.blob = t;
+  return t;
+}
+
+// A light patch on the floor (or ceiling): bright at the near edge (v = 1), soft sides,
+// fading away from the opening.
+function patchTexture() {
+  if (TEX.patch) return TEX.patch;
+  const W = 64, H = 128;
+  const c = canvas(W, H);
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const u = (x + 0.5) / W, v = 1 - (y + 0.5) / H; // v: 1 at the opening
+    const side = Math.min(1, Math.min(u, 1 - u) / 0.22);
+    const a = side * side * v ** 1.8;
+    const p = (y * W + x) * 4;
+    img.data[p] = img.data[p + 1] = img.data[p + 2] = 255;
+    img.data[p + 3] = a * 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new CanvasTexture(c);
+  TEX.patch = t;
   return t;
 }
 
@@ -1305,9 +1380,14 @@ function shaftGeometry(w, h, L) {
 export function setupLook(renderer, scene, camera, opts = {}) {
   const quality = opts.quality || pickQuality();
   const high = quality === 'high';
+  const med = quality === 'medium';
   const dark = !!opts.dark;
   const night = !!opts.night;
   const dim = dark || night;
+  // Daylight from the game clock and the weather (opts.scene); night keeps the night look.
+  const sky = skyLight(opts.scene, night);
+  const dayK = night ? 0 : Math.min(1.2, sky.level);
+  const lowQ = quality === 'low';
   const group = new Group();
   group.name = 'look3d';
   scene.add(group);
@@ -1329,7 +1409,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   // A tiny environment map: a dim room with a bright doorway toward +z. Glossy floors,
   // puddles, glass and metal reflect it instead of rendering black.
   let envRT = null;
-  if (opts.env ?? high) try {
+  if (opts.env ?? (high || med)) try {
     const envScene = new Scene();
     const roomMat = new MeshBasicMaterial({ side: BackSide, vertexColors: true });
     const roomGeo = new BoxGeometry(10, 4, 10);
@@ -1361,10 +1441,12 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   if (opts.fill !== false) {
     // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.55 : 0.95)
+      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.55 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
-        : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5);
+        : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5 * (0.35 + 0.65 * Math.min(1, dayK)));
+    // the room's fill takes on some of the daylight color (warm at dusk, blue-grey in rain)
+    if (!night && opts.scene) fill.color.lerp(new Color(sky.color), 0.6);
     group.add(fill);
   }
 
@@ -1399,7 +1481,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   }
 
   // ---------- point light budget ----------
-  const maxLights = opts.maxLights ?? (high ? 6 : 3);
+  const maxLights = opts.maxLights ?? (high ? 6 : med ? 4 : 3);
   let usedLights = 0;
   const takeLight = () => (usedLights < maxLights ? (usedLights++, true) : false);
   const flickers = []; // { light, mats, base, t, state, seed }
@@ -1496,6 +1578,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
 
   // ---------- door light and shafts ----------
   const shafts = [];
+  let doorShadow = false;
   // Cold daylight through an opening at (x, z), facing into the room (-z, turned by opts.rotY).
   function addDoorLight(x, z, nightLight = night, o = {}) {
     const w = o.width ?? 1.8;
@@ -1505,8 +1588,17 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     const g = new Group();
     g.position.set(x, 0, z);
     g.rotation.y = rotY;
-    const color = nightLight ? 0x8197bb : 0xdce8ff;
-    const spot = new SpotLight(color, nightLight ? 6 : 60, 16, 0.85, 1, 2);
+    const color = nightLight ? 0x8197bb : sky.color;
+    const k = nightLight ? 0 : dayK;
+    const spot = new SpotLight(color, nightLight ? 6 : 60 * k, 16, 0.85, 1, 2);
+    // one shadow light besides the flashlight: the main door, on high quality, by day
+    if (high && !nightLight && !o.noShadow && !doorShadow) {
+      doorShadow = true;
+      spot.castShadow = true;
+      spot.shadow.mapSize.set(1024, 1024);
+      spot.shadow.camera.near = 0.3; spot.shadow.camera.far = 16;
+      spot.shadow.bias = -0.0006; spot.shadow.normalBias = 0.04; spot.shadow.radius = 4;
+    }
     spot.position.set(0, hgt + 0.6, 1.6);
     const tgt = new Object3D();
     tgt.position.set(0, 0, -3.5);
@@ -1515,7 +1607,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     const mat = keep(new ShaderMaterial({
       vertexShader: SHAFT_VERT, fragmentShader: SHAFT_FRAG, transparent: true, depthWrite: false,
       blending: AdditiveBlending, side: DoubleSide,
-      uniforms: { uColor: { value: new Color(color) }, uAlpha: { value: nightLight ? 0.16 : 0.5 }, uTime: { value: 0 } },
+      uniforms: { uColor: { value: new Color(color) }, uAlpha: { value: nightLight ? 0.16 : 0.5 * Math.min(1.1, 0.3 + 0.7 * k) }, uTime: { value: 0 } },
     }));
     const shaft = new Mesh(shaftGeometry(w, hgt, L), mat);
     shaft.position.z = -0.05;
@@ -1523,7 +1615,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     g.add(shaft);
     // soft halo around the bright opening (fake bloom), seen from inside
     const haloMat = keep(new MeshBasicMaterial({
-      map: haloTexture(), color: color, transparent: true, opacity: nightLight ? 0.25 : 0.55,
+      map: haloTexture(), color: color, transparent: true, opacity: nightLight ? 0.16 : 0.42 * Math.min(1, 0.35 + 0.65 * k),
       blending: AdditiveBlending, depthWrite: false, fog: false, side: DoubleSide,
     }));
     const halo = new Mesh(new PlaneGeometry(w + 2.2, hgt + 1.6), haloMat);
@@ -1532,19 +1624,110 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     g.add(halo);
     if (o.sky !== false) {
       // what you see through the opening: bright overcast sky and snow (not tone mapped, so it glows)
-      const skyMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x24324a : 0xe9f0f8, toneMapped: false, fog: false }));
-      const sky = new Mesh(new PlaneGeometry(w + 6, hgt + 4), skyMat);
-      sky.position.set(0, hgt / 2 + 1, 2.4);
-      sky.rotation.y = Math.PI;
-      const snowMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x3c4a60 : 0xc9d2dc, fog: false }));
+      const skyMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x161b24 : sky.sky, toneMapped: false, fog: false }));
+      const skyM = new Mesh(new PlaneGeometry(w + 6, hgt + 4), skyMat);
+      skyM.position.set(0, hgt / 2 + 1, 2.4);
+      skyM.rotation.y = Math.PI;
+      const snowMat = keep(new MeshBasicMaterial({ color: nightLight ? 0x262a32 : new Color(0xc9d2dc).multiplyScalar(0.9), fog: false }));
       const snowG = new Mesh(new PlaneGeometry(w + 6, 2.3), snowMat);
       snowG.rotation.x = -Math.PI / 2;
       snowG.position.set(0, 0.005, 1.25);
-      g.add(sky, snowG);
+      g.add(skyM, snowG);
     }
     group.add(g);
     shafts.push({ x, z, w, L, rotY, mat, night: nightLight });
+    addOpening(x, z, w / 2);
     return { group: g, light: spot, shaft };
+  }
+
+  // ---------- openings: what the eye adapts to ----------
+  // Each opening (door, window, roof hole) lets daylight in. Near one, the view is bright
+  // and the exposure goes down; deep inside it comes up over about a second.
+  const openings = []; // { x, z, r }
+  function addOpening(x, z, r = 1) { openings.push({ x, z, r }); }
+  function openness(p) {
+    let best = 0;
+    for (const o of openings) {
+      const d = Math.max(0, Math.hypot(p.x - o.x, p.z - o.z) - o.r);
+      best = Math.max(best, Math.exp(-d / 3.5));
+    }
+    return best;
+  }
+
+  // Daylight through a front window (unshadowed), with a soft patch of light on the floor.
+  // (x, z): centre of the window on the front wall; w: its width. The room is toward -z.
+  function addWindowLight(x, z, w, o = {}) {
+    if (night || dayK <= 0.02) return null;
+    const hgt = o.height ?? 2.4;
+    addOpening(x, z, w / 2);
+    let spot = null;
+    if (o.light !== false) {
+      spot = new SpotLight(sky.color, 26 * dayK * Math.min(1.5, w / 5), 15, 1.0, 1, 1.6);
+      spot.position.set(x, hgt + 0.4, z + 1.4);
+      const tgt = new Object3D();
+      tgt.position.set(x, 0, z - 4.5);
+      group.add(spot, tgt);
+      spot.target = tgt;
+    }
+    if (!lowQ) {
+      const L = o.length ?? 4.2;
+      const m = new Mesh(new PlaneGeometry(w * 0.95, L), keep(new MeshBasicMaterial({
+        map: patchTexture(), color: sky.color, transparent: true, opacity: Math.min(0.42, 0.3 * dayK),
+        blending: AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -5,
+      })));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x, 0.006, z - L / 2 - 0.1);
+      m.renderOrder = 2;
+      group.add(m);
+    }
+    return spot;
+  }
+
+  // Bounce light near an opening: the ceiling and upper walls are not black near daylight.
+  // A tint on the ceiling (all but low) and, on high, a weak point light under the ceiling.
+  function addBounce(x, z, w, ceilY, o = {}) {
+    if (night || dayK <= 0.02 || lowQ) return;
+    const L = o.length ?? 7;
+    const m = new Mesh(new PlaneGeometry(w + 3, L), keep(new MeshBasicMaterial({
+      map: patchTexture(), color: sky.color, transparent: true, opacity: Math.min(0.3, 0.2 * dayK),
+      blending: AdditiveBlending, depthWrite: false, side: DoubleSide,
+    })));
+    m.rotation.x = Math.PI / 2;
+    m.rotation.z = Math.PI;
+    m.position.set(x, ceilY - 0.025, z - L / 2);
+    m.renderOrder = 2;
+    group.add(m);
+    if (high && takeLight()) {
+      const p = new PointLight(sky.color, 4 * dayK, 8, 2);
+      p.position.set(x, ceilY - 0.5, z - 2);
+      group.add(p);
+    }
+  }
+
+  // Contact shadows: one instanced mesh of soft dark blobs on the floor.
+  // list: [{ x, z, w, d, rot?, a? }] (a: darkness 0..1)
+  function addContactShadows(list, y = 0.004) {
+    if (!list.length) return null;
+    const geo = new PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    const mat = keep(new MeshBasicMaterial({
+      map: blobTexture(), color: 0x000000, transparent: true, opacity: STYLE_REAL ? 0.5 : 0.42, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -3,
+    }));
+    const im = new InstancedMesh(geo, mat, list.length);
+    const m4 = new Matrix4(), q = new Quaternion(), pos = new Vector3(), sc = new Vector3(), up = new Vector3(0, 1, 0);
+    list.forEach((b, i) => {
+      q.setFromAxisAngle(up, b.rot || 0);
+      pos.set(b.x, y + (i % 4) * 0.0004, b.z);
+      const grow = b.grow ?? 0.45;
+      sc.set(b.w + grow, 1, b.d + grow);
+      im.setMatrixAt(i, m4.compose(pos, q, sc));
+    });
+    im.instanceMatrix.needsUpdate = true;
+    im.renderOrder = 1;
+    im.frustumCulled = false;
+    group.add(im);
+    return im;
   }
 
   // ---------- dust ----------
@@ -1669,8 +1852,20 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   const tmpV = new Vector3();
   const size = new Vector2();
   let flashFlick = 1;
+  // Eye adaptation: exposure moves toward its target over about a second.
+  let baseExposure = renderer.toneMappingExposure;
+  let exposure = baseExposure;
+  let firstFrame = true;
   function update(dt, cameraPosition) {
     time += dt;
+    if (cameraPosition && !night && dayK > 0.02 && openings.length) {
+      const open = openness(cameraPosition);
+      let target = baseExposure * (1 + Math.min(1, dayK) * (0.2 - 0.42 * open));
+      if (flashOn) target *= 0.94;
+      exposure = firstFrame ? target : exposure + (target - exposure) * (1 - Math.exp(-dt / 0.55));
+      firstFrame = false;
+      renderer.toneMappingExposure = exposure;
+    }
     // flashlight: on/off by intensity (never .visible, which would recompile shaders)
     if (flashlight) {
       let p = flashPower;
@@ -1743,7 +1938,9 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     quality, group, fill, flashlight,
     update, dispose,
     addCeilingLight, addExitSign, addDoorLight, addDust, addWallNotice, addDecal, addBrokenGlass, addRoomShade,
-    setExposure: (e) => { renderer.toneMappingExposure = e; },
+    addWindowLight, addBounce, addOpening, addContactShadows, sky,
+    setExposure: (e) => { baseExposure = e; renderer.toneMappingExposure = e; },
+    exposure: () => renderer.toneMappingExposure,
     lightsUsed: () => usedLights,
   };
 }
