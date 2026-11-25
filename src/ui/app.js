@@ -575,6 +575,9 @@ function showCarPopup(id, lat, lon, lngLat) {
   });
 }
 
+// Test hook: open the car popup from a street-detail car id (tests can't click map tiles offline).
+if (typeof window !== 'undefined') window.__llShowCar = (id, lat, lon) => showCarPopup(id, lat, lon, null);
+
 function travelTo(id) {
   if (state.dead) return;
   if (state.location.kind === 'house') perform(state, 'action', 'leave_house');

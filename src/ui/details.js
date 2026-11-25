@@ -1,7 +1,7 @@
 // Street details on the map: abandoned cars, debris, barricades, trash bags,
 // quarantine signs, medical tents, and (as time passes) bushes and young trees.
 // They are placed near each real place with a fixed random pattern, so they are
-// always in the same spot. They are for the look only; you cannot search them yet.
+// always in the same spot. Cars have an id: you can walk to one and search it (engine/cars.js).
 import { mulberry32, hashString } from '../rng.js';
 
 export const DETAIL_INFO = {
