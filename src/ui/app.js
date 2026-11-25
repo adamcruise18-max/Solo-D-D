@@ -17,6 +17,7 @@ import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { sceneEnv } from '../engine/scene.js';
+import { QUALITY_CHOICES, QUALITY_LABELS, getQualityChoice, setQualityChoice } from './quality.js';
 import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -662,11 +663,25 @@ function showStartChoices() {
   modal(startChoicesHtml(), bindStartChoices);
 }
 
+function qualityHint(q) {
+  return {
+    auto: 'Auto: set from your device, and lowered if the 3D view runs slow.',
+    low: 'Low: fastest. No shadows of the room, no light patches. For phones and old laptops.',
+    medium: 'Medium: reflections and light patches, simple shadows.',
+    high: 'High: soft shadows and all light effects. Needs a good graphics card.',
+  }[q] + ' It is used the next time you go inside.';
+}
+
 function showMenu() {
   modal(`<h3>Game</h3>
     <p class="hint">The game saves in this browser after each action.</p>
     <div class="col">
       <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? 'checked' : ''}> Weather effects on the map (snow, rain, fog, night)</label>
+      <div class="qual-row" role="radiogroup" aria-label="3D quality">
+        <span class="qual-label">3D quality</span>
+        ${QUALITY_CHOICES.map((q) => `<button type="button" class="qual${getQualityChoice() === q ? ' on' : ''}" data-q="${q}" role="radio" aria-checked="${getQualityChoice() === q}">${QUALITY_LABELS[q]}</button>`).join('')}
+      </div>
+      <p class="hint" id="qualHint">${qualityHint(getQualityChoice())}</p>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
@@ -675,6 +690,11 @@ function showMenu() {
     <p class="hint">Map data © OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
     m.querySelector('#cancel').addEventListener('click', closeModal);
     m.querySelector('#fxToggle').addEventListener('change', (e) => { if (fx) fx.setEnabled(e.target.checked); });
+    m.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => {
+      setQualityChoice(b.dataset.q);
+      m.querySelectorAll('[data-q]').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+      m.querySelector('#qualHint').textContent = qualityHint(b.dataset.q);
+    }));
     m.querySelector('#exp').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
       const a = document.createElement('a');

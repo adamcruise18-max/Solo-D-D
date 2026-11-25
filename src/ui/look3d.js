@@ -17,6 +17,7 @@ import {
   Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator, InstancedMesh, Matrix4,
 } from 'three';
 import { STYLE_REAL, sty } from './style.js';
+import { resolveQuality } from './quality.js';
 
 // ---------- small helpers ----------
 const rngFrom = (seed) => {
@@ -769,11 +770,16 @@ export function worldUV(mesh) {
 }
 
 // ---------- quality ----------
+// The quality to use: ?q= in the page address, else the Game menu choice (src/ui/quality.js),
+// else in Auto a guess from the device (lowered after slow frame rates).
 export function pickQuality() {
   try {
     const q = new URLSearchParams(location.search).get('q');
-    if (q === 'low' || q === 'high') return q;
+    if (q === 'low' || q === 'medium' || q === 'high') return q;
   } catch { /* no location */ }
+  return resolveQuality(deviceQuality());
+}
+function deviceQuality() {
   try {
     const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     const mobile = /Android|iPhone|iPad|iPod|Mobile|Silk/i.test(navigator.userAgent || '');
@@ -1374,6 +1380,7 @@ function shaftGeometry(w, h, L) {
 export function setupLook(renderer, scene, camera, opts = {}) {
   const quality = opts.quality || pickQuality();
   const high = quality === 'high';
+  const med = quality === 'medium';
   const dark = !!opts.dark;
   const night = !!opts.night;
   const dim = dark || night;
@@ -1402,7 +1409,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   // A tiny environment map: a dim room with a bright doorway toward +z. Glossy floors,
   // puddles, glass and metal reflect it instead of rendering black.
   let envRT = null;
-  if (opts.env ?? high) try {
+  if (opts.env ?? (high || med)) try {
     const envScene = new Scene();
     const roomMat = new MeshBasicMaterial({ side: BackSide, vertexColors: true });
     const roomGeo = new BoxGeometry(10, 4, 10);
@@ -1474,7 +1481,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   }
 
   // ---------- point light budget ----------
-  const maxLights = opts.maxLights ?? (high ? 6 : 3);
+  const maxLights = opts.maxLights ?? (high ? 6 : med ? 4 : 3);
   let usedLights = 0;
   const takeLight = () => (usedLights < maxLights ? (usedLights++, true) : false);
   const flickers = []; // { light, mats, base, t, state, seed }

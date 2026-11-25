@@ -13,6 +13,7 @@ import { TOON, sty } from './style.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
+import { getQualityChoice, autoStepDown } from './quality.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
 } from './controls.js';
@@ -159,6 +160,8 @@ export function openInside(opts) {
 
   // Light, tone, fog, flashlight and room effects come from look3d.js.
   const quality = pickQuality();
+  // Low draws fewer pixels on sharp screens; medium a little fewer.
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.5 : touch ? 1.5 : 2));
   const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight(), scene: opts.scene });
   const daySky = lk.sky; // daylight color and strength from the game clock and weather
   const flash = lk.flashlight; // null without a flashlight
@@ -1404,11 +1407,24 @@ export function openInside(opts) {
   // ---------- loop ----------
   let last = performance.now();
   const fwd = new Vector3();
+  let autoWatch = quality !== 'low' && getQualityChoice() === 'auto' && !/[?&]q=/.test(location.search || '');
+  let autoT = 0;
+  let slowT = 0;
   function frame(now) {
     if (closed) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     fps = fps * 0.9 + (dt > 0 ? 1 / dt : 0) * 0.1;
+    // Auto quality: after 6 s of slow frames (under 24 fps), the next building opens one step lower.
+    if (autoWatch && !paused) {
+      autoT += dt;
+      if (autoT > 3) slowT = fps < 24 ? slowT + dt : Math.max(0, slowT - dt * 0.5);
+      if (slowT > 6) {
+        autoWatch = false;
+        const next = autoStepDown(quality);
+        if (next) toast(`The 3D view runs slow here. Next time it uses ${next} quality (Game menu to change).`, 4200);
+      }
+    }
     const tFrame = performance.now();
     const moving = !paused && !busy && !panel && !hold;
     if (moving) {
