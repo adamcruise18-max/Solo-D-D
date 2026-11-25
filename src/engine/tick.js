@@ -3,7 +3,7 @@
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
-import { airTemp, isNight, rollWeather, sunFor, solarToday, weatherInfo } from './world.js';
+import { airTemp, isNight, sunFor, solarToday, weatherInfo } from './world.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
