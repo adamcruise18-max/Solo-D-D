@@ -18,6 +18,8 @@ import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
+import { plant, waterGarden, harvest } from './garden.js';
+import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -1023,6 +1025,7 @@ export function listActions(state) {
       const startP = gasStartChance(state);
       add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
     }
+    add('walk_in', 'Walk around your home (first person)', { note: 'see what you built' });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const cookId = cookPick(state);
@@ -1096,6 +1099,29 @@ export function doAction(state, id, arg) {
     case 'house': return enterNearbyHouse(state);
     case 'room': return searchRoom(state, arg);
     case 'walk_inside': return walkInside(state, arg);
+    // Garden and heat (engine garden.js and home.js rules; the time cost is here).
+    case 'garden_plant': if (state.location.kind === 'home' && plant(state, String(arg))) advanceTime(state, 30, 'work'); return;
+    case 'garden_water': if (state.location.kind === 'home' && waterGarden(state) > 0) advanceTime(state, 15, 'work'); return;
+    case 'garden_harvest': if (state.location.kind === 'home' && Object.keys(harvest(state)).length) advanceTime(state, 30, 'work'); return;
+    case 'sleep_spot':
+      if (setSleepSpot(state, String(arg))) log(state, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
+      return;
+    case 'board_window': {
+      // One board-up: 1 scrap wood and 30 min (the rule is engine home.js boardWindow).
+      if (state.location.kind !== 'home') return;
+      const bag = (state.home.storage.scrap_wood || 0) > 0 ? state.home.storage : (state.carried.scrap_wood || 0) > 0 ? state.carried : null;
+      if (!bag) { log(state, 'You need scrap wood to board up a window.'); return; }
+      if (!boardWindow(state, String(arg))) return;
+      addItem(bag, 'scrap_wood', -1);
+      log(state, 'You nail scrap wood over the broken window. Less cold gets in.', 'good');
+      advanceTime(state, 30, 'work');
+      return;
+    }
+    case 'door': {
+      const [room, closed] = String(arg).split(':');
+      if (state.location.kind === 'home' && setDoor(state, room, closed === '1')) { log(state, closed === '1' ? 'You close the door.' : 'You open the door.'); advanceTime(state, 1); }
+      return;
+    }
     case 'flashlight': return toggleFlashlight(state);
     case 'pickup': return pickUp(state, arg);
     case 'see_zone': return seeZone(state, Number(arg));

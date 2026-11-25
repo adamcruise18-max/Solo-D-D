@@ -258,7 +258,7 @@ function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
 // Grime by place (Adam, 2026-11-25): homes and kept-up workplaces (stores, offices, clinics) have
 // low to no grime; garages and industrial sites medium; outdoors and buildings open to the weather
 // (a broken window, a collapsed roof) high. ?style=real keeps the old fixed amount.
-export const GRIME = { low: 0.12, medium: 0.6, high: 1.6 };
+export const GRIME = { clean: 0.01, low: 0.12, medium: 0.6, high: 1.6 }; // clean: your own home (kept up)
 const GRIME_BY_CAT = {
   supermarket: 'low', convenience: 'low', gas: 'low', pharmacy: 'low', clinic: 'low', hospital: 'low',
   // 'outdoor' is an outdoor-gear store (OSM shop=outdoor), a kept-up shop, not the outdoors.
@@ -482,12 +482,15 @@ function makeDrywall(S, seed, paintHex, baseHex) {
     }
     const m = (mot[i] - 0.5) * 22;
     const low = clamp01(1 - (fromFloor - basePx) / dirtBand); // dirt near the floor
-    const d = low * low * (0.4 + mot[i] * 0.6);
+    const d = low * low * (0.4 + mot[i] * 0.6) * (grimeAmt < 0.05 ? 0.2 : 1);
     o[0] = p[0] + m - d * 60; o[1] = p[1] + m - d * 62; o[2] = p[2] + m - d * 66;
     o[3] = 0.5 + peel[i] * 0.06;
     o[4] = 0.78 + d * 0.15;
   });
   const { c, rc } = L;
+  // A kept-up home (grime 'clean'): no stains, drips, scuffs or chips (same random draws).
+  const clean = grimeAmt < 0.05;
+  if (clean) { c.globalAlpha = 0; L.hc.globalAlpha = 0; }
   // water stains with drip trails from above
   for (let k = 0; k < 2; k++) {
     const x = rnd() * W;
@@ -523,6 +526,7 @@ function makeDrywall(S, seed, paintHex, baseHex) {
     L.hc.fillStyle = 'rgba(0,0,0,0.6)';
     L.hc.beginPath(); L.hc.arc(x, y, r, 0, 6.3); L.hc.fill();
   }
+  c.globalAlpha = 1; L.hc.globalAlpha = 1;
   rc.globalAlpha = 1;
   return surfaceMaterial(L, { tile: [2, 6], normal: 1.6 });
 }

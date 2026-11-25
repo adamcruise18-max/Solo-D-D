@@ -182,7 +182,7 @@ export function openInside(opts) {
   // high where the building is open to the weather (plan.exposed: a broken window or a collapsed roof).
   // ?grime=low|medium|high in the page address forces a level (to compare looks).
   const forceGrime = typeof location !== 'undefined' && (/[?&]grime=(low|medium|high)\b/.exec(location.search || '') || [])[1];
-  const grime = forceGrime || grimeLevel(plan.cat, { exposed: !!plan.exposed });
+  const grime = forceGrime || (plan.home ? 'clean' : grimeLevel(plan.cat, { exposed: !!plan.exposed }));
   const surf = (part) => surfaceFor(plan.cat, part, null, quality, grime);
   const floor = new Mesh(new PlaneGeometry(W, D), surf('floor'));
   floor.rotation.x = -Math.PI / 2;
@@ -350,6 +350,7 @@ export function openInside(opts) {
   const CULL_M = dark || opts.night ? 13 : 20;
   const FILL_KIND = { supermarket: 'grocery', pharmacy: 'pharmacy', hardware: 'hardware', outdoor: 'outdoor', convenience: 'convenience', gas: 'convenience' }[plan.cat] || 'grocery';
   let gateMesh = null;
+  let ghostMat = null;
   for (const f of plan.fixtures) {
     if (f.type === 'gate') {
       const g = new Group();
@@ -406,6 +407,24 @@ export function openInside(opts) {
       g.position.set(f.x, 0, f.z);
       g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
       statics.add(g);
+      continue;
+    }
+    if (f.type === 'proj') {
+      // Home projects: built ones are real objects; not built, a faint outline of where it goes.
+      if (f.built) {
+        const g = makeProp(`proj_${f.proj}`, 1);
+        g.position.set(f.x, f.y || 0, f.z);
+        g.traverse((o) => { if (o.isMesh) { o.castShadow = !f.y; o.receiveShadow = true; } });
+        statics.add(g);
+      } else {
+        ghostMat ||= { line: new LineBasicMaterial({ color: 0x9fe8f4, transparent: true, opacity: 0.55 }), fill: new MeshBasicMaterial({ color: 0x6fd3e6, transparent: true, opacity: 0.06, depthWrite: false }) };
+        const box = new BoxGeometry(f.w, f.h, f.d);
+        const y = (f.y || 0) + (f.y >= 2 ? -f.h / 2 : f.h / 2);
+        const e = new LineSegments(new EdgesGeometry(box), ghostMat.line);
+        const m = new Mesh(box, ghostMat.fill);
+        e.position.set(f.x, y, f.z); m.position.copy(e.position);
+        scene.add(e, m);
+      }
       continue;
     }
     if (FIXTURE_TYPES.includes(f.type)) {
@@ -593,7 +612,8 @@ export function openInside(opts) {
       for (const sp of plan.spots) {
         if (!sp.area) continue;
         const A = { x1: sp.area.x1, x2: sp.area.x2, z1: Math.min(sp.area.z1, sp.area.z2), z2: Math.max(sp.area.z1, sp.area.z2) };
-        for (const [kind, n, wall] of ROOM_SETS[sp.label] || []) for (let i = 0; i < n; i++) place(kind, !!wall, A);
+        const MESS = /^(trash_bag|paper_scatter|glass_shards|trash_pile|kids_toy|cardboard_box)$/;
+        for (const [kind, n, wall] of ROOM_SETS[sp.label] || []) if (!(plan.home && MESS.test(kind))) for (let i = 0; i < n; i++) place(kind, !!wall, A);
         (WALL_SETS[sp.label] || []).forEach((kind, i) => {
           if (!PROP_KINDS.includes(kind)) return;
           const g = makeProp(kind, Math.floor(lrnd() * 1e6));
@@ -631,11 +651,52 @@ export function openInside(opts) {
     statics.add(g);
   }
 
+  // Home lamps: the LED strip (when built and the battery has charge) and candles on the
+  // living room table (when you have candles). Warm; candles flicker. Brighter at night.
+  const flickers = [];
+  if (plan.home && opts.homeLamps) {
+    const L = opts.homeLamps;
+    const room = plan.spots.find((sp) => sp.label === 'living room');
+    if (room) {
+      const a = room.area;
+      const cx = (a.x1 + a.x2) / 2;
+      const cz = (a.z1 + a.z2) / 2;
+      const nightK = opts.night ? 1 : 0.35;
+      if (L.led) {
+        const led = new PointLight(0xffe2b0, 9 * nightK, 8, 1.6);
+        led.position.set(cx, 2.3, cz);
+        scene.add(led);
+      }
+      if (L.candles) {
+        const table = plan.fixtures.find((f) => f.type === 'table' && f.zone === room.zone);
+        const tx = table ? table.x : cx;
+        const tz = table ? table.z : cz;
+        const ty = table ? table.h : 0.75;
+        const wax = new MeshStandardMaterial({ color: 0xf3eedc, roughness: 0.55, emissive: 0x2a2014 });
+        const flame = new MeshBasicMaterial({ color: 0xffc46a });
+        for (let i = 0; i < Math.min(3, L.candles); i++) {
+          const h = 0.12 + i * 0.03;
+          const c = new Mesh(new CylinderGeometry(0.025, 0.025, h, 12), wax);
+          c.position.set(tx - 0.12 + i * 0.12, ty + h / 2, tz + (i % 2 ? 0.06 : -0.04));
+          const f = new Mesh(new SphereGeometry(0.012, 8, 6), flame);
+          f.scale.y = 2.2;
+          f.position.set(c.position.x, ty + h + 0.02, c.position.z);
+          scene.add(c, f);
+        }
+        const cl = new PointLight(0xffa048, (L.led ? 1.2 : 3.2) * nightK, 6, 1.6);
+        cl.position.set(tx, ty + 0.3, tz);
+        scene.add(cl);
+        flickers.push({ light: cl, base: cl.intensity, t: 0 });
+      }
+    }
+  }
+
   // Contact shadows: a soft dark blob under every fixture, piece of furniture, prop and covered body.
   {
     const blobs = [];
     for (const f of plan.fixtures) {
       if (!f.w || !f.d) continue;
+      if (f.type === 'proj' && (!f.built || f.y || f.d < 0.2)) continue;
       blobs.push({ x: f.x, z: f.z, w: f.w, d: f.d, grow: f.type === 'shelf' || f.type === 'endcap' ? 0.55 : 0.4 });
     }
     const NO_BLOB = /^(rug|paper_scatter|glass_shards|wall_frame|wall_clock|curtain|mail_pile|magazine|old_phone|trash_pile)$/;
@@ -1031,6 +1092,7 @@ export function openInside(opts) {
     if (target) { pickOne(target); return; }
     if (!current) { toast('Look at an item to take it.', 1400); return; }
     if (current.type === 'exit') { leave(); return; }
+    if (current.type === 'project') { toast(opts.projectInfo ? opts.projectInfo(current.id) : '', 5000); return; }
     if (current.counter && !opts.isCounterOpen()) { openGate(); return; }
     toast('Look at an item to take it.', 1400);
   }
@@ -1525,6 +1587,7 @@ export function openInside(opts) {
     }
     const tLogic = performance.now();
     lk.update(dt, camera.position);
+    for (const fl of flickers) { fl.t += dt; fl.light.intensity = fl.base * (0.85 + 0.1 * Math.sin(fl.t * 13) + 0.05 * Math.sin(fl.t * 31.7)); }
     const tLook = performance.now();
     // Shelf products far away are hidden (fog hides them anyway): saves draw calls and triangles.
     for (const face of shelfFaces) {

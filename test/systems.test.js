@@ -12,11 +12,11 @@ loadPlaces();
 
 test('systems: weather is a registered, versioned system that runs before the legacy rules', () => {
   const sys = gameSystems();
-  assert.deepEqual(sys.ids(), ['weather', 'decay', 'legacy', 'home', 'dog', 'pacer']);
+  assert.deepEqual(sys.ids(), ['weather', 'decay', 'legacy', 'home', 'garden', 'dog', 'pacer']);
   assert.equal(sys.get('weather').version, 1);
   assert.equal(sys.ownerOf('weather'), 'weather');
   assert.deepEqual(sys.missingCatchUp(), [], 'every game system says how it catches up');
-  assert.deepEqual(newGame(3).systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, dog: 1, pacer: 1 });
+  assert.deepEqual(newGame(3).systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, garden: 1, dog: 1, pacer: 1 });
 });
 
 test('systems: the weather changes at 5 AM through the clock, not inside a day', () => {
@@ -77,7 +77,7 @@ test('saves: a save from before the engine (no systemVersions) upgrades and play
   delete old.pacer; // systems added later: their init runs on load
   delete old.decay;
   const up = parseSave(JSON.stringify(old));
-  assert.deepEqual(up.systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, dog: 1, pacer: 1 });
+  assert.deepEqual(up.systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, garden: 1, dog: 1, pacer: 1 });
   assert.deepEqual(up.pacer, now.pacer, 'the pacer starts as in a new game');
   assert.deepEqual(up.weather, now.weather, 'weather is kept, not rolled again');
   for (let i = 0; i < 150 && !now.dead; i++) { botTurn(now); botTurn(up); }
@@ -144,4 +144,18 @@ test('home: its own system owns state.home; the fire, battery and water chain st
   } finally {
     setDevChecks(false);
   }
+});
+
+test('effects: pacer events may change home and dog on purpose; other writes still stop', async () => {
+  const { createSystems } = await import('../src/core/index.js');
+  const a = { id: 'a', order: 1, owns: ['x'], step: (s) => { s.x += 1; } };
+  const b = { id: 'b', order: 2, owns: ['y'], effects: ['x'], step: (s) => { s.x += 1; } };
+  const c = { id: 'c', order: 3, owns: ['z'], step: (s) => { s.x += 1; } };
+  const ok = createSystems([a, b], { dev: true });
+  const st = { x: 0, y: 0 };
+  ok.step(st, 1, {});
+  assert.equal(st.x, 2);
+  const bad = createSystems([a, c], { dev: true });
+  assert.throws(() => bad.step({ x: 0, z: 0 }, 1, {}), /Dual write/);
+  assert.deepEqual(GAME_SYSTEMS.find((s) => s.id === 'pacer').effects, ['home', 'dog']);
 });

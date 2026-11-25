@@ -129,6 +129,9 @@ export const pacerSystem = {
   order: 1100, // after the rules: the mercy rule reads this step's vitals
   version: 1,
   owns: ['pacer'],
+  // Event effects (src/data/events.js apply) may change these on purpose:
+  // a roof leak (home), the dog finds a bone (dog).
+  effects: ['home', 'dog'],
   // Hour by hour with thresholds: time must be played, not skipped.
   catchUp: 'event',
   init: (state) => initPacer(state),

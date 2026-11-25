@@ -30,9 +30,13 @@ export function homeStep(state, dt, env) {
     }
   }
   const passive = air + 6;
-  const target = Math.min(75, passive + heat);
-  const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state);
+  // The living room holds the fire, the stove and the heater. Broken windows
+  // there lose heat (none broken: the same numbers as before the room model).
+  const lw = windowLoss(h, 'living');
+  const target = Math.min(75, passive + heat / lw);
+  const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state) * lw);
   h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+  roomsStep(h, passive, dt);
 
   // Solar charge in daylight
   const m = ((state.time % 1440) + 1440) % 1440;
@@ -56,6 +60,125 @@ export function homeStep(state, dt, env) {
       ? 'Hard freeze. The water pipes are frozen. The kitchen tap stops.'
       : 'The kitchen tap coughs and stops. The city water is gone now.', 'warn');
   }
+}
+
+// ---------- Heat by room (research step 8) ----------
+// The living room is h.indoorTemp (the fire is there). Each other room trades
+// heat with the outside (more through broken windows) and with the living room
+// through its door (much less when the door is closed).
+export const ROOMS = [
+  { id: 'living', label: 'Living room' },
+  { id: 'kitchen', label: 'Kitchen' },
+  { id: 'bedroom', label: 'Bedroom' },
+  { id: 'bath', label: 'Bathroom' },
+];
+const OUT_RATE = 0.05; // per hour, to the outside, for a closed-up room
+const DOOR_OPEN = 0.15; // per hour, to the living room
+const DOOR_CLOSED = 0.02;
+const BROKEN = 1.5; // each broken window adds this much loss
+const BOARDED = 0.3; // a boarded window keeps most of it out
+
+export function ensureRooms(h) {
+  if (!h.rooms) {
+    h.rooms = {};
+    for (const r of ROOMS) if (r.id !== 'living') h.rooms[r.id] = { temp: h.indoorTemp };
+  }
+  if (!h.windows) h.windows = {}; // { [room]: { broken, boarded } }
+  if (!h.doorsClosed) h.doorsClosed = {}; // { [room]: true }
+  return h;
+}
+
+export function windowLoss(h, room) {
+  const w = h.windows?.[room];
+  if (!w) return 1;
+  return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+}
+
+// The living room is bigger than one other room, so a cold room pulls it down
+// a third as fast as it warms that room.
+const LIVING_SHARE = 1 / 3;
+
+function roomsStep(h, passive, dt) {
+  ensureRooms(h);
+  // Heat flows both ways: open doors to cold rooms cool the living room. That
+  // is the reason to close doors.
+  for (const [id, r] of Object.entries(h.rooms)) {
+    const kDoor = (h.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+    h.indoorTemp += (r.temp - h.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+  }
+  for (const [id, r] of Object.entries(h.rooms)) {
+    const kOut = OUT_RATE * windowLoss(h, id);
+    const kDoor = h.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+    const target = (kOut * passive + kDoor * h.indoorTemp) / (kOut + kDoor);
+    const rate = Math.min(0.9, kOut + kDoor);
+    r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
+  }
+}
+
+export function roomTemp(state, room) {
+  const h = state.home;
+  if (room === 'living' || !h.rooms?.[room]) return h.indoorTemp;
+  return h.rooms[room].temp;
+}
+
+// Changes from actions or events (the pacer may change home: see systems effects).
+export function breakWindow(state, room) {
+  const h = ensureRooms(state.home);
+  const w = (h.windows[room] ||= { broken: 0, boarded: 0 });
+  w.broken += 1;
+}
+export function boardWindow(state, room) {
+  const h = ensureRooms(state.home);
+  const w = h.windows[room];
+  if (!w || (w.boarded || 0) >= (w.broken || 0)) return false;
+  w.boarded = (w.boarded || 0) + 1;
+  return true;
+}
+// Where the player sleeps at home: the bedroom (a bed, +10 °F) or by the fire
+// in the living room (a couch and blankets, +6 °F).
+export const SLEEP_SPOTS = { bedroom: { label: 'Bedroom', bed: 10 }, living: { label: 'By the fire', bed: 6 } };
+export function sleepSpot(state) {
+  return SLEEP_SPOTS[state.home.sleepSpot] ? state.home.sleepSpot : 'bedroom';
+}
+export function setSleepSpot(state, spot) {
+  if (!SLEEP_SPOTS[spot]) return false;
+  state.home.sleepSpot = spot;
+  return true;
+}
+export function sleepTemp(state) {
+  const spot = sleepSpot(state);
+  return { temp: roomTemp(state, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+}
+
+export function setDoor(state, room, closed) {
+  const h = ensureRooms(state.home);
+  if (!h.rooms[room]) return false;
+  h.doorsClosed[room] = !!closed;
+  return true;
+}
+
+// For the heat panel: each room's temperature, what loses heat, and the sources.
+export function homeHeat(state) {
+  const h = state.home;
+  const air = environment(state, 'rest').air;
+  return {
+    outside: Math.round(air),
+    sources: { fire: h.fireHours > 0 ? fireHeat(state) : 0, fireHours: h.fireHours, heater: h.heaterOn ? 20 : 0, stove: built(state, 'wood_stove') },
+    insulated: built(state, 'insulate_living'),
+    sleepSpot: sleepSpot(state),
+    rooms: ROOMS.map((r) => {
+      const w = h.windows?.[r.id] || { broken: 0, boarded: 0 };
+      return {
+        id: r.id,
+        label: r.label,
+        temp: Math.round(roomTemp(state, r.id) * 10) / 10,
+        brokenWindows: (w.broken || 0) - (w.boarded || 0),
+        boardedWindows: w.boarded || 0,
+        doorClosed: r.id === 'living' ? null : !!h.doorsClosed?.[r.id],
+        loss: Math.round(windowLoss(h, r.id) * 100) / 100, // 1 = a whole, closed-up room
+      };
+    }),
+  };
 }
 
 export function homeDaily(state) {
