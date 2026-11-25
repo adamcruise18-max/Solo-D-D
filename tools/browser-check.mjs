@@ -59,7 +59,8 @@ try {
     await page.locator('[data-act="sleep"]').first().waitFor({ timeout: 10000 });
     const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lastlight.save.v1') || 'null'));
     const before = await read();
-    for (let i = 0; i < 2; i++) {
+    // Up to 4 sleeps: a sleep can end early when a need reaches its danger line (auto-wake).
+    for (let i = 0; i < 4; i++) {
       await page.locator('[data-act="sleep"]').first().click();
       await page.locator('[data-hours="10"]').waitFor({ timeout: 5000 });
       await page.locator('[data-hours="10"]').click();

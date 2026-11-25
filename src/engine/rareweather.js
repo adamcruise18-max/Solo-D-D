@@ -22,8 +22,10 @@ export const SPELLS = {
     chance: 0.02,
     days: [1, 2],
     shape: (w, r) => {
+      // This morning's low is already set (it was last night's forecast); the ice
+      // storm keeps the day and the next night cold.
       w.high = Math.min(w.high, 33);
-      w.low = Math.min(w.low, 28);
+      w.nextLow = Math.min(w.nextLow, 28);
       w.wind = 15 + Math.floor(r() * 21);
       delete w.snowInches;
     },
@@ -36,7 +38,6 @@ export const SPELLS = {
     days: [3, 5],
     shape: (w, r) => {
       w.high = 98 + Math.floor(r() * 9);
-      w.low = Math.max(w.low, 62);
       w.nextLow = Math.max(w.nextLow, 64);
       w.wind = Math.floor(r() * 6);
     },
@@ -83,6 +84,7 @@ export function rollSpell(state, day, old = {}) {
   w.baseType = w.type;
   w.type = spell.id;
   SPELLS[spell.id].shape(w, r);
+  w.nextLow = Math.min(w.nextLow, w.high - 3); // the shown low stays the real low
   w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
   return spell;
 }

@@ -640,6 +640,7 @@
       w.snowInches = randInt(state2, 1, 6);
     }
     if (w.type === "clear") w.nextLow -= 5;
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     return w;
   }
   function initWeather(state2) {
@@ -693,7 +694,8 @@
     const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
     if (m < s.rise) {
       const span2 = 1440 - peak + s.rise;
-      return ease(w.prevHigh, w.low, (m + 1440 - peak) / span2);
+      const f = (m + 1440 - peak) / span2;
+      return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
     }
     if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
     const span = 1440 - peak + s.rise;
@@ -1009,7 +1011,7 @@
       days: [1, 2],
       shape: (w, r) => {
         w.high = Math.min(w.high, 33);
-        w.low = Math.min(w.low, 28);
+        w.nextLow = Math.min(w.nextLow, 28);
         w.wind = 15 + Math.floor(r() * 21);
         delete w.snowInches;
       },
@@ -1022,7 +1024,6 @@
       days: [3, 5],
       shape: (w, r) => {
         w.high = 98 + Math.floor(r() * 9);
-        w.low = Math.max(w.low, 62);
         w.nextLow = Math.max(w.nextLow, 64);
         w.wind = Math.floor(r() * 6);
       },
@@ -1068,6 +1069,7 @@
     w.baseType = w.type;
     w.type = spell.id;
     SPELLS[spell.id].shape(w, r);
+    w.nextLow = Math.min(w.nextLow, w.high - 3);
     w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
     return spell;
   }
@@ -1466,6 +1468,10 @@
           events?.emit("day.start", { day: d, time: state2.time });
         }
         systems.step(state2, step / 60, ctx);
+        if (state2._stop) {
+          delete state2._stop;
+          break;
+        }
       }
       sendDeath(state2, events);
       return state2;
@@ -2286,7 +2292,34 @@
   }
   function advanceTime(state2, minutes, mode = "rest") {
     if (!(minutes > 0)) return;
-    gameClock().advance(state2, minutes, mode);
+    if (mode !== "sleep") return gameClock().advance(state2, minutes, mode);
+    const p = state2.player;
+    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health };
+    try {
+      gameClock().advance(state2, minutes, mode);
+    } finally {
+      delete state2._sleepFrom;
+    }
+  }
+  var WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+  var WAKE_TEXT = {
+    water: "You wake with a dry mouth and a pounding head. You need water now.",
+    food: "You wake, weak and shaking with hunger. You need to eat.",
+    warmth: "You wake up shivering hard. You are too cold to sleep.",
+    health: "You wake in pain. Something is wrong; you feel worse."
+  };
+  function checkWake(state2) {
+    const from = state2._sleepFrom;
+    if (!from || state2.dead) return;
+    const p = state2.player;
+    for (const k of Object.keys(WAKE_AT)) {
+      if (from[k] >= WAKE_AT[k] && p[k] < WAKE_AT[k]) {
+        log(state2, WAKE_TEXT[k], "danger");
+        state2._stop = true;
+        delete state2._sleepFrom;
+        return;
+      }
+    }
   }
   function tickStep(state2, dt, mode) {
     const p = state2.player;
@@ -2377,6 +2410,7 @@
       p.lightHours = Math.max(0, p.lightHours - dt);
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
+    if (sleeping) checkWake(state2);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
@@ -4678,7 +4712,8 @@
       effects: weatherEffects(state2),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
-      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow) }
+      // The low shown is the real low of the curve (with a cold snap, if one is on).
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow - hazardColder(state2, next2)) }
     };
   }
   function actionTiming(state2, minutes) {

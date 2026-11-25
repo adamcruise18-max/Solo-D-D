@@ -151,13 +151,18 @@ const FOOD_CATS = new Set(['supermarket', 'convenience', 'gas', 'house']);
 const LOW_FOOD_KCAL = 6000;
 
 function smartNextPlace(state, wantFood) {
+  // Near places first; when those are empty, a careful player ranges farther (rested, daylight).
+  return nextPlaceWithin(state, wantFood, 4) || (state.player.energy >= 60 && !isNight(state.time + 4 * 60) ? nextPlaceWithin(state, wantFood, 9) : null);
+}
+
+function nextPlaceWithin(state, wantFood, maxMiles) {
   let best = null;
   for (const pl of allPlaces()) {
     const ps = state.places[pl.id];
     if (ps && (ps.zonesDone >= ps.zones || !ps.unlocked)) continue;
     if (!CATEGORIES[pl.cat]) continue;
     const d = straightMiles(state.pos, pl);
-    if (d > 4) continue;
+    if (d > maxMiles) continue;
     const score = d * (wantFood && !FOOD_CATS.has(pl.cat) ? 3 : 1);
     if (!best || score < best.score) best = { pl, score };
   }
@@ -259,8 +264,9 @@ export function smartTurn(state) {
     if (!lowFood && spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
     if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
     if (can(state, 'store_all')) perform(state, 'action', 'store_all');
-    if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     const pl = smartNextPlace(state, lowFood);
+    // Stores give about 4x more food per hour than houses: a house only when no food store is in reach.
+    if (lowFood && can(state, 'house') && !(pl && FOOD_CATS.has(pl.cat) && pl.cat !== 'house')) { perform(state, 'action', 'house'); return 'house'; }
     if (pl) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
     if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     perform(state, 'action', 'rest'); return 'rest';
@@ -285,8 +291,8 @@ export function smartTurn(state) {
     if (can(state, 'takeall') || Object.keys(placeState(state, { ...allPlaces().find((x) => x.id === loc.id) }).leftovers).length) perform(state, 'takeall');
     return 'search';
   }
-  if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
   const pl = smartNextPlace(state, lowFood);
+  if (lowFood && can(state, 'house') && !(pl && pl.id !== loc.id && FOOD_CATS.has(pl.cat) && pl.cat !== 'house')) { perform(state, 'action', 'house'); return 'house'; }
   if (pl && pl.id !== loc.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
   perform(state, 'action', 'go_home'); return 'go home';
 }

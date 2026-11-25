@@ -98,7 +98,34 @@ function damage(state, amount, cause) {
 // below still run as one "legacy" system until they move out too.
 export function advanceTime(state, minutes, mode = 'rest') {
   if (!(minutes > 0)) return; // as before: no time, nothing happens
-  gameClock().advance(state, minutes, mode);
+  if (mode !== 'sleep') return gameClock().advance(state, minutes, mode);
+  // Sleep: remember the needs at the start, to wake when one crosses a danger line.
+  const p = state.player;
+  state._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health };
+  try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; }
+}
+
+// Auto-wake (browser playtest 1): you wake when a need falls past its danger line
+// during the sleep (not when you went to sleep below it already).
+export const WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+const WAKE_TEXT = {
+  water: 'You wake with a dry mouth and a pounding head. You need water now.',
+  food: 'You wake, weak and shaking with hunger. You need to eat.',
+  warmth: 'You wake up shivering hard. You are too cold to sleep.',
+  health: 'You wake in pain. Something is wrong; you feel worse.',
+};
+function checkWake(state) {
+  const from = state._sleepFrom;
+  if (!from || state.dead) return;
+  const p = state.player;
+  for (const k of Object.keys(WAKE_AT)) {
+    if (from[k] >= WAKE_AT[k] && p[k] < WAKE_AT[k]) {
+      log(state, WAKE_TEXT[k], 'danger');
+      state._stop = true;
+      delete state._sleepFrom; // once a sleep
+      return;
+    }
+  }
 }
 
 // Legacy system: one clock step of the rules that are not systems yet.
@@ -214,6 +241,8 @@ export function tickStep(state, dt, mode) {
 
   // The home and the dog are their own systems now (src/engine/home.js, dog.js),
   // right after these rules.
+
+  if (sleeping) checkWake(state);
 
   if (p.health <= 0) {
     p.health = 0;

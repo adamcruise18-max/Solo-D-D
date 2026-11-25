@@ -279,6 +279,17 @@ request that says which rule change is meant and why.
   hardware stores.
 - Bites: 25% infection if open for 6 h, 10% even if bandaged in time.
 
+## Browser playtest 1 fixes
+
+- Temperature curve (`world.js` `baseAirTemp`): before 5 AM the weather record is still
+  yesterday's, so the night eases from its high to its `nextLow` (no jump at midnight).
+  Rare spells no longer change this morning's low (no jump at 5 AM). The night low is
+  never above the day's high − 3, so "Low tonight" (`preview.js`, with a cold snap) is
+  the real low.
+- Auto-wake (`tick.js`): sleep ends early when water < 15, food < 10, warmth < 30 or
+  health < 30 is crossed during the sleep (one line in the journal). The clock
+  (`src/core/clock.js`) stops an action when a rule sets `state._stop`.
+
 ## Playtest list 1 fixes (research, 700 bot runs)
 
 - Antibiotics: once a course starts (`infection.abxH`), the infection does no more

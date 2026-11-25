@@ -48,6 +48,9 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
         events?.emit('day.start', { day: d, time: state.time });
       }
       systems.step(state, step / 60, ctx);
+      // A rule can end the action early (for example, waking from sleep at a
+      // danger level): it sets state._stop, and the rest of the time is not spent.
+      if (state._stop) { delete state._stop; break; }
     }
     sendDeath(state, events);
     return state;
