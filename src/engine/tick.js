@@ -257,7 +257,7 @@ export function addInjury(state, type) {
   state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false });
   const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state.player.health - 1)) : d.hp; // a cut never kills
   damage(state, hp, type === 'bite' ? 'an animal attack' : 'an injury');
-  log(state, `Injury: ${INJURY_NAMES[type]} (Health −${d.hp}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
+  log(state, `Injury: ${INJURY_NAMES[type]} (Health −${Math.round(hp)}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
   if (state.player.health <= 0) die(state, type === 'bite' ? 'an animal attack' : 'an injury');
 }
 

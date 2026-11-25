@@ -1747,9 +1747,11 @@
       }
     }
     const passive = air + 6;
-    const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
+    const lw = windowLoss(h2, "living");
+    const target = Math.min(75, passive + heat / lw);
+    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
     h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h2, passive, dt);
     const m = (state2.time % 1440 + 1440) % 1440;
     const s = sunFor(state2.time);
     if (m > s.rise && m < s.set) {
@@ -1764,6 +1766,41 @@
     if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
       h2.tapWorks = false;
       log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  var ROOMS = [
+    { id: "living", label: "Living room" },
+    { id: "kitchen", label: "Kitchen" },
+    { id: "bedroom", label: "Bedroom" },
+    { id: "bath", label: "Bathroom" }
+  ];
+  var OUT_RATE = 0.05;
+  var DOOR_OPEN = 0.15;
+  var DOOR_CLOSED = 0.02;
+  var BROKEN = 1.5;
+  var BOARDED = 0.3;
+  function ensureRooms(h2) {
+    if (!h2.rooms) {
+      h2.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+    }
+    if (!h2.windows) h2.windows = {};
+    if (!h2.doorsClosed) h2.doorsClosed = {};
+    return h2;
+  }
+  function windowLoss(h2, room) {
+    const w = h2.windows?.[room];
+    if (!w) return 1;
+    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  }
+  function roomsStep(h2, passive, dt) {
+    ensureRooms(h2);
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h2, id);
+      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+      const rate = Math.min(0.9, kOut + kDoor);
+      r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
     }
   }
   function homeDaily(state2) {
@@ -2138,7 +2175,7 @@
     state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
     const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state2.player.health - 1)) : d.hp;
     damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
-    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
   }
   var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);

@@ -211,6 +211,17 @@ request that says which rule change is meant and why.
   `setDeepActivity(true)` while the F3 view is open; `activityText(r)` for a
   bug report. The F3 view itself is UI (builder).
 
+## Heat by room (research step 8)
+
+- `src/engine/home.js`: the living room is `home.indoorTemp` (fire, stove and heater
+  are there). Kitchen, bedroom and bath (`home.rooms[id].temp`) trade heat with the
+  outside (loss 0.05/h, more per broken window: +1.5 each, a boarded one +0.45)
+  and with the living room through the door (0.15/h open, 0.02/h closed).
+- `breakWindow`, `boardWindow`, `setDoor` for actions and events; `homeHeat(state)`
+  gives the heat panel: outside air, sources, and each room's temp, windows, door, loss.
+- Not yet used by the rules (sleep still feels the living room); the builder's
+  panel shows it first.
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).
