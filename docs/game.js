@@ -4016,6 +4016,91 @@
     };
   }
 
+  // src/engine/scene.js
+  var TWILIGHT = 40;
+  var WEATHER_LOOK = {
+    clear: { cloud: 0.05, precip: "none", strength: 0, fog: 0 },
+    cloudy: { cloud: 0.7, precip: "none", strength: 0, fog: 0 },
+    fog: { cloud: 0.6, precip: "none", strength: 0, fog: 0.8 },
+    rain: { cloud: 0.85, precip: "rain", strength: 0.5, fog: 0.15 },
+    heavy_rain: { cloud: 0.95, precip: "rain", strength: 1, fog: 0.3 },
+    windstorm: { cloud: 0.8, precip: "rain", strength: 0.4, fog: 0 },
+    snow: { cloud: 0.9, precip: "snow", strength: 0.6, fog: 0.2 }
+  };
+  var clamp01 = (v) => Math.max(0, Math.min(1, v));
+  function sceneEnv(state2, t = state2.time) {
+    const m = (t % 1440 + 1440) % 1440;
+    const sun = sunFor(t);
+    const rise = sun.rise;
+    const set = sun.set;
+    let daylight;
+    let phase;
+    if (m < rise - TWILIGHT || m > set + TWILIGHT) {
+      daylight = 0;
+      phase = "night";
+    } else if (m < rise + TWILIGHT) {
+      daylight = clamp01((m - (rise - TWILIGHT)) / (2 * TWILIGHT));
+      phase = "dawn";
+    } else if (m > set - TWILIGHT) {
+      daylight = clamp01((set + TWILIGHT - m) / (2 * TWILIGHT));
+      phase = "dusk";
+    } else {
+      daylight = 1;
+      phase = "day";
+    }
+    const noon = (rise + set) / 2;
+    const sunHeight = m <= rise || m >= set ? 0 : clamp01(Math.sin(Math.PI * (m - rise) / (set - rise)));
+    const w = state2.weather || { type: "clear", wind: 0 };
+    const look = WEATHER_LOOK[w.type] || WEATHER_LOOK.clear;
+    return {
+      minuteOfDay: m,
+      hour: m / 60,
+      sunrise: rise,
+      sunset: set,
+      solarNoon: noon,
+      daylight,
+      sunHeight,
+      phase,
+      weather: w.type,
+      cloud: look.cloud,
+      precip: look.precip,
+      precipStrength: look.strength,
+      fog: look.fog,
+      windMph: w.wind || 0,
+      airF: Math.round(airTemp(state2, t)),
+      season: seasonOf(t),
+      outdoorLight: daylight * (1 - 0.6 * look.cloud)
+    };
+  }
+
+  // src/ui/quality.js
+  var KEY = "lastlight.quality.v1";
+  var AUTO_KEY = "lastlight.quality.auto.v1";
+  var QUALITY_CHOICES = ["auto", "low", "medium", "high"];
+  var QUALITY_LABELS = { auto: "Auto", low: "Low", medium: "Medium", high: "High" };
+  function read(k) {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  }
+  function write(k, v) {
+    try {
+      if (v == null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+    } catch {
+    }
+  }
+  function getQualityChoice() {
+    const v = read(KEY);
+    return QUALITY_CHOICES.includes(v) ? v : "auto";
+  }
+  function setQualityChoice(v) {
+    write(KEY, QUALITY_CHOICES.includes(v) && v !== "auto" ? v : null);
+    write(AUTO_KEY, null);
+  }
+
   // src/engine/preview.js
   var DAY_START = 300;
   function weatherEffects(state2) {
@@ -4129,7 +4214,7 @@
   }
 
   // src/engine/save.js
-  var KEY = "lastlight.save.v1";
+  var KEY2 = "lastlight.save.v1";
   var RUNS_KEY = "lastlight.runs.v1";
   var LEGACY_KEY = "lastlight.legacy.v1";
   function store() {
@@ -4143,7 +4228,7 @@
     const s = store();
     if (!s) return false;
     try {
-      s.setItem(KEY, JSON.stringify(state2));
+      s.setItem(KEY2, JSON.stringify(state2));
       return true;
     } catch {
       return false;
@@ -4157,7 +4242,7 @@
     if (!s) return null;
     let raw;
     try {
-      raw = s.getItem(KEY);
+      raw = s.getItem(KEY2);
     } catch (err) {
       problem = String(err);
       return null;
@@ -4169,7 +4254,7 @@
       problem = err?.message || String(err);
       try {
         s.setItem(UNREADABLE_KEY, raw);
-        s.removeItem(KEY);
+        s.removeItem(KEY2);
       } catch {
       }
       if (typeof console !== "undefined") console.warn(`Save not loaded (kept as ${UNREADABLE_KEY}): ${problem}`);
@@ -4184,7 +4269,7 @@
   function clearGame() {
     const s = store();
     if (s) try {
-      s.removeItem(KEY);
+      s.removeItem(KEY2);
     } catch {
     }
   }
@@ -5057,9 +5142,9 @@
       const next2 = k.next == null ? "max level" : `${k.next} xp to level ${k.level + 1}`;
       return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next2)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
     }).join("");
-    const read = (state.skills && state.skills.books || []).length;
+    const read2 = (state.skills && state.skills.books || []).length;
     const bg = backgroundText(state);
-    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
+    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read2 ? ` (${read2} read)` : ""}.</p></details>`;
   }
   function renderStats() {
     const p = state.player;
@@ -5504,11 +5589,24 @@
   function showStartChoices() {
     modal(startChoicesHtml(), bindStartChoices);
   }
+  function qualityHint(q) {
+    return {
+      auto: "Auto: set from your device, and lowered if the 3D view runs slow.",
+      low: "Low: fastest. No shadows of the room, no light patches. For phones and old laptops.",
+      medium: "Medium: reflections and light patches, simple shadows.",
+      high: "High: soft shadows and all light effects. Needs a good graphics card."
+    }[q] + " It is used the next time you go inside.";
+  }
   function showMenu() {
     modal(`<h3>Game</h3>
     <p class="hint">The game saves in this browser after each action.</p>
     <div class="col">
       <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? "checked" : ""}> Weather effects on the map (snow, rain, fog, night)</label>
+      <div class="qual-row" role="radiogroup" aria-label="3D quality">
+        <span class="qual-label">3D quality</span>
+        ${QUALITY_CHOICES.map((q) => `<button type="button" class="qual${getQualityChoice() === q ? " on" : ""}" data-q="${q}" role="radio" aria-checked="${getQualityChoice() === q}">${QUALITY_LABELS[q]}</button>`).join("")}
+      </div>
+      <p class="hint" id="qualHint">${qualityHint(getQualityChoice())}</p>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
@@ -5519,6 +5617,15 @@
       m.querySelector("#fxToggle").addEventListener("change", (e) => {
         if (fx) fx.setEnabled(e.target.checked);
       });
+      m.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
+        setQualityChoice(b.dataset.q);
+        m.querySelectorAll("[data-q]").forEach((x) => {
+          const on = x === b;
+          x.classList.toggle("on", on);
+          x.setAttribute("aria-checked", on);
+        });
+        m.querySelector("#qualHint").textContent = qualityHint(b.dataset.q);
+      }));
       m.querySelector("#exp").addEventListener("click", () => {
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
         const a = document.createElement("a");
@@ -5623,6 +5730,10 @@
       subtitle: `${cat.label} \xB7 inside`,
       dark: env.dark,
       night,
+      // Game time and weather for the light, sky and sound (src/engine/scene.js).
+      // scene: at the time you go in; getScene(): now (time passes while inside).
+      scene: sceneEnv(state),
+      getScene: () => sceneEnv(state),
       stock,
       hasFlashlight: () => (state.carried.flashlight || 0) > 0,
       isLightOn: () => hasLight(state),

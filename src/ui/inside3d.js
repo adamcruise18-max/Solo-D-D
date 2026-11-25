@@ -13,6 +13,7 @@ import { TOON, sty } from './style.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
+import { getQualityChoice, autoStepDown } from './quality.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
 } from './controls.js';
@@ -76,7 +77,26 @@ const FIXTURE_COLORS = {
 
 const PRODUCT_COLORS = [0xb2442f, 0xd4a53b, 0x3f6f9e, 0x5f8f4a, 0xe4ddd0, 0x8a4f7d, 0xc7703a, 0x2f5d5a, 0x9e9a8c, 0xd7c25c];
 
+// Pickable items: a soft rim light in the item's own color (fresnel), on top of its emissive lift.
+const ITEM_RIM = (sh) => {
+  sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    float llRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 2.2);
+    totalEmissiveRadiance += diffuseColor.rgb * (0.04 + 0.45 * llRim);`);
+};
+const SKY_PRESETS = {
+  morning: { daylight: 0.85, phase: 'dawn', sunHeight: 0.12, cloud: 0.3, precip: 'none', outdoorLight: 0.7 },
+  noon: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0.2, precip: 'none', outdoorLight: 0.88 },
+  dusk: { daylight: 0.6, phase: 'dusk', sunHeight: 0.04, cloud: 0.25, precip: 'none', outdoorLight: 0.51 },
+  overcast: { daylight: 1, phase: 'day', sunHeight: 0.7, cloud: 1, precip: 'rain', precipStrength: 0.6, outdoorLight: 0.4 },
+  night: { daylight: 0, phase: 'night', sunHeight: 0, cloud: 0.5, precip: 'none', outdoorLight: 0 },
+};
 export function openInside(opts) {
+  // ?sky=morning|noon|dusk|overcast|night in the page address forces the light (to compare looks).
+  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night)\b/.exec(location.search || '') || [])[1];
+  if (forceSky) {
+    const sc = SKY_PRESETS[forceSky];
+    opts = { ...opts, scene: sc, night: sc.daylight === 0, dark: sc.daylight === 0 ? true : opts.dark };
+  }
   const { plan } = opts;
   const root = document.createElement('div');
   root.id = 'inside';
@@ -140,7 +160,10 @@ export function openInside(opts) {
 
   // Light, tone, fog, flashlight and room effects come from look3d.js.
   const quality = pickQuality();
-  const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight() });
+  // Low draws fewer pixels on sharp screens; medium a little fewer.
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.5 : touch ? 1.5 : 2));
+  const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight(), scene: opts.scene });
+  const daySky = lk.sky; // daylight color and strength from the game clock and weather
   const flash = lk.flashlight; // null without a flashlight
   const lrnd = mulberry32(hashString(`look:${opts.title}`));
   // The flashlight beam follows the game: on, off, or weak batteries.
@@ -217,26 +240,32 @@ export function openInside(opts) {
   scene.add(worldUV(lintel));
   // Daylight (or night) through the open door, a shaft, dust in the air.
   lk.addDoorLight(0, 0, !!opts.night, { width: 1.8, height: 2.2 });
-  // Daylight through the front windows of a dark store: strong at the front, fading toward
-  // the back (no black back half). Added at build time so no shader rebuild later.
-  if (dark && !opts.night && plan.kind === 'hall') {
-    const n = W > 20 ? 3 : 2;
-    for (let i = 0; i < n; i++) {
-      const L = new PointLight(0xc9d3de, 14, D * 1.1, 1.1);
-      L.position.set(n === 1 ? 0 : -W / 3 + (i * (2 * W / 3)) / (n - 1), H - 0.6, -1.2);
+  // Daylight through the front windows: a bright front with light patches on the floor, and the
+  // back of the store fading to dark (you can always see where the way out is). The ceiling
+  // near the door and windows gets some bounce light. Added at build time (no shader rebuild).
+  if (!opts.night) {
+    if (plan.windows === 'front') {
+      const ww = W / 2 - 2;
+      for (const side of [-1, 1]) if (ww > 0.8) lk.addWindowLight(side * (1 + ww / 2 + 0.5), -0.12, ww, { length: Math.min(6, D * 0.35) });
+    } else if (dark && plan.kind === 'hall') {
+      // a big store with no front glass: a little grey light near the front only
+      const L = new PointLight(daySky.color, 8 * Math.min(1, daySky.level), D * 0.6, 1.4);
+      L.position.set(0, H - 0.6, -1.2);
       scene.add(L);
     }
+    lk.addBounce(0, 0, 1.8, H);
   }
   // Open to the weather (plan.exposed): a hole in the roof with sky and light coming in, or a
   // broken front window with glass on the floor. These buildings get high grime.
   const ex = plan.exposed;
   if (ex && ex.kind === 'roof') {
-    const sky = new Mesh(new PlaneGeometry(ex.w, ex.d), new MeshBasicMaterial({ color: opts.night ? 0x1b2536 : 0xcfdbe6, fog: false }));
+    const sky = new Mesh(new PlaneGeometry(ex.w, ex.d), new MeshBasicMaterial({ color: opts.night ? 0x1b2536 : daySky.sky, fog: false }));
     sky.rotation.x = Math.PI / 2;
     sky.position.set(ex.x, H - 0.03, ex.z);
     scene.add(sky);
+    lk.addOpening(ex.x, ex.z, Math.max(ex.w, ex.d) / 2);
     if (!opts.night) {
-      const L = new PointLight(0xe8eef4, 10, 9, 1.4);
+      const L = new PointLight(daySky.color, 10 * Math.min(1.2, daySky.level), 9, 1.4);
       L.position.set(ex.x, H - 0.5, ex.z);
       scene.add(L);
     }
@@ -246,6 +275,7 @@ export function openInside(opts) {
       scene.add(g);
     }
   } else if (ex && ex.kind === 'window') {
+    if (plan.windows !== 'front') lk.addWindowLight(ex.x, -0.12, 1.6, { length: 3 });
     const g = makeProp('glass_shards', Math.floor(ex.x * 101));
     g.position.set(ex.x, 0, -0.7);
     scene.add(g);
@@ -286,17 +316,17 @@ export function openInside(opts) {
     if (plan.windows === 'front' && lrnd() < 0.7) lk.addBrokenGlass((lrnd() < 0.5 ? -1 : 1) * (3 + lrnd() * (W / 2 - 5)), -0.8, 1.3);
   }
   // Outside, seen through the door: snow and grey sky
-  const outside = new Mesh(new PlaneGeometry(6, 4), new MeshBasicMaterial({ color: opts.night ? 0x1a2433 : 0xdfe6ec }));
+  const outside = new Mesh(new PlaneGeometry(6, 4), new MeshBasicMaterial({ color: opts.night ? 0x141920 : daySky.sky }));
   outside.position.set(0, 2, 2.5);
   outside.rotation.y = Math.PI;
   scene.add(outside);
-  const snow = new Mesh(new PlaneGeometry(6, 3), new MeshBasicMaterial({ color: opts.night ? 0x3a4656 : 0xf4f6f8 }));
+  const snow = new Mesh(new PlaneGeometry(6, 3), new MeshBasicMaterial({ color: opts.night ? 0x262a32 : 0xdfe3e6 }));
   snow.rotation.x = -Math.PI / 2;
   snow.position.set(0, 0.01, 1.4);
   scene.add(snow);
   // Store windows along the front
   if (plan.windows === 'front') {
-    const glass = new MeshBasicMaterial({ color: opts.night ? 0x16202c : 0xc5d3de, transparent: true, opacity: 0.85 });
+    const glass = new MeshBasicMaterial({ color: opts.night ? 0x16202c : new Color(daySky.sky).multiplyScalar(0.85), transparent: true, opacity: 0.85 });
     for (const side of [-1, 1]) {
       const ww = W / 2 - 2;
       const g = new Mesh(new PlaneGeometry(ww, 1.8), glass);
@@ -598,6 +628,24 @@ export function openInside(opts) {
     statics.add(g);
   }
 
+  // Contact shadows: a soft dark blob under every fixture, piece of furniture, prop and covered body.
+  {
+    const blobs = [];
+    for (const f of plan.fixtures) {
+      if (!f.w || !f.d) continue;
+      blobs.push({ x: f.x, z: f.z, w: f.w, d: f.d, grow: f.type === 'shelf' || f.type === 'endcap' ? 0.55 : 0.4 });
+    }
+    const NO_BLOB = /^(rug|paper_scatter|glass_shards|wall_frame|wall_clock|curtain|mail_pile|magazine|old_phone|trash_pile)$/;
+    for (const g of statics.children) {
+      const k = g.userData.kind || g.name || '';
+      if (!g.userData.radius || NO_BLOB.test(k) || g.position.y > 0.05) continue;
+      const r = g.userData.radius * (k === 'covered_body' ? 1.2 : 1.3);
+      const body = k === 'covered_body';
+      blobs.push({ x: g.position.x, z: g.position.z, w: body ? 0.6 : r, d: body ? 1.8 : r, rot: g.rotation.y, grow: 0.2 });
+    }
+    lk.addContactShadows(blobs);
+  }
+
   mergeStatics(statics);
   // look3d's lamps, decals, notices and shades never move: merge them by material too.
   // Lights, dust points and sprites stay where they are.
@@ -712,6 +760,9 @@ export function openInside(opts) {
           if (!mt.emissive) return mt;
           const c = mt.clone();
           if (c.map) { c.emissiveMap = c.map; c.emissive.setRGB(glow, glow, glow); } else c.emissive.copy(c.color).multiplyScalar(glow);
+          // a soft rim of its own color, so its shape reads in a dark aisle (no outline, no halo)
+          c.onBeforeCompile = ITEM_RIM;
+          c.customProgramCacheKey = () => 'llItemRim';
           return c;
         };
         m.material = Array.isArray(m.material) ? m.material.map(fix) : fix(m.material);
@@ -1356,11 +1407,24 @@ export function openInside(opts) {
   // ---------- loop ----------
   let last = performance.now();
   const fwd = new Vector3();
+  let autoWatch = quality !== 'low' && getQualityChoice() === 'auto' && !/[?&]q=/.test(location.search || '');
+  let autoT = 0;
+  let slowT = 0;
   function frame(now) {
     if (closed) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     fps = fps * 0.9 + (dt > 0 ? 1 / dt : 0) * 0.1;
+    // Auto quality: after 6 s of slow frames (under 24 fps), the next building opens one step lower.
+    if (autoWatch && !paused) {
+      autoT += dt;
+      if (autoT > 3) slowT = fps < 24 ? slowT + dt : Math.max(0, slowT - dt * 0.5);
+      if (slowT > 6) {
+        autoWatch = false;
+        const next = autoStepDown(quality);
+        if (next) toast(`The 3D view runs slow here. Next time it uses ${next} quality (Game menu to change).`, 4200);
+      }
+    }
     const tFrame = performance.now();
     const moving = !paused && !busy && !panel && !hold;
     if (moving) {
