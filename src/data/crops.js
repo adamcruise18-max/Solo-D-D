@@ -9,5 +9,10 @@ export const CROPS = {
   potatoes: { name: 'Potatoes', plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ['potatoes', 15] },
   beans: { name: 'Green beans', plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ['green_beans', 6] },
   squash: { name: 'Winter squash', plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ['squash', 4] },
+  // Winter greens (lettuce, mache, arugula): hardy to about 20°F, slow but steady in a
+  // Portland winter; cut-and-come-again. Small calories, but fresh food in the dark months.
+  greens: { name: 'Winter greens', plant: [0, 1, 9, 10, 11], days: 45, frostF: 20, minF: 32, yield: ['salad_greens', 5], regrow: 0.55, cuts: 3 },
+  // Fava beans: sow Oct-Nov (ready about May) or Feb-Mar (ready in about 100 days).
+  fava: { name: 'Fava beans', plant: [1, 2, 9, 10], days: 90, frostF: 15, minF: 36, yield: ['fava_beans', 8] },
   garlic: { name: 'Garlic', plant: [8, 9, 10, 11], days: 220, frostF: null, minF: 35, yield: ['garlic', 20] },
 };

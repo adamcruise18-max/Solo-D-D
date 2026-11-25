@@ -84,3 +84,19 @@ test('garden: kale grows back after a harvest (up to 4 cuts); the garage has sna
   assert.equal(s.garden.beds.length, 0, 'after 4 cuts the bed is free');
   assert.equal(newGame(1).home.storage.snare_wire, 1);
 });
+
+test('garden: winter greens sown in November give a first cut by late winter', () => {
+  const s = withBeds(53);
+  assert.ok(plant(s, 'greens'));
+  let ripe = null;
+  for (let d = 1; d <= 110 && ripe == null; d++) { toDay(s, d); if (d % 3 === 0) waterGarden(s); if (s.garden.beds[0].growth >= 1) ripe = d; }
+  assert.ok(ripe != null && ripe <= 100, `greens ripe on day ${ripe}`);
+});
+
+test('garden: fava beans sown in November are ready in spring, not before', () => {
+  const s = withBeds(54);
+  assert.ok(plant(s, 'fava'));
+  let ripe = null;
+  for (let d = 1; d <= 220 && ripe == null; d++) { toDay(s, d); if (d % 3 === 0) waterGarden(s); if (s.garden.beds[0].growth >= 1) ripe = d; }
+  assert.ok(ripe != null && ripe >= 130 && ripe <= 200, `fava ripe on day ${ripe}`);
+});

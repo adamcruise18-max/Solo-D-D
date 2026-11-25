@@ -26,6 +26,8 @@ export const ITEMS = {
   potatoes: { name: 'Potatoes (lb)', unit: 'lb', weight: 1, kind: 'food', cal: 350, portion: 1, needsCooking: true, perish: 60 },
   green_beans: { name: 'Green beans (lb)', unit: 'lb', weight: 1, kind: 'food', cal: 140, portion: 1, perish: 6 },
   squash: { name: 'Winter squash', unit: 'squash', weight: 3, kind: 'food', cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+  salad_greens: { name: 'Salad greens (bag)', unit: 'bag', weight: 0.3, kind: 'food', cal: 30, portion: 1, perish: 5 },
+  fava_beans: { name: 'Fava beans (lb)', unit: 'lb', weight: 1, kind: 'food', cal: 340, portion: 1, needsCooking: true, perish: 7 },
   garlic: { name: 'Garlic (head)', unit: 'head', weight: 0.1, kind: 'food', cal: 60, portion: 1, perish: 120 },
   oatmeal: { name: 'Oatmeal (canister)', unit: 'can', weight: 2.6, kind: 'food', cal: 4500, portion: 0.1, needsCooking: true },
 
