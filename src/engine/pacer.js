@@ -34,8 +34,10 @@ export function initPacer(state) {
   state.pacer = { tension: 0, hourAcc: 0, quietHours: 0, lastEventDay: null, lastBigDay: null, recent: [], count: 0 };
 }
 
-// Where the player is, for event filters.
+// Where the player is, for event filters. While the player sleeps, only events
+// written for sleep (where: 'asleep', a sound that wakes you) can happen.
 export function whereNow(state, mode) {
+  if (mode === 'sleep') return 'asleep';
   if (mode === 'walk') return 'outside';
   const k = state.location?.kind;
   if (k === 'home') return 'home';
@@ -59,7 +61,7 @@ export function candidates(state, mode, events = EVENTS) {
   const month = monthOf(state.time);
   const where = whereNow(state, mode);
   return events.filter((e) => {
-    if (e.where !== 'any' && e.where !== where) return false;
+    if (e.where !== where && !(e.where === 'any' && where !== 'asleep')) return false;
     if (e.months && (month < e.months[0] || month > e.months[1])) return false;
     if (p.recent.some((r) => r.id === e.id && day - r.day < REPEAT_GAP_DAYS)) return false;
     if (e.size === 'big' && p.lastBigDay != null && day - p.lastBigDay < BIG_GAP_DAYS) return false;

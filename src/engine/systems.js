@@ -13,6 +13,7 @@
 //   game time                      the clock only
 import { createSystems, createClock } from '../core/index.js';
 import { initWeather, rollWeather } from './world.js';
+import { rollSpell } from './rareweather.js';
 import { tickStep, dailyRollover } from './tick.js';
 import { pacerSystem } from './pacer.js';
 import { decaySystem } from './decay.js';
@@ -25,10 +26,16 @@ export const weatherSystem = {
   legacy: true, // state.weather was in saves before the engine
   owns: ['weather'],
   // One roll per game day from the shared game rng; nothing changes inside a day.
-  // Skipping days must still roll each day in order, so the result is exact.
+  // Then rare weather (ice storm, heat wave, smoke) from its own stream
+  // (src/engine/rareweather.js). Skipping days must still roll each day in order,
+  // so the result is exact.
   catchUp: 'exact',
   init: (state) => initWeather(state),
-  daily: (state, day) => rollWeather(state, day),
+  daily: (state, day) => {
+    const old = state.weather;
+    rollWeather(state, day);
+    rollSpell(state, day, old);
+  },
 };
 
 export const legacySystem = {

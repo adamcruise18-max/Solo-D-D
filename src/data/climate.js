@@ -23,4 +23,8 @@ export const WEATHER_TYPES = {
   heavy_rain: { label: 'Heavy rain', solar: 0.3, wetAfter: 10 },
   windstorm: { label: 'Windstorm', solar: 0.5, wetAfter: 30 },
   snow: { label: 'Snow', solar: 0.1, speed: 0.6 },
+  // Rare weather spells (src/engine/rareweather.js).
+  ice_storm: { label: 'Ice storm', solar: 0.2, wetAfter: 20, speed: 0.5 },
+  heat_wave: { label: 'Heat wave', solar: 1.5 },
+  smoke: { label: 'Wildfire smoke', solar: 0.4 },
 };

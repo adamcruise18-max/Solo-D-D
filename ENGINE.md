@@ -177,6 +177,22 @@ request that says which rule change is meant and why.
 - For the F3 overlay: `pacerInfo(state)`, `decayInfo(state)`, and `sceneEnv(state)` for
   the hour and weather (`src/engine/scene.js`).
 
+## Rare weather and sleep events (research spec step 7, part 3)
+
+- Part of the weather system (`src/engine/rareweather.js`, stream `weather-rare`).
+  After the normal day roll, a spell can replace the day's type for some days:
+  ice storm (Dec-Feb, about 1 winter in 2, 1-2 days), heat wave (Jul-Aug,
+  about 1 summer in 2, 3-5 days, 98-106°F), wildfire smoke (Aug-Sep, about 1
+  year in 2, 3-7 days). Snow stays on 28% of cold wet days (about 4 snow spells a
+  winter). `state.weather.spell = { id, daysLeft, first }`, `baseType` = the
+  normal type (tomorrow's roll uses it).
+- Effects: ice storm = walk speed x0.5, d20 rain disadvantage, more road events,
+  the `ice_trees_down` big event; heat wave = thirst x1.5 outside in the day;
+  smoke = 1.5 health an hour outside without an N95 mask.
+- `sceneEnv()` gives `haze` (sky tint color) and `ice` for the visuals.
+- Sleep: `whereNow()` is `'asleep'` in sleep mode. Then only events with
+  `where: 'asleep'` (written as a sound that wakes you) can happen; `'any'` means awake.
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).

@@ -3,6 +3,7 @@ import { randInt, chance } from '../rng.js';
 import { advanceTime, addInjury, environment } from './tick.js';
 import { check } from './checks.js';
 import { isNight, isBadWeather } from './world.js';
+import { WEATHER_TYPES } from '../data/climate.js';
 import { HOME, MAP_RADIUS_MILES, bagWeight, carryLimit, hasLight, log, addItem, formatDuration } from './state.js';
 import { rollZone } from './loot.js';
 import { itemName } from '../data/items.js';
@@ -28,7 +29,8 @@ export function walkSpeed(state, t = state.time) {
   const apply = (f, w) => { mph *= f; why.push(w); };
   if (p.weak) apply(0.7, 'weak');
   if (isNight(t) && !hasLight(state)) apply(0.6, 'dark, no light');
-  if (state.weather.type === 'snow') apply(0.6, 'snow');
+  const wx = WEATHER_TYPES[state.weather.type];
+  if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
   if (bagWeight(state.carried) > carryLimit(state)) apply(0.7, 'heavy pack');
   if (p.injuries.some((i) => i.type === 'sprain')) apply(0.7, 'sprain');
   if (p.warmth < 25) apply(0.8, 'hypothermia');
