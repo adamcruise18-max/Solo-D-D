@@ -41,8 +41,8 @@ export function weatherEffects(state) {
   // Short hazards from events: slower walking, a cold snap.
   for (const h of activeHazards(state)) {
     const left = formatDuration(h.endsAt - state.time);
-    if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} (about ${left} more).`, level: 'warn' });
-    if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} °F colder (about ${left} more).`, level: 'danger' });
+    if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} for about another ${left}.`, level: 'warn' });
+    if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} °F colder for about another ${left}.`, level: 'danger' });
   }
   return out;
 }

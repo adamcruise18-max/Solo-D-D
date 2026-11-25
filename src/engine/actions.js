@@ -18,14 +18,40 @@ import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
+import { plant, waterGarden, harvest } from './garden.js';
+import { SALVAGE } from '../data/salvage.js';
+import { treatDog, canTreatDog } from './dog.js';
+import { carHere, goToCar, searchCar, siphonGas, takeCarBattery, stripCarWire, addCarBattery, SIPHON_TOOLS, WRENCH_TOOLS, CAR_SEARCH_MIN, SIPHON_MIN, BATTERY_MIN, WIRE_MIN, MAX_CAR_BATTERIES } from './cars.js';
+import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS, sleepSpot } from './home.js';
+import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 // Cook fresh food first (it spoils), then rice or pasta, then cans.
-const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'canned_food'];
-import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
+const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'oatmeal', 'canned_food'];
+// Rice, pasta and oatmeal cook in water (1/8 gal a meal).
+const COOK_NEEDS_WATER = new Set(['dry_food', 'oatmeal']);
+// Home water first, then bottled water (1 gal a bottle) at home or in the bag.
+const cookWater = (h, carried = {}) => (h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal'
+  : (h.storage.water_bottle || 0) >= 0.125 ? 'storage' : (carried.water_bottle || 0) >= 0.125 ? 'carried' : null);
+function useCookWater(state) {
+  const h = state.home;
+  const w = cookWater(h, state.carried);
+  if (w === 'storage') addItem(h.storage, 'water_bottle', -0.125);
+  else if (w === 'carried') addItem(state.carried, 'water_bottle', -0.125);
+  else h[w] -= 0.125;
+}
+// The first food you can cook now: skip foods that need water when there is none.
+function cookPick(state) {
+  const h = state.home;
+  const water = cookWater(h, state.carried);
+  return COOK_ORDER().find((f) => ((h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
+}
+import { skillLevel, practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Scavenging is used all the time; half xp per use so level 5 comes in month 3 or 4, not month 2.
+const SCAV_XP = 0.5;
 
 // ---------- helpers ----------
 function source(state, from) {
@@ -45,6 +71,8 @@ export function locationLabel(state) {
   if (loc.kind === 'home') return 'Home (Aloha)';
   if (loc.kind === 'place') return getPlace(loc.id)?.name || 'Unknown place';
   if (loc.kind === 'house') return loc.label;
+  if (loc.kind === 'wild') return spotHere(state)?.name || 'Outside';
+  if (loc.kind === 'car') return 'Abandoned car';
   return '';
 }
 
@@ -98,8 +126,55 @@ export function itemUses(state, id) {
   if (it.kind === 'book') uses.push({ verb: 'read', label: hasRead(state, id) ? 'Read again' : 'Read', note: `${READ_MINUTES / 60} h · ${SKILLS[it.skill].name}` });
   if (it.kind === 'food' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Give to dog' });
   if (it.kind === 'dogfood' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Feed dog' });
+  if (id === 'car_battery' && state.location.kind === 'home') {
+    const n = state.home.carBatteries || 0;
+    uses.push({ verb: 'carbattery', label: 'Wire into the home battery', note: `+0.5 kWh storage · ${n}/${MAX_CAR_BATTERIES}`, disabled: n >= MAX_CAR_BATTERIES });
+  }
+  const sv = SALVAGE[id];
+  if (sv) {
+    const tool = salvageTool(state, id);
+    uses.push({ verb: 'salvage', label: 'Take apart', note: tool ? `${salvageMinutes(state, id)} min · ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or ')}`, disabled: !tool });
+  }
   return uses;
 }
+
+// ---------- taking junk apart ----------
+// The tool you use (the first you have, toolkit first), or null.
+export function salvageTool(state, id) {
+  const sv = SALVAGE[id];
+  if (!sv) return null;
+  const order = ['toolkit', ...sv.tools.filter((t) => t !== 'toolkit')];
+  return order.find((t) => sv.tools.includes(t) && has(state, t)) || null;
+}
+export function salvageMinutes(state, id) {
+  const sv = SALVAGE[id];
+  const tool = salvageTool(state, id);
+  const lvl = skillLevel(state, 'tinkering');
+  return Math.round(sv.min * (tool === 'toolkit' ? 0.75 : 1) * (1 - 0.06 * lvl));
+}
+function salvage(state, id, bag) {
+  const sv = SALVAGE[id];
+  const tool = salvageTool(state, id);
+  if (!tool) { log(state, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or a ')} to take this apart.`); return; }
+  const min = salvageMinutes(state, id);
+  if (advanceTime(state, min, 'work', { stopAtDanger: true }) || state.dead) return;
+  addItem(bag, id, -1);
+  // The parts go where the junk was (home storage or your bag).
+  for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
+  practice(state, 'tinkering', 2);
+  log(state, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(', ')}.`, 'good');
+}
+
+// Text helpers: no double period after a name like "Inc.", and no nested brackets.
+const endDot = (t) => (/[.!?]$/.test(t) ? t : `${t}.`);
+const plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, '');
+const QTY_WORDS = { 0.25: 'a quarter', 0.5: 'half a', 0.75: 'three quarters of a' };
+function partText(pid, q) {
+  const it = ITEMS[pid];
+  const w = QTY_WORDS[q];
+  return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+}
+const sleepWhere = (state) => (sleepSpot(state) !== 'living' ? 'in your bed' : state.home.fireHours > 0 ? 'by the fire' : 'on the couch');
 
 export function useItem(state, id, verb, from = 'carried') {
   const bag = source(state, from);
@@ -118,7 +193,7 @@ export function useItem(state, id, verb, from = 'carried') {
       addItem(bag, id, -it.portion);
       addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       if (it.water) addWater(state, it.water);
-      log(state, `You eat: ${it.name}${it.portion < 1 ? ' (one portion)' : ''}.`);
+      log(state, `You eat: ${plainName(id)}${it.portion < 1 ? ' (one portion)' : ''}.`);
       advanceTime(state, 15);
       if (risk > 0 && chance(state, risk)) { log(state, 'It tasted off. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
@@ -132,6 +207,11 @@ export function useItem(state, id, verb, from = 'carried') {
     }
     case 'med':
       return useMed(state, id, bag);
+    case 'salvage':
+      return salvage(state, id, bag);
+    case 'carbattery':
+      if (state.location.kind !== 'home') { log(state, 'You can wire the car battery into the bank only at home.'); return; }
+      return addCarBattery(state, bag);
     case 'wear': {
       // One item per layer; the old one goes back into the same bag.
       addItem(bag, id, -1);
@@ -264,15 +344,18 @@ export function takeItem(state, id, qty) {
 export function takeAll(state) {
   const bag = hereBag(state);
   const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+  const took = [];
   let left = false;
   for (const id of ids) {
     const before = bag[id];
     const w = ITEMS[id].weight;
-    const maxN = Math.floor(freeWeight(state) / w);
-    const n = Math.min(Math.floor(before), maxN);
-    if (n > 0) { addItem(bag, id, -n); addItem(state.carried, id, n); }
+    const room = freeWeight(state) / w;
+    // Whole units, but a part-unit (0.5 roll of wire) can be taken whole if it fits.
+    const n = before < 1 ? (room >= before ? before : 0) : Math.min(Math.floor(before), Math.floor(room));
+    if (n > 0) { addItem(bag, id, -n); addItem(state.carried, id, n); took.push(itemName(id).toLowerCase()); }
     if (bag[id]) left = true;
   }
+  if (took.length) log(state, `You take: ${took.join(', ')}.`);
   if (left) log(state, 'Your pack is full. Some items stay here.', 'warn');
   advanceTime(state, 2);
 }
@@ -300,11 +383,13 @@ export function storeAll(state) {
 // ---------- rest and sleep ----------
 export function rest(state, hours) {
   log(state, `You rest for ${hours} h.`);
-  advanceTime(state, hours * 60, 'rest');
+  advanceTime(state, hours * 60, 'rest', { stopAtDanger: true });
 }
 
 export function sleep(state, hours) {
-  const where = state.location.kind === 'home' ? 'in your bed' : 'on the floor';
+  const k = state.location.kind;
+  const where = k === 'home' ? sleepWhere(state)
+    : k === 'wild' ? 'on the ground' : k === 'car' ? 'in the car' : 'on the floor';
   log(state, `You sleep ${where} for ${hours} h.`);
   advanceTime(state, hours * 60, 'sleep');
   if (!state.dead) log(state, 'You wake up.');
@@ -391,14 +476,11 @@ function homeAction(state, id) {
       advanceTime(state, 5);
       return;
     case 'cook': {
-      const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+      const food = cookPick(state);
+      if (!food) { log(state, 'You have nothing you can cook now.'); return; }
       const bag = (h.storage[food] || 0) > 0 ? h.storage : state.carried;
       const it = ITEMS[food];
-      if (food === 'dry_food') {
-        const water = h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal' : null;
-        if (!water) { log(state, 'You need water to cook rice or pasta.'); return; }
-        h[water] -= 0.125;
-      }
+      if (COOK_NEEDS_WATER.has(food)) useCookWater(state);
       const how = useHeat(state, 0.5);
       const risk = eatRisk(state, food, true);
       const stage = stageLabel(state, food);
@@ -408,7 +490,7 @@ function homeAction(state, id) {
       p.morale = clamp(p.morale + 5 + cookMoraleBonus(state), 0, 100);
       p.warmFedH = WARM_FED_HOURS; // "Warm and fed": warmth drops slower for a while
       practice(state, 'cooking', 3);
-      log(state, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== 'Fresh' ? `, ${stage.toLowerCase()}` : ''}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, 'good');
+      log(state, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== 'Fresh' ? `, ${stage.toLowerCase()}` : ''}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, 'good');
       advanceTime(state, 30);
       if (risk > 0 && chance(state, risk)) { log(state, 'The food was bad. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
@@ -427,9 +509,8 @@ function homeAction(state, id) {
     }
     case 'run_generator': {
       const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state.carried;
+      if (advanceTime(state, 120, 'work', { stopAtDanger: true }) || state.dead) return; // stopped: the gas stays in the can
       addItem(bag, 'gas_can', -1);
-      advanceTime(state, 120, 'work');
-      if (state.dead) return;
       if (!chance(state, gasStartChance(state))) {
         log(state, 'You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.', 'warn');
         p.morale = clamp(p.morale - 2, 0, 100);
@@ -442,10 +523,10 @@ function homeAction(state, id) {
       return;
     }
     case 'break_furniture':
+      if (advanceTime(state, 60, 'heavy', { stopAtDanger: true }) || state.dead) return;
       h.furniture -= 1;
       addItem(h.storage, 'firewood', 1);
       log(state, 'You break up old furniture into firewood (+1 bundle). It is hard work.');
-      advanceTime(state, 60, 'heavy');
       practice(state, 'tinkering', 2);
       return;
     case 'heater':
@@ -749,7 +830,7 @@ export function pickUp(state, pid) {
   ctx.holder.taken.push(pid);
   addItem(state.carried, it.item, 1);
   log(state, `You take: ${itemName(it.item)}.`);
-  practice(state, 'scavenging', 1);
+  practice(state, 'scavenging', SCAV_XP);
   if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
     markZoneDone(ctx, zone);
     state.stats.zonesSearched += 1;
@@ -784,7 +865,7 @@ export function openContainer(state, cid) {
   if (state.dead) return true;
   h.opened.push(cid);
   log(state, 'You open it and look inside.');
-  practice(state, 'scavenging', 1);
+  practice(state, 'scavenging', SCAV_XP);
   return true;
 }
 export function openedContainers(state) {
@@ -818,7 +899,7 @@ export function searchZone(state, index) {
   markZoneDone(ctx, zone);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-  practice(state, 'scavenging', 2);
+  practice(state, 'scavenging', 2 * SCAV_XP);
   reportFound(state, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
   state.lastFound = found;
   return true;
@@ -903,7 +984,7 @@ export function enterNearbyHouse(state) {
   state.houses[id].pos = pos;
   state.pos = { ...pos };
   advanceTime(state, 5, 'walk');
-  log(state, `You walk to a house ${near}.`);
+  log(state, endDot(`You walk to a house ${near}`));
   // Entry: 70% of doors are locked.
   if (chance(state, 0.7)) {
     if (has(state, 'pry_bar')) {
@@ -925,9 +1006,23 @@ export function enterNearbyHouse(state) {
   }
   state.stats.housesSearched += 1;
   state.location = { kind: 'house', id, label, parent };
-  if (state.houses[id].body) seeBody(state, 'Someone is in the bedroom. You close the door.');
-  else log(state, 'The house is empty and cold. A family lived here.');
+  const hn = state.stats.housesSearched;
+  if (state.houses[id].body) seeBody(state, BODY_LINES[hn % BODY_LINES.length]);
+  else log(state, EMPTY_LINES[hn % EMPTY_LINES.length]);
 }
+
+const BODY_LINES = [
+  'Someone is in the bedroom. You close the door.',
+  'Someone lies under a blanket on the couch. You do not look long.',
+  'A door upstairs is shut, and the air is bad. You leave it shut.',
+];
+const EMPTY_LINES = [
+  'The house is empty and cold. A family lived here.',
+  'The house is quiet. Dust covers the table.',
+  'Coats still hang by the door. Nobody is here.',
+  'The rooms are cold and dark. The clocks have stopped.',
+  'Toys lie on the floor. The house is empty.',
+];
 
 export function searchRoom(state, index) {
   const ctx = zoneCtx(state);
@@ -949,7 +1044,7 @@ export function searchRoom(state, index) {
   markZoneDone(ctx, room);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-  practice(state, 'scavenging', 2);
+  practice(state, 'scavenging', 2 * SCAV_XP);
   reportFound(state, found, HOUSE_ROOMS[room]);
   state.lastFound = found;
   return true;
@@ -970,7 +1065,7 @@ export function goToPlace(state, placeId) {
   const ok = travel(state, place, place.name);
   if (!ok) return;
   state.location = { kind: 'place', id: placeId };
-  log(state, `You arrive at ${place.name}.`, 'travel');
+  log(state, endDot(`You arrive at ${place.name}`), 'travel');
   enterPlace(state, place);
 }
 
@@ -1008,12 +1103,14 @@ export function listActions(state) {
       const startP = gasStartChance(state);
       add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
     }
+    add('walk_in', 'Walk around your home (first person)', { note: 'see what you built' });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
-    const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
+    const cookId = cookPick(state);
     const food = !!cookId;
+    const onlyDry = !food && COOK_ORDER().some((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
     const cr = cookId ? eatRisk(state, cookId, true) : 0;
-    add('cook', 'Cook a hot meal', { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` · ${Math.round(cr * 100)}% food poisoning` : ''} · warm and fed ${WARM_FED_HOURS} h` : undefined, risk: cr > 0, disabled: (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
+    add('cook', 'Cook a hot meal', { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` · ${Math.round(cr * 100)}% food poisoning` : ''} · warm and fed ${WARM_FED_HOURS} h` : undefined, risk: cr > 0, disabled: (onlyDry && 'Need water to cook') || (!food && 'No food to cook') || (!canHeat(state, 0.5) && 'Light a fire or charge the battery') });
     if (p.wet) add('dry_clothes', 'Change into dry clothes');
     if (!h.fridgeOpened) add('fridge', 'Open the fridge');
     if (Object.keys(state.carried).some((k) => k !== 'backpack' && k !== 'flashlight')) add('store_all', 'Put away everything you carry');
@@ -1050,10 +1147,46 @@ export function listActions(state) {
     add('walk_in', 'Walk inside (first person)', { note: 'look for loot yourself' });
     add('leave_house', 'Leave the house');
   }
+  if (loc.kind === 'car') {
+    const c = carHere(state) || {};
+    const hasAny = (ids) => ids.some((t) => has(state, t));
+    add('car_search', c.searched ? 'Glovebox and trunk: searched' : `Search the glovebox and trunk (${CAR_SEARCH_MIN} min)`, { disabled: c.searched && 'Done' });
+    add('car_siphon', c.siphoned ? 'Gas tank: done' : `Siphon gas (${SIPHON_MIN} min)`, { disabled: (c.siphoned && 'Done') || (!hasAny(SIPHON_TOOLS) && 'You need a garden hose or pipe and fittings'), note: c.siphoned ? undefined : 'many tanks are dry' });
+    add('car_battery', c.battery ? 'Battery: taken' : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: (c.battery && 'Done') || (!hasAny(WRENCH_TOOLS) && 'You need a tool kit or multitool'), note: c.battery ? undefined : 'adds storage to the home battery' });
+    add('car_wire', c.wire ? 'Wire and mirror: taken' : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: (c.wire && 'Done') || (!hasAny(['toolkit', 'multitool', 'knife']) && 'You need a knife or a tool') });
+    add('go_home', 'Walk home');
+  }
+  if (loc.kind === 'wild') {
+    const spot = spotHere(state);
+    if (spot?.kind === 'fish') {
+      const why = canFish(state);
+      add('fish', `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? undefined : oddsText(fishOdds(state)) });
+    }
+    if (spot?.kind === 'hunt') {
+      const methods = huntMethods(state);
+      if (!methods.length) add('hunt_bow', `Hunt (${HUNT_MINUTES / 60} h)`, { disabled: 'You need a bow and arrows, or a rifle and rounds' });
+      for (const m of methods) {
+        const o = huntOdds(state, m);
+        const why = canHunt(state, m);
+        add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game · ${o.shot.pct}% hit a ${o.animal}${m === 'rifle' ? ' · loud' : ''}${isScared(state) ? ' · game is wary' : ''}`, risk: m === 'rifle' });
+      }
+      const w = state.wild?.snares?.[spot.id];
+      if (w != null) {
+        const hours = (state.time - w) / 60;
+        add('check_snare', 'Check your snares', { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
+        add('take_snare', 'Take up your snares');
+      } else if (spot.game?.includes('rabbit')) {
+        const why = canSetSnare(state);
+        add('set_snare', 'Set snares for rabbits (30 min)', { disabled: why, note: why ? undefined : 'check after a night' });
+      }
+    }
+    add('go_home', 'Walk home');
+  }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? `Sleep ${sleepWhere(state)}…` : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
+    if (state.dog.sick) { const why = canTreatDog(state); add('treat_dog', `Treat ${state.dog.name} (antibiotics)`, { disabled: why, note: why ? undefined : '1 course of antibiotics' }); }
     if (loc.kind === 'home') add('dog_follow', state.dog.withPlayer ? `${state.dog.name}: stay home` : `${state.dog.name}: come with me`);
   }
   return acts;
@@ -1080,6 +1213,29 @@ export function doAction(state, id, arg) {
     case 'house': return enterNearbyHouse(state);
     case 'room': return searchRoom(state, arg);
     case 'walk_inside': return walkInside(state, arg);
+    // Garden and heat (engine garden.js and home.js rules; the time cost is here).
+    case 'garden_plant': if (state.location.kind === 'home' && plant(state, String(arg))) advanceTime(state, 30, 'work'); return;
+    case 'garden_water': if (state.location.kind === 'home' && waterGarden(state) > 0) advanceTime(state, 15, 'work'); return;
+    case 'garden_harvest': if (state.location.kind === 'home' && Object.keys(harvest(state)).length) advanceTime(state, 30, 'work'); return;
+    case 'sleep_spot':
+      if (setSleepSpot(state, String(arg))) log(state, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
+      return;
+    case 'board_window': {
+      // One board-up: 1 scrap wood and 30 min (the rule is engine home.js boardWindow).
+      if (state.location.kind !== 'home') return;
+      const bag = (state.home.storage.scrap_wood || 0) > 0 ? state.home.storage : (state.carried.scrap_wood || 0) > 0 ? state.carried : null;
+      if (!bag) { log(state, 'You need scrap wood to board up a window.'); return; }
+      if (!boardWindow(state, String(arg))) return;
+      addItem(bag, 'scrap_wood', -1);
+      log(state, 'You nail scrap wood over the broken window. Less cold gets in.', 'good');
+      advanceTime(state, 30, 'work');
+      return;
+    }
+    case 'door': {
+      const [room, closed] = String(arg).split(':');
+      if (state.location.kind === 'home' && setDoor(state, room, closed === '1')) { log(state, closed === '1' ? 'You close the door.' : 'You open the door.'); advanceTime(state, 1); }
+      return;
+    }
     case 'flashlight': return toggleFlashlight(state);
     case 'pickup': return pickUp(state, arg);
     case 'see_zone': return seeZone(state, Number(arg));
@@ -1088,6 +1244,19 @@ export function doAction(state, id, arg) {
     case 'leave_house': return leaveHouse(state);
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
+    case 'go_spot': return goToSpot(state, arg);
+    case 'treat_dog': { const ok = treatDog(state); if (ok) advanceTime(state, 10); return; }
+    case 'go_car': { const [cid, la, lo] = String(arg).split('|'); return goToCar(state, cid, Number(la), Number(lo)); }
+    case 'car_search': return searchCar(state);
+    case 'car_siphon': return siphonGas(state);
+    case 'car_battery': return takeCarBattery(state);
+    case 'car_wire': return stripCarWire(state);
+    case 'fish': return fish(state);
+    case 'hunt_bow': return hunt(state, 'bow');
+    case 'hunt_rifle': return hunt(state, 'rifle');
+    case 'set_snare': return setSnare(state);
+    case 'check_snare': return checkSnare(state);
+    case 'take_snare': return takeUpSnare(state);
     case 'play_dog': return playWithDog(state);
     case 'dog_follow': return toggleDogFollow(state);
     case 'build': return workOnProject(state, arg);

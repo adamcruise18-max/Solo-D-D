@@ -1,7 +1,7 @@
 // Street details on the map: abandoned cars, debris, barricades, trash bags,
 // quarantine signs, medical tents, and (as time passes) bushes and young trees.
 // They are placed near each real place with a fixed random pattern, so they are
-// always in the same spot. They are for the look only; you cannot search them yet.
+// always in the same spot. Cars have an id: you can walk to one and search it (engine/cars.js).
 import { mulberry32, hashString } from '../rng.js';
 
 export const DETAIL_INFO = {
@@ -54,7 +54,7 @@ export function detailFeatures(places, home) {
     const rng = mulberry32(hashString(`detail:${p.id}`));
     const list = p.cat === 'home' ? [['car', 3], ['trash', 1]] : NEAR[p.cat] || [];
     for (const [type, n] of list) {
-      for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === 'home' ? 30 : 25, type === 'car' ? 110 : 80), rng);
+      for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === 'home' ? 30 : 25, type === 'car' ? 110 : 80), rng, type === 'car' ? { id: `car:${p.id}:${i}` } : {});
     }
     // Overgrowth: more bushes and trees appear as time passes.
     const greens = p.cat === 'home' ? 6 : 5;

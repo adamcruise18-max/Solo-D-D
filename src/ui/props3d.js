@@ -1244,6 +1244,104 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.022, 0.022, 0.02, 12), M.blackPl, 0.06, 0.205, 0);
     add(g, gBox(0.12, 0.09, 0.002), tmat(frontTex({ t: 'GASOLINE', s: '1 GAL  SAFETY CAN', n: 'FLAMMABLE  KEEP AWAY FROM FLAME', b: '#f1c21b', f: '#111', a: '#c8281e', p: 'flame' }, 256, 192), 0.6), 0, 0.06, 0.061);
   },
+  broken_radio(g) {
+    // clock radio with a cracked face and a cut cord
+    add(g, gRBox(0.2, 0.08, 0.1, 0.015), col(0x2b2b2e, 0.5));
+    add(g, gBox(0.08, 0.035, 0.002), col(0x3a1010, 0.3), -0.04, 0.025, 0.051);
+    add(g, gCyl(0.025, 0.025, 0.004, 14), col(0x55585c, 0.6), 0.05, 0.04, 0.051, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.003, 0.003, 0.25, 4), col(0x111111, 0.6), -0.2, 0.004, -0.03, 0, 0, Math.PI / 2);
+  },
+  old_toaster(g) {
+    add(g, gRBox(0.26, 0.17, 0.14, 0.04), M.chrome);
+    for (const z of [-0.025, 0.025]) add(g, gBox(0.18, 0.004, 0.022), col(0x111111, 0.6), 0, 0.17, z);
+    add(g, gBox(0.02, 0.04, 0.02), col(0x1d1d1d, 0.5), 0.14, 0.09, 0);
+  },
+  desk_lamp(g) {
+    const c = col(0x2e5f8a, 0.45, 0.2);
+    add(g, gCyl(0.07, 0.08, 0.02, 16), c);
+    add(g, gCyl(0.008, 0.008, 0.28, 8), M.chrome, 0, 0.02, 0, 0, 0, 0.35);
+    add(g, gCyl(0.035, 0.07, 0.09, 14, true), c, -0.12, 0.2, 0, 0, 0, -1.2);
+  },
+  extension_cord(g) {
+    const o = col(0xe08a1e, 0.6);
+    for (let i = 0; i < 3; i++) add(g, gTorus(0.09 - i * 0.004, 0.008, 6, 20), o, 0, 0.008 + i * 0.012, 0, Math.PI / 2, 0, 0);
+    add(g, gBox(0.04, 0.025, 0.03), o, 0.11, 0, 0.02);
+  },
+  wooden_chair(g) {
+    const w = col(0x8a5a32, 0.65);
+    add(g, gBox(0.42, 0.04, 0.4), w, 0, 0.44, 0);
+    for (const x of [-0.18, 0.18]) for (const z of [-0.17, 0.17]) add(g, gBox(0.035, 0.44, 0.035), w, x, 0, z);
+    for (const x of [-0.18, 0.18]) add(g, gBox(0.035, 0.46, 0.035), w, x, 0.48, -0.17);
+    add(g, gBox(0.4, 0.12, 0.025), w, 0, 0.78, -0.17);
+  },
+  garden_hose(g) {
+    const gr = col(0x2f7a3a, 0.55);
+    for (let i = 0; i < 4; i++) add(g, gTorus(0.16 - i * 0.012, 0.012, 6, 24), gr, 0, 0.012 + i * 0.014, 0, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.016, 0.016, 0.04, 10), col(0xc9a23a, 0.35, 0.6), 0.17, 0.01, 0, 0, 0, Math.PI / 2);
+  },
+  broken_bike(g) {
+    // lying on its side: two wheels, a frame, bent handlebars
+    const frame = col(0x9a2f2f, 0.4, 0.3);
+    for (const x of [-0.5, 0.5]) add(g, gTorus(0.33, 0.018, 6, 28), col(0x1b1b1b, 0.7), x, 0.02, 0, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.018, 0.018, 0.75, 8), frame, 0.38, 0.05, 0, 0, 0, Math.PI / 2);
+    add(g, gCyl(0.018, 0.018, 0.5, 8), frame, 0.1, 0.05, 0.05, 0, 0.6, Math.PI / 2);
+    add(g, gCyl(0.012, 0.012, 0.45, 8), M.chrome, 0.5, 0.06, 0.2, Math.PI / 2, 0, 0.3);
+  },
+  fishing_rod(g) {
+    // two-piece rod lying down: cork grip, reel, thin blank, tip guide
+    const H = Math.PI / 2;
+    add(g, gCyl(0.012, 0.014, 0.2, 10), col(0xb8875a, 0.85), 0.42, 0.014, 0, 0, 0, H);
+    add(g, gCyl(0.004, 0.009, 0.72, 8), col(0x1f3b5a, 0.35, 0.2), 0.22, 0.014, 0, 0, 0, H);
+    add(g, gCyl(0.028, 0.028, 0.03, 14), col(0x2b2d30, 0.4, 0.4), 0.31, 0.03, 0, 0, 0, 0);
+    add(g, gCyl(0.02, 0.02, 0.032, 12), M.chrome, 0.31, 0.03, 0, 0, 0, 0);
+    for (const x of [0.05, -0.15, -0.33]) add(g, gTorus(0.008, 0.0015, 4, 10), M.chrome, x, 0.026, 0, 0, H, 0);
+  },
+  fishing_line(g) {
+    // small clear tackle box with a spool of line and a card of hooks
+    add(g, gRBox(0.12, 0.03, 0.08, 0.008), mat('tackle', { color: 0x9fc6d8, roughness: 0.2, transparent: true, opacity: 0.55 }));
+    add(g, gCyl(0.025, 0.025, 0.02, 14), col(0x3fae6a, 0.4), -0.025, 0.004, 0);
+    add(g, gBox(0.035, 0.002, 0.05), col(0xe8e4da, 0.8), 0.03, 0.006, 0);
+  },
+  bow(g) {
+    // recurve bow lying flat, with its string (built upright, then laid down)
+    const R = 0.55, arc = Math.PI * 0.62, half = arc / 2;
+    const ex = R * Math.sin(half), ey = R * Math.cos(half);
+    const b = new THREE.Group();
+    add(b, gTorus(R, 0.012, 6, 24, arc), col(0x6b4325, 0.55), 0, 0, 0, 0, 0, Math.PI / 2 - half);
+    add(b, gBox(0.12, 0.03, 0.03), col(0x2b2b2b, 0.8), -0.06, R - 0.015, -0.015);
+    add(b, gCyl(0.0015, 0.0015, ex * 2, 4), col(0xe8e2d0, 0.9), ex, ey, 0, 0, 0, Math.PI / 2);
+    b.rotation.x = -Math.PI / 2;
+    b.position.set(0, 0.012, (R + ey) / 2);
+    g.add(b);
+  },
+  arrows(g) {
+    // six arrows in a bundle, with a band
+    for (let i = 0; i < 6; i++) {
+      const z = (i - 2.5) * 0.012;
+      add(g, gCyl(0.004, 0.004, 0.7, 6), col(0x8a6a44, 0.6), 0.35, 0.005 + (i % 2) * 0.006, z, 0, 0, Math.PI / 2);
+      add(g, gBox(0.07, 0.012, 0.002), col(i % 3 ? 0xe2c23a : 0xd8d8d8, 0.8), 0.31, 0.012 + (i % 2) * 0.006, z);
+      add(g, gCyl(0.0, 0.006, 0.03, 6), M.steel, -0.35, 0.005 + (i % 2) * 0.006, z, 0, 0, Math.PI / 2);
+    }
+    add(g, gBox(0.012, 0.02, 0.08), col(0x2b2b2b, 0.8), 0, 0, 0);
+  },
+  rifle(g) {
+    // stylized hunting rifle lying on its side: wood stock, dark barrel and scope
+    const wood = col(0x7a4a28, 0.5);
+    add(g, gRBox(0.42, 0.035, 0.11, 0.02), wood, 0.2, 0, 0);
+    add(g, gRBox(0.24, 0.03, 0.05, 0.012), wood, -0.12, 0.005, 0.02);
+    add(g, gCyl(0.011, 0.011, 0.55, 10), col(0x232528, 0.35, 0.5), 0.0, 0.03, 0.035, 0, 0, Math.PI / 2);
+    add(g, gCyl(0.018, 0.018, 0.24, 12), col(0x1a1b1d, 0.35, 0.4), 0.18, 0.03, 0.0, 0, 0, Math.PI / 2);
+  },
+  rifle_rounds(g) {
+    // small card box of rounds (made-up label)
+    add(g, gBox(0.1, 0.035, 0.07), col(0x3d5a2a, 0.75));
+    add(g, gBox(0.08, 0.002, 0.05), tmat(frontTex({ t: 'RIFLE ROUNDS', s: '20 CT  HUNTING', n: 'KEEP AWAY FROM CHILDREN', b: '#e9dfc2', f: '#2a2a2a', a: '#3d5a2a' }, 256, 160), 0.7), 0, 0.035, 0);
+  },
+  snare_wire(g) {
+    // a coil of thin wire
+    const wire = col(0xa9a39a, 0.35, 0.6);
+    for (let i = 0; i < 4; i++) add(g, gTorus(0.05 - i * 0.002, 0.0018, 4, 20), wire, 0, 0.003 + i * 0.003, 0, Math.PI / 2, 0, 0);
+  },
   generator(g) {
     // small open-frame generator: tube frame, tank, engine, panel
     const frame = col(0x2a2a2c, 0.45, 0.3);
@@ -3636,6 +3734,106 @@ const HOUSE_PROPS = {
   },
 };
 Object.assign(PROP_BUILDERS, HOUSE_PROPS);
+// Home projects (src/engine/interior.js HOME_PROJECT_SLOTS): clean, new-built look.
+// Each fits its slot box (w x d x h, origin at the bottom center, front toward +z).
+const HOME_PROPS = {
+  proj_wood_stove(g) {
+    const iron = col(0x2a2c30, 0.55, 0.35);
+    add(g, gRBox(0.7, 0.62, 0.55, 0.05), iron, 0, 0.12, 0);
+    for (const x of [-0.28, 0.28]) for (const z of [-0.2, 0.2]) add(g, gCyl(0.03, 0.035, 0.12, 8), iron, x, 0, z);
+    add(g, gBox(0.36, 0.26, 0.02), mat('stoveglass', { color: 0x3a1a0a, emissive: 0xc8501a, emissiveIntensity: 0.9, roughness: 0.2 }), 0, 0.28, 0.28);
+    add(g, gBox(0.44, 0.34, 0.02), col(0x18191b, 0.4, 0.5), 0, 0.24, 0.275);
+    add(g, gCyl(0.075, 0.075, 0.9, 14, true), iron, 0, 0.74, -0.1);
+    add(g, gBox(0.9, 0.02, 0.9), col(0x8a5a3a, 0.8), 0, 0, 0); // hearth board
+  },
+  proj_insulate_living(g) {
+    // foil-faced foam panels on the wall, taped seams
+    const foil = mat('foilpanel', { color: 0xd8d4c4, roughness: 0.45, metalness: 0.35 });
+    for (let i = 0; i < 4; i++) add(g, gBox(0.72, 2.1, 0.06), foil, -1.11 + i * 0.74, 0.05, 0);
+    for (let i = 0; i < 3; i++) add(g, gBox(0.06, 2.1, 0.065), col(0x9aa0a6, 0.6), -0.74 + i * 0.74, 0.05, 0.001);
+    add(g, gBox(3.0, 0.08, 0.1), col(0xe8e2d4, 0.8), 0, 0, 0.01);
+  },
+  proj_led_lights(g) {
+    // LED strip in a channel on the ceiling, wire to the wall
+    add(g, gBox(1.4, 0.03, 0.08), col(0xe8e8e4, 0.4), 0, -0.03, 0);
+    add(g, gBox(1.34, 0.008, 0.05), mat('ledstrip', { color: 0xfff1d6, emissive: 0xffe2b0, emissiveIntensity: 1.2, roughness: 0.3 }), 0, -0.038, 0);
+    add(g, gBox(0.01, 0.01, 1.2), col(0x1d1e20, 0.5), 0.7, -0.01, -0.6);
+  },
+  proj_filter_station(g) {
+    // two stacked buckets with a spigot on a wood stand
+    const wood = col(0xb08458, 0.8);
+    add(g, gBox(0.6, 0.6, 0.5), wood, 0, 0, 0);
+    const blue = col(0x2a6fd6, 0.45);
+    add(g, gCyl(0.17, 0.15, 0.36, 18), col(0xecebe6, 0.45), 0, 0.6, 0);
+    add(g, gCyl(0.17, 0.15, 0.36, 18), blue, 0, 0.98, 0);
+    add(g, gCyl(0.18, 0.18, 0.03, 18), blue, 0, 1.33, 0);
+    add(g, gCyl(0.015, 0.015, 0.06, 8), M.chrome, 0, 0.68, 0.17, Math.PI / 2, 0, 0);
+    add(g, gBox(0.18, 0.1, 0.002), tmat(frontTex({ t: 'CLEAN', s: 'FILTERED WATER', b: '#f4f1ea', f: '#1d4f9a', a: '#2a6fd6' }, 256, 128), 0.6), 0, 1.1, 0.172);
+  },
+  proj_sealed_store(g) {
+    // three lidded metal bins
+    const tin = col(0xb8bcc0, 0.35, 0.6);
+    for (let i = 0; i < 3; i++) {
+      const x = -0.33 + i * 0.33;
+      add(g, gCyl(0.15, 0.14, 0.5, 18), tin, x, 0, 0);
+      add(g, gCyl(0.16, 0.16, 0.04, 18), col(0x9aa0a6, 0.35, 0.6), x, 0.5, 0);
+      add(g, gTorus(0.04, 0.008, 4, 10), M.darkMetal, x, 0.56, 0, Math.PI / 2);
+    }
+    add(g, gBox(0.2, 0.08, 0.002), tmat(frontTex({ t: 'RICE · BEANS', s: 'SEALED', b: '#f4f1ea', f: '#111', a: '#c4221c' }, 256, 96), 0.6), 0, 0.3, 0.151);
+  },
+  proj_rocket_stove(g) {
+    // a metal bin rocket stove with an L-shaped feed tube and a pot rest
+    const steel = col(0x6a6d72, 0.5, 0.5);
+    add(g, gCyl(0.2, 0.2, 0.5, 18), steel, 0, 0, 0);
+    add(g, gBox(0.14, 0.14, 0.3), M.darkMetal, 0, 0.08, 0.28);
+    add(g, gCyl(0.07, 0.07, 0.12, 12, true), M.darkMetal, 0, 0.5, 0);
+    for (let i = 0; i < 3; i++) add(g, gBox(0.03, 0.04, 0.24), steel, Math.cos(i * 2.1) * 0.06, 0.6, Math.sin(i * 2.1) * 0.06, 0, i * 2.1, 0);
+    for (let i = 0; i < 4; i++) add(g, gBox(0.3, 0.05, 0.05), col(0x9a7a58, 0.8), 0.32, 0.02 + i * 0.05, -0.1 + (i % 2) * 0.08, 0, 0.3 * i, 0); // scrap wood
+  },
+  proj_rain_barrels(g) {
+    const blue = col(0x2a5ab8, 0.5);
+    for (const x of [-0.36, 0.36]) {
+      add(g, gCyl(0.29, 0.29, 0.95, 20), blue, x, 0.12, 0);
+      for (const y of [0.35, 0.8]) add(g, gTorus(0.292, 0.012, 4, 24), col(0x1f4a9a, 0.5), x, 0.12 + y, 0, Math.PI / 2);
+      add(g, gCyl(0.02, 0.02, 0.08, 8), M.brass, x, 0.25, 0.3, Math.PI / 2, 0, 0);
+    }
+    add(g, gBox(1.4, 0.12, 0.62), col(0x8a7a64, 0.9), 0, 0, 0); // cinder block base
+    add(g, gCyl(0.025, 0.025, 0.72, 8), col(0xe8e8e4, 0.5), 0, 0.95, 0, 0, 0, Math.PI / 2);
+  },
+  proj_second_battery(g) {
+    const w = col(0xe8e8e4, 0.4);
+    add(g, gRBox(0.5, 0.7, 0.16, 0.03), w, 0, 0.05, 0);
+    for (let i = 0; i < 5; i++) add(g, gBox(0.04, 0.008, 0.002), mat('ledg' + i, { color: 0x2fd65a, emissive: 0x0a4a1a, roughness: 0.3 }), -0.12 + i * 0.06, 0.65, 0.082);
+    add(g, gBox(0.2, 0.12, 0.002), tmat(frontTex({ t: 'BATTERY 2', s: 'LiFePO4  5 kWh', b: '#f4f1ea', f: '#111', a: '#2a6fd6' }, 256, 160), 0.5), 0, 0.4, 0.081);
+    add(g, gBox(0.02, 0.6, 0.02), col(0x1d1e20, 0.5), -0.3, 0.2, 0);
+  },
+  proj_home_battery(g) {
+    const w = col(0xdedfdc, 0.4);
+    add(g, gRBox(0.5, 0.7, 0.16, 0.03), w);
+    for (let i = 0; i < 5; i++) add(g, gBox(0.04, 0.008, 0.002), mat('ledh' + i, { color: i < 3 ? 0x2fd65a : 0x1a3a22, emissive: i < 3 ? 0x0a4a1a : 0, roughness: 0.3 }), -0.12 + i * 0.06, 0.6, 0.082);
+    add(g, gBox(0.2, 0.12, 0.002), tmat(frontTex({ t: 'HOME BATTERY', s: 'SOLAR  13.5 kWh', b: '#f4f1ea', f: '#111', a: '#e0a41e' }, 256, 160), 0.5), 0, 0.35, 0.081);
+  },
+  proj_sick_room(g) {
+    // a clean cot under a plastic sheet tent, a bucket and a bleach jug
+    const pipe = col(0xd8d8d4, 0.4, 0.3);
+    for (const x of [-0.45, 0.45]) for (const z of [-0.4, 0.4]) add(g, gCyl(0.015, 0.015, 1.9, 8), pipe, x, 0, z);
+    add(g, gBox(0.92, 1.8, 0.004), M.clearPl, 0, 0.05, 0.42);
+    add(g, gBox(0.004, 1.8, 0.82), M.clearPl, -0.46, 0.05, 0);
+    add(g, gBox(0.6, 0.35, 0.8), col(0x5a6a4a, 0.8), 0.1, 0, -0.02);
+    add(g, gBox(0.56, 0.06, 0.76), col(0xf0f0ea, 0.9), 0.1, 0.35, -0.02);
+    add(g, gCyl(0.1, 0.09, 0.22, 14), col(0xecebe6, 0.45), -0.3, 0, 0.25);
+  },
+  proj_med_cabinet(g) {
+    // wall cabinet with a green first-aid cross (never a red cross) and a small padlock
+    add(g, gBox(0.6, 0.8, 0.28), col(0xf2f0ea, 0.5), 0, 0, 0);
+    add(g, gBox(0.58, 0.78, 0.01), col(0xe8e6e0, 0.45), 0, 0.01, 0.14);
+    add(g, gBox(0.2, 0.06, 0.004), col(0x2f8a4a, 0.5), 0, 0.42, 0.147);
+    add(g, gBox(0.06, 0.2, 0.004), col(0x2f8a4a, 0.5), 0, 0.35, 0.147);
+    add(g, gBox(0.05, 0.06, 0.03), M.brass, 0.24, 0.35, 0.16);
+  },
+};
+Object.assign(PROP_BUILDERS, HOME_PROPS);
+
 const WALL_PROPS = new Set(['wall_frame', 'wall_clock', 'curtain']);
 export const PROP_KINDS = Object.keys(PROP_BUILDERS);
 const FLAT_PROPS = new Set(['rug', 'paper_scatter', 'glass_shards']);

@@ -7,7 +7,7 @@ import {
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
 import { forceOpts, listActions, itemUses, hereBag, locationLabel, searchMinutes, zonesDoneList, quickChoice, buildingItems, openedContainers } from '../engine/actions.js';
-import { buildInterior } from '../engine/interior.js';
+import { buildInterior, buildHome } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
 import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js';
@@ -30,6 +30,12 @@ import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
 import { PROJECTS } from '../data/projects.js';
 import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostics.js';
+import { homeHeat } from '../engine/home.js';
+import { gardenInfo, canPlant } from '../engine/garden.js';
+import { CROPS } from '../data/crops.js';
+import { SALVAGE } from '../data/salvage.js';
+import { SPOTS, GAME } from '../data/wild.js';
+import { gameHere } from '../engine/wild.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
@@ -77,10 +83,11 @@ export async function start() {
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
-    + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span>'
+    + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span>'
+    + '<span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
-    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
+    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
     window.__llMap = mapApi.map; // for tests
     const showCoords = () => {
       const c = mapApi.map.getCenter();
@@ -168,10 +175,27 @@ function outlookHtml() {
 }
 
 // A walk: time, energy, finish time, the 5 AM change and the weather on the way.
+// Reasons not to go on a long trip now (over 2 miles, or arriving in the dark). Shown in the popup above Walk here.
+function tripRisks(t) {
+  const p = state.player;
+  if (!(t.miles > 2 || t.darkOnArrival)) return [];
+  const water = (state.carried.water_bottle || 0);
+  return [
+    p.health < 50 && 'your health is low',
+    p.injuries.some((i) => !i.bandaged) && 'a wound is not bandaged',
+    p.illness?.infection && 'an infection is not treated',
+    water < 0.5 && 'you carry less than 2 qt of water',
+    t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && 'it will be dark and you have no light',
+    p.energy < 30 && 'you are very tired',
+    p.warmth < 40 && 'you are cold',
+  ].filter(Boolean);
+}
+
 function tripHtml(dest) {
   const t = tripPreview(state, dest);
+  const risks = tripRisks(t);
   const fx = t.weather.effects.filter((e) => e.level !== 'ok').map((e) => esc(e.text)).join('<br>');
-  return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
+  return `${risks.length ? `<p class="warn-line">⚠ Think first: ${esc(risks.join('; '))}.</p>` : ''}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
     + `${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(', ')}</small></p>` : ''}${fx ? `<p class="wx-trip"><small>${fx}</small></p>` : ''}`;
 }
 
@@ -225,7 +249,9 @@ function goalsHtml() {
   const free = MAX_GOALS - g.picked.length;
   const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : '';
   const empty = g.picked.length ? '' : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
-  return `<details class="goals"${goalsOpen ? ' open' : ''}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+  // Until you pick your first goal, the section is open and has a badge, so the new board is not missed.
+  const fresh = !g.picked.length;
+  return `<details class="goals"${goalsOpen || fresh ? ' open' : ''}><summary>Legacy${fresh ? ' <span class="badge-new">New</span>' : ''}</summary>${empty}${rows}${choose}</details>`;
 }
 
 function showGoalBoard() {
@@ -294,6 +320,8 @@ function renderLocation() {
     const p = getPlace(loc.id);
     sub = CATEGORIES[p.cat].label;
   } else if (loc.kind === 'home') sub = 'Your house. One story, a fireplace, solar panels and a home battery.';
+  else if (loc.kind === 'wild') sub = wildSub(SPOTS[loc.id]);
+  else if (loc.kind === 'car') sub = 'An abandoned car at the curb. Zoom in on the map to find more.';
   else sub = 'A house. Search it room by room.';
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
@@ -315,14 +343,14 @@ function itemRow(id, q, from, buttons) {
 }
 
 function useButtons(id, from) {
-  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join('');
+  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}${u.verb === 'salvage' && u.note ? ` <small>${esc(u.note)}</small>` : ''}</button>`).join('');
 }
 
 // Auto-sort: items in groups by kind, then by name.
 const KIND_GROUPS = [
   ['Food', ['food', 'dogfood']], ['Water', ['drink']], ['Medicine', ['med']],
   ['Light and tools', ['tool', 'batteries']], ['Clothes', ['wear']],
-  ['Fuel and parts', ['fuel', 'part']], ['Books', ['book']], ['Other', ['misc', 'comfort', 'warm']],
+  ['Fuel and parts', ['fuel', 'part', 'junk']], ['Books', ['book']], ['Other', ['misc', 'comfort', 'warm']],
 ];
 function groupOf(id) {
   const k = ITEMS[id] ? ITEMS[id].kind : 'misc';
@@ -389,6 +417,8 @@ function renderHome() {
       ${built(state, 'filter_station') ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ''}
       <span>Kitchen tap</span><b>${h.tapWorks ? 'weak flow' : 'stopped'}</b>
     </div>
+    ${renderHeat(atHome)}
+    ${renderGarden(atHome)}
     ${renderBase()}`;
 }
 
@@ -410,7 +440,14 @@ function renderBase() {
     for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
     for (const t of st.tools) if (!t.have) need[t.id] = 1;
   }
-  const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} ×${q}</span>`).join('');
+  // Where you left needed parts behind (pack was full): up to two places by name.
+  const leftAt = (id) => {
+    const at = [];
+    for (const [pid, ps] of Object.entries(state.places || {})) if ((ps.leftovers?.[id] || 0) > 0) at.push(getPlace(pid)?.name || 'a store');
+    for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || 'a house');
+    return at.length ? ` · left at ${at.slice(0, 2).join(', ')}${at.length > 2 ? ` +${at.length - 2}` : ''}` : '';
+  };
+  const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} ×${q}${esc(leftAt(id))}</span>`).join('');
   return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${(done / PROJECTS.length) * 100}%"></i></div>
@@ -446,6 +483,7 @@ function renderDog() {
   if (d.stage === 'joined') {
     const bar = (label, v) => `<div class="stat ${v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok'}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
     html = `<h3>${esc(d.name)} <small>${d.withPlayer ? 'with you' : 'at home'}</small></h3>${bar('Food', d.food)}${bar('Health', d.health)}${bar('Bond', d.bond)}
+      ${d.sick ? `<p class="warn-line">⚠ ${esc(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ''}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
   } else if (d.stage === 'visiting') {
     html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
@@ -473,12 +511,22 @@ function showPlacePopup(id, lngLat) {
     const atHome = state.location.kind === 'home';
     html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
       : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+  } else if (id.startsWith('wild:')) {
+    const sid = id.slice(5);
+    const sp = SPOTS[sid];
+    pos = sp;
+    const here = state.location.kind === 'wild' && state.location.id === sid;
+    const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
+    html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === 'fish' ? 'Fishing' : 'Hunting'} · ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      ${here ? '<p><i>You are here.</i></p>' : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
   } else {
     const p = getPlace(id);
     pos = p;
     const cat = CATEGORIES[p.cat];
     const ps = state.places[p.id];
-    const status = !ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched: nothing left' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
+    const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+    const status = (!ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched all of it' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`)
+      + (left > 0 ? ` · items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ': nothing left' : '');
     const here = state.location.kind === 'place' && state.location.id === id;
     const fromHome = straightMiles(homeOf(state), p).toFixed(1);
     html = `<h4>${esc(p.name)}</h4><p>${cat.label} · ${fromHome} mi from home</p><p><i>${status}</i></p>
@@ -492,16 +540,50 @@ function showPlacePopup(id, lngLat) {
     popup.remove();
     travelTo(e.currentTarget.dataset.goplace);
   });
+  el.querySelector('[data-gowild]')?.addEventListener('click', (e) => {
+    popup.remove();
+    travelTo(`wild:${e.currentTarget.dataset.gowild}`);
+  });
   el.querySelector('[data-gohome]')?.addEventListener('click', () => {
     popup.remove();
     travelTo('__home');
   });
 }
 
+// One line on what lives at a fishing or hunting spot (now, when you stand there).
+function wildSub(sp) {
+  if (!sp) return '';
+  if (sp.kind === 'fish') return `Fish here: ${sp.fish.join(', ')}.${sp.run ? ` A ${sp.run.fish} run comes in some months.` : ''}`;
+  const here = state.location.kind === 'wild' && SPOTS[state.location.id] === sp;
+  const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
+  return `Game here${here ? ' now' : ''}: ${now.length ? now.join(', ') : 'none this time of year'}.`;
+}
+
+// An abandoned car on the map (zoom 14+): what is left to do there, and Walk here.
+function showCarPopup(id, lat, lon, lngLat) {
+  if (!state || !mapApi || picking) return;
+  if (popup) popup.remove();
+  const c = state.cars?.[id] || {};
+  const here = state.location.kind === 'car' && state.location.id === id;
+  const left = [!c.searched && 'glovebox and trunk', !c.siphoned && 'gas tank', !c.battery && 'battery', !c.wire && 'wire'].filter(Boolean);
+  const html = `<h4>Abandoned car</h4><p>Dust and leaves cover the glass.</p><p><i>${left.length ? `Not done: ${left.join(', ')}` : 'Nothing left to take'}</i></p>
+    ${here ? '<p><i>You are here.</i></p>' : `${tripHtml({ lat, lon })}<button class="go" data-gocar="1">Walk here</button>`}`;
+  popup = new window.maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(lngLat || [lon, lat]).setHTML(html).addTo(mapApi.map);
+  popup.getElement().querySelector('[data-gocar]')?.addEventListener('click', () => {
+    popup.remove();
+    travelTo(`car:${id}|${lat}|${lon}`);
+  });
+}
+
+// Test hook: open the car popup from a street-detail car id (tests can't click map tiles offline).
+if (typeof window !== 'undefined') window.__llShowCar = (id, lat, lon) => showCarPopup(id, lat, lon, null);
+
 function travelTo(id) {
   if (state.dead) return;
   if (state.location.kind === 'house') perform(state, 'action', 'leave_house');
   if (id === '__home') perform(state, 'action', 'go_home');
+  else if (id.startsWith('wild:')) perform(state, 'action', 'go_spot', id.slice(5));
+  else if (id.startsWith('car:')) perform(state, 'action', 'go_car', id.slice(4));
   else perform(state, 'action', 'go_place', id);
   if (state.dead) recordRun(state);
   commit(true);
@@ -536,12 +618,30 @@ function showIntro() {
   });
 }
 
+// Food, water and warmth after a sleep of h hours: try it on a copy of the game.
+function sleepPreview(h) {
+  try {
+    const copy = structuredClone(state);
+    copy.log = [];
+    perform(copy, 'action', 'sleep', h);
+    const p = copy.player;
+    return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
+  } catch { return null; }
+}
+
 function showSleep() {
+  const p = state.player;
+  const prev = {};
   const opts = [1, 2, 4, 6, 8, 10].map((h) => {
     const a = actionTiming(state, h * 60);
-    return `<button data-hours="${h}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}</small></button>`;
+    const f = (prev[h] = sleepPreview(h));
+    const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
+    const warn = !f ? '' : f.dead ? ' · you may not wake' : low ? ` · wake ${[f.water < 15 && 'very thirsty', f.food < 15 && 'starving', f.warmth < 15 && 'freezing'].filter(Boolean).join(', ')}` : '';
+    return `<button data-hours="${h}" class="${low ? 'risky' : ''}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}${esc(warn)}</small></button>`;
   }).join('');
-  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+  const need = [p.water < 40 && 'Drink first: you are thirsty.', p.food < 40 && 'Eat first: you are hungry.', p.warmth < 40 && 'Get warm first: you are cold.'].filter(Boolean);
+  const now = `<p class="hint">Now: Food ${Math.round(p.food)} · Water ${Math.round(p.water)} · Warmth ${Math.round(p.warmth)} · Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">⚠ ${esc(need.join(' '))}</p>` : ''}`;
+  modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
     m.querySelectorAll('[data-hours]').forEach((b) => b.addEventListener('click', () => {
       closeModal();
       act('action', 'sleep', Number(b.dataset.hours));
@@ -849,6 +949,14 @@ async function walkInside() {
     stock = cat.stock;
     title = loc.label;
     zoneName = 'room';
+  } else if (loc.kind === 'home') {
+    // Your home: no loot to search; built projects stand in their rooms (interior.js buildHome).
+    cat = { label: 'Home base' };
+    plan = buildHome((id) => built(state, id));
+    zoneList = () => [];
+    stock = 1;
+    title = 'Home (Aloha)';
+    zoneName = 'room';
   } else return;
   const env = environment(state, 'work');
   const night = isNight(state.time);
@@ -907,8 +1015,12 @@ async function walkInside() {
       return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
     },
+    projectInfo: (id) => homeProjectText(state, id, true),
+    // Lamps at home: LED lights need the project built and charge in the battery.
+    homeLamps: loc.kind === 'home' ? { led: built(state, 'led_lights') && state.home.battery > 0.2, candles: state.home.storage.candles || 0 } : null,
     describe: (n) => {
-      if (n.type === 'exit') return '<kbd>E</kbd> Leave the building <small>back to the map</small>';
+      if (n.type === 'exit') return loc.kind === 'home' ? '<kbd>E</kbd> Back to the home panel' : '<kbd>E</kbd> Leave the building <small>back to the map</small>';
+      if (n.type === 'project') return homeProjectText(state, n.id, false);
       if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? ' <kbd>F</kbd> Take all' : ''}`;
       if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
         return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, 'pry_bar') ? 'pry bar: sure to work' : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
@@ -939,7 +1051,7 @@ async function walkInside() {
       const msgs = state.log.slice(n0).filter((e) => e.kind !== 'info' || !ok).map((e) => e.text).join(' ');
       return { ok, name: it ? itemName(it.item) : '', msg: msgs };
     },
-    onSeeZone: (zone) => { perform(state, 'action', 'see_zone', zone); saveGame(state); },
+    onSeeZone: (zone) => { if (loc.kind === 'home') return; perform(state, 'action', 'see_zone', zone); saveGame(state); },
     isOpened: (cid) => openedContainers(state).includes(cid),
     notice: () => noticeOf(state),
     onOpenContainer: (cid) => {
@@ -955,6 +1067,7 @@ async function walkInside() {
       const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
       return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
         + (need ? `<span class="need">Needed: ${esc(need)}</span>` : '')
+        + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : '')
         + (near > 1 ? `<small class="more">Hold ${touch ? 'USE' : 'E'}: take all ${near} in reach</small>` : '');
     },
     onSearch: (zone) => {
@@ -1081,6 +1194,12 @@ function bindEvents() {
     else if (b.dataset.drop) act('drop', b.dataset.drop);
     else if (b.dataset.build) act('action', 'build', b.dataset.build);
     else if (b.dataset.goalboard) showGoalBoard();
+    else if (b.dataset.garden) {
+      const [what, crop] = b.dataset.garden.split(':');
+      act('action', `garden_${what}`, crop);
+    } else if (b.dataset.sleepspot) act('action', 'sleep_spot', b.dataset.sleepspot);
+    else if (b.dataset.board) act('action', 'board_window', b.dataset.board);
+    else if (b.dataset.door) act('action', 'door', b.dataset.door);
     else if (b.dataset.goaldrop) {
       const why = dropGoal(state, b.dataset.goaldrop);
       if (why) alert(why); else commit();
@@ -1110,4 +1229,97 @@ function diagText(state) {
     `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? '?' : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? '  deep log on' : ''}`,
     ...d.activity.slice(-3).flatMap((r) => activityText(r).split('\n').slice(0, 6)),
   ];
+}
+
+// What you see when you look at a home project in the 3D view: built (what it does) or not
+// (what it still needs). long: the E text with every part.
+function homeProjectText(state, id, long) {
+  if (id === 'home_battery') {
+    const h = state.home;
+    const txt = `${h.battery.toFixed(1)} / ${h.batteryMax} kWh · charged by the solar panels`;
+    return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
+  }
+  const proj = PROJECTS.find((p) => p.id === id);
+  if (!proj) return '';
+  const st = projectStatus(state, proj);
+  if (st.built) return long ? `${proj.name}: built. ${proj.effect || ''}` : `${esc(proj.name)} <small>built · ${esc(proj.effect || '')}</small>`;
+  const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(', ');
+  const tools = st.tools.length ? ` · tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? '' : ' (missing)')).join(', ')}` : '';
+  const req = st.missingReq.length ? ` · build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(', ')}` : '';
+  if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
+  return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} · <kbd>E</kbd> details</small>`;
+}
+
+// Heat path (engine home.js homeHeat): where the heat comes from, each room's temperature,
+// what lets it out, and where you sleep.
+function renderHeat(atHome) {
+  const hh = homeHeat(state);
+  const src = [];
+  if (hh.sources.fireHours > 0) src.push(`${hh.sources.stove ? 'Wood stove' : 'Fireplace'} (${formatDuration(hh.sources.fireHours * 60)} left)`);
+  if (hh.sources.heater) src.push('Electric heater');
+  const tcls = (t) => (t < 40 ? 'bad' : t < 55 ? 'warn' : 'ok');
+  const rows = hh.rooms.map((r) => {
+    const leaks = [];
+    if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? 's' : ''}`);
+    if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
+    if (r.id === 'living' && hh.insulated) leaks.push('insulated');
+    const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? '' : 'disabled'} title="1 scrap wood, 30 min">Board up a window</button>` : '';
+    const door = r.doorClosed == null ? '' : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? '' : 'disabled'}>${r.doorClosed ? 'Open door' : 'Close door'}</button>`;
+    const bed = r.id === 'bedroom' || r.id === 'living'
+      ? (hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? '' : 'disabled'}>Sleep here</button>`)
+      : '';
+    const w = Math.max(4, Math.min(100, ((r.temp - 20) / 50) * 100));
+    return `<div class="heat-row">
+      <span class="hn">${esc(r.label)}</span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <b class="${tcls(r.temp)}">${Math.round(r.temp)}°F</b>
+      <small>${esc(leaks.join(' · ') || 'closed up')}${r.loss > 1.05 ? ` · draft ×${r.loss.toFixed(1)}` : ''}</small>
+      <span class="hb">${board}${door}${bed}</span>
+    </div>`;
+  }).join('');
+  return `<div class="heat">
+    <h3>Heat <small>outside ${hh.outside}°F</small></h3>
+    <p class="sub">Heat from: ${src.length ? esc(src.join(', ')) : 'nothing now (light a fire or turn on the heater)'} → living room → rooms with open doors. Closed doors keep a room's heat in or out.</p>
+    ${rows}
+  </div>`;
+}
+
+// Garden (engine garden.js): beds, what grows, and what you can sow this month.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// [1,2,3,6,7,8] -> "Feb–Apr, Jul–Sep"
+function monthsText(list) {
+  const m = [...list].sort((a, b) => a - b);
+  const runs = [];
+  for (const x of m) { const r = runs[runs.length - 1]; if (r && x === r[1] + 1) r[1] = x; else runs.push([x, x]); }
+  return runs.map(([a, b]) => (a === b ? MONTHS[a] : `${MONTHS[a]}–${MONTHS[b]}`)).join(', ');
+}
+
+function renderGarden(atHome) {
+  const g = gardenInfo(state);
+  if (!g.beds) return '';
+  const beds = [];
+  for (let i = 0; i < g.beds; i++) {
+    const b = g.planted[i];
+    if (!b) { beds.push('<div class="bed empty"><span>Empty bed</span></div>'); continue; }
+    const stage = { seedling: 'seedlings', growing: 'growing', nearly: 'nearly ready', ready: 'ready to harvest', dead: 'dead' }[b.stage] || b.stage;
+    beds.push(`<div class="bed ${b.dead ? 'dead' : b.ready ? 'ready' : ''}"><b>${esc(b.name)}</b> <span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? '' : `${b.growth}% grown · about ${Math.max(1, Math.round((CROPS[b.crop].days * (100 - b.growth)) / 100))} days left if warm · `}water ${b.water}%</small></div>`);
+  }
+  const sow = g.canSow.map((id) => {
+    const why = canPlant(state, id);
+    return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? '' : 'disabled'} title="${esc(why || '')}">Sow ${esc(CROPS[id].name.toLowerCase())}</button>`;
+  }).join('');
+  const any = g.planted.some((b) => !b.dead && !b.ready);
+  const ripe = g.planted.some((b) => b.ready);
+  return `<div class="garden">
+    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <div class="beds">${beds.join('')}</div>
+    <div class="row">
+      ${any ? `<button class="small" data-garden="water" ${atHome ? '' : 'disabled'}>Water the beds (15 min)</button>` : ''}
+      ${ripe ? `<button class="small primary" data-garden="harvest" ${atHome ? '' : 'disabled'}>Harvest (30 min)</button>` : ''}
+    </div>
+    <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : 'Nothing to sow this month.'}</p>
+    <div class="row">${sow}</div>
+    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(' · ')}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
+  </div>`;
 }

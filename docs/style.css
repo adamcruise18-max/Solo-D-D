@@ -246,7 +246,8 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   .legend, .coords { display: none; }
   .hud { top: 50px; left: 10px; transform: none; font-size: 12px; max-width: calc(100% - 20px); }
   .hud span { padding: 6px 8px; }
-  .hud .h-alert, .hud .h-season { display: none; }
+  .hud .h-season, .hud .h-wx { display: none; }
+  .hud { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .marker-you i, .marker-home.here span, .hud .h-alert { animation: none; }
@@ -304,7 +305,7 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 #inside .hint { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
 #inside button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 #inside .in-toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); max-width: min(520px, calc(100% - 32px)); padding: 8px 14px; background: var(--glass); border: 1px solid var(--line-2); text-align: center; pointer-events: none; }
-#inside .in-help { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12px; color: var(--dim); white-space: nowrap; pointer-events: none; }
+#inside .in-help { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12px; color: #d6dde4; background: rgba(8,12,16,.62); padding: 4px 10px; border-radius: 3px; text-shadow: 0 1px 2px #000; white-space: nowrap; pointer-events: none; }
 #inside .in-pause { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 9, 13, .6); }
 #inside .in-pause[hidden], #inside [hidden] { display: none; }
 #inside .in-pause .box { padding: 18px 20px; display: grid; gap: 8px; min-width: 260px; max-width: calc(100% - 32px); }
@@ -447,3 +448,29 @@ details.goals > summary { cursor: pointer; font-size: 12px; letter-spacing: .12e
 .gb { max-height: 60vh; overflow-y: auto; }
 ul.epilogue { padding-left: 18px; }
 ul.epilogue li { margin: 6px 0; }
+
+/* ---------- heat path and garden (home panel) ---------- */
+.heat, .garden { margin-top: 12px; }
+.heat-row { display: grid; grid-template-columns: 7.5em 1fr 3.2em; gap: 2px 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #1b252f; }
+.heat-row small { grid-column: 1 / -1; color: var(--muted, #8a97a3); }
+.heat-row .hb { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.hbar { height: 6px; background: #1b252f; position: relative; display: block; }
+.hbar i { position: absolute; inset: 0 auto 0 0; background: #6fd3e6; }
+.hbar i.warn, b.warn { background: #e0a41e; color: #e0a41e; }
+.hbar i.bad, b.bad { background: #e05a4a; color: #e05a4a; }
+b.ok, b.warn, b.bad { background: none; }
+.beds { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 6px 0; }
+.bed { border: 1px solid #24313c; padding: 6px 8px; display: grid; gap: 3px; font-size: 13px; }
+.bed.empty { color: var(--muted, #8a97a3); border-style: dashed; }
+.bed.ready { border-color: #5fbf6a; }
+.bed.dead { opacity: .6; }
+.garden .row, .heat .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+/* Fishing and hunting spots on the map */
+.marker-wild { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 system-ui, sans-serif; cursor: pointer; border: 2px solid #0d1218; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.marker-wild.fish { background: #4aa3d8; color: #0d1218; }
+.marker-wild.hunt { background: #7fae5a; color: #0d1218; }
+/* Sleep dialog and trip warnings */
+.warn-line { color: #e3b04b; margin: 6px 0; font-size: 13px; }
+#modal .row button.risky { border-color: #c96a3a; }
+#modal .row button.risky small { color: #e3a06b; }
+.badge-new { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #2a2205; background: #e3b04b; border-radius: 2px; vertical-align: middle; }

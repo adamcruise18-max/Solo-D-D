@@ -4,7 +4,7 @@
 
 export const CATEGORIES = {
   supermarket: {
-    label: 'Supermarket', color: '#d9a441', stock: 0.55, zones: 8, zoneMinutes: 20, dark: true,
+    label: 'Supermarket', color: '#d9a441', stock: 0.85, zones: 8, zoneMinutes: 12, dark: true,
     zoneName: 'aisle',
     loot: [
       { id: 'canned_food', w: 30 }, { id: 'dry_food', w: 18 }, { id: 'water_bottle', w: 10 },
@@ -22,7 +22,7 @@ export const CATEGORIES = {
     entryText: 'The doors are open. The air smells of rotten food. It is dark inside.',
   },
   convenience: {
-    label: 'Convenience store', color: '#c98b3c', stock: 0.5, zones: 2, zoneMinutes: 10,
+    label: 'Convenience store', color: '#c98b3c', stock: 0.75, zones: 2, zoneMinutes: 8,
     zoneName: 'shelf area',
     loot: [
       { id: 'snacks', w: 30 }, { id: 'water_bottle', w: 15 }, { id: 'canned_food', w: 10 },
@@ -34,7 +34,7 @@ export const CATEGORIES = {
     entryText: 'The glass door is broken. Shelves are half empty.',
   },
   gas: {
-    label: 'Gas station', color: '#9c6b3a', stock: 0.6, zones: 2, zoneMinutes: 15,
+    label: 'Gas station', color: '#9c6b3a', stock: 0.75, zones: 2, zoneMinutes: 10,
     zoneName: 'shop area',
     loot: [
       { id: 'snacks', w: 30 }, { id: 'water_bottle', w: 12 }, { id: 'lighter', w: 12 },
@@ -64,7 +64,7 @@ export const CATEGORIES = {
     label: 'Clinic', color: '#4f9c92', stock: 0.7, zones: 3, zoneMinutes: 20,
     zoneName: 'room', bodies: true,
     loot: [
-      { id: 'first_aid', w: 20 }, { id: 'antibiotics', w: 6 }, { id: 'n95', w: 15 },
+      { id: 'first_aid', w: 20 }, { id: 'antibiotics', w: 3 }, { id: 'n95', w: 15 },
       { id: 'pain_pills', w: 10 }, { id: 'saline', w: 10 }, { id: 'ors', w: 6 },
       { id: 'bandages', w: 15 }, { id: 'ibuprofen', w: 6 }, { id: 'soap', w: 3 },
       { id: 'book_first_aid', w: 1.5 },
@@ -75,7 +75,7 @@ export const CATEGORIES = {
     label: 'Hospital', color: '#7fd1c4', stock: 0.7, zones: 12, zoneMinutes: 30, dark: true,
     zoneName: 'ward', bodies: true, entryMorale: -5,
     loot: [
-      { id: 'first_aid', w: 18 }, { id: 'antibiotics', w: 12 }, { id: 'saline', w: 15 },
+      { id: 'first_aid', w: 18 }, { id: 'antibiotics', w: 6 }, { id: 'saline', w: 15 },
       { id: 'pain_pills', w: 12 }, { id: 'n95', w: 12 }, { id: 'ors', w: 8 }, { id: 'snacks', w: 5 },
       { id: 'bandages', w: 15 }, { id: 'ibuprofen', w: 6 }, { id: 'blanket', w: 4 }, { id: 'sports_drink', w: 3 },
       { id: 'book_first_aid', w: 1 },
@@ -128,18 +128,20 @@ export const CATEGORIES = {
     entryText: 'The engine bay is empty. The crews went out on calls and did not come back.',
   },
   house: {
-    label: 'House', color: '#aaaaaa', stock: 0.8, zones: 6, zoneMinutes: 10,
+    label: 'House', color: '#aaaaaa', stock: 0.8, zones: 6, zoneMinutes: 18,
     zoneName: 'room',
     loot: [
-      { id: 'canned_food', w: 20 }, { id: 'dry_food', w: 8 }, { id: 'snacks', w: 8 },
-      { id: 'peanut_butter', w: 5 }, { id: 'water_bottle', w: 5 }, { id: 'pain_pills', w: 6 },
+      { id: 'canned_food', w: 10 }, { id: 'dry_food', w: 4 }, { id: 'snacks', w: 4 },
+      { id: 'broken_radio', w: 2 }, { id: 'old_toaster', w: 2 }, { id: 'desk_lamp', w: 2.5 }, { id: 'extension_cord', w: 3 },
+      { id: 'wooden_chair', w: 1.5 }, { id: 'garden_hose', w: 1.5 }, { id: 'broken_bike', w: 0.5 },
+      { id: 'peanut_butter', w: 2.5 }, { id: 'water_bottle', w: 5 }, { id: 'pain_pills', w: 6 },
       { id: 'first_aid', w: 4 }, { id: 'antibiotics', w: 2 }, { id: 'batteries', w: 6 },
       { id: 'winter_hat', w: 4 }, { id: 'gloves', w: 4 }, { id: 'rain_jacket', w: 3 },
       { id: 'comfort', w: 5 }, { id: 'firewood', w: 4 }, { id: 'dog_food', w: 2 }, { id: 'lighter', w: 4 },
       { id: 'toolkit', w: 2 }, { id: 'scrap_wood', w: 3 }, { id: 'hardware_parts', w: 3 }, { id: 'wiring', w: 2 },
       { id: 'pipe_fittings', w: 2 }, { id: 'metal_bin', w: 2 }, { id: 'rain_barrel', w: 1 }, { id: 'battery_module', w: 0.6 },
       { id: 'gas_can', w: 1.5 }, { id: 'generator', w: 0.4 },
-      { id: 'canned_fruit', w: 5 }, { id: 'instant_noodles', w: 4 }, { id: 'oatmeal', w: 3 }, { id: 'chips', w: 3 },
+      { id: 'canned_fruit', w: 2.5 }, { id: 'instant_noodles', w: 2 }, { id: 'oatmeal', w: 1.5 }, { id: 'chips', w: 1.5 },
       { id: 'soda', w: 3 }, { id: 'bandages', w: 3 }, { id: 'ibuprofen', w: 3 }, { id: 'candles', w: 4 }, { id: 'matches', w: 3 },
       { id: 'blanket', w: 4 }, { id: 'wool_socks', w: 3 }, { id: 'toilet_paper', w: 4 }, { id: 'soap', w: 3 }, { id: 'toothpaste', w: 2 },
       { id: 'can_opener', w: 2 }, { id: 'cooking_pot', w: 2 }, { id: 'duct_tape', w: 2 }, { id: 'knife', w: 1 }, { id: 'radio', w: 1 },

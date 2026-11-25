@@ -6,6 +6,7 @@ import { winterizeStyle, seasonPaint } from './winter-style.js';
 import { detailFeatures, addDetailIcons, DETAIL_INFO } from './details.js';
 import { seasonOf, overgrowth } from '../engine/season.js';
 import { legacyMarks } from '../engine/goals.js';
+import { SPOTS } from '../data/wild.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -45,7 +46,7 @@ function circlePolygon(center, miles, n = 128) {
   return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
 }
 
-export async function createMap(container, { places, onPlaceClick }) {
+export async function createMap(container, { places, onPlaceClick, onCarClick }) {
   const maplibregl = window.maplibregl;
   const { style, online } = await pickStyle();
   const map = new maplibregl.Map({
@@ -94,6 +95,12 @@ export async function createMap(container, { places, onPlaceClick }) {
     if (!f || map.queryRenderedFeatures(e.point, { layers: ['places'] }).length) return;
     const info = DETAIL_INFO[f.properties.type];
     if (detailPopup) detailPopup.remove();
+    // Cars are places you can walk to (search, siphon gas, take the battery).
+    if (f.properties.type === 'car' && f.properties.id && onCarClick) {
+      const [lon, lat] = f.geometry.coordinates;
+      onCarClick(f.properties.id, lat, lon, e.lngLat);
+      return;
+    }
     detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
       .setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
   });
@@ -154,6 +161,16 @@ export async function createMap(container, { places, onPlaceClick }) {
   youEl.innerHTML = '<i></i>';
   const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
 
+  // Fishing and hunting spots: a small pin each (fish = blue hook, hunt = green track).
+  for (const [id, sp] of Object.entries(SPOTS)) {
+    const el = document.createElement('div');
+    el.className = `marker-wild ${sp.kind}`;
+    el.title = `${sp.name} (${sp.kind === 'fish' ? 'fishing' : 'hunting'})`;
+    el.innerHTML = `<span>${sp.kind === 'fish' ? '≈' : '⋀'}</span>`;
+    el.addEventListener('click', (ev) => { ev.stopPropagation(); onPlaceClick(`wild:${id}`, null); });
+    new maplibregl.Marker({ element: el }).setLngLat([sp.lon, sp.lat]).addTo(map);
+  }
+
   // Legacy marks: painted signs at places (one small marker each), lit window and capsule on home.
   const signMarkers = new Map();
   function applyMarks(state, list) {
@@ -211,7 +228,9 @@ function placesGeo(list, placeStates) {
     type: 'FeatureCollection',
     features: list.map((p) => {
       const ps = placeStates[p.id];
-      const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+      // Searched with items left behind (pack was full) stays amber, not grey.
+      const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+      const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
       return {
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [p.lon, p.lat] },

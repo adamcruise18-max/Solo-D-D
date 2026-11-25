@@ -182,7 +182,7 @@ export function openInside(opts) {
   // high where the building is open to the weather (plan.exposed: a broken window or a collapsed roof).
   // ?grime=low|medium|high in the page address forces a level (to compare looks).
   const forceGrime = typeof location !== 'undefined' && (/[?&]grime=(low|medium|high)\b/.exec(location.search || '') || [])[1];
-  const grime = forceGrime || grimeLevel(plan.cat, { exposed: !!plan.exposed });
+  const grime = forceGrime || (plan.home ? 'clean' : grimeLevel(plan.cat, { exposed: !!plan.exposed }));
   const surf = (part) => surfaceFor(plan.cat, part, null, quality, grime);
   const floor = new Mesh(new PlaneGeometry(W, D), surf('floor'));
   floor.rotation.x = -Math.PI / 2;
@@ -220,7 +220,7 @@ export function openInside(opts) {
     const spots = [];
     for (let z = -3; z > -D + 1; z -= 5) for (let x = -W / 2 + 3; x < W / 2 - 1; x += 6) spots.push([x, z]);
     if (plan.cat === 'house' || plan.kind !== 'hall') spots.splice(0, spots.length, ...spots.filter((_, i) => i % 2 === 0));
-    let emergency = dark ? 1 + Math.floor(lrnd() * 2) : 0;
+    let emergency = dark && !opts.night ? 1 + Math.floor(lrnd() * 2) : 0; // at night the emergency batteries are long dead
     spots.forEach(([x, z], i) => {
       const r = lrnd();
       const state = emergency > 0 && r < 0.18 ? (emergency--, 'emergency') : plan.cat !== 'house' && r > 0.86 ? 'flicker' : 'dead';
@@ -350,6 +350,7 @@ export function openInside(opts) {
   const CULL_M = dark || opts.night ? 13 : 20;
   const FILL_KIND = { supermarket: 'grocery', pharmacy: 'pharmacy', hardware: 'hardware', outdoor: 'outdoor', convenience: 'convenience', gas: 'convenience' }[plan.cat] || 'grocery';
   let gateMesh = null;
+  let ghostMat = null;
   for (const f of plan.fixtures) {
     if (f.type === 'gate') {
       const g = new Group();
@@ -406,6 +407,24 @@ export function openInside(opts) {
       g.position.set(f.x, 0, f.z);
       g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
       statics.add(g);
+      continue;
+    }
+    if (f.type === 'proj') {
+      // Home projects: built ones are real objects; not built, a faint outline of where it goes.
+      if (f.built) {
+        const g = makeProp(`proj_${f.proj}`, 1);
+        g.position.set(f.x, f.y || 0, f.z);
+        g.traverse((o) => { if (o.isMesh) { o.castShadow = !f.y; o.receiveShadow = true; } });
+        statics.add(g);
+      } else {
+        ghostMat ||= { line: new LineBasicMaterial({ color: 0x9fe8f4, transparent: true, opacity: 0.55 }), fill: new MeshBasicMaterial({ color: 0x6fd3e6, transparent: true, opacity: 0.06, depthWrite: false }) };
+        const box = new BoxGeometry(f.w, f.h, f.d);
+        const y = (f.y || 0) + (f.y >= 2 ? -f.h / 2 : f.h / 2);
+        const e = new LineSegments(new EdgesGeometry(box), ghostMat.line);
+        const m = new Mesh(box, ghostMat.fill);
+        e.position.set(f.x, y, f.z); m.position.copy(e.position);
+        scene.add(e, m);
+      }
       continue;
     }
     if (FIXTURE_TYPES.includes(f.type)) {
@@ -465,7 +484,9 @@ export function openInside(opts) {
     if (face.group) { scene.remove(face.group); face.group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); }
     const { f, side } = face;
     // Picked over after 3 months: front shelves are 20-50% full.
-    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.6));
+    // Lower 3D quality shows fewer packs on the shelves (the shelf stock is most of the triangles).
+    const qFill = quality === 'low' ? 0.45 : quality === 'medium' ? 0.75 : 1;
+    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.6) * qFill);
     const g = makeShelfFill(FILL_KIND, f.d - 0.1, [0.12, 0.62, 1.12, 1.57], fill, hashString(`${opts.title}:${f.x}:${f.z}:${side}`));
     g.position.set(f.x + side * 0.05, 0, f.z);
     g.rotation.y = side > 0 ? 0 : Math.PI;
@@ -535,8 +556,15 @@ export function openInside(opts) {
       && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad)
       && x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad;
     // area: limit to one room ({x1,x2,z1,z2}); the default is the whole building.
+    // Lower 3D quality leaves out some clutter props: 2 in 5 on Low, 1 in 5 on Medium.
+    const CLUTTER = /^(trash_bag|paper_scatter|glass_shards|trash_pile|kids_toy|cardboard_box|box_stack|clothes_pile|bottles|cans|debris|magazine|old_phone)$/;
+    let propN = 0;
     const place = (kind, nearWall = false, area = null) => {
       if (!PROP_KINDS.includes(kind)) return null;
+      if (CLUTTER.test(kind)) {
+        const k = propN++ % 5;
+        if ((quality === 'low' && k < 2) || (quality === 'medium' && k === 0)) return null;
+      }
       const g = makeProp(kind, Math.floor(lrnd() * 1e6));
       const rad = Math.min(1.2, (g.userData.radius || 0.3) + 0.1);
       const flat = kind === 'rug' || kind === 'paper_scatter' || kind === 'clothes_pile';
@@ -593,7 +621,8 @@ export function openInside(opts) {
       for (const sp of plan.spots) {
         if (!sp.area) continue;
         const A = { x1: sp.area.x1, x2: sp.area.x2, z1: Math.min(sp.area.z1, sp.area.z2), z2: Math.max(sp.area.z1, sp.area.z2) };
-        for (const [kind, n, wall] of ROOM_SETS[sp.label] || []) for (let i = 0; i < n; i++) place(kind, !!wall, A);
+        const MESS = /^(trash_bag|paper_scatter|glass_shards|trash_pile|kids_toy|cardboard_box)$/;
+        for (const [kind, n, wall] of ROOM_SETS[sp.label] || []) if (!(plan.home && MESS.test(kind))) for (let i = 0; i < n; i++) place(kind, !!wall, A);
         (WALL_SETS[sp.label] || []).forEach((kind, i) => {
           if (!PROP_KINDS.includes(kind)) return;
           const g = makeProp(kind, Math.floor(lrnd() * 1e6));
@@ -631,11 +660,52 @@ export function openInside(opts) {
     statics.add(g);
   }
 
+  // Home lamps: the LED strip (when built and the battery has charge) and candles on the
+  // living room table (when you have candles). Warm; candles flicker. Brighter at night.
+  const flickers = [];
+  if (plan.home && opts.homeLamps) {
+    const L = opts.homeLamps;
+    const room = plan.spots.find((sp) => sp.label === 'living room');
+    if (room) {
+      const a = room.area;
+      const cx = (a.x1 + a.x2) / 2;
+      const cz = (a.z1 + a.z2) / 2;
+      const nightK = opts.night ? 1 : 0.35;
+      if (L.led) {
+        const led = new PointLight(0xffe2b0, 9 * nightK, 8, 1.6);
+        led.position.set(cx, 2.3, cz);
+        scene.add(led);
+      }
+      if (L.candles) {
+        const table = plan.fixtures.find((f) => f.type === 'table' && f.zone === room.zone);
+        const tx = table ? table.x : cx;
+        const tz = table ? table.z : cz;
+        const ty = table ? table.h : 0.75;
+        const wax = new MeshStandardMaterial({ color: 0xf3eedc, roughness: 0.55, emissive: 0x2a2014 });
+        const flame = new MeshBasicMaterial({ color: 0xffc46a });
+        for (let i = 0; i < Math.min(3, L.candles); i++) {
+          const h = 0.12 + i * 0.03;
+          const c = new Mesh(new CylinderGeometry(0.025, 0.025, h, 12), wax);
+          c.position.set(tx - 0.12 + i * 0.12, ty + h / 2, tz + (i % 2 ? 0.06 : -0.04));
+          const f = new Mesh(new SphereGeometry(0.012, 8, 6), flame);
+          f.scale.y = 2.2;
+          f.position.set(c.position.x, ty + h + 0.02, c.position.z);
+          scene.add(c, f);
+        }
+        const cl = new PointLight(0xffa048, (L.led ? 1.2 : 3.2) * nightK, 6, 1.6);
+        cl.position.set(tx, ty + 0.3, tz);
+        scene.add(cl);
+        flickers.push({ light: cl, base: cl.intensity, t: 0 });
+      }
+    }
+  }
+
   // Contact shadows: a soft dark blob under every fixture, piece of furniture, prop and covered body.
   {
     const blobs = [];
     for (const f of plan.fixtures) {
       if (!f.w || !f.d) continue;
+      if (f.type === 'proj' && (!f.built || f.y || f.d < 0.2)) continue;
       blobs.push({ x: f.x, z: f.z, w: f.w, d: f.d, grow: f.type === 'shelf' || f.type === 'endcap' ? 0.55 : 0.4 });
     }
     const NO_BLOB = /^(rug|paper_scatter|glass_shards|wall_frame|wall_clock|curtain|mail_pile|magazine|old_phone|trash_pile)$/;
@@ -734,7 +804,37 @@ export function openInside(opts) {
     return k ? `something inside: ${k} item${k > 1 ? 's' : ''}` : 'it sounds empty';
   }
   // An open box: the lid flaps fold back (shown as a lower, tilted box).
-  function openLook(c) { c.obj.scale.y = 0.85; c.obj.rotation.z = 0.06; }
+  // An opened box: flaps folded out and a dark inside, so you can see at a glance it is done.
+  const flapMat = new MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9, side: DoubleSide });
+  const holeMat = new MeshBasicMaterial({ color: 0x17110b });
+  function openLook(c) {
+    if (c.obj.userData.openDone) return;
+    c.obj.userData.openDone = true;
+    // Size in the box's own frame (no rotation), then build the open top as its child.
+    const rot = c.obj.rotation.y;
+    c.obj.rotation.y = 0;
+    c.obj.updateMatrixWorld(true);
+    const bb = new Box3().setFromObject(c.obj);
+    c.obj.rotation.y = rot;
+    const P = c.obj.position;
+    const hx = (bb.max.x - bb.min.x) / 2, hz = (bb.max.z - bb.min.z) / 2, top = bb.max.y - P.y + 0.003;
+    const cx = (bb.min.x + bb.max.x) / 2 - P.x, cz = (bb.min.z + bb.max.z) / 2 - P.z;
+    const g = new Group();
+    const hole = new Mesh(new PlaneGeometry(hx * 1.84, hz * 1.84), holeMat);
+    hole.rotation.x = -Math.PI / 2; hole.position.set(cx, top, cz); g.add(hole);
+    const len = Math.min(hx, hz) * 0.9;
+    for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const pivot = new Group();
+      pivot.position.set(cx + sx * hx, top, cz + sz * hz);
+      const f = new Mesh(new PlaneGeometry(sx ? hz * 1.9 : hx * 1.9, len), flapMat);
+      f.position.y = len / 2;
+      if (sx) f.rotation.y = Math.PI / 2;
+      pivot.add(f);
+      if (sx) pivot.rotation.z = -sx * 0.7; else pivot.rotation.x = sz * 0.7;
+      g.add(pivot);
+    }
+    c.obj.add(g);
+  }
 
   function addItems() {
     for (const it of opts.items()) {
@@ -745,7 +845,9 @@ export function openInside(opts) {
         if (c && !c.opened) continue; // still in the closed box
         if (c) {
           // Out of the box, on the floor next to it.
-          const k = hashString(it.pid) % 360;
+          // Next to the box on the side you stand (so they are in reach), spread a little.
+          const toYou = Math.atan2(camera.position.z - c.z, camera.position.x - c.x);
+          const k = toYou + (((hashString(it.pid) % 100) / 100) - 0.5) * 1.6;
           p = { x: c.x + Math.cos(k) * (c.r + 0.15), y: 0, z: c.z + Math.sin(k) * (c.r + 0.15) };
         }
       }
@@ -756,7 +858,8 @@ export function openInside(opts) {
       // Loot is a little brighter than the room, so the eye finds it.
       // The item lights itself with its own colors (emissive map = its texture), so it stays
       // bright and saturated in a dim store and reads above the darker shelf stock.
-      const glow = 0.32 + 0.18 * notice.lootGlow;
+      // In a dark store at night the glow is faint: you need your flashlight to find loot.
+      const glow = (0.32 + 0.18 * notice.lootGlow) * (dark && opts.night ? 0.2 : 1);
       obj.traverse((m) => {
         if (!m.isMesh || !m.material) return;
         const fix = (mt) => {
@@ -1031,6 +1134,7 @@ export function openInside(opts) {
     if (target) { pickOne(target); return; }
     if (!current) { toast('Look at an item to take it.', 1400); return; }
     if (current.type === 'exit') { leave(); return; }
+    if (current.type === 'project') { toast(opts.projectInfo ? opts.projectInfo(current.id) : '', 5000); return; }
     if (current.counter && !opts.isCounterOpen()) { openGate(); return; }
     toast('Look at an item to take it.', 1400);
   }
@@ -1078,7 +1182,7 @@ export function openInside(opts) {
     if (busy || paused || closed || hold) return false;
     if (target && target.container) return false;
     const near = itemsInReach(camera.position);
-    if (!near.length) return false;
+    if (!near.length) { if (!target) toast('Nothing in reach. Walk up to an item.', 1400); return false; }
     const bar = $('.in-bar');
     const fill = bar.querySelector('i');
     bar.hidden = false;
@@ -1525,6 +1629,7 @@ export function openInside(opts) {
     }
     const tLogic = performance.now();
     lk.update(dt, camera.position);
+    for (const fl of flickers) { fl.t += dt; fl.light.intensity = fl.base * (0.85 + 0.1 * Math.sin(fl.t * 13) + 0.05 * Math.sin(fl.t * 31.7)); }
     const tLook = performance.now();
     // Shelf products far away are hidden (fog hides them anyway): saves draw calls and triangles.
     for (const face of shelfFaces) {

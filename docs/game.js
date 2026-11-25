@@ -51,7 +51,7 @@
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
     // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
     gas_can: { name: "Gas can (1 gal)", unit: "can", weight: 7, kind: "fuel" },
-    generator: { name: "Small generator", unit: "pc", weight: 45, kind: "tool" },
+    generator: { name: "Small generator", unit: "pc", weight: 32, kind: "tool" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
     bleach: { name: "Unscented bleach", unit: "jug", weight: 8, kind: "misc" },
@@ -97,6 +97,15 @@
     book_survival: { name: "Wilderness survival guide", unit: "pc", weight: 0.8, kind: "book", skill: "survival" },
     // Parts for home base projects (kind 'part': no use on their own).
     toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
+    // Junk: worth little as it is; take it apart for parts (src/data/salvage.js).
+    broken_radio: { name: "Broken clock radio", unit: "pc", weight: 1.5, kind: "junk" },
+    old_toaster: { name: "Old toaster", unit: "pc", weight: 3, kind: "junk" },
+    desk_lamp: { name: "Desk lamp", unit: "pc", weight: 2, kind: "junk" },
+    extension_cord: { name: "Extension cord", unit: "pc", weight: 1.5, kind: "junk" },
+    wooden_chair: { name: "Wooden chair", unit: "pc", weight: 9, kind: "junk" },
+    garden_hose: { name: "Garden hose", unit: "pc", weight: 5, kind: "junk" },
+    broken_bike: { name: "Broken bicycle", unit: "pc", weight: 25, kind: "junk" },
+    car_battery: { name: "Car battery (12 V)", unit: "pc", weight: 35, kind: "part" },
     scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
     hardware_parts: { name: "Nails, screws and brackets", unit: "box", weight: 1, kind: "part" },
     wiring: { name: "Electrical wire and connectors", unit: "roll", weight: 2, kind: "part" },
@@ -117,9 +126,9 @@
     supermarket: {
       label: "Supermarket",
       color: "#d9a441",
-      stock: 0.55,
+      stock: 0.85,
       zones: 8,
-      zoneMinutes: 20,
+      zoneMinutes: 12,
       dark: true,
       zoneName: "aisle",
       loot: [
@@ -159,9 +168,9 @@
     convenience: {
       label: "Convenience store",
       color: "#c98b3c",
-      stock: 0.5,
+      stock: 0.75,
       zones: 2,
-      zoneMinutes: 10,
+      zoneMinutes: 8,
       zoneName: "shelf area",
       loot: [
         { id: "snacks", w: 30 },
@@ -186,9 +195,9 @@
     gas: {
       label: "Gas station",
       color: "#9c6b3a",
-      stock: 0.6,
+      stock: 0.75,
       zones: 2,
-      zoneMinutes: 15,
+      zoneMinutes: 10,
       zoneName: "shop area",
       loot: [
         { id: "snacks", w: 30 },
@@ -255,7 +264,7 @@
       bodies: true,
       loot: [
         { id: "first_aid", w: 20 },
-        { id: "antibiotics", w: 6 },
+        { id: "antibiotics", w: 3 },
         { id: "n95", w: 15 },
         { id: "pain_pills", w: 10 },
         { id: "saline", w: 10 },
@@ -279,7 +288,7 @@
       entryMorale: -5,
       loot: [
         { id: "first_aid", w: 18 },
-        { id: "antibiotics", w: 12 },
+        { id: "antibiotics", w: 6 },
         { id: "saline", w: 15 },
         { id: "pain_pills", w: 12 },
         { id: "n95", w: 12 },
@@ -419,13 +428,20 @@
       color: "#aaaaaa",
       stock: 0.8,
       zones: 6,
-      zoneMinutes: 10,
+      zoneMinutes: 18,
       zoneName: "room",
       loot: [
-        { id: "canned_food", w: 20 },
-        { id: "dry_food", w: 8 },
-        { id: "snacks", w: 8 },
-        { id: "peanut_butter", w: 5 },
+        { id: "canned_food", w: 10 },
+        { id: "dry_food", w: 4 },
+        { id: "snacks", w: 4 },
+        { id: "broken_radio", w: 2 },
+        { id: "old_toaster", w: 2 },
+        { id: "desk_lamp", w: 2.5 },
+        { id: "extension_cord", w: 3 },
+        { id: "wooden_chair", w: 1.5 },
+        { id: "garden_hose", w: 1.5 },
+        { id: "broken_bike", w: 0.5 },
+        { id: "peanut_butter", w: 2.5 },
         { id: "water_bottle", w: 5 },
         { id: "pain_pills", w: 6 },
         { id: "first_aid", w: 4 },
@@ -448,10 +464,10 @@
         { id: "battery_module", w: 0.6 },
         { id: "gas_can", w: 1.5 },
         { id: "generator", w: 0.4 },
-        { id: "canned_fruit", w: 5 },
-        { id: "instant_noodles", w: 4 },
-        { id: "oatmeal", w: 3 },
-        { id: "chips", w: 3 },
+        { id: "canned_fruit", w: 2.5 },
+        { id: "instant_noodles", w: 2 },
+        { id: "oatmeal", w: 1.5 },
+        { id: "chips", w: 1.5 },
         { id: "soda", w: 3 },
         { id: "bandages", w: 3 },
         { id: "ibuprofen", w: 3 },
@@ -902,7 +918,7 @@
       id: "garden_beds",
       wing: "food",
       name: "Raised garden beds",
-      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).",
+      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food.",
       needs: { scrap_wood: 4, hardware_parts: 1 },
       tools: [],
       hours: 6
@@ -1169,13 +1185,54 @@
     const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
     w.broken += 1;
   }
+  function boardWindow(state2, room) {
+    const h2 = ensureRooms(state2.home);
+    const w = h2.windows[room];
+    if (!w || (w.boarded || 0) >= (w.broken || 0)) return false;
+    w.boarded = (w.boarded || 0) + 1;
+    return true;
+  }
   var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
   function sleepSpot(state2) {
     return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
   }
+  function setSleepSpot(state2, spot) {
+    if (!SLEEP_SPOTS[spot]) return false;
+    state2.home.sleepSpot = spot;
+    return true;
+  }
   function sleepTemp(state2) {
     const spot = sleepSpot(state2);
     return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  }
+  function setDoor(state2, room, closed) {
+    const h2 = ensureRooms(state2.home);
+    if (!h2.rooms[room]) return false;
+    h2.doorsClosed[room] = !!closed;
+    return true;
+  }
+  function homeHeat(state2) {
+    const h2 = state2.home;
+    const air = environment(state2, "rest").air;
+    return {
+      outside: Math.round(air),
+      sources: { fire: h2.fireHours > 0 ? fireHeat(state2) : 0, fireHours: h2.fireHours, heater: h2.heaterOn ? 20 : 0, stove: built(state2, "wood_stove") },
+      insulated: built(state2, "insulate_living"),
+      sleepSpot: sleepSpot(state2),
+      rooms: ROOMS.map((r) => {
+        const w = h2.windows?.[r.id] || { broken: 0, boarded: 0 };
+        return {
+          id: r.id,
+          label: r.label,
+          temp: Math.round(roomTemp(state2, r.id) * 10) / 10,
+          brokenWindows: (w.broken || 0) - (w.boarded || 0),
+          boardedWindows: w.boarded || 0,
+          doorClosed: r.id === "living" ? null : !!h2.doorsClosed?.[r.id],
+          loss: Math.round(windowLoss(h2, r.id) * 100) / 100
+          // 1 = a whole, closed-up room
+        };
+      })
+    };
   }
   var WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
   var WINDOW_ROOMS = ["living", "kitchen", "bedroom", "bath"];
@@ -1269,6 +1326,9 @@
     if (og <= 0.25) return 1;
     return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
   }
+  function animalCover(t) {
+    return Math.min(1, overgrowth(t) * LEAF[seasonOf(t)] * 1.2);
+  }
 
   // src/core/activity.js
   var source = { sys: null, hook: null };
@@ -1354,7 +1414,7 @@
       begin,
       end,
       line,
-      records: (count = limit) => records.slice(-count),
+      records: (count2 = limit) => records.slice(-count2),
       clear: () => {
         records.length = 0;
         open = null;
@@ -1591,7 +1651,7 @@
     { id: "night_crash", size: "small", where: "asleep", months: [3, 99], text: "A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again." },
     { id: "night_owls", size: "small", where: "asleep", months: [3, 99], text: "Owls call to each other outside. You wake, and lie listening until they stop." },
     { id: "night_dogs", size: "medium", where: "asleep", months: [3, 99], text: "Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while." },
-    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", apply: (s) => startHazard(s, "road_blocked", 72), text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
+    { id: "ice_trees_down", size: "medium", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", apply: (s) => startHazard(s, "road_blocked", 72), text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
     { id: "power_line_down", size: "big", where: "any", months: [3, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A loud crack and a crash: a power pole goes down somewhere close. Walking anywhere takes longer for two days." },
     // ---- small ----
     { id: "dog_bone", size: "small", where: "home", months: [3, 99], when: dogWithYou, apply: (s) => {
@@ -1609,7 +1669,7 @@
       s.home.rawGal = (s.home.rawGal || 0) + 2;
       s.home.indoorTemp -= 3;
     }, text: "Water drips through the ceiling in the hall. You put a pot under it: 2 gal of rain water to filter, but the house is colder." },
-    { id: "gas_smell", size: "medium", where: "inside", months: [3, 8], when: inHouse, text: "A strong smell of gas in this house. You open a window, and you do not light anything in here." },
+    { id: "gas_smell", size: "medium", where: "inside", months: [3, 14], when: inHouse, text: "A strong smell of gas in this house. You open a window, and you do not light anything in here." },
     { id: "black_ice", size: "medium", where: "outside", months: [3, 99], when: (s) => isColdSeason(s) && (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, "black_ice", 18), text: "Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts." },
     { id: "house_fire_far", size: "medium", where: "any", months: [3, 99], when: (s) => !raining(s), text: "To the south, the sky glows orange under a column of smoke. A house burns there, and the next one catches. The smell reaches you an hour later." },
     // ---- big ----
@@ -1969,6 +2029,27 @@
       log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
   }
+  function canTreatDog(state2) {
+    const d = state2.dog;
+    if (!d || d.stage !== "joined") return "No dog";
+    if (!d.sick) return `${d.name} is not sick`;
+    if (!has(state2, "antibiotics")) return "You need antibiotics";
+    return null;
+  }
+  function treatDog(state2) {
+    const why = canTreatDog(state2);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    const d = state2.dog;
+    const bag = (state2.carried.antibiotics || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, "antibiotics", -1);
+    d.sick = null;
+    d.health = Math.min(100, d.health + 10);
+    log(state2, `You push the pills into a bit of food. ${d.name} swallows them. By evening ${d.name} looks better.`, "good");
+    return true;
+  }
   function dogBondDaily(state2) {
     const d = state2.dog;
     if (d.stage !== "joined") return;
@@ -2055,6 +2136,12 @@
     const s = freshOf(state2)[id] || 0;
     return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
   }
+  function addFresh(state2, bags2, id, qty, spoil = 0) {
+    if (!isPerishable(id)) return;
+    const f = freshOf(state2);
+    const have = bags2.reduce((n, b) => n + (b[id] || 0), 0);
+    f[id] = have + qty > 0 ? ((f[id] || 0) * have + spoil * qty) / (have + qty) : spoil;
+  }
   function ageFood(state2, dt, tempAt) {
     const f = freshOf(state2);
     for (const id of Object.keys(ITEMS)) {
@@ -2079,15 +2166,21 @@
   }
 
   // src/engine/garden.js
+  var BEDS = 4;
   var ROT_DAYS = 30;
+  var WATER_GAL = 2;
   var DRY_PER_DAY = 0.35;
   var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
+  var monthOfDay3 = (day) => new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
   function initGarden(state2) {
     state2.garden = { beds: [] };
   }
   function garden(state2) {
     if (!state2.garden) initGarden(state2);
     return state2.garden;
+  }
+  function bedCount(state2) {
+    return built(state2, "garden_beds") ? BEDS : 0;
   }
   function dayGrowth(crop, meanF, water) {
     const c = CROPS[crop];
@@ -2125,6 +2218,98 @@
         log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
       }
     }
+  }
+  function canPlant(state2, cropId) {
+    const c = CROPS[cropId];
+    if (!c) return "No such crop";
+    if (!bedCount(state2)) return "Build the garden beds first";
+    if (!has(state2, "seeds")) return "You need a seed packet";
+    const g = garden(state2);
+    const free = g.beds.filter((b) => b.crop && !b.dead).length < bedCount(state2);
+    if (!free) return "All beds are in use";
+    if (!c.plant.includes(monthOfDay3(dayIndex(state2.time)))) return `Not the season to sow ${c.name.toLowerCase()}`;
+    return null;
+  }
+  function plant(state2, cropId) {
+    const why = canPlant(state2, cropId);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    const g = garden(state2);
+    g.beds = g.beds.filter((b) => b.crop && !b.dead);
+    g.beds.push({ crop: cropId, day: dayIndex(state2.time), growth: 0, water: 0.6, ripeDay: null, dead: false });
+    const bag = (state2.carried.seeds || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, "seeds", -1);
+    log(state2, `You sow ${CROPS[cropId].name.toLowerCase()} in a garden bed.`, "good");
+    return true;
+  }
+  function waterGarden(state2) {
+    const g = garden(state2);
+    const beds = g.beds.filter((b) => b.crop && !b.dead && b.growth < 1 && b.water < 1);
+    if (!beds.length) {
+      log(state2, "The beds do not need water.");
+      return 0;
+    }
+    const h2 = state2.home;
+    let n = 0;
+    for (const b of beds) {
+      if (h2.rawGal >= WATER_GAL) h2.rawGal -= WATER_GAL;
+      else if (h2.tankGal >= WATER_GAL) h2.tankGal -= WATER_GAL;
+      else break;
+      b.water = 1;
+      n++;
+    }
+    log(state2, n ? `You water ${n} garden bed${n > 1 ? "s" : ""} (${n * WATER_GAL} gal).` : "You have no water to spare for the garden.");
+    return n;
+  }
+  function harvest(state2) {
+    const g = garden(state2);
+    const ripe = g.beds.filter((b) => b.crop && !b.dead && b.growth >= 1);
+    if (!ripe.length) {
+      log(state2, "Nothing in the garden is ready.");
+      return {};
+    }
+    const got = {};
+    for (const b of ripe) {
+      const [id, qty] = CROPS[b.crop].yield;
+      addFresh(state2, [state2.home.storage, state2.carried], id, qty, 0);
+      addItem(state2.home.storage, id, qty);
+      got[id] = (got[id] || 0) + qty;
+      const c = CROPS[b.crop];
+      b.cuts = (b.cuts || 0) + 1;
+      if (c.regrow && b.cuts < (c.cuts || 1)) {
+        b.growth = c.regrow;
+        b.ripeDay = null;
+      } else b.dead = true;
+    }
+    g.beds = g.beds.filter((b) => !b.dead);
+    log(state2, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
+    return got;
+  }
+  function stageOf2(b) {
+    if (b.dead) return "dead";
+    if (b.growth >= 1) return "ready";
+    if (b.growth >= 0.6) return "nearly";
+    if (b.growth >= 0.2) return "growing";
+    return "seedling";
+  }
+  function gardenInfo(state2) {
+    const g = garden(state2);
+    const month = monthOfDay3(dayIndex(state2.time));
+    return {
+      beds: bedCount(state2),
+      planted: g.beds.map((b) => ({
+        crop: b.crop,
+        name: CROPS[b.crop]?.name,
+        growth: Math.round(b.growth * 100),
+        water: Math.round(b.water * 100),
+        ready: b.growth >= 1 && !b.dead,
+        dead: b.dead,
+        stage: stageOf2(b)
+      })),
+      canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id)
+    };
   }
   var gardenSystem = {
     id: "garden",
@@ -2630,9 +2815,11 @@
       h2.work[id] = 0;
       log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
     }
-    const hours = Math.min(WORK_BLOCK_H, st.leftH);
-    advanceTime(state2, Math.round(hours * 60), "heavy");
+    let hours = Math.min(WORK_BLOCK_H, st.leftH);
+    const t0 = state2.time;
+    const stopped = advanceTime(state2, Math.round(hours * 60), "heavy", { stopAtDanger: true });
     if (state2.dead) return;
+    if (stopped) hours = Math.max(0, (state2.time - t0) / 60);
     h2.work[id] += hours;
     if (h2.work[id] >= proj.hours - 1e-9) {
       delete h2.work[id];
@@ -3359,10 +3546,492 @@
   }
   var GEN_KWH_PER_GAL = 3;
 
+  // src/data/salvage.js
+  var SALVAGE = {
+    broken_radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit", "knife"], min: 15, what: "wire and screws" },
+    old_toaster: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit"], min: 15, what: "wire and screws" },
+    desk_lamp: { parts: { wiring: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "wire" },
+    extension_cord: { parts: { wiring: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "wire" },
+    wooden_chair: { parts: { scrap_wood: 1, hardware_parts: 0.25 }, tools: ["toolkit", "pry_bar"], min: 30, what: "wood and screws" },
+    garden_hose: { parts: { pipe_fittings: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "hose and fittings" },
+    broken_bike: { parts: { hardware_parts: 0.5, pipe_fittings: 0.25, wiring: 0.25 }, tools: ["toolkit", "multitool"], min: 30, what: "screws, tube and cable" }
+  };
+
+  // src/engine/cars-loot.js
+  var TABLE = [
+    ["paper_map", 6],
+    ["first_aid", 4],
+    ["rain_jacket", 4],
+    ["snacks", 6],
+    ["water_bottle", 4],
+    ["flashlight", 3],
+    ["batteries", 4],
+    ["lighter", 3],
+    ["blanket", 2],
+    ["pain_pills", 3],
+    ["multitool", 1],
+    ["toolkit", 0.6],
+    ["extension_cord", 1],
+    ["gloves", 3],
+    ["tarp", 1.5]
+  ];
+  function rollTable(state2) {
+    const total = TABLE.reduce((a, [, w]) => a + w, 0);
+    const n = chance(state2, 0.15) ? 0 : randInt(state2, 1, 3);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      let x = randInt(state2, 0, 9999) / 1e4 * total;
+      const hit = TABLE.find(([, w]) => (x -= w) < 0) || TABLE[0];
+      out.push(hit[0]);
+    }
+    return out;
+  }
+
+  // src/engine/cars.js
+  var CAR_SEARCH_MIN = 15;
+  var SIPHON_MIN = 20;
+  var BATTERY_MIN = 25;
+  var WIRE_MIN = 20;
+  var CAR_BATTERY_KWH = 0.5;
+  var MAX_CAR_BATTERIES = 4;
+  function carsOf(state2) {
+    if (!state2.cars || typeof state2.cars !== "object") state2.cars = {};
+    return state2.cars;
+  }
+  function carHere(state2) {
+    const loc = state2.location;
+    return loc && loc.kind === "car" ? carsOf(state2)[loc.id] || null : null;
+  }
+  function goToCar(state2, id, lat, lon) {
+    if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+    const cars = carsOf(state2);
+    if (!cars[id]) cars[id] = { lat, lon };
+    if (!travel(state2, { lat, lon }, "the car")) return false;
+    state2.location = { kind: "car", id };
+    log(state2, "You reach the abandoned car. Leaves and dust cover the glass.", "travel");
+    return true;
+  }
+  var whole = (state2, id) => (state2.carried[id] || 0) >= 1 || state2.location.kind === "home" && (state2.home.storage[id] || 0) >= 1;
+  var hasAny = (state2, ids) => ids.find((t) => whole(state2, t)) || null;
+  var SIPHON_TOOLS = ["garden_hose", "pipe_fittings"];
+  var WRENCH_TOOLS = ["toolkit", "multitool"];
+  function searchCar(state2) {
+    const c = carHere(state2);
+    if (!c || c.searched) return;
+    if (advanceTime(state2, CAR_SEARCH_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    c.searched = true;
+    const found = rollTable(state2);
+    for (const id of found) addItem(state2.carried, id, 1);
+    practice(state2, "scavenging", 1);
+    log(state2, found.length ? `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min): ${found.map((id) => ITEMS[id].name.toLowerCase()).join(", ")}.` : `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min). Nothing useful.`, found.length ? "good" : void 0);
+  }
+  function siphonGas(state2) {
+    const c = carHere(state2);
+    if (!c || c.siphoned) return;
+    if (!hasAny(state2, SIPHON_TOOLS)) {
+      log(state2, "You need a hose to siphon gas.");
+      return;
+    }
+    if (advanceTime(state2, SIPHON_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    c.siphoned = true;
+    const gal = chance(state2, 0.35) ? 0 : randInt(state2, 1, 3);
+    if (!gal) {
+      log(state2, "You feed the hose into the tank. It is dry.");
+      return;
+    }
+    addItem(state2.carried, "gas_can", gal);
+    const stale = decayShare(state2, "stale_gas");
+    log(state2, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min).${stale > 0.3 ? " It smells sour. Old gas: it may not start an engine." : ""}`, "good");
+  }
+  function takeCarBattery(state2) {
+    const c = carHere(state2);
+    if (!c || c.battery) return;
+    const tool = hasAny(state2, WRENCH_TOOLS);
+    if (!tool) {
+      log(state2, "You need a wrench (tool kit or multitool) to take the battery out.");
+      return;
+    }
+    if (advanceTime(state2, BATTERY_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    c.battery = true;
+    addItem(state2.carried, "car_battery", 1);
+    practice(state2, "tinkering", 2);
+    log(state2, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, "good");
+  }
+  function stripCarWire(state2) {
+    const c = carHere(state2);
+    if (!c || c.wire) return;
+    const tool = hasAny(state2, ["toolkit", "multitool", "knife"]);
+    if (!tool) {
+      log(state2, "You need a knife or a tool to cut the wire.");
+      return;
+    }
+    if (advanceTime(state2, WIRE_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    c.wire = true;
+    addItem(state2.carried, "wiring", 0.5);
+    addItem(state2.carried, "hardware_parts", 0.25);
+    practice(state2, "tinkering", 2);
+    log(state2, `You pull wire from under the dash and take the mirror and its screws (${WIRE_MIN} min).`, "good");
+  }
+  function addCarBattery(state2, bag) {
+    const h2 = state2.home;
+    h2.carBatteries = h2.carBatteries || 0;
+    if (!((bag.car_battery || 0) >= 1)) return;
+    if (h2.carBatteries >= MAX_CAR_BATTERIES) {
+      log(state2, "The bank has no room for more car batteries.");
+      return;
+    }
+    addItem(bag, "car_battery", -1);
+    h2.carBatteries += 1;
+    h2.batteryMax += CAR_BATTERY_KWH;
+    advanceTime(state2, 30, "work");
+    log(state2, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h2.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
+  }
+
+  // src/data/wild.js
+  var SPOTS = {
+    tualatin_rood: { name: "Tualatin River at Rood Bridge Park", lat: 45.4905, lon: -122.9505, kind: "fish", fish: ["largemouth bass", "catfish", "cutthroat trout"], quality: 1 },
+    tualatin_cook: { name: "Tualatin River at Cook Park", lat: 45.3975, lon: -122.77, kind: "fish", fish: ["largemouth bass", "crappie", "catfish"], quality: 1 },
+    fanno_creek: { name: "Fanno Creek", lat: 45.43, lon: -122.774, kind: "fish", fish: ["cutthroat trout"], quality: 0.6 },
+    commonwealth_lake: { name: "Commonwealth Lake", lat: 45.5076, lon: -122.799, kind: "fish", fish: ["rainbow trout", "bluegill", "largemouth bass"], quality: 0.8 },
+    willamette_park: { name: "Willamette River at Willamette Park", lat: 45.477, lon: -122.67, kind: "fish", fish: ["smallmouth bass", "walleye"], runs: [{ months: [2, 3, 4, 8, 9], fish: "salmon", n: 4 }, { months: [11, 0, 1, 2], fish: "winter steelhead", n: 3 }], quality: 1.1 },
+    nature_park: { name: "Tualatin Hills Nature Park", lat: 45.502, lon: -122.837, kind: "hunt", game: ["rabbit", "deer", "duck"] },
+    cooper_mountain: { name: "Cooper Mountain Nature Park", lat: 45.451, lon: -122.874, kind: "hunt", game: ["rabbit", "deer"] },
+    jackson_bottom: { name: "Jackson Bottom Wetlands", lat: 45.501, lon: -122.989, kind: "hunt", game: ["duck", "goose", "deer", "rabbit"] },
+    fernhill: { name: "Fernhill Wetlands", lat: 45.5075, lon: -123.09, kind: "hunt", game: ["duck", "goose"] },
+    tualatin_refuge: { name: "Tualatin River Wildlife Refuge", lat: 45.388, lon: -122.829, kind: "hunt", game: ["duck", "goose", "deer", "rabbit"] },
+    forest_park: { name: "Forest Park", lat: 45.56, lon: -122.76, kind: "hunt", game: ["deer", "rabbit"] }
+  };
+  var GAME = {
+    rabbit: { name: "rabbit", dc: 13, meat: 2, clean: 20, w: 4, snare: true },
+    duck: { name: "duck", dc: 14, meat: 1.5, clean: 20, w: 3, months: [9, 10, 11, 0, 1, 2] },
+    goose: { name: "Canada goose", dc: 14, meat: 4, clean: 30, w: 2, months: [9, 10, 11, 0, 1, 2] },
+    deer: { name: "black-tailed deer", dc: 16, meat: 40, clean: 120, w: 1.5, dawnDusk: true }
+  };
+  var GEAR = {
+    fish: [["fishing_rod"], ["fishing_line"]],
+    bow: ["bow", "arrows"],
+    rifle: ["rifle", "rifle_rounds"],
+    snare: ["snare_wire"],
+    clean: ["knife", "multitool"]
+  };
+
+  // src/engine/wild.js
+  var FISH_MINUTES = 120;
+  var HUNT_MINUTES = 180;
+  var SNARE_SET_MINUTES = 30;
+  var SNARE_CHECK_MINUTES = 20;
+  var SCARED_HOURS = 24;
+  var FISH_DC = 12;
+  var PRESSURE_PER_TRIP = 1;
+  var PRESSURE_RECOVER_PER_DAY = 0.25;
+  var PRESSURE_CATCH = 0.15;
+  var WINTER_CATCH = 0.5;
+  var FISH_CLEAN = 5;
+  function wildOf(state2) {
+    if (!state2.wild || typeof state2.wild !== "object") state2.wild = {};
+    const w = state2.wild;
+    w.scared || (w.scared = {});
+    w.snares || (w.snares = {});
+    w.pressure || (w.pressure = {});
+    return w;
+  }
+  var bags = (state2) => [state2.carried, state2.home.storage];
+  var hasAll = (state2, ids) => ids.every((id) => has(state2, id));
+  var hasKnife = (state2) => GEAR.clean.some((id) => has(state2, id));
+  function useOne(state2, id) {
+    const bag = (state2.carried[id] || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, id, -1);
+  }
+  function dawnOrDusk(t) {
+    const m = (t % 1440 + 1440) % 1440;
+    const s = sunFor(t);
+    return Math.abs(m - s.rise) <= 90 || Math.abs(m - s.set) <= 90;
+  }
+  function spotHere(state2) {
+    const loc = state2.location;
+    return loc && loc.kind === "wild" ? { id: loc.id, ...SPOTS[loc.id] } : null;
+  }
+  function goToSpot(state2, id) {
+    const s = SPOTS[id];
+    if (!s) {
+      log(state2, "No such place.");
+      return false;
+    }
+    if (!travel(state2, s, s.name)) return false;
+    state2.location = { kind: "wild", id };
+    log(state2, `You reach ${s.name}. ${s.kind === "fish" ? "The water is high and brown with rain." : "Brush, tall grass and the edge of the trees."}`, "travel");
+    return true;
+  }
+  function spotPressure(state2, id, t = state2.time) {
+    const e = state2.wild?.pressure?.[id];
+    if (!e) return 0;
+    return Math.max(0, e.p - (t - e.t) / 1440 * PRESSURE_RECOVER_PER_DAY);
+  }
+  function catchFactor(state2, id) {
+    const month = calendar(state2.time).month;
+    const season = [11, 0, 1].includes(month) ? WINTER_CATCH : 1;
+    return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state2, id)) * season;
+  }
+  function canFish(state2) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "fish") return "Go to a river, creek or lake first";
+    if (!GEAR.fish.some((ids) => hasAll(state2, ids))) return "You need a fishing rod, or line and hooks";
+    return null;
+  }
+  function fishSetup(state2) {
+    const s = spotHere(state2) || {};
+    const month = calendar(state2.time).month;
+    const mods = [];
+    const adv = [];
+    const dis = [];
+    const lvl = skillLevel(state2, "fishing");
+    if (lvl) mods.push(["fishing skill", lvl]);
+    if (dawnOrDusk(state2.time)) mods.push(["dawn or dusk", 2]);
+    const run2 = (s.runs || []).find((x) => x.months.includes(month)) || null;
+    if (run2) mods.push([`${run2.fish} run`, 3]);
+    if ([11, 0, 1].includes(month)) mods.push(["cold water", -2]);
+    if ((s.quality ?? 1) < 0.7) mods.push(["small creek", -2]);
+    if (!has(state2, "fishing_rod")) mods.push(["hand line", -1]);
+    const pr = Math.round(spotPressure(state2, s.id));
+    if (pr >= 2) mods.push(["fished out", -Math.min(4, pr - 1)]);
+    if ((state2.weather?.low ?? 40) <= 30) mods.push(["frozen ground, no worms", -2]);
+    return { mods, adv, dis, run: run2, spot: s };
+  }
+  function fishOdds(state2) {
+    const f = fishSetup(state2);
+    return odds(state2, FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+  }
+  function fish(state2) {
+    const why = canFish(state2);
+    if (why) {
+      log(state2, why + ".");
+      return { ok: false, fish: 0 };
+    }
+    const f = fishSetup(state2);
+    log(state2, `You fish from the bank at ${f.spot.name} for two hours.`);
+    if (advanceTime(state2, FISH_MINUTES, "rest", { stopAtDanger: true }) || state2.dead) return { ok: false, fish: 0, stopped: !state2.dead };
+    const r = check(state2, "Fishing", FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+    let n = 0;
+    let what = "";
+    if (r.success) {
+      const k = catchFactor(state2, f.spot.id);
+      if (f.run && chance(state2, 0.5)) {
+        n = f.run.n;
+        what = f.run.fish;
+      } else {
+        const base2 = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
+        n = Math.max(1, Math.floor(base2 * k + randInt(state2, 0, 99) / 100));
+        what = f.spot.fish[randInt(state2, 0, f.spot.fish.length - 1)];
+      }
+      const clean = (hasKnife(state2) ? FISH_CLEAN : 15) * n;
+      advanceTime(state2, clean, "rest");
+      addFresh(state2, bags(state2), "fresh_fish", n, 0);
+      addItem(state2.carried, "fresh_fish", n);
+      log(state2, what === f.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state2) ? "" : ", slow with no knife"}).`, "good");
+    } else log(state2, "Nothing bites. You wind in the line.");
+    const w = wildOf(state2);
+    w.pressure[f.spot.id] = { p: spotPressure(state2, f.spot.id) + PRESSURE_PER_TRIP, t: state2.time };
+    practice(state2, "fishing", r.success ? 4 : 2);
+    return { ok: r.success, fish: n, what };
+  }
+  var count = (state2, id) => (state2.carried[id] || 0) + (state2.home.storage[id] || 0);
+  function arrowsLeft(state2) {
+    return (state2.wild?.arrows || 0) + 6 * count(state2, "arrows");
+  }
+  function roundsLeft(state2) {
+    return (state2.wild?.rounds || 0) + 20 * count(state2, "rifle_rounds");
+  }
+  var canBow = (state2) => has(state2, "bow") && arrowsLeft(state2) > 0;
+  var canRifle = (state2) => has(state2, "rifle") && roundsLeft(state2) > 0;
+  function huntMethods(state2) {
+    const m = [];
+    if (canBow(state2)) m.push("bow");
+    if (canRifle(state2)) m.push("rifle");
+    return m;
+  }
+  function canHunt(state2, method) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "hunt") return "Go to a park, wetland or the edge of the woods first";
+    if (method === "bow" && !canBow(state2)) return "You need a bow and arrows";
+    if (method === "rifle" && !canRifle(state2)) return "You need a rifle and rounds";
+    if (method !== "bow" && method !== "rifle") return "Hunt with a bow or a rifle";
+    return null;
+  }
+  function gameHere(state2) {
+    const s = spotHere(state2);
+    if (!s || !s.game) return [];
+    const month = calendar(state2.time).month;
+    return s.game.filter((id) => !GAME[id].months || GAME[id].months.includes(month)).map((id) => ({ id, ...GAME[id], w: GAME[id].w * (GAME[id].dawnDusk && dawnOrDusk(state2.time) ? 2 : 1) }));
+  }
+  function isScared(state2, spotId = state2.location?.id) {
+    const until = state2.wild?.scared?.[spotId];
+    return until != null && state2.time < until;
+  }
+  function findChance(state2) {
+    let p = 0.5 + animalCover(state2.time) * 0.3;
+    if (dawnOrDusk(state2.time)) p += 0.15;
+    if (isNight(state2.time)) p *= 0.3;
+    if (isScared(state2)) p *= 0.4;
+    if (!gameHere(state2).length) p = 0;
+    return Math.min(0.95, p);
+  }
+  function shotSetup(state2, method, g) {
+    const mods = [];
+    const adv = [];
+    const dis = [];
+    const lvl = skillLevel(state2, "hunting");
+    if (lvl) mods.push(["hunting skill", lvl]);
+    if (method === "rifle") mods.push(["rifle", 3]);
+    if (animalCover(state2.time) > 0.6) mods.push(["thick brush", -1]);
+    if (g?.dawnDusk && dawnOrDusk(state2.time)) mods.push(["deer move at dawn", 1]);
+    if (isScared(state2)) dis.push("game is wary");
+    return { mods, adv, dis };
+  }
+  function huntOdds(state2, method) {
+    const list = gameHere(state2);
+    const g = list.length ? list.reduce((a, b) => b.w > a.w ? b : a) : GAME.rabbit;
+    const s = shotSetup(state2, method, g);
+    return { find: Math.round(findChance(state2) * 100), animal: g.name, shot: odds(state2, g.dc, s.mods, { outside: true, adv: s.adv, dis: s.dis }) };
+  }
+  function spendShot(state2, method) {
+    const w = wildOf(state2);
+    if (method === "rifle") {
+      if (!(w.rounds > 0)) {
+        useOne(state2, "rifle_rounds");
+        w.rounds = 20;
+      }
+      w.rounds--;
+      w.scared[state2.location.id] = state2.time + SCARED_HOURS * 60;
+    }
+  }
+  function loseArrow(state2) {
+    const w = wildOf(state2);
+    if (!(w.arrows > 0)) {
+      useOne(state2, "arrows");
+      w.arrows = 6;
+    }
+    w.arrows--;
+  }
+  function takeMeat(state2, g, spoil = 0) {
+    const knife = hasKnife(state2);
+    const lb = knife ? g.meat : Math.max(1, Math.round(g.meat * 0.4));
+    const min = g.clean * (knife ? 1 : 2);
+    advanceTime(state2, min, "work");
+    addFresh(state2, bags(state2), "raw_meat", lb, spoil);
+    addItem(state2.carried, "raw_meat", lb);
+    log(state2, `You clean the ${g.name} (${min} min${knife ? "" : ", hard work with no knife"}) and take ${lb} lb of meat.${lb >= 20 ? " It is a heavy load." : ""}`, "good");
+    return lb;
+  }
+  function hunt(state2, method) {
+    const why = canHunt(state2, method);
+    if (why) {
+      log(state2, why + ".");
+      return { ok: false };
+    }
+    const s = spotHere(state2);
+    log(state2, `You move slowly through ${s.name} with the ${method}, and wait.`);
+    const findP = findChance(state2);
+    if (advanceTime(state2, HUNT_MINUTES, "work", { stopAtDanger: true }) || state2.dead) return { ok: false, stopped: !state2.dead };
+    const list = gameHere(state2);
+    if (!list.length || !chance(state2, findP)) {
+      log(state2, isScared(state2) ? "Nothing moves. The game here is still wary after the shot." : "You see tracks and droppings, but no animal comes in range.");
+      practice(state2, "hunting", 1);
+      return { ok: false, seen: null };
+    }
+    const total = list.reduce((a, b) => a + b.w, 0);
+    let x = randInt(state2, 0, 999) / 1e3 * total;
+    const g = list.find((e) => (x -= e.w) < 0) || list[0];
+    const sh = shotSetup(state2, method, g);
+    spendShot(state2, method);
+    const r = check(state2, `Shoot the ${g.name} (${method})`, g.dc, sh.mods, { outside: true, adv: sh.adv, dis: sh.dis });
+    if (method === "rifle") log(state2, "The shot cracks across the open ground. Every animal near here will be wary for a day.", "warn");
+    practice(state2, "hunting", r.success ? 5 : 3);
+    if (!r.success) {
+      if (method === "bow" && chance(state2, 0.4)) {
+        loseArrow(state2);
+        log(state2, `You miss. The ${g.name} is gone, and so is the arrow.`);
+      } else log(state2, `You miss. The ${g.name} is gone.`);
+      return { ok: false, seen: g.id };
+    }
+    const lb = takeMeat(state2, g);
+    return { ok: true, seen: g.id, meat: lb };
+  }
+  function canSetSnare(state2) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "hunt" || !s.game.includes("rabbit")) return "Snares need a place with rabbits";
+    if (!has(state2, "snare_wire")) return "You need snare wire";
+    if (wildOf(state2).snares[s.id] != null) return "Your snares are already set here";
+    return null;
+  }
+  function setSnare(state2) {
+    const why = canSetSnare(state2);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    advanceTime(state2, SNARE_SET_MINUTES, "work");
+    wildOf(state2).snares[state2.location.id] = state2.time;
+    log(state2, "You set a line of wire snares on the rabbit runs at the edge of the brush. Come back tomorrow.");
+    practice(state2, "hunting", 1);
+    return true;
+  }
+  function checkSnare(state2) {
+    const s = spotHere(state2);
+    const w = wildOf(state2);
+    const set = s ? w.snares[s.id] : null;
+    if (set == null) {
+      log(state2, "You have no snares here.");
+      return { ok: false };
+    }
+    const hours = (state2.time - set) / 60;
+    if (hours < 12) {
+      log(state2, "Too soon. Give the snares a night.");
+      return { ok: false };
+    }
+    advanceTime(state2, SNARE_CHECK_MINUTES, "work");
+    const days = Math.min(3, Math.max(1, Math.floor(hours / 24)));
+    const p = Math.min(0.8, 0.3 + 0.08 * skillLevel(state2, "hunting") + animalCover(state2.time) * 0.2);
+    let caught = 0;
+    for (let i = 0; i < days; i++) if (chance(state2, p)) caught++;
+    w.snares[s.id] = state2.time;
+    practice(state2, "hunting", caught ? 3 : 1);
+    if (!caught) {
+      log(state2, "The snares are empty. One is pulled loose; you set it again.");
+      return { ok: false, rabbits: 0 };
+    }
+    log(state2, `${caught} rabbit${caught > 1 ? "s" : ""} in the snares.`, "good");
+    let lb = 0;
+    for (let i = 0; i < caught; i++) lb += takeMeat(state2, GAME.rabbit, Math.min(0.6, hours / 24 * 0.15));
+    return { ok: true, rabbits: caught, meat: lb };
+  }
+  function takeUpSnare(state2) {
+    const s = spotHere(state2);
+    const w = wildOf(state2);
+    if (!s || w.snares[s.id] == null) return false;
+    delete w.snares[s.id];
+    log(state2, "You take up your snares.");
+    return true;
+  }
+
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
-  var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
+  var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "oatmeal", "canned_food"];
+  var COOK_NEEDS_WATER = /* @__PURE__ */ new Set(["dry_food", "oatmeal"]);
+  var cookWater = (h2, carried = {}) => h2.safeGal >= 0.125 ? "safeGal" : h2.rawGal >= 0.125 ? "rawGal" : h2.tankGal >= 0.125 ? "tankGal" : (h2.storage.water_bottle || 0) >= 0.125 ? "storage" : (carried.water_bottle || 0) >= 0.125 ? "carried" : null;
+  function useCookWater(state2) {
+    const h2 = state2.home;
+    const w = cookWater(h2, state2.carried);
+    if (w === "storage") addItem(h2.storage, "water_bottle", -0.125);
+    else if (w === "carried") addItem(state2.carried, "water_bottle", -0.125);
+    else h2[w] -= 0.125;
+  }
+  function cookPick(state2) {
+    const h2 = state2.home;
+    const water = cookWater(h2, state2.carried);
+    return COOK_ORDER().find((f) => ((h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
+  }
   var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var SCAV_XP = 0.5;
   function source2(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
   }
@@ -3378,6 +4047,8 @@
     if (loc.kind === "home") return "Home (Aloha)";
     if (loc.kind === "place") return getPlace(loc.id)?.name || "Unknown place";
     if (loc.kind === "house") return loc.label;
+    if (loc.kind === "wild") return spotHere(state2)?.name || "Outside";
+    if (loc.kind === "car") return "Abandoned car";
     return "";
   }
   function canHeat(state2, kwh) {
@@ -3423,8 +4094,52 @@
     if (it.kind === "book") uses.push({ verb: "read", label: hasRead(state2, id) ? "Read again" : "Read", note: `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}` });
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
+    if (id === "car_battery" && state2.location.kind === "home") {
+      const n = state2.home.carBatteries || 0;
+      uses.push({ verb: "carbattery", label: "Wire into the home battery", note: `+0.5 kWh storage \xB7 ${n}/${MAX_CAR_BATTERIES}`, disabled: n >= MAX_CAR_BATTERIES });
+    }
+    const sv = SALVAGE[id];
+    if (sv) {
+      const tool = salvageTool(state2, id);
+      uses.push({ verb: "salvage", label: "Take apart", note: tool ? `${salvageMinutes(state2, id)} min \xB7 ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")}`, disabled: !tool });
+    }
     return uses;
   }
+  function salvageTool(state2, id) {
+    const sv = SALVAGE[id];
+    if (!sv) return null;
+    const order = ["toolkit", ...sv.tools.filter((t) => t !== "toolkit")];
+    return order.find((t) => sv.tools.includes(t) && has2(state2, t)) || null;
+  }
+  function salvageMinutes(state2, id) {
+    const sv = SALVAGE[id];
+    const tool = salvageTool(state2, id);
+    const lvl = skillLevel(state2, "tinkering");
+    return Math.round(sv.min * (tool === "toolkit" ? 0.75 : 1) * (1 - 0.06 * lvl));
+  }
+  function salvage(state2, id, bag) {
+    const sv = SALVAGE[id];
+    const tool = salvageTool(state2, id);
+    if (!tool) {
+      log(state2, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or a ")} to take this apart.`);
+      return;
+    }
+    const min = salvageMinutes(state2, id);
+    if (advanceTime(state2, min, "work", { stopAtDanger: true }) || state2.dead) return;
+    addItem(bag, id, -1);
+    for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
+    practice(state2, "tinkering", 2);
+    log(state2, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(", ")}.`, "good");
+  }
+  var endDot = (t) => /[.!?]$/.test(t) ? t : `${t}.`;
+  var plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, "");
+  var QTY_WORDS = { 0.25: "a quarter", 0.5: "half a", 0.75: "three quarters of a" };
+  function partText(pid, q) {
+    const it = ITEMS[pid];
+    const w = QTY_WORDS[q];
+    return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+  }
+  var sleepWhere = (state2) => sleepSpot(state2) !== "living" ? "in your bed" : state2.home.fireHours > 0 ? "by the fire" : "on the couch";
   function useItem(state2, id, verb, from = "carried") {
     const bag = source2(state2, from);
     const it = ITEMS[id];
@@ -3442,7 +4157,7 @@
         addItem(bag, id, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         if (it.water) addWater(state2, it.water);
-        log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
+        log(state2, `You eat: ${plainName(id)}${it.portion < 1 ? " (one portion)" : ""}.`);
         advanceTime(state2, 15);
         if (risk > 0 && chance(state2, risk)) {
           log(state2, "It tasted off. Your stomach turns.", "warn");
@@ -3459,6 +4174,14 @@
       }
       case "med":
         return useMed(state2, id, bag);
+      case "salvage":
+        return salvage(state2, id, bag);
+      case "carbattery":
+        if (state2.location.kind !== "home") {
+          log(state2, "You can wire the car battery into the bank only at home.");
+          return;
+        }
+        return addCarBattery(state2, bag);
       case "wear": {
         addItem(bag, id, -1);
         const old = putOn(p, id);
@@ -3605,18 +4328,21 @@
   function takeAll(state2) {
     const bag = hereBag(state2);
     const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+    const took = [];
     let left = false;
     for (const id of ids) {
       const before = bag[id];
       const w = ITEMS[id].weight;
-      const maxN = Math.floor(freeWeight(state2) / w);
-      const n = Math.min(Math.floor(before), maxN);
+      const room = freeWeight(state2) / w;
+      const n = before < 1 ? room >= before ? before : 0 : Math.min(Math.floor(before), Math.floor(room));
       if (n > 0) {
         addItem(bag, id, -n);
         addItem(state2.carried, id, n);
+        took.push(itemName(id).toLowerCase());
       }
       if (bag[id]) left = true;
     }
+    if (took.length) log(state2, `You take: ${took.join(", ")}.`);
     if (left) log(state2, "Your pack is full. Some items stay here.", "warn");
     advanceTime(state2, 2);
   }
@@ -3640,10 +4366,11 @@
   }
   function rest(state2, hours) {
     log(state2, `You rest for ${hours} h.`);
-    advanceTime(state2, hours * 60, "rest");
+    advanceTime(state2, hours * 60, "rest", { stopAtDanger: true });
   }
   function sleep(state2, hours) {
-    const where = state2.location.kind === "home" ? "in your bed" : "on the floor";
+    const k = state2.location.kind;
+    const where = k === "home" ? sleepWhere(state2) : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
     log(state2, `You sleep ${where} for ${hours} h.`);
     advanceTime(state2, hours * 60, "sleep");
     if (!state2.dead) log(state2, "You wake up.");
@@ -3728,17 +4455,14 @@
         advanceTime(state2, 5);
         return;
       case "cook": {
-        const food = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+        const food = cookPick(state2);
+        if (!food) {
+          log(state2, "You have nothing you can cook now.");
+          return;
+        }
         const bag = (h2.storage[food] || 0) > 0 ? h2.storage : state2.carried;
         const it = ITEMS[food];
-        if (food === "dry_food") {
-          const water = h2.safeGal >= 0.125 ? "safeGal" : h2.rawGal >= 0.125 ? "rawGal" : h2.tankGal >= 0.125 ? "tankGal" : null;
-          if (!water) {
-            log(state2, "You need water to cook rice or pasta.");
-            return;
-          }
-          h2[water] -= 0.125;
-        }
+        if (COOK_NEEDS_WATER.has(food)) useCookWater(state2);
         const how = useHeat(state2, 0.5);
         const risk = eatRisk(state2, food, true);
         const stage = stageLabel(state2, food);
@@ -3748,7 +4472,7 @@
         p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
         p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
-        log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
+        log(state2, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
         advanceTime(state2, 30);
         if (risk > 0 && chance(state2, risk)) {
           log(state2, "The food was bad. Your stomach turns.", "warn");
@@ -3770,9 +4494,8 @@
       }
       case "run_generator": {
         const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
+        if (advanceTime(state2, 120, "work", { stopAtDanger: true }) || state2.dead) return;
         addItem(bag, "gas_can", -1);
-        advanceTime(state2, 120, "work");
-        if (state2.dead) return;
         if (!chance(state2, gasStartChance(state2))) {
           log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
           p.morale = clamp3(p.morale - 2, 0, 100);
@@ -3785,10 +4508,10 @@
         return;
       }
       case "break_furniture":
+        if (advanceTime(state2, 60, "heavy", { stopAtDanger: true }) || state2.dead) return;
         h2.furniture -= 1;
         addItem(h2.storage, "firewood", 1);
         log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
-        advanceTime(state2, 60, "heavy");
         practice(state2, "tinkering", 2);
         return;
       case "heater":
@@ -4063,7 +4786,7 @@
     ctx.holder.taken.push(pid);
     addItem(state2.carried, it.item, 1);
     log(state2, `You take: ${itemName(it.item)}.`);
-    practice(state2, "scavenging", 1);
+    practice(state2, "scavenging", SCAV_XP);
     if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
       markZoneDone(ctx, zone);
       state2.stats.zonesSearched += 1;
@@ -4093,7 +4816,7 @@
     if (state2.dead) return true;
     h2.opened.push(cid);
     log(state2, "You open it and look inside.");
-    practice(state2, "scavenging", 1);
+    practice(state2, "scavenging", SCAV_XP);
     return true;
   }
   function openedContainers(state2) {
@@ -4125,7 +4848,7 @@
     markZoneDone(ctx, zone);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-    practice(state2, "scavenging", 2);
+    practice(state2, "scavenging", 2 * SCAV_XP);
     reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
     state2.lastFound = found;
     return true;
@@ -4201,7 +4924,7 @@
     state2.houses[id].pos = pos;
     state2.pos = { ...pos };
     advanceTime(state2, 5, "walk");
-    log(state2, `You walk to a house ${near}.`);
+    log(state2, endDot(`You walk to a house ${near}`));
     if (chance(state2, 0.7)) {
       if (has2(state2, "pry_bar")) {
         log(state2, "The door is locked. You open it with the pry bar.");
@@ -4222,9 +4945,22 @@
     }
     state2.stats.housesSearched += 1;
     state2.location = { kind: "house", id, label, parent };
-    if (state2.houses[id].body) seeBody(state2, "Someone is in the bedroom. You close the door.");
-    else log(state2, "The house is empty and cold. A family lived here.");
+    const hn = state2.stats.housesSearched;
+    if (state2.houses[id].body) seeBody(state2, BODY_LINES[hn % BODY_LINES.length]);
+    else log(state2, EMPTY_LINES[hn % EMPTY_LINES.length]);
   }
+  var BODY_LINES = [
+    "Someone is in the bedroom. You close the door.",
+    "Someone lies under a blanket on the couch. You do not look long.",
+    "A door upstairs is shut, and the air is bad. You leave it shut."
+  ];
+  var EMPTY_LINES = [
+    "The house is empty and cold. A family lived here.",
+    "The house is quiet. Dust covers the table.",
+    "Coats still hang by the door. Nobody is here.",
+    "The rooms are cold and dark. The clocks have stopped.",
+    "Toys lie on the floor. The house is empty."
+  ];
   function searchRoom(state2, index) {
     const ctx = zoneCtx(state2);
     if (!ctx || !ctx.house) return false;
@@ -4245,7 +4981,7 @@
     markZoneDone(ctx, room);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-    practice(state2, "scavenging", 2);
+    practice(state2, "scavenging", 2 * SCAV_XP);
     reportFound(state2, found, HOUSE_ROOMS[room]);
     state2.lastFound = found;
     return true;
@@ -4263,7 +4999,7 @@
     const ok = travel(state2, place, place.name);
     if (!ok) return;
     state2.location = { kind: "place", id: placeId };
-    log(state2, `You arrive at ${place.name}.`, "travel");
+    log(state2, endDot(`You arrive at ${place.name}`), "travel");
     enterPlace(state2, place);
   }
   function goHome(state2) {
@@ -4297,12 +5033,14 @@
         const startP = gasStartChance(state2);
         add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
+      add("walk_in", "Walk around your home (first person)", { note: "see what you built" });
       if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
       add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
-      const cookId = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+      const cookId = cookPick(state2);
       const food = !!cookId;
+      const onlyDry = !food && COOK_ORDER().some((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
       const cr = cookId ? eatRisk(state2, cookId, true) : 0;
-      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
+      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: onlyDry && "Need water to cook" || !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
       if (!h2.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
@@ -4339,10 +5077,49 @@
       add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("leave_house", "Leave the house");
     }
+    if (loc.kind === "car") {
+      const c = carHere(state2) || {};
+      const hasAny2 = (ids) => ids.some((t) => has2(state2, t));
+      add("car_search", c.searched ? "Glovebox and trunk: searched" : `Search the glovebox and trunk (${CAR_SEARCH_MIN} min)`, { disabled: c.searched && "Done" });
+      add("car_siphon", c.siphoned ? "Gas tank: done" : `Siphon gas (${SIPHON_MIN} min)`, { disabled: c.siphoned && "Done" || !hasAny2(SIPHON_TOOLS) && "You need a garden hose or pipe and fittings", note: c.siphoned ? void 0 : "many tanks are dry" });
+      add("car_battery", c.battery ? "Battery: taken" : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: c.battery && "Done" || !hasAny2(WRENCH_TOOLS) && "You need a tool kit or multitool", note: c.battery ? void 0 : "adds storage to the home battery" });
+      add("car_wire", c.wire ? "Wire and mirror: taken" : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: c.wire && "Done" || !hasAny2(["toolkit", "multitool", "knife"]) && "You need a knife or a tool" });
+      add("go_home", "Walk home");
+    }
+    if (loc.kind === "wild") {
+      const spot = spotHere(state2);
+      if (spot?.kind === "fish") {
+        const why = canFish(state2);
+        add("fish", `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? void 0 : oddsText(fishOdds(state2)) });
+      }
+      if (spot?.kind === "hunt") {
+        const methods = huntMethods(state2);
+        if (!methods.length) add("hunt_bow", `Hunt (${HUNT_MINUTES / 60} h)`, { disabled: "You need a bow and arrows, or a rifle and rounds" });
+        for (const m of methods) {
+          const o = huntOdds(state2, m);
+          const why = canHunt(state2, m);
+          add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game \xB7 ${o.shot.pct}% hit a ${o.animal}${m === "rifle" ? " \xB7 loud" : ""}${isScared(state2) ? " \xB7 game is wary" : ""}`, risk: m === "rifle" });
+        }
+        const w = state2.wild?.snares?.[spot.id];
+        if (w != null) {
+          const hours = (state2.time - w) / 60;
+          add("check_snare", "Check your snares", { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
+          add("take_snare", "Take up your snares");
+        } else if (spot.game?.includes("rabbit")) {
+          const why = canSetSnare(state2);
+          add("set_snare", "Set snares for rabbits (30 min)", { disabled: why, note: why ? void 0 : "check after a night" });
+        }
+      }
+      add("go_home", "Walk home");
+    }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? `Sleep ${sleepWhere(state2)}\u2026` : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
+      if (state2.dog.sick) {
+        const why = canTreatDog(state2);
+        add("treat_dog", `Treat ${state2.dog.name} (antibiotics)`, { disabled: why, note: why ? void 0 : "1 course of antibiotics" });
+      }
       if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
     }
     return acts;
@@ -4374,6 +5151,40 @@
         return searchRoom(state2, arg);
       case "walk_inside":
         return walkInside(state2, arg);
+      // Garden and heat (engine garden.js and home.js rules; the time cost is here).
+      case "garden_plant":
+        if (state2.location.kind === "home" && plant(state2, String(arg))) advanceTime(state2, 30, "work");
+        return;
+      case "garden_water":
+        if (state2.location.kind === "home" && waterGarden(state2) > 0) advanceTime(state2, 15, "work");
+        return;
+      case "garden_harvest":
+        if (state2.location.kind === "home" && Object.keys(harvest(state2)).length) advanceTime(state2, 30, "work");
+        return;
+      case "sleep_spot":
+        if (setSleepSpot(state2, String(arg))) log(state2, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
+        return;
+      case "board_window": {
+        if (state2.location.kind !== "home") return;
+        const bag = (state2.home.storage.scrap_wood || 0) > 0 ? state2.home.storage : (state2.carried.scrap_wood || 0) > 0 ? state2.carried : null;
+        if (!bag) {
+          log(state2, "You need scrap wood to board up a window.");
+          return;
+        }
+        if (!boardWindow(state2, String(arg))) return;
+        addItem(bag, "scrap_wood", -1);
+        log(state2, "You nail scrap wood over the broken window. Less cold gets in.", "good");
+        advanceTime(state2, 30, "work");
+        return;
+      }
+      case "door": {
+        const [room, closed] = String(arg).split(":");
+        if (state2.location.kind === "home" && setDoor(state2, room, closed === "1")) {
+          log(state2, closed === "1" ? "You close the door." : "You open the door.");
+          advanceTime(state2, 1);
+        }
+        return;
+      }
       case "flashlight":
         return toggleFlashlight(state2);
       case "pickup":
@@ -4390,6 +5201,37 @@
         return goHome(state2);
       case "go_place":
         return goToPlace(state2, arg);
+      case "go_spot":
+        return goToSpot(state2, arg);
+      case "treat_dog": {
+        const ok = treatDog(state2);
+        if (ok) advanceTime(state2, 10);
+        return;
+      }
+      case "go_car": {
+        const [cid, la, lo] = String(arg).split("|");
+        return goToCar(state2, cid, Number(la), Number(lo));
+      }
+      case "car_search":
+        return searchCar(state2);
+      case "car_siphon":
+        return siphonGas(state2);
+      case "car_battery":
+        return takeCarBattery(state2);
+      case "car_wire":
+        return stripCarWire(state2);
+      case "fish":
+        return fish(state2);
+      case "hunt_bow":
+        return hunt(state2, "bow");
+      case "hunt_rifle":
+        return hunt(state2, "rifle");
+      case "set_snare":
+        return setSnare(state2);
+      case "check_snare":
+        return checkSnare(state2);
+      case "take_snare":
+        return takeUpSnare(state2);
       case "play_dog":
         return playWithDog(state2);
       case "dog_follow":
@@ -4581,6 +5423,60 @@
       plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
   }
+  var HOME_PROJECT_SLOTS = {
+    wood_stove: { room: "living room", slot: "A", w: 0.9, d: 0.9, h: 1 },
+    insulate_living: { room: "living room", slot: "W", w: 3, d: 0.12, h: 2.2 },
+    led_lights: { room: "living room", slot: "C", w: 1.4, d: 0.3, h: 0.08 },
+    filter_station: { room: "kitchen", slot: "A", w: 0.7, d: 0.6, h: 1.5 },
+    sealed_store: { room: "kitchen", slot: "B", w: 1, d: 0.6, h: 1 },
+    rocket_stove: { room: "garage", slot: "A", w: 0.6, d: 0.6, h: 0.8 },
+    rain_barrels: { room: "garage", slot: "B", w: 1.4, d: 0.7, h: 1.1 },
+    second_battery: { room: "garage", slot: "W", w: 0.6, d: 0.3, h: 0.8, dx: 0.75 },
+    sick_room: { room: "second bedroom", slot: "A", w: 1, d: 0.9, h: 1.9 },
+    med_cabinet: { room: "bathroom", slot: "A", w: 0.6, d: 0.3, h: 0.8, y: 1 }
+  };
+  function buildHome(built2) {
+    const r = mulberry32(hashString("interior:home"));
+    const plan = roomsPlan("house", HOUSE_ROOMS.length, r, {});
+    plan.cat = "house";
+    plan.home = true;
+    plan.dark = false;
+    plan.exposed = null;
+    plan.projects = [];
+    const roomOf = (name) => plan.spots.find((s) => s.label === name);
+    for (const [id, s] of Object.entries(HOME_PROJECT_SLOTS)) {
+      const sp = roomOf(s.room);
+      if (!sp) continue;
+      const a = sp.area;
+      const side = sp.x > 0 ? 1 : -1;
+      const xin = side > 0 ? a.x1 : a.x2;
+      const cx = (a.x1 + a.x2) / 2;
+      let x;
+      let z;
+      if (s.slot === "A" || s.slot === "B") {
+        x = xin + side * (s.w / 2 + 0.15);
+        const gap = s.y ? 0.02 : 0.15;
+        z = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
+      } else if (s.slot === "W") {
+        x = cx + (s.dx || 0) * side;
+        z = a.z1 + s.d / 2 + 0.02;
+      } else {
+        x = cx;
+        z = (a.z1 + a.z2) / 2;
+      }
+      const isBuilt = !!built2(id);
+      const flat = s.slot === "W" || s.slot === "C";
+      const f = { type: "proj", proj: id, built: isBuilt, x, z, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
+      plan.fixtures.push(f);
+      plan.projects.push({ id, x, z, room: s.room, built: isBuilt, y: f.y, h: s.h });
+    }
+    const g = roomOf("garage");
+    if (g) {
+      const a = g.area;
+      plan.fixtures.push({ type: "proj", proj: "home_battery", built: true, x: (a.x1 + a.x2) / 2 + 0.05 * (g.x > 0 ? 1 : -1), z: a.z1 + 0.1, w: 0.5, d: 0.16, h: 0.7, y: 0, zone: g.zone, solid: true });
+    }
+    return plan;
+  }
 
   // src/engine/stock.js
   var QUARTS_PER_GAL = 4;
@@ -4738,8 +5634,8 @@
     }
     for (const h2 of activeHazards(state2)) {
       const left = formatDuration(h2.endsAt - state2.time);
-      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} (about ${left} more).`, level: "warn" });
-      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder (about ${left} more).`, level: "danger" });
+      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} for about another ${left}.`, level: "warn" });
+      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder for about another ${left}.`, level: "danger" });
     }
     return out;
   }
@@ -5125,7 +6021,7 @@
       const rng = mulberry32(hashString(`detail:${p.id}`));
       const list = p.cat === "home" ? [["car", 3], ["trash", 1]] : NEAR[p.cat] || [];
       for (const [type, n] of list) {
-        for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === "home" ? 30 : 25, type === "car" ? 110 : 80), rng);
+        for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === "home" ? 30 : 25, type === "car" ? 110 : 80), rng, type === "car" ? { id: `car:${p.id}:${i}` } : {});
       }
       const greens = p.cat === "home" ? 6 : 5;
       for (let i = 0; i < greens; i++) {
@@ -5616,7 +6512,7 @@
     }
     return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
   }
-  async function createMap(container, { places, onPlaceClick }) {
+  async function createMap(container, { places, onPlaceClick, onCarClick }) {
     const maplibregl = window.maplibregl;
     const { style, online } = await pickStyle();
     const map = new maplibregl.Map({
@@ -5662,6 +6558,11 @@
       if (!f || map.queryRenderedFeatures(e.point, { layers: ["places"] }).length) return;
       const info = DETAIL_INFO[f.properties.type];
       if (detailPopup) detailPopup.remove();
+      if (f.properties.type === "car" && f.properties.id && onCarClick) {
+        const [lon, lat] = f.geometry.coordinates;
+        onCarClick(f.properties.id, lat, lon, e.lngLat);
+        return;
+      }
       detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px" }).setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
     });
     map.on("mouseenter", "details", () => {
@@ -5742,6 +6643,17 @@
     youEl.title = "You";
     youEl.innerHTML = "<i></i>";
     const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    for (const [id, sp] of Object.entries(SPOTS)) {
+      const el = document.createElement("div");
+      el.className = `marker-wild ${sp.kind}`;
+      el.title = `${sp.name} (${sp.kind === "fish" ? "fishing" : "hunting"})`;
+      el.innerHTML = `<span>${sp.kind === "fish" ? "\u2248" : "\u22C0"}</span>`;
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onPlaceClick(`wild:${id}`, null);
+      });
+      new maplibregl.Marker({ element: el }).setLngLat([sp.lon, sp.lat]).addTo(map);
+    }
     const signMarkers = /* @__PURE__ */ new Map();
     function applyMarks(state2, list) {
       const m = legacyMarks(state2);
@@ -5795,7 +6707,8 @@
       type: "FeatureCollection",
       features: list.map((p) => {
         const ps = placeStates[p.id];
-        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
         return {
           type: "Feature",
           geometry: { type: "Point", coordinates: [p.lon, p.lat] },
@@ -6021,9 +6934,9 @@
     state = loadGame();
     bindEvents();
     fx = createFx($("#mapwrap"));
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span><span><i class="edge"></i>15-mile edge</span>';
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span><span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span><span><i class="edge"></i>15-mile edge</span>';
     try {
-      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
+      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
       window.__llMap = mapApi.map;
       const showCoords = () => {
         const c = mapApi.map.getCenter();
@@ -6100,10 +7013,25 @@
     const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join("");
     return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}\xB0F.</div>${fx2 ? `<ul class="wx-fx">${fx2}</ul>` : ""}`;
   }
+  function tripRisks(t) {
+    const p = state.player;
+    if (!(t.miles > 2 || t.darkOnArrival)) return [];
+    const water = state.carried.water_bottle || 0;
+    return [
+      p.health < 50 && "your health is low",
+      p.injuries.some((i) => !i.bandaged) && "a wound is not bandaged",
+      p.illness?.infection && "an infection is not treated",
+      water < 0.5 && "you carry less than 2 qt of water",
+      t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && "it will be dark and you have no light",
+      p.energy < 30 && "you are very tired",
+      p.warmth < 40 && "you are cold"
+    ].filter(Boolean);
+  }
   function tripHtml(dest) {
     const t = tripPreview(state, dest);
+    const risks2 = tripRisks(t);
     const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
-    return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
+    return `${risks2.length ? `<p class="warn-line">\u26A0 Think first: ${esc(risks2.join("; "))}.</p>` : ""}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
   }
   function freshTag(id) {
     const l = stageLabel(state, id);
@@ -6146,7 +7074,8 @@
     const free = MAX_GOALS - g.picked.length;
     const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : "";
     const empty = g.picked.length ? "" : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
-    return `<details class="goals"${goalsOpen ? " open" : ""}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+    const fresh = !g.picked.length;
+    return `<details class="goals"${goalsOpen || fresh ? " open" : ""}><summary>Legacy${fresh ? ' <span class="badge-new">New</span>' : ""}</summary>${empty}${rows}${choose}</details>`;
   }
   function showGoalBoard() {
     const g = ensureGoals(state);
@@ -6215,6 +7144,8 @@
       const p = getPlace(loc.id);
       sub = CATEGORIES[p.cat].label;
     } else if (loc.kind === "home") sub = "Your house. One story, a fireplace, solar panels and a home battery.";
+    else if (loc.kind === "wild") sub = wildSub(SPOTS[loc.id]);
+    else if (loc.kind === "car") sub = "An abandoned car at the curb. Zoom in on the map to find more.";
     else sub = "A house. Search it room by room.";
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
@@ -6233,7 +7164,7 @@
     return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
   }
   function useButtons(id, from) {
-    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
+    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc(u.note)}</small>` : ""}</button>`).join("");
   }
   var KIND_GROUPS = [
     ["Food", ["food", "dogfood"]],
@@ -6241,7 +7172,7 @@
     ["Medicine", ["med"]],
     ["Light and tools", ["tool", "batteries"]],
     ["Clothes", ["wear"]],
-    ["Fuel and parts", ["fuel", "part"]],
+    ["Fuel and parts", ["fuel", "part", "junk"]],
     ["Books", ["book"]],
     ["Other", ["misc", "comfort", "warm"]]
   ];
@@ -6314,6 +7245,8 @@
       ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
       <span>Kitchen tap</span><b>${h2.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
+    ${renderHeat(atHome)}
+    ${renderGarden(atHome)}
     ${renderBase()}`;
   }
   function renderBase() {
@@ -6332,7 +7265,13 @@
       for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
       for (const t of st.tools) if (!t.have) need[t.id] = 1;
     }
-    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} \xD7${q}</span>`).join("");
+    const leftAt = (id) => {
+      const at = [];
+      for (const [pid, ps] of Object.entries(state.places || {})) if ((ps.leftovers?.[id] || 0) > 0) at.push(getPlace(pid)?.name || "a store");
+      for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || "a house");
+      return at.length ? ` \xB7 left at ${at.slice(0, 2).join(", ")}${at.length > 2 ? ` +${at.length - 2}` : ""}` : "";
+    };
+    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} \xD7${q}${esc(leftAt(id))}</span>`).join("");
     return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
@@ -6366,6 +7305,7 @@
     if (d.stage === "joined") {
       const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
       html = `<h3>${esc(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
+      ${d.sick ? `<p class="warn-line">\u26A0 ${esc(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
     } else if (d.stage === "visiting") {
       html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
@@ -6389,12 +7329,21 @@
       pos = homeOf(state);
       const atHome = state.location.kind === "home";
       html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+    } else if (id.startsWith("wild:")) {
+      const sid = id.slice(5);
+      const sp = SPOTS[sid];
+      pos = sp;
+      const here = state.location.kind === "wild" && state.location.id === sid;
+      const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
+      html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === "fish" ? "Fishing" : "Hunting"} \xB7 ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
     } else {
       const p = getPlace(id);
       pos = p;
       const cat = CATEGORIES[p.cat];
       const ps = state.places[p.id];
-      const status = !ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched: nothing left" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
+      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+      const status = (!ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched all of it" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`) + (left > 0 ? ` \xB7 items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ": nothing left" : "");
       const here = state.location.kind === "place" && state.location.id === id;
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
       html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
@@ -6407,15 +7356,43 @@
       popup.remove();
       travelTo(e.currentTarget.dataset.goplace);
     });
+    el.querySelector("[data-gowild]")?.addEventListener("click", (e) => {
+      popup.remove();
+      travelTo(`wild:${e.currentTarget.dataset.gowild}`);
+    });
     el.querySelector("[data-gohome]")?.addEventListener("click", () => {
       popup.remove();
       travelTo("__home");
     });
   }
+  function wildSub(sp) {
+    if (!sp) return "";
+    if (sp.kind === "fish") return `Fish here: ${sp.fish.join(", ")}.${sp.run ? ` A ${sp.run.fish} run comes in some months.` : ""}`;
+    const here = state.location.kind === "wild" && SPOTS[state.location.id] === sp;
+    const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
+    return `Game here${here ? " now" : ""}: ${now.length ? now.join(", ") : "none this time of year"}.`;
+  }
+  function showCarPopup(id, lat, lon, lngLat) {
+    if (!state || !mapApi || picking) return;
+    if (popup) popup.remove();
+    const c = state.cars?.[id] || {};
+    const here = state.location.kind === "car" && state.location.id === id;
+    const left = [!c.searched && "glovebox and trunk", !c.siphoned && "gas tank", !c.battery && "battery", !c.wire && "wire"].filter(Boolean);
+    const html = `<h4>Abandoned car</h4><p>Dust and leaves cover the glass.</p><p><i>${left.length ? `Not done: ${left.join(", ")}` : "Nothing left to take"}</i></p>
+    ${here ? "<p><i>You are here.</i></p>" : `${tripHtml({ lat, lon })}<button class="go" data-gocar="1">Walk here</button>`}`;
+    popup = new window.maplibregl.Popup({ closeButton: true, maxWidth: "260px" }).setLngLat(lngLat || [lon, lat]).setHTML(html).addTo(mapApi.map);
+    popup.getElement().querySelector("[data-gocar]")?.addEventListener("click", () => {
+      popup.remove();
+      travelTo(`car:${id}|${lat}|${lon}`);
+    });
+  }
+  if (typeof window !== "undefined") window.__llShowCar = (id, lat, lon) => showCarPopup(id, lat, lon, null);
   function travelTo(id) {
     if (state.dead) return;
     if (state.location.kind === "house") perform(state, "action", "leave_house");
     if (id === "__home") perform(state, "action", "go_home");
+    else if (id.startsWith("wild:")) perform(state, "action", "go_spot", id.slice(5));
+    else if (id.startsWith("car:")) perform(state, "action", "go_car", id.slice(4));
     else perform(state, "action", "go_place", id);
     if (state.dead) recordRun(state);
     commit(true);
@@ -6449,12 +7426,30 @@
       });
     });
   }
+  function sleepPreview(h2) {
+    try {
+      const copy = structuredClone(state);
+      copy.log = [];
+      perform(copy, "action", "sleep", h2);
+      const p = copy.player;
+      return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
+    } catch {
+      return null;
+    }
+  }
   function showSleep() {
+    const p = state.player;
+    const prev = {};
     const opts = [1, 2, 4, 6, 8, 10].map((h2) => {
       const a = actionTiming(state, h2 * 60);
-      return `<button data-hours="${h2}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
+      const f = prev[h2] = sleepPreview(h2);
+      const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
+      const warn = !f ? "" : f.dead ? " \xB7 you may not wake" : low ? ` \xB7 wake ${[f.water < 15 && "very thirsty", f.food < 15 && "starving", f.warmth < 15 && "freezing"].filter(Boolean).join(", ")}` : "";
+      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc(warn)}</small></button>`;
     }).join("");
-    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+    const need = [p.water < 40 && "Drink first: you are thirsty.", p.food < 40 && "Eat first: you are hungry.", p.warmth < 40 && "Get warm first: you are cold."].filter(Boolean);
+    const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc(need.join(" "))}</p>` : ""}`;
+    modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
         closeModal();
         act("action", "sleep", Number(b.dataset.hours));
@@ -6769,6 +7764,13 @@
       stock = cat.stock;
       title = loc.label;
       zoneName = "room";
+    } else if (loc.kind === "home") {
+      cat = { label: "Home base" };
+      plan = buildHome((id) => built(state, id));
+      zoneList = () => [];
+      stock = 1;
+      title = "Home (Aloha)";
+      zoneName = "room";
     } else return;
     const env = environment(state, "work");
     const night = isNight(state.time);
@@ -6826,8 +7828,12 @@
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
         return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
       },
+      projectInfo: (id) => homeProjectText(state, id, true),
+      // Lamps at home: LED lights need the project built and charge in the battery.
+      homeLamps: loc.kind === "home" ? { led: built(state, "led_lights") && state.home.battery > 0.2, candles: state.home.storage.candles || 0 } : null,
       describe: (n) => {
-        if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
+        if (n.type === "exit") return loc.kind === "home" ? "<kbd>E</kbd> Back to the home panel" : "<kbd>E</kbd> Leave the building <small>back to the map</small>";
+        if (n.type === "project") return homeProjectText(state, n.id, false);
         if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
           return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
@@ -6859,6 +7865,7 @@
         return { ok, name: it ? itemName(it.item) : "", msg: msgs };
       },
       onSeeZone: (zone) => {
+        if (loc.kind === "home") return;
         perform(state, "action", "see_zone", zone);
         saveGame(state);
       },
@@ -6875,7 +7882,7 @@
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
         const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
-        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -6990,6 +7997,12 @@
       else if (b.dataset.drop) act("drop", b.dataset.drop);
       else if (b.dataset.build) act("action", "build", b.dataset.build);
       else if (b.dataset.goalboard) showGoalBoard();
+      else if (b.dataset.garden) {
+        const [what, crop] = b.dataset.garden.split(":");
+        act("action", `garden_${what}`, crop);
+      } else if (b.dataset.sleepspot) act("action", "sleep_spot", b.dataset.sleepspot);
+      else if (b.dataset.board) act("action", "board_window", b.dataset.board);
+      else if (b.dataset.door) act("action", "door", b.dataset.door);
       else if (b.dataset.goaldrop) {
         const why = dropGoal(state, b.dataset.goaldrop);
         if (why) alert(why);
@@ -7020,6 +8033,94 @@
       `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
       ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
     ];
+  }
+  function homeProjectText(state2, id, long) {
+    if (id === "home_battery") {
+      const h2 = state2.home;
+      const txt = `${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels`;
+      return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
+    }
+    const proj = PROJECTS.find((p) => p.id === id);
+    if (!proj) return "";
+    const st = projectStatus(state2, proj);
+    if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc(proj.name)} <small>built \xB7 ${esc(proj.effect || "")}</small>`;
+    const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
+    const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
+    const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
+    if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
+    return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} \xB7 <kbd>E</kbd> details</small>`;
+  }
+  function renderHeat(atHome) {
+    const hh = homeHeat(state);
+    const src = [];
+    if (hh.sources.fireHours > 0) src.push(`${hh.sources.stove ? "Wood stove" : "Fireplace"} (${formatDuration(hh.sources.fireHours * 60)} left)`);
+    if (hh.sources.heater) src.push("Electric heater");
+    const tcls = (t) => t < 40 ? "bad" : t < 55 ? "warn" : "ok";
+    const rows = hh.rooms.map((r) => {
+      const leaks = [];
+      if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? "s" : ""}`);
+      if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
+      if (r.id === "living" && hh.insulated) leaks.push("insulated");
+      const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? "" : "disabled"} title="1 scrap wood, 30 min">Board up a window</button>` : "";
+      const door = r.doorClosed == null ? "" : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? "" : "disabled"}>${r.doorClosed ? "Open door" : "Close door"}</button>`;
+      const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
+      const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
+      return `<div class="heat-row">
+      <span class="hn">${esc(r.label)}</span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
+      <small>${esc(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
+      <span class="hb">${board}${door}${bed}</span>
+    </div>`;
+    }).join("");
+    return `<div class="heat">
+    <h3>Heat <small>outside ${hh.outside}\xB0F</small></h3>
+    <p class="sub">Heat from: ${src.length ? esc(src.join(", ")) : "nothing now (light a fire or turn on the heater)"} \u2192 living room \u2192 rooms with open doors. Closed doors keep a room's heat in or out.</p>
+    ${rows}
+  </div>`;
+  }
+  var MONTHS2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function monthsText(list) {
+    const m = [...list].sort((a, b) => a - b);
+    const runs = [];
+    for (const x of m) {
+      const r = runs[runs.length - 1];
+      if (r && x === r[1] + 1) r[1] = x;
+      else runs.push([x, x]);
+    }
+    return runs.map(([a, b]) => a === b ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b]}`).join(", ");
+  }
+  function renderGarden(atHome) {
+    const g = gardenInfo(state);
+    if (!g.beds) return "";
+    const beds = [];
+    for (let i = 0; i < g.beds; i++) {
+      const b = g.planted[i];
+      if (!b) {
+        beds.push('<div class="bed empty"><span>Empty bed</span></div>');
+        continue;
+      }
+      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
+      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b> <span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? "" : `${b.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b.crop].days * (100 - b.growth) / 100))} days left if warm \xB7 `}water ${b.water}%</small></div>`);
+    }
+    const sow = g.canSow.map((id) => {
+      const why = canPlant(state, id);
+      return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc(why || "")}">Sow ${esc(CROPS[id].name.toLowerCase())}</button>`;
+    }).join("");
+    const any = g.planted.some((b) => !b.dead && !b.ready);
+    const ripe = g.planted.some((b) => b.ready);
+    return `<div class="garden">
+    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <div class="beds">${beds.join("")}</div>
+    <div class="row">
+      ${any ? `<button class="small" data-garden="water" ${atHome ? "" : "disabled"}>Water the beds (15 min)</button>` : ""}
+      ${ripe ? `<button class="small primary" data-garden="harvest" ${atHome ? "" : "disabled"}>Harvest (30 min)</button>` : ""}
+    </div>
+    <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : "Nothing to sow this month."}</p>
+    <div class="row">${sow}</div>
+    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(" \xB7 ")}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
+  </div>`;
   }
 
   // src/main.js

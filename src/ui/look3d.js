@@ -258,7 +258,7 @@ function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
 // Grime by place (Adam, 2026-11-25): homes and kept-up workplaces (stores, offices, clinics) have
 // low to no grime; garages and industrial sites medium; outdoors and buildings open to the weather
 // (a broken window, a collapsed roof) high. ?style=real keeps the old fixed amount.
-export const GRIME = { low: 0.12, medium: 0.6, high: 1.6 };
+export const GRIME = { clean: 0.01, low: 0.12, medium: 0.6, high: 1.6 }; // clean: your own home (kept up)
 const GRIME_BY_CAT = {
   supermarket: 'low', convenience: 'low', gas: 'low', pharmacy: 'low', clinic: 'low', hospital: 'low',
   // 'outdoor' is an outdoor-gear store (OSM shop=outdoor), a kept-up shop, not the outdoors.
@@ -482,12 +482,15 @@ function makeDrywall(S, seed, paintHex, baseHex) {
     }
     const m = (mot[i] - 0.5) * 22;
     const low = clamp01(1 - (fromFloor - basePx) / dirtBand); // dirt near the floor
-    const d = low * low * (0.4 + mot[i] * 0.6);
+    const d = low * low * (0.4 + mot[i] * 0.6) * (grimeAmt < 0.05 ? 0.2 : 1);
     o[0] = p[0] + m - d * 60; o[1] = p[1] + m - d * 62; o[2] = p[2] + m - d * 66;
     o[3] = 0.5 + peel[i] * 0.06;
     o[4] = 0.78 + d * 0.15;
   });
   const { c, rc } = L;
+  // A kept-up home (grime 'clean'): no stains, drips, scuffs or chips (same random draws).
+  const clean = grimeAmt < 0.05;
+  if (clean) { c.globalAlpha = 0; L.hc.globalAlpha = 0; }
   // water stains with drip trails from above
   for (let k = 0; k < 2; k++) {
     const x = rnd() * W;
@@ -523,6 +526,7 @@ function makeDrywall(S, seed, paintHex, baseHex) {
     L.hc.fillStyle = 'rgba(0,0,0,0.6)';
     L.hc.beginPath(); L.hc.arc(x, y, r, 0, 6.3); L.hc.fill();
   }
+  c.globalAlpha = 1; L.hc.globalAlpha = 1;
   rc.globalAlpha = 1;
   return surfaceMaterial(L, { tile: [2, 6], normal: 1.6 });
 }
@@ -1398,7 +1402,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   const keep = (x) => (disposables.push(x), x);
 
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = dim ? 1.25 : 1.0;
+  renderer.toneMappingExposure = dark && night ? 0.6 : dim ? 1.25 : 1.0; // a dark store at night: only your light
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = high ? PCFSoftShadowMap : PCFShadowMap;
@@ -1436,7 +1440,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     pm.dispose();
     roomGeo.dispose(); roomMat.dispose(); door.geometry.dispose(); door.material.dispose();
     scene.environment = envRT.texture;
-    scene.environmentIntensity = dark ? 0.35 : night ? 0.3 : 0.6;
+    scene.environmentIntensity = dark ? (night ? 0.06 : 0.35) : night ? 0.3 : 0.6;
   } catch { envRT = null; }
 
   // Fill light: what bounces around the room. Low in the dark so the flashlight matters.
@@ -1444,7 +1448,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   if (opts.fill !== false) {
     // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.55 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
+      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.12 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
         : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5 * (0.35 + 0.65 * Math.min(1, dayK)));
@@ -1457,7 +1461,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   let flashlight = null;
   let flashOn = false;
   let flashPower = 1;
-  const FLASH_I = 70;
+  const FLASH_I = dark && night ? 140 : 70; // stronger to match the lower exposure in a dark store at night
   const flashTarget = new Object3D();
   if (opts.flashlight !== false) {
     const spot = new SpotLight(0xfff1dc, 0, 26, 0.48, 0.55, 2);
