@@ -1057,18 +1057,18 @@
     return Object.freeze({ order: 100, ...sys, version, migrations });
   }
   function createSystems(list = [], { dev = false } = {}) {
-    const byId2 = /* @__PURE__ */ new Map();
+    const byId3 = /* @__PURE__ */ new Map();
     const owner = /* @__PURE__ */ new Map();
     let ordered = [];
     function add(sys) {
       const s = defineSystem(sys);
-      if (byId2.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
+      if (byId3.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
       for (const f of s.owns || []) {
         if (owner.has(f)) throw new Error(`Field "${f}" is owned by both "${owner.get(f)}" and "${s.id}"`);
       }
       for (const f of s.owns || []) owner.set(f, s.id);
-      byId2.set(s.id, s);
-      ordered = [...byId2.values()].sort((a, b) => a.order - b.order);
+      byId3.set(s.id, s);
+      ordered = [...byId3.values()].sort((a, b) => a.order - b.order);
       return s;
     }
     for (const s of list) add(s);
@@ -1095,7 +1095,7 @@
     }
     return {
       add,
-      get: (id) => byId2.get(id),
+      get: (id) => byId3.get(id),
       ids: () => ordered.map((s) => s.id),
       ownerOf: (field) => owner.get(field) || null,
       // Systems that have not said how they catch up: reduced or abstract
@@ -3922,7 +3922,10 @@
     rain: { cloud: 0.85, precip: "rain", strength: 0.5, fog: 0.15 },
     heavy_rain: { cloud: 0.95, precip: "rain", strength: 1, fog: 0.3 },
     windstorm: { cloud: 0.8, precip: "rain", strength: 0.4, fog: 0 },
-    snow: { cloud: 0.9, precip: "snow", strength: 0.6, fog: 0.2 }
+    snow: { cloud: 0.9, precip: "snow", strength: 0.6, fog: 0.2 },
+    ice_storm: { cloud: 0.95, precip: "rain", strength: 0.6, fog: 0.2, ice: true },
+    heat_wave: { cloud: 0, precip: "none", strength: 0, fog: 0.1, haze: "#f3d9a4" },
+    smoke: { cloud: 0.4, precip: "none", strength: 0, fog: 0.5, haze: "#d9822b" }
   };
   var clamp01 = (v) => Math.max(0, Math.min(1, v));
   function sceneEnv(state2, t = state2.time) {
@@ -3963,6 +3966,10 @@
       precip: look.precip,
       precipStrength: look.strength,
       fog: look.fog,
+      haze: look.haze || null,
+      // sky tint for smoke or heat (CSS color), or null
+      ice: !!look.ice,
+      // ice storm: glazed surfaces
       windMph: w.wind || 0,
       airF: Math.round(airTemp(state2, t)),
       season: seasonOf(t),
@@ -4884,6 +4891,279 @@
     };
   }
 
+  // src/data/legacy-goals.js
+  var stored = (s, id) => s.home?.storage?.[id] || 0;
+  var storedAny = (s, ids) => ids.reduce((a, id) => a + stored(s, id), 0);
+  var BOOKS = ["book_first_aid", "book_repair", "book_cooking", "book_survival"];
+  var dayNow = (s) => gameDay(s.time);
+  var GOAL_KINDS = {
+    preserve: { label: "Preserve", hint: "Keep something alive or safe for later." },
+    repair: { label: "Repair", hint: "Make something work again." },
+    document: { label: "Document", hint: "Keep a record of the city as it changes." },
+    leave: { label: "Leave behind", hint: "Make something for whoever comes after." }
+  };
+  var GOALS = [
+    {
+      id: "seed_bank",
+      kind: "preserve",
+      title: "Seed bank",
+      why: "Seeds stay alive for years if they are dry and cool.",
+      steps: [
+        { id: "seeds_1", text: "Store a packet of seeds at home", check: (s) => stored(s, "seeds") >= 1 },
+        { id: "seeds_5", text: "Store 5 packets of seeds", check: (s) => stored(s, "seeds") >= 5 },
+        { id: "dry_store", text: "Build the sealed food store (dry, safe from mice)", check: (s) => built(s, "sealed_store") },
+        { id: "seeds_12", text: "Store 12 packets of seeds", check: (s) => stored(s, "seeds") >= 12 },
+        { id: "water_for_bed", text: "Have a rain barrel system to water a test bed", check: (s) => built(s, "rain_barrels") }
+      ],
+      epilogue: {
+        none: "The seed packets stayed in the stores, and the mice found them.",
+        some: "A few jars of seeds sit dry on a shelf in a house in Aloha.",
+        all: "A dry store in Aloha holds seeds for a whole garden, labeled and sealed."
+      }
+    },
+    {
+      id: "library_shelf",
+      kind: "preserve",
+      title: "A shelf of books",
+      why: "Paper rots in a wet city. A dry shelf keeps what people knew.",
+      steps: [
+        { id: "books_1", text: "Bring a book home", check: (s) => storedAny(s, BOOKS) >= 1 },
+        { id: "books_4", text: "Have 4 books on the shelf at home", check: (s) => storedAny(s, BOOKS) >= 4 },
+        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b) => stored(s, b) >= 1) },
+        { id: "dry_room", text: "Insulate the living room to keep the shelf dry", check: (s) => built(s, "insulate_living") },
+        { id: "books_10", text: "Have 10 books on the shelf", check: (s) => storedAny(s, BOOKS) >= 10 }
+      ],
+      epilogue: {
+        none: "The libraries stood open to the rain, and the books swelled and fell apart.",
+        some: "A short row of books stays dry in one living room.",
+        all: "A dry shelf in Aloha keeps how to heal, fix, cook and live, for whoever reads next."
+      }
+    },
+    {
+      id: "animal_care",
+      kind: "preserve",
+      title: "Animal care",
+      why: "The animals did not choose this either.",
+      steps: [
+        { id: "dog_joined", text: "Take in the stray dog", check: (s) => s.dog?.stage === "joined" },
+        { id: "dog_food_5", text: "Store 5 bags of dog food at home", check: (s) => stored(s, "dog_food") >= 5 },
+        { id: "flea_spray", text: "Keep flea spray at home", check: (s) => stored(s, "flea_spray") >= 1 },
+        { id: "bond_80", text: "Earn the dog\u2019s full trust (bond 80)", check: (s) => s.dog?.stage === "joined" && s.dog.bond >= 80 },
+        { id: "dog_60_days", text: "Keep the dog alive and with you for 60 days", check: (s) => s.dog?.stage === "joined" && dayNow(s) >= 60 }
+      ],
+      epilogue: {
+        none: "The dogs of the city went wild, and then went quiet.",
+        some: "One dog was fed and named, for a while.",
+        all: "A dog grew old and safe in a warm house, and never went hungry."
+      }
+    },
+    {
+      id: "light_on_hill",
+      kind: "repair",
+      title: "Light in the window",
+      why: "One lit window, every night, in a dark city.",
+      steps: [
+        { id: "battery_module", text: "Bring home a battery module", check: (s) => stored(s, "battery_module") >= 1 },
+        { id: "led", text: "Build LED lights on the battery", check: (s) => built(s, "led_lights") },
+        { id: "second_battery", text: "Build a second battery", check: (s) => built(s, "second_battery") },
+        { id: "candles_10", text: "Store 10 candles for the nights the battery is empty", check: (s) => stored(s, "candles") >= 10 }
+      ],
+      epilogue: {
+        none: "At night the whole city was dark, to the last house.",
+        some: "For a while, one window in Aloha was lit at night.",
+        all: "Every night a window in Aloha lights up on its own, as long as the sun charges the battery."
+      }
+    },
+    {
+      id: "water_for_anyone",
+      kind: "repair",
+      title: "Water for anyone",
+      why: "Clean water is the first thing anyone needs.",
+      steps: [
+        { id: "barrels", text: "Build the rain barrel system", check: (s) => built(s, "rain_barrels") },
+        { id: "filter", text: "Build the water filter station", check: (s) => built(s, "filter_station") },
+        { id: "safe_20", text: "Have 20 gal of safe water in store", check: (s) => (s.home?.safeGal || 0) >= 20 },
+        { id: "tablets", text: "Store 3 packs of water tablets for later", check: (s) => stored(s, "water_tablets") >= 3 }
+      ],
+      epilogue: {
+        none: "The taps went dry, and the rain ran into the drains.",
+        some: "A barrel by a house in Aloha still fills with rain.",
+        all: "Rain still turns into clean water at a house in Aloha, with nobody to turn a tap."
+      }
+    },
+    {
+      id: "radio",
+      kind: "repair",
+      title: "The radio",
+      why: "Nobody answers. You keep the radio working anyway.",
+      steps: [
+        { id: "radio_home", text: "Bring a radio home", check: (s) => stored(s, "radio") >= 1 },
+        { id: "radio_parts", text: "Store wiring and hardware parts for repairs", check: (s) => stored(s, "wiring") >= 1 && stored(s, "hardware_parts") >= 1 },
+        { id: "radio_power", text: "Build LED lights on the battery (the radio runs on it too)", check: (s) => built(s, "led_lights") },
+        { id: "radio_batteries", text: "Store 4 sets of batteries for the radio", check: (s) => stored(s, "batteries") >= 4 }
+      ],
+      epilogue: {
+        none: "The air was only static, on every band.",
+        some: "A radio in Aloha was switched on each evening for a while.",
+        all: "A radio in Aloha was kept working to the end, listening to the static."
+      }
+    },
+    {
+      id: "city_atlas",
+      kind: "document",
+      title: "City atlas",
+      why: "Walk it and mark it: what is left, and where.",
+      steps: [
+        { id: "miles_10", text: "Walk 10 miles", check: (s) => (s.stats?.miles || 0) >= 10 },
+        { id: "places_10", text: "Search 10 places", check: (s) => (s.stats?.placesSearched || 0) >= 10 },
+        { id: "map_carried", text: "Keep a paper map with you to mark", check: (s) => (s.carried?.paper_map || 0) >= 1 || stored(s, "paper_map") >= 1 },
+        { id: "miles_50", text: "Walk 50 miles", check: (s) => (s.stats?.miles || 0) >= 50 },
+        { id: "places_40", text: "Search 40 places", check: (s) => (s.stats?.placesSearched || 0) >= 40 },
+        { id: "houses_20", text: "Search 20 houses", check: (s) => (s.stats?.housesSearched || 0) >= 20 }
+      ],
+      epilogue: {
+        none: "Nobody knew any more which stores still had food.",
+        some: "A paper map in Aloha has marks on it: searched, empty, water here.",
+        all: "A worn paper map in Aloha shows every store, every road, and what was left in each."
+      }
+    },
+    {
+      id: "weather_record",
+      kind: "document",
+      title: "Weather record",
+      why: "Write down every day. Someone may need to know the seasons here.",
+      steps: [
+        { id: "days_14", text: "Keep the record for 14 days", check: (s) => dayNow(s) >= 14 },
+        { id: "days_30", text: "Keep the record for 30 days", check: (s) => dayNow(s) >= 30 },
+        { id: "first_snow", text: "Live through a day of snow", check: (s) => s.weather?.type === "snow" },
+        { id: "days_90", text: "Keep the record for 90 days", check: (s) => dayNow(s) >= 90 },
+        { id: "days_365", text: "Keep the record for a full year", check: (s) => dayNow(s) >= 365 }
+      ],
+      epilogue: {
+        none: "Nobody wrote down the weather any more.",
+        some: "A notebook in Aloha lists the weather, day by day, for a season.",
+        all: "A shelf of notebooks in Aloha holds a full year of weather, one line a day."
+      }
+    },
+    {
+      id: "time_capsule",
+      kind: "leave",
+      title: "Time capsule",
+      why: "A box of small things that say how people lived.",
+      steps: [
+        { id: "tc_bin", text: "Bring home a metal bin to seal it in", check: (s) => stored(s, "metal_bin") >= 1 },
+        { id: "tc_comfort", text: "Keep a comfort item for it", check: (s) => stored(s, "comfort") >= 1 },
+        { id: "tc_book", text: "Keep a book for it", check: (s) => storedAny(s, BOOKS) >= 1 },
+        { id: "tc_radio", text: "Keep a radio for it", check: (s) => stored(s, "radio") >= 1 },
+        { id: "tc_map", text: "Keep a paper map for it", check: (s) => stored(s, "paper_map") >= 1 },
+        { id: "tc_seal", text: "Store plastic sheet and duct tape to seal it", check: (s) => stored(s, "plastic_sheet") >= 1 && stored(s, "duct_tape") >= 1 }
+      ],
+      epilogue: {
+        none: "The small things of daily life were lost with everything else.",
+        some: "A metal bin in Aloha holds a few small things from before.",
+        all: "A sealed bin in Aloha holds a toy, a map, a book and a radio, for someone to open one day."
+      }
+    },
+    {
+      id: "message_wall",
+      kind: "leave",
+      title: "Signs for later",
+      why: "Practical advice, painted large, for anyone who comes later.",
+      steps: [
+        { id: "mw_tools", text: "Keep a toolkit and scrap wood for sign boards", check: (s) => stored(s, "toolkit") >= 1 && stored(s, "scrap_wood") >= 2 },
+        { id: "mw_water", text: "Know where water is: build the filter station", check: (s) => built(s, "filter_station") },
+        { id: "mw_places", text: "Search 20 places, so the signs say what is left", check: (s) => (s.stats?.placesSearched || 0) >= 20 },
+        { id: "mw_miles", text: "Walk 30 miles to put the signs up across the city", check: (s) => (s.stats?.miles || 0) >= 30 }
+      ],
+      epilogue: {
+        none: "The streets gave no advice to anyone.",
+        some: "A few hand-painted signs say where to find water.",
+        all: "Painted signs across the west side say where water is, which roads are open and which stores still have food."
+      }
+    }
+  ];
+
+  // src/engine/goals.js
+  var MAX_GOALS = 3;
+  var BOARD_OPENS_DAY = 7;
+  var CHANGE_GAP_DAYS = 30;
+  var STEP_MORALE = 3;
+  var byId2 = new Map(GOALS.map((g) => [g.id, g]));
+  function ensureGoals(state2) {
+    const p = state2.player;
+    if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null };
+    return p.goals;
+  }
+  var boardOpen = (state2) => gameDay(state2.time) >= BOARD_OPENS_DAY;
+  function canChange(state2) {
+    const g = ensureGoals(state2);
+    return g.changedDay == null || gameDay(state2.time) - g.changedDay >= CHANGE_GAP_DAYS;
+  }
+  function pickGoal(state2, id) {
+    var _a;
+    const g = ensureGoals(state2);
+    if (!boardOpen(state2)) return `The board opens on day ${BOARD_OPENS_DAY + 1}. First, stay alive.`;
+    if (!byId2.has(id)) return "Unknown goal.";
+    if (g.picked.includes(id)) return "You already work on this.";
+    if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
+    g.picked.push(id);
+    (_a = g.done)[id] || (_a[id] = []);
+    log(state2, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
+    checkGoals(state2);
+    return null;
+  }
+  function dropGoal(state2, id) {
+    const g = ensureGoals(state2);
+    if (!g.picked.includes(id)) return "You do not work on this.";
+    if (!canChange(state2)) return `You can change a goal again in ${CHANGE_GAP_DAYS - (gameDay(state2.time) - g.changedDay)} days.`;
+    g.picked = g.picked.filter((x) => x !== id);
+    g.changedDay = gameDay(state2.time);
+    log(state2, `You put the goal aside: ${byId2.get(id).title}.`);
+    return null;
+  }
+  function checkGoals(state2) {
+    var _a;
+    const g = state2.player.goals;
+    if (!g || !g.picked.length || state2.dead) return [];
+    const now = [];
+    for (const id of g.picked) {
+      const goal = byId2.get(id);
+      if (!goal) continue;
+      const done = (_a = g.done)[id] || (_a[id] = []);
+      for (const st of goal.steps) {
+        if (done.includes(st.id)) continue;
+        let ok = false;
+        try {
+          ok = !!st.check(state2);
+        } catch {
+          ok = false;
+        }
+        if (!ok) continue;
+        done.push(st.id);
+        state2.player.morale = Math.min(100, state2.player.morale + STEP_MORALE);
+        const all = done.length === goal.steps.length;
+        log(state2, all ? `${goal.title}: done. ${goal.epilogue.all}` : `${goal.title}: ${st.text} (step ${done.length} of ${goal.steps.length}).`, "good");
+        now.push({ goal: id, step: st.id });
+      }
+    }
+    return now;
+  }
+  function goalProgress(state2, id) {
+    const goal = byId2.get(id);
+    const done = state2.player.goals?.done?.[id] || [];
+    return { goal, done: done.length, total: goal.steps.length, steps: goal.steps.map((s) => ({ ...s, done: done.includes(s.id) })) };
+  }
+  function epilogue(state2) {
+    const g = state2.player.goals;
+    if (!g) return [];
+    const ids = [.../* @__PURE__ */ new Set([...g.picked, ...Object.keys(g.done).filter((k) => g.done[k].length)])];
+    return ids.filter((id) => byId2.has(id)).map((id) => {
+      const { goal, done, total } = goalProgress(state2, id);
+      const line = done === 0 ? goal.epilogue.none : done === total ? goal.epilogue.all : goal.epilogue.some;
+      return { id, title: goal.title, kind: GOAL_KINDS[goal.kind].label, done, total, line };
+    });
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
@@ -4944,6 +5224,7 @@
   function act(kind, a, b, c) {
     const wasDead = !!state.dead;
     perform(state, kind, a, b, c);
+    afterAction2();
     if (!wasDead && state.dead) recordRun(state);
     commit();
   }
@@ -5020,10 +5301,60 @@
   }
   var skillsOpen = false;
   var clothesOpen = false;
+  var goalsOpen = false;
+  function afterAction2() {
+    if (!state || state.dead) return;
+    if (boardOpen(state) && !state.player.goals?.announced) {
+      ensureGoals(state).announced = true;
+      log(state, "A week alive. You start to think about more than the next meal: what could you keep, fix or leave behind? (Legacy, under your skills.)", "hint");
+    }
+    checkGoals(state);
+  }
+  function goalsHtml() {
+    if (!boardOpen(state)) return "";
+    const g = ensureGoals(state);
+    const rows = g.picked.map((id) => {
+      const pr = goalProgress(state, id);
+      const steps = pr.steps.map((st) => `<li class="${st.done ? "done" : ""}">${st.done ? "\u2713" : "\u25CB"} ${esc(st.text)}</li>`).join("");
+      return `<div class="goal"><div class="goal-h"><b>${esc(pr.goal.title)}</b><span class="goal-k">${esc(GOAL_KINDS[pr.goal.kind].label)}</span><span class="goal-n">${pr.done} / ${pr.total}</span>
+      <button class="link goal-drop" data-goaldrop="${id}" ${canChange(state) ? "" : "disabled"} title="${canChange(state) ? "Put this goal aside (steps done are kept)" : `You can change a goal once per ${CHANGE_GAP_DAYS} days`}">Put aside</button></div><ul class="goal-steps">${steps}</ul></div>`;
+    }).join("");
+    const free = MAX_GOALS - g.picked.length;
+    const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : "";
+    const empty = g.picked.length ? "" : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
+    return `<details class="goals"${goalsOpen ? " open" : ""}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+  }
+  function showGoalBoard() {
+    const g = ensureGoals(state);
+    const groups = Object.entries(GOAL_KINDS).map(([kind, k]) => {
+      const items = GOALS.filter((x) => x.kind === kind).map((x) => {
+        const on = g.picked.includes(x.id);
+        const pr = goalProgress(state, x.id);
+        return `<div class="gb-goal"><div><b>${esc(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc(x.why)}</p></div>
+        <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
+      }).join("");
+      return `<h4>${esc(k.label)} <span class="hint">${esc(k.hint)}</span></h4>${items}`;
+    }).join("");
+    modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
+    <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
+      m.querySelector("#cancel").addEventListener("click", closeModal);
+      m.querySelectorAll("[data-goalpick]").forEach((b) => b.addEventListener("click", () => {
+        const why = pickGoal(state, b.dataset.goalpick);
+        if (why) {
+          alert(why);
+          return;
+        }
+        goalsOpen = true;
+        closeModal();
+        commit();
+      }));
+    });
+  }
   document.addEventListener("toggle", (e) => {
     if (!e.target.classList) return;
     if (e.target.classList.contains("skills")) skillsOpen = e.target.open;
     if (e.target.classList.contains("clothes")) clothesOpen = e.target.open;
+    if (e.target.classList.contains("goals")) goalsOpen = e.target.open;
   }, true);
   function skillsHtml(open) {
     const rows = allSkills(state).map((k) => {
@@ -5051,7 +5382,7 @@
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
     if (p.wetness >= 10) chips.push([p.wetness >= 50 ? "bad" : "warn", `Wet ${Math.round(p.wetness)}%`]);
     chips.push(["", `Wearing: ${wornText(p)}`]);
-    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false) + goalsHtml();
   }
   function renderLocation() {
     const loc = state.location;
@@ -5321,6 +5652,11 @@
       });
     });
   }
+  function legacyEpilogueHtml() {
+    const ep = epilogue(state);
+    if (!ep.length) return "";
+    return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc(e.title)}</b> <span class="hint">${esc(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc(e.line)}</li>`).join("")}</ul>`;
+  }
   function showDeath() {
     const d = state.dead;
     const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc(r.cause)}${r.dog ? ` \xB7 with ${esc(r.dog)}` : ""}</li>`).join("");
@@ -5328,6 +5664,7 @@
     <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc(d.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : "none"}</b></div>
+    ${legacyEpilogueHtml()}
     <h3>Best runs</h3><ol>${runs}</ol>
     ${startChoicesHtml()}`, bindStartChoices);
   }
@@ -5825,7 +6162,12 @@
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);
       else if (b.dataset.build) act("action", "build", b.dataset.build);
-      else if (b.id === "menuBtn") showMenu();
+      else if (b.dataset.goalboard) showGoalBoard();
+      else if (b.dataset.goaldrop) {
+        const why = dropGoal(state, b.dataset.goaldrop);
+        if (why) alert(why);
+        else commit();
+      } else if (b.id === "menuBtn") showMenu();
       else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
     document.body.addEventListener("toggle", (e) => {
