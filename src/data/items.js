@@ -117,6 +117,7 @@ export const ITEMS = {
   wooden_chair: { name: 'Wooden chair', unit: 'pc', weight: 9, kind: 'junk' },
   garden_hose: { name: 'Garden hose', unit: 'pc', weight: 5, kind: 'junk' },
   broken_bike: { name: 'Broken bicycle', unit: 'pc', weight: 25, kind: 'junk' },
+  car_battery: { name: 'Car battery (12 V)', unit: 'pc', weight: 35, kind: 'part' },
   scrap_wood: { name: 'Lumber and plywood', unit: 'pc', weight: 6, kind: 'part' },
   hardware_parts: { name: 'Nails, screws and brackets', unit: 'box', weight: 1, kind: 'part' },
   wiring: { name: 'Electrical wire and connectors', unit: 'roll', weight: 2, kind: 'part' },

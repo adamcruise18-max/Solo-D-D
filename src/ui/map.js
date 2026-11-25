@@ -46,7 +46,7 @@ function circlePolygon(center, miles, n = 128) {
   return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
 }
 
-export async function createMap(container, { places, onPlaceClick }) {
+export async function createMap(container, { places, onPlaceClick, onCarClick }) {
   const maplibregl = window.maplibregl;
   const { style, online } = await pickStyle();
   const map = new maplibregl.Map({
@@ -95,6 +95,12 @@ export async function createMap(container, { places, onPlaceClick }) {
     if (!f || map.queryRenderedFeatures(e.point, { layers: ['places'] }).length) return;
     const info = DETAIL_INFO[f.properties.type];
     if (detailPopup) detailPopup.remove();
+    // Cars are places you can walk to (search, siphon gas, take the battery).
+    if (f.properties.type === 'car' && f.properties.id && onCarClick) {
+      const [lon, lat] = f.geometry.coordinates;
+      onCarClick(f.properties.id, lat, lon, e.lngLat);
+      return;
+    }
     detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '240px' })
       .setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
   });

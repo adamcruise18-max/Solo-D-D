@@ -20,6 +20,7 @@ import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 import { plant, waterGarden, harvest } from './garden.js';
 import { SALVAGE } from '../data/salvage.js';
+import { carHere, goToCar, searchCar, siphonGas, takeCarBattery, stripCarWire, addCarBattery, SIPHON_TOOLS, WRENCH_TOOLS, CAR_SEARCH_MIN, SIPHON_MIN, BATTERY_MIN, WIRE_MIN, MAX_CAR_BATTERIES } from './cars.js';
 import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
 import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
@@ -70,6 +71,7 @@ export function locationLabel(state) {
   if (loc.kind === 'place') return getPlace(loc.id)?.name || 'Unknown place';
   if (loc.kind === 'house') return loc.label;
   if (loc.kind === 'wild') return spotHere(state)?.name || 'Outside';
+  if (loc.kind === 'car') return 'Abandoned car';
   return '';
 }
 
@@ -123,6 +125,10 @@ export function itemUses(state, id) {
   if (it.kind === 'book') uses.push({ verb: 'read', label: hasRead(state, id) ? 'Read again' : 'Read', note: `${READ_MINUTES / 60} h · ${SKILLS[it.skill].name}` });
   if (it.kind === 'food' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Give to dog' });
   if (it.kind === 'dogfood' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Feed dog' });
+  if (id === 'car_battery' && state.location.kind === 'home') {
+    const n = state.home.carBatteries || 0;
+    uses.push({ verb: 'carbattery', label: 'Wire into the home battery', note: `+0.5 kWh storage · ${n}/${MAX_CAR_BATTERIES}`, disabled: n >= MAX_CAR_BATTERIES });
+  }
   const sv = SALVAGE[id];
   if (sv) {
     const tool = salvageTool(state, id);
@@ -191,6 +197,8 @@ export function useItem(state, id, verb, from = 'carried') {
       return useMed(state, id, bag);
     case 'salvage':
       return salvage(state, id, bag);
+    case 'carbattery':
+      return addCarBattery(state, bag);
     case 'wear': {
       // One item per layer; the old one goes back into the same bag.
       addItem(bag, id, -1);
@@ -1108,6 +1116,15 @@ export function listActions(state) {
     add('walk_in', 'Walk inside (first person)', { note: 'look for loot yourself' });
     add('leave_house', 'Leave the house');
   }
+  if (loc.kind === 'car') {
+    const c = carHere(state) || {};
+    const hasAny = (ids) => ids.some((t) => has(state, t));
+    add('car_search', c.searched ? 'Glovebox and trunk: searched' : `Search the glovebox and trunk (${CAR_SEARCH_MIN} min)`, { disabled: c.searched && 'Done' });
+    add('car_siphon', c.siphoned ? 'Gas tank: done' : `Siphon gas (${SIPHON_MIN} min)`, { disabled: (c.siphoned && 'Done') || (!hasAny(SIPHON_TOOLS) && 'You need a garden hose or pipe and fittings'), note: c.siphoned ? undefined : 'many tanks are dry' });
+    add('car_battery', c.battery ? 'Battery: taken' : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: (c.battery && 'Done') || (!hasAny(WRENCH_TOOLS) && 'You need a tool kit or multitool'), note: c.battery ? undefined : 'adds storage to the home battery' });
+    add('car_wire', c.wire ? 'Wire and mirror: taken' : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: (c.wire && 'Done') || (!hasAny(['toolkit', 'multitool', 'knife']) && 'You need a knife or a tool') });
+    add('go_home', 'Walk home');
+  }
   if (loc.kind === 'wild') {
     const spot = spotHere(state);
     if (spot?.kind === 'fish') {
@@ -1135,7 +1152,7 @@ export function listActions(state) {
     add('go_home', 'Walk home');
   }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : state.location.kind === 'wild' ? 'Sleep here on the ground…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
     if (loc.kind === 'home') add('dog_follow', state.dog.withPlayer ? `${state.dog.name}: stay home` : `${state.dog.name}: come with me`);
@@ -1196,6 +1213,11 @@ export function doAction(state, id, arg) {
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
     case 'go_spot': return goToSpot(state, arg);
+    case 'go_car': { const [cid, la, lo] = String(arg).split('|'); return goToCar(state, cid, Number(la), Number(lo)); }
+    case 'car_search': return searchCar(state);
+    case 'car_siphon': return siphonGas(state);
+    case 'car_battery': return takeCarBattery(state);
+    case 'car_wire': return stripCarWire(state);
     case 'fish': return fish(state);
     case 'hunt_bow': return hunt(state, 'bow');
     case 'hunt_rifle': return hunt(state, 'rifle');

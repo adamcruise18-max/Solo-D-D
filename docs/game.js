@@ -105,6 +105,7 @@
     wooden_chair: { name: "Wooden chair", unit: "pc", weight: 9, kind: "junk" },
     garden_hose: { name: "Garden hose", unit: "pc", weight: 5, kind: "junk" },
     broken_bike: { name: "Broken bicycle", unit: "pc", weight: 25, kind: "junk" },
+    car_battery: { name: "Car battery (12 V)", unit: "pc", weight: 35, kind: "part" },
     scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
     hardware_parts: { name: "Nails, screws and brackets", unit: "box", weight: 1, kind: "part" },
     wiring: { name: "Electrical wire and connectors", unit: "roll", weight: 2, kind: "part" },
@@ -3447,6 +3448,138 @@
     radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit", "knife"], min: 15, what: "wire and screws" }
   };
 
+  // src/engine/cars-loot.js
+  var TABLE = [
+    ["paper_map", 6],
+    ["first_aid", 4],
+    ["rain_jacket", 4],
+    ["snacks", 6],
+    ["water_bottle", 4],
+    ["flashlight", 3],
+    ["batteries", 4],
+    ["lighter", 3],
+    ["blanket", 2],
+    ["pain_pills", 3],
+    ["multitool", 1],
+    ["toolkit", 0.6],
+    ["extension_cord", 1],
+    ["gloves", 3],
+    ["tarp", 1.5]
+  ];
+  function rollTable(state2) {
+    const total = TABLE.reduce((a, [, w]) => a + w, 0);
+    const n = chance(state2, 0.15) ? 0 : randInt(state2, 1, 3);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      let x = randInt(state2, 0, 9999) / 1e4 * total;
+      const hit = TABLE.find(([, w]) => (x -= w) < 0) || TABLE[0];
+      out.push(hit[0]);
+    }
+    return out;
+  }
+
+  // src/engine/cars.js
+  var CAR_SEARCH_MIN = 15;
+  var SIPHON_MIN = 20;
+  var BATTERY_MIN = 25;
+  var WIRE_MIN = 20;
+  var CAR_BATTERY_KWH = 0.5;
+  var MAX_CAR_BATTERIES = 4;
+  function carsOf(state2) {
+    if (!state2.cars || typeof state2.cars !== "object") state2.cars = {};
+    return state2.cars;
+  }
+  function carHere(state2) {
+    const loc = state2.location;
+    return loc && loc.kind === "car" ? carsOf(state2)[loc.id] || null : null;
+  }
+  function goToCar(state2, id, lat, lon) {
+    if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+    const cars = carsOf(state2);
+    if (!cars[id]) cars[id] = { lat, lon };
+    if (!travel(state2, { lat, lon }, "the car")) return false;
+    state2.location = { kind: "car", id };
+    log(state2, "You reach the abandoned car. Leaves and dust cover the glass.", "travel");
+    return true;
+  }
+  var hasAny = (state2, ids) => ids.find((t) => has(state2, t)) || null;
+  var SIPHON_TOOLS = ["garden_hose", "pipe_fittings"];
+  var WRENCH_TOOLS = ["toolkit", "multitool"];
+  function searchCar(state2) {
+    const c = carHere(state2);
+    if (!c || c.searched) return;
+    c.searched = true;
+    advanceTime(state2, CAR_SEARCH_MIN, "work");
+    if (state2.dead) return;
+    const found = rollTable(state2);
+    for (const id of found) addItem(state2.carried, id, 1);
+    practice(state2, "scavenging", 1);
+    log(state2, found.length ? `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min): ${found.map((id) => ITEMS[id].name.toLowerCase()).join(", ")}.` : `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min). Nothing useful.`, found.length ? "good" : void 0);
+  }
+  function siphonGas(state2) {
+    const c = carHere(state2);
+    if (!c || c.siphoned) return;
+    if (!hasAny(state2, SIPHON_TOOLS)) {
+      log(state2, "You need a hose to siphon gas.");
+      return;
+    }
+    c.siphoned = true;
+    advanceTime(state2, SIPHON_MIN, "work");
+    if (state2.dead) return;
+    const gal = chance(state2, 0.35) ? 0 : randInt(state2, 1, 3);
+    if (!gal) {
+      log(state2, "You feed the hose into the tank. It is dry.");
+      return;
+    }
+    addItem(state2.carried, "gas_can", gal);
+    const stale = decayShare(state2, "stale_gas");
+    log(state2, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min). It smells sour.${stale > 0.3 ? " Old gas: it may not start an engine." : ""}`, "good");
+  }
+  function takeCarBattery(state2) {
+    const c = carHere(state2);
+    if (!c || c.battery) return;
+    const tool = hasAny(state2, WRENCH_TOOLS);
+    if (!tool) {
+      log(state2, "You need a wrench (tool kit or multitool) to take the battery out.");
+      return;
+    }
+    c.battery = true;
+    advanceTime(state2, BATTERY_MIN, "work");
+    if (state2.dead) return;
+    addItem(state2.carried, "car_battery", 1);
+    practice(state2, "tinkering", 2);
+    log(state2, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, "good");
+  }
+  function stripCarWire(state2) {
+    const c = carHere(state2);
+    if (!c || c.wire) return;
+    const tool = hasAny(state2, ["toolkit", "multitool", "knife"]);
+    if (!tool) {
+      log(state2, "You need a knife or a tool to cut the wire.");
+      return;
+    }
+    c.wire = true;
+    advanceTime(state2, WIRE_MIN, "work");
+    if (state2.dead) return;
+    addItem(state2.carried, "wiring", 0.5);
+    addItem(state2.carried, "hardware_parts", 0.25);
+    practice(state2, "tinkering", 2);
+    log(state2, `You pull wire from under the dash and take the mirror and its screws (${WIRE_MIN} min).`, "good");
+  }
+  function addCarBattery(state2, bag) {
+    const h2 = state2.home;
+    h2.carBatteries = h2.carBatteries || 0;
+    if (h2.carBatteries >= MAX_CAR_BATTERIES) {
+      log(state2, "The bank has no room for more car batteries.");
+      return;
+    }
+    addItem(bag, "car_battery", -1);
+    h2.carBatteries += 1;
+    h2.batteryMax += CAR_BATTERY_KWH;
+    advanceTime(state2, 30, "work");
+    log(state2, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h2.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
+  }
+
   // src/data/wild.js
   var SPOTS = {
     tualatin_rood: { name: "Tualatin River at Rood Bridge Park", lat: 45.4905, lon: -122.9505, kind: "fish", fish: ["largemouth bass", "catfish", "cutthroat trout"], quality: 1 },
@@ -3802,6 +3935,7 @@
     if (loc.kind === "place") return getPlace(loc.id)?.name || "Unknown place";
     if (loc.kind === "house") return loc.label;
     if (loc.kind === "wild") return spotHere(state2)?.name || "Outside";
+    if (loc.kind === "car") return "Abandoned car";
     return "";
   }
   function canHeat(state2, kwh) {
@@ -3847,6 +3981,10 @@
     if (it.kind === "book") uses.push({ verb: "read", label: hasRead(state2, id) ? "Read again" : "Read", note: `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}` });
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
+    if (id === "car_battery" && state2.location.kind === "home") {
+      const n = state2.home.carBatteries || 0;
+      uses.push({ verb: "carbattery", label: "Wire into the home battery", note: `+0.5 kWh storage \xB7 ${n}/${MAX_CAR_BATTERIES}`, disabled: n >= MAX_CAR_BATTERIES });
+    }
     const sv = SALVAGE[id];
     if (sv) {
       const tool = salvageTool(state2, id);
@@ -3916,6 +4054,8 @@
         return useMed(state2, id, bag);
       case "salvage":
         return salvage(state2, id, bag);
+      case "carbattery":
+        return addCarBattery(state2, bag);
       case "wear": {
         addItem(bag, id, -1);
         const old = putOn(p, id);
@@ -4795,6 +4935,15 @@
       add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("leave_house", "Leave the house");
     }
+    if (loc.kind === "car") {
+      const c = carHere(state2) || {};
+      const hasAny2 = (ids) => ids.some((t) => has2(state2, t));
+      add("car_search", c.searched ? "Glovebox and trunk: searched" : `Search the glovebox and trunk (${CAR_SEARCH_MIN} min)`, { disabled: c.searched && "Done" });
+      add("car_siphon", c.siphoned ? "Gas tank: done" : `Siphon gas (${SIPHON_MIN} min)`, { disabled: c.siphoned && "Done" || !hasAny2(SIPHON_TOOLS) && "You need a garden hose or pipe and fittings", note: c.siphoned ? void 0 : "many tanks are dry" });
+      add("car_battery", c.battery ? "Battery: taken" : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: c.battery && "Done" || !hasAny2(WRENCH_TOOLS) && "You need a tool kit or multitool", note: c.battery ? void 0 : "adds storage to the home battery" });
+      add("car_wire", c.wire ? "Wire and mirror: taken" : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: c.wire && "Done" || !hasAny2(["toolkit", "multitool", "knife"]) && "You need a knife or a tool" });
+      add("go_home", "Walk home");
+    }
     if (loc.kind === "wild") {
       const spot = spotHere(state2);
       if (spot?.kind === "fish") {
@@ -4822,7 +4971,7 @@
       add("go_home", "Walk home");
     }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
       if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
@@ -4908,6 +5057,18 @@
         return goToPlace(state2, arg);
       case "go_spot":
         return goToSpot(state2, arg);
+      case "go_car": {
+        const [cid, la, lo] = String(arg).split("|");
+        return goToCar(state2, cid, Number(la), Number(lo));
+      }
+      case "car_search":
+        return searchCar(state2);
+      case "car_siphon":
+        return siphonGas(state2);
+      case "car_battery":
+        return takeCarBattery(state2);
+      case "car_wire":
+        return stripCarWire(state2);
       case "fish":
         return fish(state2);
       case "hunt_bow":
@@ -5707,7 +5868,7 @@
       const rng = mulberry32(hashString(`detail:${p.id}`));
       const list = p.cat === "home" ? [["car", 3], ["trash", 1]] : NEAR[p.cat] || [];
       for (const [type, n] of list) {
-        for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === "home" ? 30 : 25, type === "car" ? 110 : 80), rng);
+        for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === "home" ? 30 : 25, type === "car" ? 110 : 80), rng, type === "car" ? { id: `car:${p.id}:${i}` } : {});
       }
       const greens = p.cat === "home" ? 6 : 5;
       for (let i = 0; i < greens; i++) {
@@ -6198,7 +6359,7 @@
     }
     return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
   }
-  async function createMap(container, { places, onPlaceClick }) {
+  async function createMap(container, { places, onPlaceClick, onCarClick }) {
     const maplibregl = window.maplibregl;
     const { style, online } = await pickStyle();
     const map = new maplibregl.Map({
@@ -6244,6 +6405,11 @@
       if (!f || map.queryRenderedFeatures(e.point, { layers: ["places"] }).length) return;
       const info = DETAIL_INFO[f.properties.type];
       if (detailPopup) detailPopup.remove();
+      if (f.properties.type === "car" && f.properties.id && onCarClick) {
+        const [lon, lat] = f.geometry.coordinates;
+        onCarClick(f.properties.id, lat, lon, e.lngLat);
+        return;
+      }
       detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px" }).setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
     });
     map.on("mouseenter", "details", () => {
@@ -6617,7 +6783,7 @@
     fx = createFx($("#mapwrap"));
     $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span><span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span><span><i class="edge"></i>15-mile edge</span>';
     try {
-      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
+      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
       window.__llMap = mapApi.map;
       const showCoords = () => {
         const c = mapApi.map.getCenter();
@@ -6824,6 +6990,7 @@
       sub = CATEGORIES[p.cat].label;
     } else if (loc.kind === "home") sub = "Your house. One story, a fireplace, solar panels and a home battery.";
     else if (loc.kind === "wild") sub = wildSub(SPOTS[loc.id]);
+    else if (loc.kind === "car") sub = "An abandoned car at the curb. Zoom in on the map to find more.";
     else sub = "A house. Search it room by room.";
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
@@ -7049,11 +7216,26 @@
     const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
     return `Game here${here ? " now" : ""}: ${now.length ? now.join(", ") : "none this time of year"}.`;
   }
+  function showCarPopup(id, lat, lon, lngLat) {
+    if (!state || !mapApi || picking) return;
+    if (popup) popup.remove();
+    const c = state.cars?.[id] || {};
+    const here = state.location.kind === "car" && state.location.id === id;
+    const left = [!c.searched && "glovebox and trunk", !c.siphoned && "gas tank", !c.battery && "battery", !c.wire && "wire"].filter(Boolean);
+    const html = `<h4>Abandoned car</h4><p>Dust and leaves cover the glass.</p><p><i>${left.length ? `Not done: ${left.join(", ")}` : "Nothing left to take"}</i></p>
+    ${here ? "<p><i>You are here.</i></p>" : `${tripHtml({ lat, lon })}<button class="go" data-gocar="1">Walk here</button>`}`;
+    popup = new window.maplibregl.Popup({ closeButton: true, maxWidth: "260px" }).setLngLat(lngLat || [lon, lat]).setHTML(html).addTo(mapApi.map);
+    popup.getElement().querySelector("[data-gocar]")?.addEventListener("click", () => {
+      popup.remove();
+      travelTo(`car:${id}|${lat}|${lon}`);
+    });
+  }
   function travelTo(id) {
     if (state.dead) return;
     if (state.location.kind === "house") perform(state, "action", "leave_house");
     if (id === "__home") perform(state, "action", "go_home");
     else if (id.startsWith("wild:")) perform(state, "action", "go_spot", id.slice(5));
+    else if (id.startsWith("car:")) perform(state, "action", "go_car", id.slice(4));
     else perform(state, "action", "go_place", id);
     if (state.dead) recordRun(state);
     commit(true);

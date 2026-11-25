@@ -54,7 +54,7 @@ export function detailFeatures(places, home) {
     const rng = mulberry32(hashString(`detail:${p.id}`));
     const list = p.cat === 'home' ? [['car', 3], ['trash', 1]] : NEAR[p.cat] || [];
     for (const [type, n] of list) {
-      for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === 'home' ? 30 : 25, type === 'car' ? 110 : 80), rng);
+      for (let i = 0; i < n; i++) add(type, pointNear(rng, p.lat, p.lon, p.cat === 'home' ? 30 : 25, type === 'car' ? 110 : 80), rng, type === 'car' ? { id: `car:${p.id}:${i}` } : {});
     }
     // Overgrowth: more bushes and trees appear as time passes.
     const greens = p.cat === 'home' ? 6 : 5;

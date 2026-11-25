@@ -87,7 +87,7 @@ export async function start() {
     + '<span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
-    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
+    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
     window.__llMap = mapApi.map; // for tests
     const showCoords = () => {
       const c = mapApi.map.getCenter();
@@ -319,6 +319,7 @@ function renderLocation() {
     sub = CATEGORIES[p.cat].label;
   } else if (loc.kind === 'home') sub = 'Your house. One story, a fireplace, solar panels and a home battery.';
   else if (loc.kind === 'wild') sub = wildSub(SPOTS[loc.id]);
+  else if (loc.kind === 'car') sub = 'An abandoned car at the curb. Zoom in on the map to find more.';
   else sub = 'A house. Search it room by room.';
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
@@ -555,11 +556,28 @@ function wildSub(sp) {
   return `Game here${here ? ' now' : ''}: ${now.length ? now.join(', ') : 'none this time of year'}.`;
 }
 
+// An abandoned car on the map (zoom 14+): what is left to do there, and Walk here.
+function showCarPopup(id, lat, lon, lngLat) {
+  if (!state || !mapApi || picking) return;
+  if (popup) popup.remove();
+  const c = state.cars?.[id] || {};
+  const here = state.location.kind === 'car' && state.location.id === id;
+  const left = [!c.searched && 'glovebox and trunk', !c.siphoned && 'gas tank', !c.battery && 'battery', !c.wire && 'wire'].filter(Boolean);
+  const html = `<h4>Abandoned car</h4><p>Dust and leaves cover the glass.</p><p><i>${left.length ? `Not done: ${left.join(', ')}` : 'Nothing left to take'}</i></p>
+    ${here ? '<p><i>You are here.</i></p>' : `${tripHtml({ lat, lon })}<button class="go" data-gocar="1">Walk here</button>`}`;
+  popup = new window.maplibregl.Popup({ closeButton: true, maxWidth: '260px' }).setLngLat(lngLat || [lon, lat]).setHTML(html).addTo(mapApi.map);
+  popup.getElement().querySelector('[data-gocar]')?.addEventListener('click', () => {
+    popup.remove();
+    travelTo(`car:${id}|${lat}|${lon}`);
+  });
+}
+
 function travelTo(id) {
   if (state.dead) return;
   if (state.location.kind === 'house') perform(state, 'action', 'leave_house');
   if (id === '__home') perform(state, 'action', 'go_home');
   else if (id.startsWith('wild:')) perform(state, 'action', 'go_spot', id.slice(5));
+  else if (id.startsWith('car:')) perform(state, 'action', 'go_car', id.slice(4));
   else perform(state, 'action', 'go_place', id);
   if (state.dead) recordRun(state);
   commit(true);
