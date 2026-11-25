@@ -544,11 +544,11 @@ export function openInside(opts) {
     };
     if (plan.cat === 'house') {
       // Lived-in rooms: each room gets its own set. Wall pieces (frames, curtains, a stopped
-      // clock) hang on the room's front or back wall. No faces, names or addresses anywhere.
+      // clock) hang on the room's front or back wall. No names or addresses anywhere; faces only in pictures (photos, covers, phones).
       const ROOM_SETS = {
         kitchen: [['trash_bag', 1], ['paper_scatter', 1], ['chair', 1]],
-        'living room': [['rug', 1], ['tv', 1, true], ['lamp', 1, true], ['potted_plant_dead', 1, true], ['bookshelf', 1, true], ['kids_toy', 1], ['clothes_pile', 1], ['paper_scatter', 1], ['shoes', 1]],
-        bedroom: [['rug', 1], ['lamp', 1, true], ['clothes_pile', 2], ['shoes', 1], ['cardboard_box', 1]],
+        'living room': [['rug', 1], ['magazine', 1], ['old_phone', 1], ['tv', 1, true], ['lamp', 1, true], ['potted_plant_dead', 1, true], ['bookshelf', 1, true], ['kids_toy', 1], ['clothes_pile', 1], ['paper_scatter', 1], ['shoes', 1]],
+        bedroom: [['rug', 1], ['old_phone', 1], ['magazine', 1], ['lamp', 1, true], ['clothes_pile', 2], ['shoes', 1], ['cardboard_box', 1]],
         bathroom: [['clothes_pile', 1], ['trash_bag', 1]],
         'second bedroom': [['rug', 1], ['kids_toy', 2], ['clothes_pile', 1], ['shoes', 1]],
         garage: [['box_stack', 1, true], ['cardboard_box', 2], ['trash_bag', 1], ['traffic_cone', 1]],
@@ -574,7 +574,7 @@ export function openInside(opts) {
       // Things on tables: mail, dishes. Chairs around the table if the model has none.
       for (const f of plan.fixtures) {
         if (f.type !== 'table') continue;
-        for (const [kind, dx] of [['mail_pile', -0.25], ['dish_stack', 0.25]]) {
+        for (const [kind, dx] of [['mail_pile', -0.25], ['dish_stack', 0.25], ['magazine', 0], ['old_phone', 0.05]]) {
           if (!PROP_KINDS.includes(kind) || lrnd() < 0.3) continue;
           const g = makeProp(kind, Math.floor(lrnd() * 1e6));
           g.position.set(f.x + dx, f.h, f.z + (lrnd() - 0.5) * 0.4);
@@ -590,16 +590,9 @@ export function openInside(opts) {
     }
   }
 
-  // A body under a sheet: only a covered shape. Nothing more is shown.
-  const sheetMat = new MeshStandardMaterial({ color: 0xcfd3cf, roughness: 1 });
+  // A body under a sheet: only a covered shape (adult sized). Nothing more is shown.
   for (const b of plan.bodies) {
-    const g = new Group();
-    const torso = new Mesh(new BoxGeometry(0.42, 0.2, 1.3), sheetMat);
-    torso.position.set(0, 0.1, 0.1);
-    const head = new Mesh(new SphereGeometry(0.15, 10, 8), sheetMat);
-    head.scale.set(1, 0.7, 1.1);
-    head.position.set(0, 0.12, -0.72);
-    g.add(torso, head);
+    const g = makeProp('covered_body', Math.floor((b.x * 31 + b.z * 17) * 100));
     g.position.set(b.x, b.y || 0, b.z);
     g.rotation.y = (b.rot || 0) + Math.PI / 2;
     statics.add(g);
