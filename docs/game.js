@@ -471,12 +471,12 @@
     };
   }
   function hashString(str) {
-    let h = 2166136261 >>> 0;
+    let h2 = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) {
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619);
+      h2 ^= str.charCodeAt(i);
+      h2 = Math.imul(h2, 16777619);
     }
-    return h >>> 0;
+    return h2 >>> 0;
   }
   function rand(state2) {
     let a = state2.rngState | 0;
@@ -574,7 +574,7 @@
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
   }
   function hazardColder(state2, t = state2.time) {
-    return activeHazards(state2, t).reduce((a, h) => a + (h.colder || 0), 0);
+    return activeHazards(state2, t).reduce((a, h2) => a + (h2.colder || 0), 0);
   }
   function clearOldHazards(state2) {
     const hz = state2.flags?.hazards;
@@ -1074,6 +1074,103 @@
     }
   }
 
+  // src/core/activity.js
+  var source = { sys: null, hook: null };
+  function currentSource() {
+    return source;
+  }
+  function withSource(src, fn) {
+    const old = source;
+    source = { ...old, ...src };
+    try {
+      return fn();
+    } finally {
+      source = old;
+    }
+  }
+  var SPLIT = /* @__PURE__ */ new Set(["player", "home", "location", "dog", "weather", "stats", "places", "houses", "houseAreas", "flags", "world", "systemVersions", "rngStreams"]);
+  var SKIP = /* @__PURE__ */ new Set(["log", "journal"]);
+  var h = (v) => hashString(JSON.stringify(v ?? null)).toString(36);
+  function fieldHashes(s) {
+    const out = {};
+    for (const [k, v] of Object.entries(s)) {
+      if (SKIP.has(k)) continue;
+      if (SPLIT.has(k) && v && typeof v === "object" && !Array.isArray(v)) {
+        for (const [k2, v2] of Object.entries(v)) out[`${k}.${k2}`] = h(v2);
+      } else out[k] = h(v);
+    }
+    return out;
+  }
+  function changedPaths(before, after) {
+    const keys = /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)]);
+    return [...keys].filter((k) => before[k] !== after[k]).sort();
+  }
+  function createActivity({ limit = 100 } = {}) {
+    const records = [];
+    let open = null;
+    let snap = null;
+    let n = 0;
+    let deep = false;
+    function begin(state2, action) {
+      if (open) end(state2);
+      open = {
+        n: ++n,
+        action,
+        t0: state2.time,
+        t1: state2.time,
+        minutes: 0,
+        lines: [],
+        rng: { shared: false, streams: [] },
+        changed: null
+      };
+      snap = {
+        rngState: state2.rngState,
+        streams: { ...state2.rngStreams || {} },
+        fields: deep ? fieldHashes(state2) : null
+      };
+      return open;
+    }
+    function end(state2) {
+      if (!open) return null;
+      const r = open;
+      r.t1 = state2.time;
+      r.minutes = r.t1 - r.t0;
+      r.rng.shared = state2.rngState !== snap.rngState;
+      const now = state2.rngStreams || {};
+      r.rng.streams = Object.keys(now).filter((k) => now[k] !== snap.streams[k]).sort();
+      if (snap.fields) r.changed = changedPaths(snap.fields, fieldHashes(state2));
+      records.push(r);
+      if (records.length > limit) records.splice(0, records.length - limit);
+      open = null;
+      snap = null;
+      return r;
+    }
+    function line(state2, entry) {
+      const src = currentSource();
+      const l = { t: entry.t, text: entry.text, kind: entry.kind, sys: src.sys || null, hook: src.hook || null };
+      if (open) open.lines.push(l);
+      else {
+        records.push({ n: ++n, action: "other", t0: entry.t, t1: entry.t, minutes: 0, lines: [l], rng: null, changed: null });
+        if (records.length > limit) records.splice(0, records.length - limit);
+      }
+    }
+    return {
+      begin,
+      end,
+      line,
+      records: (count = limit) => records.slice(-count),
+      clear: () => {
+        records.length = 0;
+        open = null;
+        snap = null;
+      },
+      setDeep: (on) => {
+        deep = !!on;
+      },
+      isDeep: () => deep
+    };
+  }
+
   // src/core/systems.js
   var HOOKS = ["init", "step", "daily"];
   var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
@@ -1083,8 +1180,8 @@
     for (const k of Object.keys(sys)) {
       if (!KNOWN.has(k)) throw new Error(`System "${sys.id}": unknown field "${k}"`);
     }
-    for (const h of HOOKS) {
-      if (sys[h] != null && typeof sys[h] !== "function") throw new Error(`System "${sys.id}": ${h} must be a function`);
+    for (const h2 of HOOKS) {
+      if (sys[h2] != null && typeof sys[h2] !== "function") throw new Error(`System "${sys.id}": ${h2} must be a function`);
     }
     const version = sys.version ?? 1;
     if (!Number.isInteger(version) || version < 1) throw new Error(`System "${sys.id}": version must be a whole number from 1`);
@@ -1121,15 +1218,16 @@
       for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
       return out;
     };
-    function run(hook, state2, arg, ctx) {
+    function run2(hook, state2, arg, ctx) {
       for (const s of ordered) {
         if (!s[hook]) continue;
+        const call = () => s[hook](state2, arg, ctx);
         if (!dev || !owner.size) {
-          s[hook](state2, arg, ctx);
+          withSource({ sys: s.id, hook }, call);
           continue;
         }
         const before = snapOthers(state2, s.id);
-        s[hook](state2, arg, ctx);
+        withSource({ sys: s.id, hook }, call);
         for (const [f, v] of Object.entries(before)) {
           if (JSON.stringify(state2[f] ?? null) !== v) {
             throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);
@@ -1147,11 +1245,11 @@
       missingCatchUp: () => ordered.filter((s) => !s.catchUp).map((s) => s.id),
       list: () => ordered.slice(),
       init: (state2, ctx) => {
-        run("init", state2, void 0, ctx);
+        run2("init", state2, void 0, ctx);
         state2.systemVersions = Object.fromEntries(ordered.map((s) => [s.id, s.version]));
       },
-      step: (state2, dtHours, ctx) => run("step", state2, dtHours, ctx),
-      daily: (state2, day, ctx) => run("daily", state2, day, ctx)
+      step: (state2, dtHours, ctx) => run2("step", state2, dtHours, ctx),
+      daily: (state2, day, ctx) => run2("daily", state2, day, ctx)
     };
   }
 
@@ -1173,12 +1271,12 @@
       if (running) throw new Error("Time was moved inside a clock step (time charged twice)");
       running = true;
       try {
-        return run(state2, minutes, mode);
+        return run2(state2, minutes, mode);
       } finally {
         running = false;
       }
     }
-    function run(state2, minutes, mode) {
+    function run2(state2, minutes, mode) {
       let left = minutes;
       const ctx = { mode, events, clock: api };
       while (left > 1e-4 && !state2.dead) {
@@ -1353,8 +1451,8 @@
     }
     const rate = warmthRate(feltTemp(state2, "rest"));
     if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
-      const h = (p.warmth - 25) / -rate;
-      out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
+      const h2 = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h2 < 1 ? `${Math.max(5, Math.round(h2 * 60 / 5) * 5)} min` : `${Math.round(h2)} h`} here: get warm` });
     }
     if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
     if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
@@ -1832,40 +1930,40 @@
     state2._damage = {};
   }
   function homeStep(state2, dt, env) {
-    const h = state2.home;
+    const h2 = state2.home;
     const air = env.air;
     let heat = 0;
-    if (h.fireHours > 0) {
+    if (h2.fireHours > 0) {
       heat += fireHeat(state2);
-      h.fireHours = Math.max(0, h.fireHours - dt);
-      if (h.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+      h2.fireHours = Math.max(0, h2.fireHours - dt);
+      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
     }
-    if (h.heaterOn) {
-      h.battery -= 1.5 * dt;
+    if (h2.heaterOn) {
+      h2.battery -= 1.5 * dt;
       heat += 20;
-      if (h.battery <= 0) {
-        h.battery = 0;
-        h.heaterOn = false;
+      if (h2.battery <= 0) {
+        h2.battery = 0;
+        h2.heaterOn = false;
         log(state2, "The home battery is empty. The electric heater stops.", "warn");
       }
     }
     const passive = air + 6;
     const target = Math.min(75, passive + heat);
     const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
-    h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
     const m = (state2.time % 1440 + 1440) % 1440;
     const s = sunFor(state2.time);
     if (m > s.rise && m < s.set) {
       const hours = (s.set - s.rise) / 60;
-      h.battery = Math.min(h.batteryMax, h.battery + solarToday(state2) / hours * dt);
+      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
     }
-    if (built(state2, "rain_barrels") && h.rawGal < 110) {
+    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
       const t = state2.weather.type;
       const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
+      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
     }
-    if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
-      h.tapWorks = false;
+    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
+      h2.tapWorks = false;
       log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
   }
@@ -2021,10 +2119,10 @@
   var WORK_BLOCK_H = 2;
   var MIN_WORK_ENERGY = 15;
   function base(state2) {
-    const h = state2.home;
-    if (!h.projects) h.projects = {};
-    if (!h.work) h.work = {};
-    return h;
+    const h2 = state2.home;
+    if (!h2.projects) h2.projects = {};
+    if (!h2.work) h2.work = {};
+    return h2;
   }
   function built(state2, id) {
     return !!(state2.home.projects && state2.home.projects[id]);
@@ -2036,9 +2134,9 @@
     return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
   }
   function projectStatus(state2, proj) {
-    const h = base(state2);
-    const started = h.work[proj.id] != null;
-    const doneH = h.work[proj.id] || 0;
+    const h2 = base(state2);
+    const started = h2.work[proj.id] != null;
+    const doneH = h2.work[proj.id] || 0;
     const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
     const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
     const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
@@ -2082,7 +2180,7 @@
   function workOnProject(state2, id) {
     const proj = PROJECT_BY_ID[id];
     if (!proj) return;
-    const h = base(state2);
+    const h2 = base(state2);
     const st = projectStatus(state2, proj);
     if (!st.canWork) {
       log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
@@ -2090,25 +2188,25 @@
     }
     if (!st.started) {
       takeParts(state2, proj.needs);
-      h.work[id] = 0;
+      h2.work[id] = 0;
       log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
     }
     const hours = Math.min(WORK_BLOCK_H, st.leftH);
     advanceTime(state2, Math.round(hours * 60), "heavy");
     if (state2.dead) return;
-    h.work[id] += hours;
-    if (h.work[id] >= proj.hours - 1e-9) {
-      delete h.work[id];
-      h.projects[id] = true;
+    h2.work[id] += hours;
+    if (h2.work[id] >= proj.hours - 1e-9) {
+      delete h2.work[id];
+      h2.projects[id] = true;
       finishProject(state2, proj);
     } else {
-      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h.work[id]) * 60)} of work left.`);
+      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h2.work[id]) * 60)} of work left.`);
     }
   }
   function finishProject(state2, proj) {
-    const h = state2.home;
+    const h2 = state2.home;
     const p = state2.player;
-    if (proj.id === "second_battery") h.batteryMax = 27;
+    if (proj.id === "second_battery") h2.batteryMax = 27;
     let morale = 5;
     if (proj.id === "sealed_store") morale += 5;
     p.morale = Math.min(100, p.morale + morale);
@@ -2121,9 +2219,9 @@
   var AUTO_FILTER_GAL_PER_DAY = 12;
   var SAFE_TANK_GAL = 40;
   function autoFilterToday(state2) {
-    const h = state2.home;
+    const h2 = state2.home;
     if (!built(state2, "rain_barrels") || !built(state2, "filter_station")) return 0;
-    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h.rawGal, SAFE_TANK_GAL - h.safeGal));
+    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h2.rawGal, SAFE_TANK_GAL - h2.safeGal));
   }
   function runAutoFilter(state2) {
     const g = autoFilterToday(state2);
@@ -2334,6 +2432,9 @@
     return [j ? JOBS[j].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
   }
 
+  // src/engine/activity.js
+  var activity = createActivity({ limit: 100 });
+
   // src/engine/state.js
   var SAVE_VERSION = 1;
   var START_MINUTE = 9 * 60 + 5;
@@ -2457,11 +2558,11 @@
   var minuteOfDay2 = (t) => (t % 1440 + 1440) % 1440;
   function formatClock(t) {
     const m = Math.floor(minuteOfDay2(t));
-    let h = Math.floor(m / 60);
+    let h2 = Math.floor(m / 60);
     const mm = String(m % 60).padStart(2, "0");
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12 || 12;
-    return `${h}:${mm} ${ampm}`;
+    const ampm = h2 >= 12 ? "PM" : "AM";
+    h2 = h2 % 12 || 12;
+    return `${h2}:${mm} ${ampm}`;
   }
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -2475,10 +2576,10 @@
   }
   function formatDuration(min) {
     min = Math.round(min);
-    const h = Math.floor(min / 60);
+    const h2 = Math.floor(min / 60);
     const m = min % 60;
-    if (h && m) return `${h} h ${m} min`;
-    if (h) return `${h} h`;
+    if (h2 && m) return `${h2} h ${m} min`;
+    if (h2) return `${h2} h`;
     return `${m} min`;
   }
   function addItem(bag, id, qty = 1) {
@@ -2504,7 +2605,9 @@
     return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0 && !state2.player.lightOff;
   }
   function log(state2, text, kind = "info") {
-    state2.log.push({ t: state2.time, text, kind });
+    const entry = { t: state2.time, text, kind };
+    state2.log.push(entry);
+    activity.line(state2, entry);
     if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
     journalNote(state2, text, kind);
   }
@@ -2638,8 +2741,8 @@
     const toR = Math.PI / 180;
     const dLat = (b.lat - a.lat) * toR;
     const dLon = (b.lon - a.lon) * toR;
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h));
+    const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h2));
   }
   var routeMiles = (a, b) => straightMiles(a, b) * ROUTE_FACTOR;
   function walkSpeed(state2, t = state2.time) {
@@ -2660,7 +2763,7 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h of activeHazards(state2, t)) if (h.walk) apply(h.walk, h.label);
+    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -2784,7 +2887,7 @@
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
   var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  function source(state2, from) {
+  function source2(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
   }
   function hereBag(state2) {
@@ -2847,7 +2950,7 @@
     return uses;
   }
   function useItem(state2, id, verb, from = "carried") {
-    const bag = source(state2, from);
+    const bag = source2(state2, from);
     const it = ITEMS[id];
     if (!bag[id] || !it) return;
     const p = state2.player;
@@ -3070,19 +3173,19 @@
     if (!state2.dead) log(state2, "You wake up.");
   }
   function homeAction(state2, id) {
-    const h = state2.home;
+    const h2 = state2.home;
     const p = state2.player;
     switch (id) {
       case "drink_tank":
-        h.tankGal = Math.max(0, h.tankGal - 0.25);
+        h2.tankGal = Math.max(0, h2.tankGal - 0.25);
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drain water from the water heater tank and drink a quart. It is clean.");
         advanceTime(state2, 10);
         return;
       case "fill_jug": {
-        const fromSafe = h.safeGal >= 1;
-        if (fromSafe) h.safeGal -= 1;
-        else h.tankGal -= 1;
+        const fromSafe = h2.safeGal >= 1;
+        if (fromSafe) h2.safeGal -= 1;
+        else h2.tankGal -= 1;
         addItem(state2.carried, "water_bottle", 1);
         log(state2, `You fill a 1-gallon jug with clean water from the ${fromSafe ? "boiled water pot" : "water heater tank"}.`);
         advanceTime(state2, 10);
@@ -3090,23 +3193,23 @@
       }
       case "collect_tap":
         if (!tapRuns(state2)) {
-          h.tapWorks = false;
+          h2.tapWorks = false;
           log(state2, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
           return;
         }
-        h.rawGal += 2;
+        h2.rawGal += 2;
         log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
         advanceTime(state2, 15);
         practice(state2, "survival", 1);
         return;
       case "collect_toilet":
-        h.rawGal += h.toiletGal;
-        log(state2, `You take the water from the toilet tanks (${h.toiletGal} gal). Boil it before you drink it.`);
-        h.toiletGal = 0;
+        h2.rawGal += h2.toiletGal;
+        log(state2, `You take the water from the toilet tanks (${h2.toiletGal} gal). Boil it before you drink it.`);
+        h2.toiletGal = 0;
         advanceTime(state2, 10);
         return;
       case "drink_raw":
-        h.rawGal = Math.max(0, h.rawGal - 0.25);
+        h2.rawGal = Math.max(0, h2.rawGal - 0.25);
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state2, 5);
@@ -3114,51 +3217,51 @@
         return;
       case "boil": {
         const how = useHeat(state2, 0.4);
-        const g = Math.min(1, h.rawGal);
-        h.rawGal -= g;
-        h.safeGal += g;
+        const g = Math.min(1, h2.rawGal);
+        h2.rawGal -= g;
+        h2.safeGal += g;
         log(state2, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
         advanceTime(state2, Math.round(20 * boilTimeFactor(state2)));
         practice(state2, "cooking", 2);
         return;
       }
       case "purify": {
-        const bag = (state2.carried.water_tablets || 0) > 0 ? state2.carried : h.storage;
-        const g = Math.min(1, h.rawGal);
+        const bag = (state2.carried.water_tablets || 0) > 0 ? state2.carried : h2.storage;
+        const g = Math.min(1, h2.rawGal);
         addItem(bag, "water_tablets", -ITEMS.water_tablets.portion);
-        h.rawGal -= g;
-        h.safeGal += g;
+        h2.rawGal -= g;
+        h2.safeGal += g;
         log(state2, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
         advanceTime(state2, 30);
         practice(state2, "cooking", 1);
         return;
       }
       case "filter_water": {
-        const g = Math.min(2, h.rawGal);
-        h.rawGal -= g;
-        h.safeGal += g;
+        const g = Math.min(2, h2.rawGal);
+        h2.rawGal -= g;
+        h2.safeGal += g;
         log(state2, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
         advanceTime(state2, 10);
         practice(state2, "survival", 1);
         return;
       }
       case "drink_safe":
-        h.safeGal = Math.max(0, h.safeGal - 0.25);
+        h2.safeGal = Math.max(0, h2.safeGal - 0.25);
         addWater(state2, WATER_PER_QUART);
         log(state2, "You drink a quart of boiled water.");
         advanceTime(state2, 5);
         return;
       case "cook": {
-        const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
-        const bag = (h.storage[food] || 0) > 0 ? h.storage : state2.carried;
+        const food = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+        const bag = (h2.storage[food] || 0) > 0 ? h2.storage : state2.carried;
         const it = ITEMS[food];
         if (food === "dry_food") {
-          const water = h.safeGal >= 0.125 ? "safeGal" : h.rawGal >= 0.125 ? "rawGal" : h.tankGal >= 0.125 ? "tankGal" : null;
+          const water = h2.safeGal >= 0.125 ? "safeGal" : h2.rawGal >= 0.125 ? "rawGal" : h2.tankGal >= 0.125 ? "tankGal" : null;
           if (!water) {
             log(state2, "You need water to cook rice or pasta.");
             return;
           }
-          h[water] -= 0.125;
+          h2[water] -= 0.125;
         }
         const how = useHeat(state2, 0.5);
         const risk = eatRisk(state2, food, true);
@@ -3178,19 +3281,19 @@
         return;
       }
       case "add_wood": {
-        const bag = (h.storage.firewood || 0) > 0 ? h.storage : state2.carried;
+        const bag = (h2.storage.firewood || 0) > 0 ? h2.storage : state2.carried;
         addItem(bag, "firewood", -1);
-        const lit = h.fireHours > 0;
+        const lit = h2.fireHours > 0;
         const per = Math.round(fireHoursPerBundle(state2) * fireBonusFactor(state2) * 10) / 10;
         const where = built(state2, "wood_stove") ? "wood stove" : "fireplace";
-        h.fireHours += per;
+        h2.fireHours += per;
         log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         practice(state2, "survival", lit ? 1 : 2);
         return;
       }
       case "run_generator": {
-        const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state2.carried;
+        const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
         addItem(bag, "gas_can", -1);
         advanceTime(state2, 120, "work");
         if (state2.dead) return;
@@ -3199,22 +3302,22 @@
           p.morale = clamp2(p.morale - 2, 0, 100);
           return;
         }
-        const kwh = Math.min(GEN_KWH_PER_GAL, h.batteryMax - h.battery);
-        h.battery += kwh;
+        const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
+        h2.battery += kwh;
         log(state2, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
         practice(state2, "tinkering", 1);
         return;
       }
       case "break_furniture":
-        h.furniture -= 1;
-        addItem(h.storage, "firewood", 1);
+        h2.furniture -= 1;
+        addItem(h2.storage, "firewood", 1);
         log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
         advanceTime(state2, 60, "heavy");
         practice(state2, "tinkering", 2);
         return;
       case "heater":
-        h.heaterOn = !h.heaterOn;
-        log(state2, h.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
+        h2.heaterOn = !h2.heaterOn;
+        log(state2, h2.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
         advanceTime(state2, 1);
         return;
       case "dry_clothes":
@@ -3226,7 +3329,7 @@
         advanceTime(state2, 10);
         return;
       case "fridge":
-        h.fridgeOpened = true;
+        h2.fridgeOpened = true;
         p.morale = clamp2(p.morale - 2, 0, 100);
         log(state2, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
         advanceTime(state2, 2);
@@ -3422,17 +3525,17 @@
     else ctx.holder.zonesDone = done.length;
   }
   function zoneItemList(state2, ctx, zone) {
-    const h = ctx.holder;
-    if (!h.zoneItems) h.zoneItems = {};
-    if (!h.taken) h.taken = [];
-    if (!h.zoneItems[zone]) {
+    const h2 = ctx.holder;
+    if (!h2.zoneItems) h2.zoneItems = {};
+    if (!h2.taken) h2.taken = [];
+    if (!h2.zoneItems[zone]) {
       const found = rollZone(state2, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state2));
       if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
       const list = [];
       for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
-      h.zoneItems[zone] = list;
+      h2.zoneItems[zone] = list;
     }
-    return h.zoneItems[zone];
+    return h2.zoneItems[zone];
   }
   function buildingItems(state2) {
     const ctx = zoneCtx(state2);
@@ -3450,12 +3553,12 @@
     return list.filter((it) => !ctx.holder.taken.includes(it.pid));
   }
   function touchZone(state2, ctx, zone) {
-    const h = ctx.holder;
-    if (!h.touched) h.touched = [];
-    if (h.touched.includes(zone)) return;
-    h.touched.push(zone);
+    const h2 = ctx.holder;
+    if (!h2.touched) h2.touched = [];
+    if (h2.touched.includes(zone)) return;
+    h2.touched.push(zone);
     zoneInjuryCheck(state2);
-    if (ctx.catId === "supermarket" && h.touched.length === 1) {
+    if (ctx.catId === "supermarket" && h2.touched.length === 1) {
       state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
       log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
@@ -3506,13 +3609,13 @@
   function openContainer(state2, cid) {
     const ctx = zoneCtx(state2);
     if (!ctx || typeof cid !== "string" || !/^c\d+$/.test(cid)) return false;
-    const h = ctx.holder;
-    h.opened || (h.opened = []);
-    if (h.opened.includes(cid)) return false;
+    const h2 = ctx.holder;
+    h2.opened || (h2.opened = []);
+    if (h2.opened.includes(cid)) return false;
     const env = environment(state2, "work");
     advanceTime(state2, CONTAINER_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
     if (state2.dead) return true;
-    h.opened.push(cid);
+    h2.opened.push(cid);
     log(state2, "You open it and look inside.");
     practice(state2, "scavenging", 1);
     return true;
@@ -3696,36 +3799,36 @@
   function listActions(state2) {
     const loc = state2.location;
     const p = state2.player;
-    const h = state2.home;
+    const h2 = state2.home;
     const acts = [];
     const add = (id, label, opts = {}) => acts.push({ id, label, ...opts });
     if (loc.kind === "home") {
-      add("drink_tank", "Drink from the water heater tank", { disabled: h.tankGal < 0.25 && "The tank is empty", note: `${h.tankGal.toFixed(1)} gal left` });
-      if (h.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h.safeGal.toFixed(1)} gal` });
-      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h.safeGal < 1 && h.tankGal < 1 && "No clean water" });
+      add("drink_tank", "Drink from the water heater tank", { disabled: h2.tankGal < 0.25 && "The tank is empty", note: `${h2.tankGal.toFixed(1)} gal left` });
+      if (h2.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h2.safeGal.toFixed(1)} gal` });
+      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h2.safeGal < 1 && h2.tankGal < 1 && "No clean water" });
       if (tapRuns(state2)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
-      if (h.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
-      if (h.rawGal > 0) {
-        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h.rawGal.toFixed(1)} gal unsafe` });
+      if (h2.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
+      if (h2.rawGal > 0) {
+        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h2.rawGal.toFixed(1)} gal unsafe` });
         if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
         if (has2(state2, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
         add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
-      const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
-      add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      const fuel = (h2.storage.firewood || 0) + (state2.carried.firewood || 0);
+      add("add_wood", h2.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (has2(state2, "generator")) {
-        const gas = (h.storage.gas_can || 0) + (state2.carried.gas_can || 0);
+        const gas = (h2.storage.gas_can || 0) + (state2.carried.gas_can || 0);
         const startP = gasStartChance(state2);
-        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h.batteryMax - h.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
-      if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
-      add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
-      const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+      if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
+      add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
+      const cookId = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
       const food = !!cookId;
       const cr = cookId ? eatRisk(state2, cookId, true) : 0;
       add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
-      if (!h.fridgeOpened) add("fridge", "Open the fridge");
+      if (!h2.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
       if (state2.dog.stage === "visiting") {
         const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
@@ -3861,15 +3964,15 @@
     return { x: (x1 + x2) / 2, z: (z1 + z2) / 2, w: Math.max(T, Math.abs(x2 - x1)), d: Math.max(T, Math.abs(z2 - z1)) };
   }
   function outerWalls(W, D) {
-    const h = W / 2;
+    const h2 = W / 2;
     return [
-      wallBox(-h, 0, -1, 0),
-      wallBox(1, 0, h, 0),
+      wallBox(-h2, 0, -1, 0),
+      wallBox(1, 0, h2, 0),
       // front, with door gap
-      wallBox(-h, -D, h, -D),
+      wallBox(-h2, -D, h2, -D),
       // back
-      wallBox(-h, 0, -h, -D),
-      wallBox(h, 0, h, -D)
+      wallBox(-h2, 0, -h2, -D),
+      wallBox(h2, 0, h2, -D)
       // sides
     ];
   }
@@ -3964,7 +4067,7 @@
   function furnishRoom(plan, cat, name, zone, room, r, opts) {
     const { cx, cz, side, RW, RD, xout } = room;
     const wallX = xout - side * 0.55;
-    const put = (type, x, z, w, d, h, extra = {}) => plan.fixtures.push({ type, x, z, w, d, h, zone, solid: true, ...extra });
+    const put = (type, x, z, w, d, h2, extra = {}) => plan.fixtures.push({ type, x, z, w, d, h: h2, zone, solid: true, ...extra });
     let items;
     if (cat === "house") items = HOUSE_FURNITURE[name] || ["cabinet"];
     else if (cat === "hospital") items = ["bed", "bed", "cart"];
@@ -4018,14 +4121,14 @@
     const t = { cal: 0, water: 0 };
     addBag(state2.carried, t);
     addBag(state2.home.storage, t);
-    const h = state2.home;
-    t.water += (h.tankGal + h.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
+    const h2 = state2.home;
+    t.water += (h2.tankGal + h2.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
     const foodDayPts = FOOD_LOSS_PER_HOUR * 24;
     const waterDayPts = WATER_LOSS_PER_HOUR * 24;
     return {
       foodDays: t.cal / CAL_PER_FOOD_POINT / foodDayPts,
       waterDays: t.water / waterDayPts,
-      rawGal: h.rawGal
+      rawGal: h2.rawGal
     };
   }
   function stockLine(state2) {
@@ -4034,14 +4137,14 @@
     return `Food: ${d(s.foodDays)} \xB7 Water: ${d(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
   }
   function powerSummary(state2) {
-    const h = state2.home;
+    const h2 = state2.home;
     const inToday = solarToday(state2);
-    const outKw = h.heaterOn ? HEATER_KW : 0;
+    const outKw = h2.heaterOn ? HEATER_KW : 0;
     return {
       inToday,
       outKw,
-      hoursLeft: outKw > 0 ? h.battery / outKw : null,
-      heaterHoursFull: h.battery / HEATER_KW
+      hoursLeft: outKw > 0 ? h2.battery / outKw : null,
+      heaterHoursFull: h2.battery / HEATER_KW
     };
   }
 
@@ -4157,10 +4260,10 @@
     if (chill >= 3) {
       out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
     }
-    for (const h of activeHazards(state2)) {
-      const left = formatDuration(h.endsAt - state2.time);
-      if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} (about ${left} more).`, level: "warn" });
-      if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} \xB0F colder (about ${left} more).`, level: "danger" });
+    for (const h2 of activeHazards(state2)) {
+      const left = formatDuration(h2.endsAt - state2.time);
+      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} (about ${left} more).`, level: "warn" });
+      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder (about ${left} more).`, level: "danger" });
     }
     return out;
   }
@@ -4215,6 +4318,14 @@
   // src/engine/game.js
   function perform(state2, kind, a, b, c) {
     if (state2.dead) return;
+    activity.begin(state2, [kind, a, b].filter((v) => v != null && typeof v !== "object").join(":"));
+    try {
+      run(state2, kind, a, b, c);
+    } finally {
+      activity.end(state2);
+    }
+  }
+  function run(state2, kind, a, b, c) {
     switch (kind) {
       case "action":
         doAction(state2, a, b);
@@ -4363,11 +4474,11 @@
     const s = str.trim().toLowerCase();
     if (!COLOR_RE.test(s)) return null;
     if (s[0] === "#") {
-      let h = s.slice(1);
-      if (h.length === 3 || h.length === 4) h = [...h].map((c) => c + c).join("");
-      if (h.length !== 6 && h.length !== 8) return null;
-      const n = (i) => parseInt(h.slice(i, i + 2), 16);
-      return { r: n(0), g: n(2), b: n(4), a: h.length === 8 ? n(6) / 255 : 1 };
+      let h2 = s.slice(1);
+      if (h2.length === 3 || h2.length === 4) h2 = [...h2].map((c) => c + c).join("");
+      if (h2.length !== 6 && h2.length !== 8) return null;
+      const n = (i) => parseInt(h2.slice(i, i + 2), 16);
+      return { r: n(0), g: n(2), b: n(4), a: h2.length === 8 ? n(6) / 255 : 1 };
     }
     const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v) => parseFloat(v));
     if (nums.length < 3 || nums.some(Number.isNaN)) return null;
@@ -4375,12 +4486,12 @@
     if (s.startsWith("rgb")) return { r: nums[0], g: nums[1], b: nums[2], a };
     return { ...hslToRgb(nums[0], nums[1] / 100, nums[2] / 100), a };
   }
-  function hslToRgb(h, s, l) {
-    h = (h % 360 + 360) % 360;
+  function hslToRgb(h2, s, l) {
+    h2 = (h2 % 360 + 360) % 360;
     const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(h / 60 % 2 - 1));
+    const x = c * (1 - Math.abs(h2 / 60 % 2 - 1));
     const m = l - c / 2;
-    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    const [r, g, b] = h2 < 60 ? [c, x, 0] : h2 < 120 ? [x, c, 0] : h2 < 180 ? [0, c, x] : h2 < 240 ? [0, x, c] : h2 < 300 ? [x, 0, c] : [c, 0, x];
     return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
   }
   function toCss({ r, g, b, a }) {
@@ -4555,12 +4666,12 @@
     draw(x, size);
     return { data: x.getImageData(0, 0, c.width, c.height), pixelRatio: px };
   }
-  function rrect(x, a, b, w, h, r) {
+  function rrect(x, a, b, w, h2, r) {
     x.beginPath();
     x.moveTo(a + r, b);
-    x.arcTo(a + w, b, a + w, b + h, r);
-    x.arcTo(a + w, b + h, a, b + h, r);
-    x.arcTo(a, b + h, a, b, r);
+    x.arcTo(a + w, b, a + w, b + h2, r);
+    x.arcTo(a + w, b + h2, a, b + h2, r);
+    x.arcTo(a, b + h2, a, b, r);
     x.arcTo(a, b, a + w, b, r);
     x.closePath();
   }
@@ -4865,8 +4976,8 @@
         applySeason(state2.time);
         map.getSource("places").setData(placesGeo(list, state2.places));
         you.setLngLat([state2.pos.lon, state2.pos.lat]);
-        const h = state2.homePos || HOME;
-        homeMarker.setLngLat([h.lon, h.lat]);
+        const h2 = state2.homePos || HOME;
+        homeMarker.setLngLat([h2.lon, h2.lat]);
         youEl.classList.toggle("at-home", state2.location.kind === "home");
         homeEl.classList.toggle("here", state2.location.kind === "home");
       },
@@ -4928,11 +5039,11 @@
       canvas2.style.height = `${r.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    function spawn(w, h, anywhere) {
+    function spawn(w, h2, anywhere) {
       const snow = kind === "snow" || kind === "leaves";
       return {
         x: Math.random() * (w + 200) - 100,
-        y: anywhere ? Math.random() * h : -10,
+        y: anywhere ? Math.random() * h2 : -10,
         r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
         c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
         v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
@@ -4942,11 +5053,11 @@
     function frame() {
       raf = 0;
       const w = canvas2.clientWidth;
-      const h = canvas2.clientHeight;
-      ctx.clearRect(0, 0, w, h);
+      const h2 = canvas2.clientHeight;
+      ctx.clearRect(0, 0, w, h2);
       if (!enabled || kind === "none" || document.hidden) return;
-      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h / 6e5 + 0.3));
-      while (parts.length < want) parts.push(spawn(w, h, true));
+      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h2 / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w, h2, true));
       if (parts.length > want) parts.length = want;
       const drift = wind / 12;
       if (kind === "snow") {
@@ -4957,7 +5068,7 @@
           s.p += 0.02;
           s.y += s.v;
           s.x += Math.sin(s.p) * 0.4 + drift;
-          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
           ctx.beginPath();
           ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
           ctx.fill();
@@ -4968,7 +5079,7 @@
           s.p += 0.05;
           s.y += s.v * 0.9;
           s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
-          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
           ctx.save();
           ctx.translate(s.x, s.y);
           ctx.rotate(s.p);
@@ -4985,7 +5096,7 @@
         for (const s of parts) {
           s.y += s.v;
           s.x += drift * 3;
-          if (s.y > h + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h, false));
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
           ctx.moveTo(s.x, s.y);
           ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
         }
@@ -4993,12 +5104,12 @@
       }
       raf = requestAnimationFrame(frame);
     }
-    function run() {
+    function run2() {
       if (!raf) raf = requestAnimationFrame(frame);
     }
     new ResizeObserver(resize).observe(wrap);
     resize();
-    document.addEventListener("visibilitychange", run);
+    document.addEventListener("visibilitychange", run2);
     return {
       // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
       update({ weather, night, windMph, season }) {
@@ -5016,14 +5127,14 @@
         layer.classList.toggle("is-ice", weather === "ice_storm");
         layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
         layer.classList.toggle("off", !enabled);
-        run();
+        run2();
       },
       setEnabled(on) {
         enabled = on;
         setFxEnabled(on);
         layer.classList.toggle("off", !on);
         if (!on) ctx.clearRect(0, 0, canvas2.width, canvas2.height);
-        run();
+        run2();
       },
       get enabled() {
         return enabled;
@@ -5286,25 +5397,25 @@
     <ul class="items">${cHtml}</ul>`;
   }
   function renderHome() {
-    const h = state.home;
+    const h2 = state.home;
     const atHome = state.location.kind === "home";
-    const pct = Math.round(h.battery / h.batteryMax * 100);
+    const pct = Math.round(h2.battery / h2.batteryMax * 100);
     const pw = powerSummary(state);
     const hrs = (x) => x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`;
     $("#home").innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
-      <span>Inside temp</span><b>${Math.round(h.indoorTemp)}\xB0F</b>
-      <span>Fire</span><b>${h.fireHours > 0 ? `burning (${formatDuration(h.fireHours * 60)})` : "out"}</b>
-      <span>Battery</span><b>${pct}% (${h.battery.toFixed(1)} of ${h.batteryMax} kWh)</b>
+      <span>Inside temp</span><b>${Math.round(h2.indoorTemp)}\xB0F</b>
+      <span>Fire</span><b>${h2.fireHours > 0 ? `burning (${formatDuration(h2.fireHours * 60)})` : "out"}</b>
+      <span>Battery</span><b>${pct}% (${h2.battery.toFixed(1)} of ${h2.batteryMax} kWh)</b>
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
-      <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
-      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
-      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>Water heater tank</span><b>${h2.tankGal.toFixed(1)} gal (clean)</b>
+      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h2.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
+      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h2.rawGal.toFixed(1)} gal</b>
       ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
-      <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
+      <span>Kitchen tap</span><b>${h2.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
     ${renderBase()}`;
   }
@@ -5442,9 +5553,9 @@
     });
   }
   function showSleep() {
-    const opts = [1, 2, 4, 6, 8, 10].map((h) => {
-      const a = actionTiming(state, h * 60);
-      return `<button data-hours="${h}" title="${esc(a.dayStartText || "")}">${h} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
+    const opts = [1, 2, 4, 6, 8, 10].map((h2) => {
+      const a = actionTiming(state, h2 * 60);
+      return `<button data-hours="${h2}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
     }).join("");
     modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {

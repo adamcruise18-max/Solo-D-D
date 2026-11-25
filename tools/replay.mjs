@@ -7,6 +7,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { newGame, dayIndex } from '../src/engine/state.js';
 import { hashString } from '../src/rng.js';
+import { fieldHashes } from '../src/core/activity.js';
 import { loadPlaces, botTurn } from './bot.mjs';
 import { setDevChecks } from '../src/engine/systems.js';
 
@@ -15,23 +16,10 @@ export const DAYS = 30;
 const GOLDEN = fileURLToPath(new URL('../test/golden/replay.json', import.meta.url));
 const TRACE = fileURLToPath(new URL('../test/golden/trace.json', import.meta.url));
 
-// State paths for the turn trace. Each object below is split one level down
-// (player.food, home.battery, places.<id>), so a change names the field.
-// log and journal hold player text only: a new wording is not a rule change.
-const SPLIT = new Set(['player', 'home', 'location', 'dog', 'weather', 'stats', 'places', 'houses', 'houseAreas', 'flags', 'world', 'systemVersions', 'rngStreams']);
-const SKIP = new Set(['log', 'journal']);
-const h = (v) => hashString(JSON.stringify(v ?? null)).toString(36);
-
-export function fieldHashes(s) {
-  const out = {};
-  for (const [k, v] of Object.entries(s)) {
-    if (SKIP.has(k)) continue;
-    if (SPLIT.has(k) && v && typeof v === 'object' && !Array.isArray(v)) {
-      for (const [k2, v2] of Object.entries(v)) out[`${k}.${k2}`] = h(v2);
-    } else out[k] = h(v);
-  }
-  return out;
-}
+// State paths for the turn trace (shared with the activity log, src/core/activity.js):
+// each big object is split one level down (player.food, places.<id>); log and
+// journal hold player text only, so a new wording is not a rule change.
+export { fieldHashes };
 
 // One trace line per bot turn:
 //   turn|action|start time|end time|minutes|rng before>after|changed path=hash,...
