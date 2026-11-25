@@ -3,6 +3,7 @@
 // Exports: makeItemModel(itemId, seed), makeShelfFill(kind, length, levels, fill, seed), makeProp(kind, seed).
 // Units are meters. Item and prop origins sit at the bottom center (y = 0 is the floor or table).
 import * as THREE from 'three';
+import { TOON } from './style.js';
 
 // ---------- caches shared by every call ----------
 const GEO = new Map();
@@ -34,7 +35,7 @@ function hashStr(s) {
 // Rounded boxes cost about 9 times the triangles. Shelf stock (hundreds of small far boxes) stays square.
 let ROUND = true;
 function squareOnly(fn) { const was = ROUND; ROUND = false; try { return fn(); } finally { ROUND = was; } }
-export const TOON = !(typeof location !== 'undefined' && /[?&]style=real\b/.test(location.search || ''));
+export { TOON };
 const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const TAU = Math.PI * 2;
 

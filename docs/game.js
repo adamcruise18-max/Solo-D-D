@@ -3435,7 +3435,16 @@
     plan.cat = cat;
     plan.dark = !!CATEGORIES[cat]?.dark;
     addDebris(plan, r);
+    plan.exposed = exposure(cat, key, plan);
     return plan;
+  }
+  var EXPOSED_CHANCE = { house: 0.12, hardware: 0.15, fire: 0.1 };
+  function exposure(cat, key, plan) {
+    const r = mulberry32(hashString(`exposed:${key}`));
+    if (r() >= (EXPOSED_CHANCE[cat] ?? 0.1)) return null;
+    const { w, d } = plan.size;
+    if (r() < 0.6) return { kind: "window", x: (r() - 0.5) * w * 0.6, z: -0.2 };
+    return { kind: "roof", x: (r() - 0.5) * w * 0.4, z: -d * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
   }
   function wallBox(x1, z1, x2, z2) {
     return { x: (x1 + x2) / 2, z: (z1 + z2) / 2, w: Math.max(T, Math.abs(x2 - x1)), d: Math.max(T, Math.abs(z2 - z1)) };

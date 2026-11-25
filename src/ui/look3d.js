@@ -16,6 +16,7 @@ import {
   DoubleSide, AdditiveBlending, ACESFilmicToneMapping, PCFSoftShadowMap, PCFShadowMap,
   Vector3, Vector2, Vector4, Quaternion, MathUtils, Scene, BackSide, PMREMGenerator,
 } from 'three';
+import { STYLE_REAL, sty } from './style.js';
 
 // ---------- small helpers ----------
 const rngFrom = (seed) => {
@@ -256,11 +257,15 @@ function stains(L, n, rnd, color = '90,62,30', maxR = 0.18, strength = 1) {
 // Grime by place (Adam, 2026-11-25): homes and kept-up workplaces (stores, offices, clinics) have
 // low to no grime; garages and industrial sites medium; outdoors and buildings open to the weather
 // (a broken window, a collapsed roof) high. ?style=real keeps the old fixed amount.
-const STYLE_REAL = typeof location !== 'undefined' && /[?&]style=real\b/.test(location.search || '');
 export const GRIME = { low: 0.12, medium: 0.6, high: 1.6 };
 const GRIME_BY_CAT = {
   supermarket: 'low', convenience: 'low', gas: 'low', pharmacy: 'low', clinic: 'low', hospital: 'low',
+  // 'outdoor' is an outdoor-gear store (OSM shop=outdoor), a kept-up shop, not the outdoors.
   outdoor: 'low', house: 'low', hardware: 'medium', fire: 'medium',
+  // Industrial places for later map categories.
+  warehouse: 'medium', factory: 'medium', auto_repair: 'medium', storage: 'medium', industrial: 'medium',
+  // Outdoor areas (streets, parks, yards) when they get a walkable view.
+  street: 'high', park: 'high', yard: 'high', outside: 'high',
 };
 // The grime level for a building: its category, a garage room, or open to the weather.
 export function grimeLevel(cat, { room = null, exposed = false } = {}) {
@@ -664,7 +669,7 @@ export function makeSurfaces(quality = 'high', grime = 'low') {
     woodFloor: () => makeWood(S, 37),
     carpet: () => makeCarpet(low ? 256 : 384, 41),
     concrete: () => makeConcrete(S, 53),
-    drywall: () => makeDrywall(low ? 192 : 384, 61, 0xb4b8aa, 0x3b3a37),
+    drywall: () => makeDrywall(low ? 192 : 384, 61, sty(0xd2c6b0, 0xb4b8aa), sty(0x6a5e50, 0x3b3a37)), // stylized: warm paint
     drywallWarm: () => makeDrywall(low ? 192 : 384, 67, 0xb3a58c, 0xd2ccbe),
     tileWall: () => makeTileWall(S, 71),
     ceilingTile: () => makeCeilingTile(S, 83),

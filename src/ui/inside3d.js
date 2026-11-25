@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
+import { TOON, sty } from './style.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
@@ -65,8 +66,9 @@ const FLOORS = {
   rooms: { base: '#a7aca8', lines: 4 }, // clinic linoleum
 };
 
+// Stylized: shelves are warm cream paint, not blue-grey metal.
 const FIXTURE_COLORS = {
-  shelf: 0x7d8790, rack: 0xc06a2b, clothes: 0x6b6f73, checkout: 0x4b545c, coolers: 0x9aa3a8,
+  shelf: sty(0xd6cbb8, 0x7d8790), rack: 0xc06a2b, clothes: 0x6b6f73, checkout: 0x4b545c, coolers: 0x9aa3a8,
   rx_counter: 0xd8d4c8, gate: 0x8c949b, bed: 0x9aa6ad, cabinet: 0x8e8a80, fridge: 0xd9dadb, counter: 0x7a6a58,
   sofa: 0x5b6a5e, tub: 0xe9e9e4, locker: 0x6d7b86, dresser: 0x6e5a45, cart: 0xb0b6ba, table: 0x6b5641, bench: 0x5c534a,
   desk: 0x6a6f74,
@@ -225,6 +227,44 @@ export function openInside(opts) {
       scene.add(L);
     }
   }
+  // Open to the weather (plan.exposed): a hole in the roof with sky and light coming in, or a
+  // broken front window with glass on the floor. These buildings get high grime.
+  const ex = plan.exposed;
+  if (ex && ex.kind === 'roof') {
+    const sky = new Mesh(new PlaneGeometry(ex.w, ex.d), new MeshBasicMaterial({ color: opts.night ? 0x1b2536 : 0xcfdbe6, fog: false }));
+    sky.rotation.x = Math.PI / 2;
+    sky.position.set(ex.x, H - 0.03, ex.z);
+    scene.add(sky);
+    if (!opts.night) {
+      const L = new PointLight(0xe8eef4, 10, 9, 1.4);
+      L.position.set(ex.x, H - 0.5, ex.z);
+      scene.add(L);
+    }
+    for (const [k, dx, dz] of [['trash_pile', 0, 0], ['paper_scatter', 0.6, 0.4]]) {
+      const g = makeProp(k, Math.floor(ex.x * 97 + dx * 13));
+      g.position.set(ex.x + dx, 0, ex.z + dz);
+      scene.add(g);
+    }
+  } else if (ex && ex.kind === 'window') {
+    const g = makeProp('glass_shards', Math.floor(ex.x * 101));
+    g.position.set(ex.x, 0, -0.7);
+    scene.add(g);
+    const g2 = makeProp('paper_scatter', Math.floor(ex.x * 103));
+    g2.position.set(ex.x + 0.5, 0, -1.2);
+    scene.add(g2);
+  }
+  // A garage in a house has its own concrete floor with medium grime.
+  if (plan.cat === 'house' && TOON) {
+    for (const sp of plan.spots) {
+      if (sp.label !== 'garage' || !sp.area) continue;
+      const a = sp.area;
+      const gf = new Mesh(new PlaneGeometry(a.x2 - a.x1, a.z2 - a.z1), surfaceFor('house', 'floor', 'garage', quality, ex ? 'high' : 'medium'));
+      gf.rotation.x = -Math.PI / 2;
+      gf.position.set((a.x1 + a.x2) / 2, 0.003, (a.z1 + a.z2) / 2);
+      gf.receiveShadow = true;
+      scene.add(worldUV(gf));
+    }
+  }
   if (plan.cat !== 'house') lk.addExitSign(0, Math.min(H - 0.25, 2.55), -0.14, Math.PI);
   lk.addDust({ minX: -W / 2 + 0.3, maxX: W / 2 - 0.3, minY: 0.1, maxY: H - 0.2, minZ: -D + 0.3, maxZ: -0.3 });
   // Notices by the door (no brands, no real names), dirt and paper on the floor.
@@ -271,7 +311,7 @@ export function openInside(opts) {
   scene.add(statics);
   // ---------- fixtures ----------
   const matCache = {};
-  const mat = (type) => (matCache[type] ||= new MeshStandardMaterial({ color: FIXTURE_COLORS[type] ?? 0x888888, roughness: 0.8, metalness: type === 'shelf' || type === 'gate' || type === 'locker' ? 0.35 : 0.05 }));
+  const mat = (type) => (matCache[type] ||= new MeshStandardMaterial({ color: FIXTURE_COLORS[type] ?? 0x888888, roughness: 0.8, metalness: (type === 'shelf' && TOON) ? 0.08 : type === 'shelf' || type === 'gate' || type === 'locker' ? 0.35 : 0.05 }));
   const shelfSlots = []; // clothes on racks: {x,y,z,zone}
   const shelfFaces = []; // shelf faces with detailed products
   const CULL_M = dark || opts.night ? 13 : 20;

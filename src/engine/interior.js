@@ -38,7 +38,20 @@ export function buildInterior(cat, key, zones, opts = {}) {
   plan.cat = cat;
   plan.dark = !!CATEGORIES[cat]?.dark;
   addDebris(plan, r);
+  plan.exposed = exposure(cat, key, plan);
   return plan;
+}
+
+// Some buildings are open to the weather: a broken window or a collapsed part of the roof.
+// Those get high grime (look3d) and a visible opening (inside3d). Its own seed, so the rest of
+// the plan (and every saved place) stays the same.
+const EXPOSED_CHANCE = { house: 0.12, hardware: 0.15, fire: 0.1 };
+function exposure(cat, key, plan) {
+  const r = mulberry32(hashString(`exposed:${key}`));
+  if (r() >= (EXPOSED_CHANCE[cat] ?? 0.1)) return null;
+  const { w, d } = plan.size;
+  if (r() < 0.6) return { kind: 'window', x: (r() - 0.5) * w * 0.6, z: -0.2 };
+  return { kind: 'roof', x: (r() - 0.5) * w * 0.4, z: -d * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
 }
 
 function wallBox(x1, z1, x2, z2) {
