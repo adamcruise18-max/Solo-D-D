@@ -484,7 +484,9 @@ export function openInside(opts) {
     if (face.group) { scene.remove(face.group); face.group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); }
     const { f, side } = face;
     // Picked over after 3 months: front shelves are 20-50% full.
-    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.6));
+    // Lower 3D quality shows fewer packs on the shelves (the shelf stock is most of the triangles).
+    const qFill = quality === 'low' ? 0.45 : quality === 'medium' ? 0.75 : 1;
+    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.6) * qFill);
     const g = makeShelfFill(FILL_KIND, f.d - 0.1, [0.12, 0.62, 1.12, 1.57], fill, hashString(`${opts.title}:${f.x}:${f.z}:${side}`));
     g.position.set(f.x + side * 0.05, 0, f.z);
     g.rotation.y = side > 0 ? 0 : Math.PI;
@@ -554,8 +556,15 @@ export function openInside(opts) {
       && !(Math.abs(x) < 1.6 && z > -3) && !taken.some((t) => Math.hypot(t[0] - x, t[1] - z) < t[2] + rad)
       && x > -W / 2 + rad && x < W / 2 - rad && z < -rad && z > -D + rad;
     // area: limit to one room ({x1,x2,z1,z2}); the default is the whole building.
+    // Lower 3D quality leaves out some clutter props: 2 in 5 on Low, 1 in 5 on Medium.
+    const CLUTTER = /^(trash_bag|paper_scatter|glass_shards|trash_pile|kids_toy|cardboard_box|box_stack|clothes_pile|bottles|cans|debris|magazine|old_phone)$/;
+    let propN = 0;
     const place = (kind, nearWall = false, area = null) => {
       if (!PROP_KINDS.includes(kind)) return null;
+      if (CLUTTER.test(kind)) {
+        const k = propN++ % 5;
+        if ((quality === 'low' && k < 2) || (quality === 'medium' && k === 0)) return null;
+      }
       const g = makeProp(kind, Math.floor(lrnd() * 1e6));
       const rad = Math.min(1.2, (g.userData.radius || 0.3) + 0.1);
       const flat = kind === 'rug' || kind === 'paper_scatter' || kind === 'clothes_pile';
