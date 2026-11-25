@@ -18,7 +18,7 @@ test('cuts: bleeding stops at the floor; an infected cut takes no health', () =>
   addInjury(s, 'deep_cut');
   startInfection(s, 'deep_cut');
   s.player.illness.infection.ageH = 100;
-  for (let i = 0; i < 48; i++) tickStep(s, 1, 'rest');
+  for (let i = 0; i < 48; i++) { s.player.food = s.player.water = s.player.warmth = 90; tickStep(s, 1, 'rest'); }
   assert.ok(!s.dead);
   assert.ok(s.player.health >= BLEED_FLOOR - 1e-9, `health ${s.player.health}`);
 });
