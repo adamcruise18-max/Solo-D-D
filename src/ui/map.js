@@ -46,14 +46,15 @@ function circlePolygon(center, miles, n = 128) {
   return { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} };
 }
 
-export async function createMap(container, { places, onPlaceClick, onCarClick }) {
+export async function createMap(container, { places, onPlaceClick, onCarClick, center }) {
   const maplibregl = window.maplibregl;
   const { style, online } = await pickStyle();
   const map = new maplibregl.Map({
     container,
     style,
-    center: [HOME.lon, HOME.lat],
-    zoom: 12.5,
+    // Open over the player (a saved game), else over home.
+    center: center && Number.isFinite(center.lat) ? [center.lon, center.lat] : [HOME.lon, HOME.lat],
+    zoom: center ? 15 : 12.5,
     minZoom: 9,
     maxZoom: 18,
     maxBounds: [[HOME.lon - 0.75, HOME.lat - 0.5], [HOME.lon + 0.75, HOME.lat + 0.5]],

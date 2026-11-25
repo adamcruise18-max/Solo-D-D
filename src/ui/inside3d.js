@@ -860,6 +860,7 @@ export function openInside(opts) {
       // bright and saturated in a dim store and reads above the darker shelf stock.
       // In a dark store at night the glow is faint: you need your flashlight to find loot.
       const glow = (0.32 + 0.18 * notice.lootGlow) * (dark && opts.night ? 0.2 : 1);
+      const mats = [];
       obj.traverse((m) => {
         if (!m.isMesh || !m.material) return;
         const fix = (mt) => {
@@ -869,13 +870,14 @@ export function openInside(opts) {
           // a soft rim of its own color, so its shape reads in a dark aisle (no outline, no halo)
           c.onBeforeCompile = ITEM_RIM;
           c.customProgramCacheKey = () => 'llItemRim';
+          mats.push(c);
           return c;
         };
         m.material = Array.isArray(m.material) ? m.material.map(fix) : fix(m.material);
       });
       scene.add(obj);
       const h = obj.userData.height || 0.2;
-      itemObjs.set(it.pid, { it, obj, x: p.x, y: p.y + h / 2, z: p.z, r: obj.userData.radius || 0.15 });
+      itemObjs.set(it.pid, { it, obj, mats, x: p.x, y: p.y + h / 2, z: p.z, r: obj.userData.radius || 0.15 });
     }
   }
   addItems();
@@ -886,11 +888,61 @@ export function openInside(opts) {
     itemObjs.delete(pid);
   }
   // Thin box around the item you look at.
-  const hiMat = new LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.9, depthTest: false });
+  // Adam's playtest: things you can use must stand out more. The item you look at gets a
+  // bright box with a soft fill; items in reach pulse gently in their own colors.
+  const hiMat = new LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 1, depthTest: false });
   const hiBox = new LineSegments(new EdgesGeometry(new BoxGeometry(1, 1, 1)), hiMat);
   hiBox.renderOrder = 10;
   hiBox.visible = false;
+  const hiFill = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.25, depthWrite: false, depthTest: false, toneMapped: false }));
+  hiFill.renderOrder = 9;
+  hiBox.add(hiFill);
+  // A second, slightly larger frame: WebGL lines are 1 px, two frames read as a thick one.
+  const hiBox2 = new LineSegments(hiBox.geometry, hiMat);
+  hiBox2.scale.setScalar(1.06);
+  hiBox2.renderOrder = 10;
+  hiBox.add(hiBox2);
   scene.add(hiBox);
+  const PULSE_R = 3.2; // m: items this near pulse
+  let pulsed = new Set();
+  // A soft glowing ring under each item in reach (pooled, flat, no shadows).
+  const ringGeo = new RingGeometry(0.62, 1, 32);
+  ringGeo.rotateX(-Math.PI / 2);
+  const ringMat = new MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false, side: DoubleSide });
+  const rings = [];
+  function ringAt(i, o, k) {
+    let r = rings[i];
+    if (!r) { r = new Mesh(ringGeo, ringMat); r.renderOrder = 8; scene.add(r); rings[i] = r; }
+    const h = o.obj.userData.height || 0.2;
+    const rad = Math.max(0.14, Math.min(0.45, (o.r || 0.15) * 1.25)) * k;
+    r.scale.set(rad, 1, rad);
+    r.position.set(o.x, o.y - h / 2 + 0.012, o.z);
+    r.visible = true;
+  }
+  function pulseItems(now, targetPid) {
+    const w = 0.5 + 0.5 * Math.sin(now / 260);
+    const next = new Set();
+    for (const o of itemObjs.values()) {
+      if (!o.mats || !o.mats.length) continue;
+      const d = Math.hypot(o.x - camera.position.x, o.z - camera.position.z);
+      const k = o.it.pid === targetPid ? 2.8 + 0.8 * w : d < PULSE_R ? 1.4 + 0.9 * w : 1;
+      if (k === 1 && !pulsed.has(o.it.pid)) continue;
+      for (const m of o.mats) m.emissiveIntensity = k;
+      if (k !== 1) next.add(o.it.pid);
+    }
+    pulsed = next;
+    let n = 0;
+    if (!paused && !panel) {
+      for (const o of itemObjs.values()) {
+        if (n >= 24) break;
+        if (Math.hypot(o.x - camera.position.x, o.z - camera.position.z) < PULSE_R) ringAt(n++, o, o.it.pid === targetPid ? 1.25 : 1 + 0.08 * w);
+      }
+    }
+    for (let i = n; i < rings.length; i++) rings[i].visible = false;
+    ringMat.opacity = 0.35 + 0.3 * w;
+    hiMat.opacity = 0.75 + 0.25 * w;
+    hiFill.material.opacity = 0.18 + 0.17 * w;
+  }
   const REACH = 2.3;
   // True when a wall, shelf, counter or closed gate is between the eye and the item.
   // Segment against each box (slab test). Walls have no height: they go to the ceiling.
@@ -1593,6 +1645,7 @@ export function openInside(opts) {
     // Walking through an aisle or room: tell the game (an empty zone then counts as done).
     if (n && n.type === 'search' && n.dist === 0 && !seenZones.has(n.zone)) { seenZones.add(n.zone); opts.onSeeZone(n.zone); status(); }
     if (n && n.type === 'search' && !(n.counter && !opts.isCounterOpen())) n = null;
+    pulseItems(performance.now(), t && !t.container ? t.it.pid : null);
     const key = (t ? `i:${t.container ? t.cid : t.it.pid}` : '') + (n ? `${n.type}:${n.zone}` : '');
     if (current === undefined || key !== lastKey || frame.n++ % 20 === 0) {
       current = n;
