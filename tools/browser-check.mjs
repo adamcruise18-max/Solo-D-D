@@ -3,7 +3,7 @@
 //   npm run check:browser
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -46,6 +46,38 @@ try {
   await page.waitForTimeout(1500);
   check(errors.length === 0, `game page loads with no script errors${errors.length ? ': ' + errors.join(' | ') : ''}`);
 
+  // Live play: time moves through the engine clock and the weather system.
+  // Start a run, sleep 10 h twice (past 5 AM), and read the autosave.
+  const play = await (async () => {
+    await page.evaluate(() => localStorage.removeItem('lastlight.save.v1'));
+    await page.reload({ waitUntil: 'load' });
+    // The intro shows after the map loads: wait for it, do not guess a time.
+    await page.locator('#startBtn').waitFor({ timeout: 20000 });
+    await page.locator('#startBtn').click();
+    await page.locator('[data-act="sleep"]').first().waitFor({ timeout: 10000 });
+    const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lastlight.save.v1') || 'null'));
+    const before = await read();
+    for (let i = 0; i < 2; i++) {
+      await page.locator('[data-act="sleep"]').first().click();
+      await page.locator('[data-hours="10"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-hours="10"]').click();
+      await page.waitForTimeout(300);
+      // Close any message (for example the dog) so the next click works.
+      for (const sel of ['#okName', '.modal .primary']) {
+        if (await page.locator(sel).count()) { await page.locator(sel).first().click().catch(() => {}); }
+      }
+    }
+    const after = await read();
+    return { before, after };
+  })().catch((e) => ({ error: String(e) }));
+  check(!play.error && play.before && play.after, `a new run starts and saves${play.error ? ': ' + play.error : ''}`);
+  if (play.after) {
+    check(play.after.systemVersions?.weather === 1, 'the live save has the weather system version');
+    check(play.after.time > play.before.time + 600, `sleeping moves time through the clock (${Math.round(play.before.time)} -> ${Math.round(play.after.time)} min)`);
+    check(play.after.weather.day > play.before.weather.day, `the weather system rolled a new day (day ${play.before.weather.day} -> ${play.after.weather.day})`);
+  }
+  check(errors.length === 0, `no script errors while playing${errors.length ? ': ' + errors.join(' | ') : ''}`);
+
   await page.addScriptTag({ url: '__core.js' });
   const r = await page.evaluate(async () => {
     const C = window.LLCore;
@@ -71,7 +103,42 @@ try {
   check(r.listed, 'the save slot shows in the list');
   check(r.fallback, 'a broken newest save falls back to the last good save');
   check(r.gone, 'a removed slot is gone');
+
+  // Save timing with real IndexedDB (printed, not a pass/fail check).
+  const timing = await page.evaluate(async () => {
+    const C = window.LLCore;
+    const store = C.createSaveStore(C.bestBackend());
+    const out = [];
+    for (const mb of [1, 5, 10, 25]) {
+      const places = {};
+      const per = 220; // bytes per place, about
+      for (let i = 0; i < (mb * 1024 * 1024) / per; i++) places['osm-' + i] = { zones: 6, zonesDone: i % 6, taken: { ['osm-' + i + ':p0']: true }, lastVisit: 600 + i };
+      const g = { version: 1, seed: 5, time: 600, player: { food: 40 }, home: { storage: {} }, places };
+      await store.save('bench-slot', g);
+      let t = performance.now();
+      await store.save('bench-slot', { ...g, time: 610 });
+      const save = performance.now() - t;
+      t = performance.now();
+      await store.load('bench-slot');
+      const load = performance.now() - t;
+      out.push({ mb, bytes: JSON.stringify(g).length, save: Math.round(save), load: Math.round(load) });
+      await store.remove('bench-slot');
+    }
+    return out;
+  });
+  for (const x of timing) console.log(`info IndexedDB ${x.mb} MB save (2 copies) ${x.save} ms, load ${x.load} ms`);
+} catch (e) {
+  check(false, `browser check stopped: ${e?.message || e}`);
 } finally {
+  // On a failure, keep a screenshot and the page errors for the CI artifact.
+  if (failed) {
+    try {
+      const dir = fileURLToPath(new URL('../artifacts/', import.meta.url));
+      await mkdir(dir, { recursive: true });
+      await page.screenshot({ path: join(dir, 'browser-check.png'), fullPage: true });
+      await writeFile(join(dir, 'browser-check-errors.txt'), errors.join('\n') + '\n');
+    } catch { /* the screenshot is a help only */ }
+  }
   await browser.close();
   server.close();
 }

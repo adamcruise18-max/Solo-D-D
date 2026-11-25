@@ -23,8 +23,17 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
   if (!systems) throw new Error('The clock needs a systems list');
 
   // mode: what the player does while time passes: rest, work, heavy, walk, sleep.
+  let running = false;
   function advance(state, minutes, mode = 'rest') {
     if (!(minutes >= 0)) throw new Error(`Bad number of minutes: ${minutes}`);
+    // A system that moves time inside a step would charge the time twice and step
+    // every system again inside the step. Time moves only from actions.
+    if (running) throw new Error('Time was moved inside a clock step (time charged twice)');
+    running = true;
+    try { return run(state, minutes, mode); } finally { running = false; }
+  }
+
+  function run(state, minutes, mode) {
     let left = minutes;
     const ctx = { mode, events, clock: api };
     while (left > 0.0001 && !state.dead) {
