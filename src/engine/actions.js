@@ -19,6 +19,7 @@ import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 import { plant, waterGarden, harvest } from './garden.js';
+import { SALVAGE } from '../data/salvage.js';
 import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
 import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
@@ -44,7 +45,7 @@ function cookPick(state) {
   const water = cookWater(h, state.carried);
   return COOK_ORDER().find((f) => ((h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
 }
-import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
+import { skillLevel, practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // Scavenging is used all the time; half xp per use so level 5 comes in month 3 or 4, not month 2.
@@ -122,7 +123,39 @@ export function itemUses(state, id) {
   if (it.kind === 'book') uses.push({ verb: 'read', label: hasRead(state, id) ? 'Read again' : 'Read', note: `${READ_MINUTES / 60} h · ${SKILLS[it.skill].name}` });
   if (it.kind === 'food' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Give to dog' });
   if (it.kind === 'dogfood' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Feed dog' });
+  const sv = SALVAGE[id];
+  if (sv) {
+    const tool = salvageTool(state, id);
+    uses.push({ verb: 'salvage', label: 'Take apart', note: tool ? `${salvageMinutes(state, id)} min · ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or ')}`, disabled: !tool });
+  }
   return uses;
+}
+
+// ---------- taking junk apart ----------
+// The tool you use (the first you have, toolkit first), or null.
+export function salvageTool(state, id) {
+  const sv = SALVAGE[id];
+  if (!sv) return null;
+  const order = ['toolkit', ...sv.tools.filter((t) => t !== 'toolkit')];
+  return order.find((t) => sv.tools.includes(t) && has(state, t)) || null;
+}
+export function salvageMinutes(state, id) {
+  const sv = SALVAGE[id];
+  const tool = salvageTool(state, id);
+  const lvl = skillLevel(state, 'tinkering');
+  return Math.round(sv.min * (tool === 'toolkit' ? 0.75 : 1) * (1 - 0.06 * lvl));
+}
+function salvage(state, id, bag) {
+  const sv = SALVAGE[id];
+  const tool = salvageTool(state, id);
+  if (!tool) { log(state, `You need ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or ')} to take this apart.`); return; }
+  const min = salvageMinutes(state, id);
+  addItem(bag, id, -1);
+  // The parts go where the junk was (home storage or your bag).
+  for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
+  advanceTime(state, min, 'work');
+  practice(state, 'tinkering', 2);
+  log(state, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => `${q} ${ITEMS[pid].unit} ${itemName(pid).toLowerCase()}`).join(', ')}.`, 'good');
 }
 
 export function useItem(state, id, verb, from = 'carried') {
@@ -156,6 +189,8 @@ export function useItem(state, id, verb, from = 'carried') {
     }
     case 'med':
       return useMed(state, id, bag);
+    case 'salvage':
+      return salvage(state, id, bag);
     case 'wear': {
       // One item per layer; the old one goes back into the same bag.
       addItem(bag, id, -1);

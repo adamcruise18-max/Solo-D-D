@@ -97,6 +97,14 @@
     book_survival: { name: "Wilderness survival guide", unit: "pc", weight: 0.8, kind: "book", skill: "survival" },
     // Parts for home base projects (kind 'part': no use on their own).
     toolkit: { name: "Tool kit", unit: "kit", weight: 6, kind: "tool" },
+    // Junk: worth little as it is; take it apart for parts (src/data/salvage.js).
+    broken_radio: { name: "Broken clock radio", unit: "pc", weight: 1.5, kind: "junk" },
+    old_toaster: { name: "Old toaster", unit: "pc", weight: 3, kind: "junk" },
+    desk_lamp: { name: "Desk lamp", unit: "pc", weight: 2, kind: "junk" },
+    extension_cord: { name: "Extension cord", unit: "pc", weight: 1.5, kind: "junk" },
+    wooden_chair: { name: "Wooden chair", unit: "pc", weight: 9, kind: "junk" },
+    garden_hose: { name: "Garden hose", unit: "pc", weight: 5, kind: "junk" },
+    broken_bike: { name: "Broken bicycle", unit: "pc", weight: 25, kind: "junk" },
     scrap_wood: { name: "Lumber and plywood", unit: "pc", weight: 6, kind: "part" },
     hardware_parts: { name: "Nails, screws and brackets", unit: "box", weight: 1, kind: "part" },
     wiring: { name: "Electrical wire and connectors", unit: "roll", weight: 2, kind: "part" },
@@ -425,6 +433,13 @@
         { id: "canned_food", w: 10 },
         { id: "dry_food", w: 4 },
         { id: "snacks", w: 4 },
+        { id: "broken_radio", w: 2 },
+        { id: "old_toaster", w: 2 },
+        { id: "desk_lamp", w: 2.5 },
+        { id: "extension_cord", w: 3 },
+        { id: "wooden_chair", w: 1.5 },
+        { id: "garden_hose", w: 1.5 },
+        { id: "broken_bike", w: 0.5 },
         { id: "peanut_butter", w: 2.5 },
         { id: "water_bottle", w: 5 },
         { id: "pain_pills", w: 6 },
@@ -3420,6 +3435,18 @@
   }
   var GEN_KWH_PER_GAL = 3;
 
+  // src/data/salvage.js
+  var SALVAGE = {
+    broken_radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit", "knife"], min: 15, what: "wire and screws" },
+    old_toaster: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit"], min: 15, what: "wire and screws" },
+    desk_lamp: { parts: { wiring: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "wire" },
+    extension_cord: { parts: { wiring: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "wire" },
+    wooden_chair: { parts: { scrap_wood: 1, hardware_parts: 0.25 }, tools: ["toolkit", "pry_bar"], min: 30, what: "wood and screws" },
+    garden_hose: { parts: { pipe_fittings: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "hose and fittings" },
+    broken_bike: { parts: { hardware_parts: 0.5, pipe_fittings: 0.25, wiring: 0.25 }, tools: ["toolkit", "multitool"], min: 30, what: "screws, tube and cable" },
+    radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit", "knife"], min: 15, what: "wire and screws" }
+  };
+
   // src/data/wild.js
   var SPOTS = {
     tualatin_rood: { name: "Tualatin River at Rood Bridge Park", lat: 45.4905, lon: -122.9505, kind: "fish", fish: ["largemouth bass", "catfish", "cutthroat trout"], quality: 1 },
@@ -3820,7 +3847,38 @@
     if (it.kind === "book") uses.push({ verb: "read", label: hasRead(state2, id) ? "Read again" : "Read", note: `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}` });
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
+    const sv = SALVAGE[id];
+    if (sv) {
+      const tool = salvageTool(state2, id);
+      uses.push({ verb: "salvage", label: "Take apart", note: tool ? `${salvageMinutes(state2, id)} min \xB7 ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")}`, disabled: !tool });
+    }
     return uses;
+  }
+  function salvageTool(state2, id) {
+    const sv = SALVAGE[id];
+    if (!sv) return null;
+    const order = ["toolkit", ...sv.tools.filter((t) => t !== "toolkit")];
+    return order.find((t) => sv.tools.includes(t) && has2(state2, t)) || null;
+  }
+  function salvageMinutes(state2, id) {
+    const sv = SALVAGE[id];
+    const tool = salvageTool(state2, id);
+    const lvl = skillLevel(state2, "tinkering");
+    return Math.round(sv.min * (tool === "toolkit" ? 0.75 : 1) * (1 - 0.06 * lvl));
+  }
+  function salvage(state2, id, bag) {
+    const sv = SALVAGE[id];
+    const tool = salvageTool(state2, id);
+    if (!tool) {
+      log(state2, `You need ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")} to take this apart.`);
+      return;
+    }
+    const min = salvageMinutes(state2, id);
+    addItem(bag, id, -1);
+    for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
+    advanceTime(state2, min, "work");
+    practice(state2, "tinkering", 2);
+    log(state2, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => `${q} ${ITEMS[pid].unit} ${itemName(pid).toLowerCase()}`).join(", ")}.`, "good");
   }
   function useItem(state2, id, verb, from = "carried") {
     const bag = source2(state2, from);
@@ -3856,6 +3914,8 @@
       }
       case "med":
         return useMed(state2, id, bag);
+      case "salvage":
+        return salvage(state2, id, bag);
       case "wear": {
         addItem(bag, id, -1);
         const old = putOn(p, id);
@@ -6782,7 +6842,7 @@
     return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
   }
   function useButtons(id, from) {
-    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
+    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc(u.note)}</small>` : ""}</button>`).join("");
   }
   var KIND_GROUPS = [
     ["Food", ["food", "dogfood"]],
@@ -6790,7 +6850,7 @@
     ["Medicine", ["med"]],
     ["Light and tools", ["tool", "batteries"]],
     ["Clothes", ["wear"]],
-    ["Fuel and parts", ["fuel", "part"]],
+    ["Fuel and parts", ["fuel", "part", "junk"]],
     ["Books", ["book"]],
     ["Other", ["misc", "comfort", "warm"]]
   ];
@@ -7483,7 +7543,7 @@
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
         const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
-        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;

@@ -1244,6 +1244,49 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.022, 0.022, 0.02, 12), M.blackPl, 0.06, 0.205, 0);
     add(g, gBox(0.12, 0.09, 0.002), tmat(frontTex({ t: 'GASOLINE', s: '1 GAL  SAFETY CAN', n: 'FLAMMABLE  KEEP AWAY FROM FLAME', b: '#f1c21b', f: '#111', a: '#c8281e', p: 'flame' }, 256, 192), 0.6), 0, 0.06, 0.061);
   },
+  broken_radio(g) {
+    // clock radio with a cracked face and a cut cord
+    add(g, gRBox(0.2, 0.08, 0.1, 0.015), col(0x2b2b2e, 0.5));
+    add(g, gBox(0.08, 0.035, 0.002), col(0x3a1010, 0.3), -0.04, 0.025, 0.051);
+    add(g, gCyl(0.025, 0.025, 0.004, 14), col(0x55585c, 0.6), 0.05, 0.04, 0.051, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.003, 0.003, 0.25, 4), col(0x111111, 0.6), -0.2, 0.004, -0.03, 0, 0, Math.PI / 2);
+  },
+  old_toaster(g) {
+    add(g, gRBox(0.26, 0.17, 0.14, 0.04), M.chrome);
+    for (const z of [-0.025, 0.025]) add(g, gBox(0.18, 0.004, 0.022), col(0x111111, 0.6), 0, 0.17, z);
+    add(g, gBox(0.02, 0.04, 0.02), col(0x1d1d1d, 0.5), 0.14, 0.09, 0);
+  },
+  desk_lamp(g) {
+    const c = col(0x2e5f8a, 0.45, 0.2);
+    add(g, gCyl(0.07, 0.08, 0.02, 16), c);
+    add(g, gCyl(0.008, 0.008, 0.28, 8), M.chrome, 0, 0.02, 0, 0, 0, 0.35);
+    add(g, gCyl(0.035, 0.07, 0.09, 14, true), c, -0.12, 0.2, 0, 0, 0, -1.2);
+  },
+  extension_cord(g) {
+    const o = col(0xe08a1e, 0.6);
+    for (let i = 0; i < 3; i++) add(g, gTorus(0.09 - i * 0.004, 0.008, 6, 20), o, 0, 0.008 + i * 0.012, 0, Math.PI / 2, 0, 0);
+    add(g, gBox(0.04, 0.025, 0.03), o, 0.11, 0, 0.02);
+  },
+  wooden_chair(g) {
+    const w = col(0x8a5a32, 0.65);
+    add(g, gBox(0.42, 0.04, 0.4), w, 0, 0.44, 0);
+    for (const x of [-0.18, 0.18]) for (const z of [-0.17, 0.17]) add(g, gBox(0.035, 0.44, 0.035), w, x, 0, z);
+    for (const x of [-0.18, 0.18]) add(g, gBox(0.035, 0.46, 0.035), w, x, 0.48, -0.17);
+    add(g, gBox(0.4, 0.12, 0.025), w, 0, 0.78, -0.17);
+  },
+  garden_hose(g) {
+    const gr = col(0x2f7a3a, 0.55);
+    for (let i = 0; i < 4; i++) add(g, gTorus(0.16 - i * 0.012, 0.012, 6, 24), gr, 0, 0.012 + i * 0.014, 0, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.016, 0.016, 0.04, 10), col(0xc9a23a, 0.35, 0.6), 0.17, 0.01, 0, 0, 0, Math.PI / 2);
+  },
+  broken_bike(g) {
+    // lying on its side: two wheels, a frame, bent handlebars
+    const frame = col(0x9a2f2f, 0.4, 0.3);
+    for (const x of [-0.5, 0.5]) add(g, gTorus(0.33, 0.018, 6, 28), col(0x1b1b1b, 0.7), x, 0.02, 0, Math.PI / 2, 0, 0);
+    add(g, gCyl(0.018, 0.018, 0.75, 8), frame, 0.38, 0.05, 0, 0, 0, Math.PI / 2);
+    add(g, gCyl(0.018, 0.018, 0.5, 8), frame, 0.1, 0.05, 0.05, 0, 0.6, Math.PI / 2);
+    add(g, gCyl(0.012, 0.012, 0.45, 8), M.chrome, 0.5, 0.06, 0.2, Math.PI / 2, 0, 0.3);
+  },
   fishing_rod(g) {
     // two-piece rod lying down: cork grip, reel, thin blank, tip guide
     const H = Math.PI / 2;

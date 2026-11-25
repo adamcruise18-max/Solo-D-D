@@ -33,6 +33,7 @@ import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostic
 import { homeHeat } from '../engine/home.js';
 import { gardenInfo, canPlant } from '../engine/garden.js';
 import { CROPS } from '../data/crops.js';
+import { SALVAGE } from '../data/salvage.js';
 import { SPOTS, GAME } from '../data/wild.js';
 import { gameHere } from '../engine/wild.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
@@ -339,14 +340,14 @@ function itemRow(id, q, from, buttons) {
 }
 
 function useButtons(id, from) {
-  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join('');
+  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}${u.verb === 'salvage' && u.note ? ` <small>${esc(u.note)}</small>` : ''}</button>`).join('');
 }
 
 // Auto-sort: items in groups by kind, then by name.
 const KIND_GROUPS = [
   ['Food', ['food', 'dogfood']], ['Water', ['drink']], ['Medicine', ['med']],
   ['Light and tools', ['tool', 'batteries']], ['Clothes', ['wear']],
-  ['Fuel and parts', ['fuel', 'part']], ['Books', ['book']], ['Other', ['misc', 'comfort', 'warm']],
+  ['Fuel and parts', ['fuel', 'part', 'junk']], ['Books', ['book']], ['Other', ['misc', 'comfort', 'warm']],
 ];
 function groupOf(id) {
   const k = ITEMS[id] ? ITEMS[id].kind : 'misc';
@@ -1042,6 +1043,7 @@ async function walkInside() {
       const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
       return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
         + (need ? `<span class="need">Needed: ${esc(need)}</span>` : '')
+        + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : '')
         + (near > 1 ? `<small class="more">Hold ${touch ? 'USE' : 'E'}: take all ${near} in reach</small>` : '');
     },
     onSearch: (zone) => {

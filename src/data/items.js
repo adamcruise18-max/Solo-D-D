@@ -109,6 +109,14 @@ export const ITEMS = {
 
   // Parts for home base projects (kind 'part': no use on their own).
   toolkit: { name: 'Tool kit', unit: 'kit', weight: 6, kind: 'tool' },
+  // Junk: worth little as it is; take it apart for parts (src/data/salvage.js).
+  broken_radio: { name: 'Broken clock radio', unit: 'pc', weight: 1.5, kind: 'junk' },
+  old_toaster: { name: 'Old toaster', unit: 'pc', weight: 3, kind: 'junk' },
+  desk_lamp: { name: 'Desk lamp', unit: 'pc', weight: 2, kind: 'junk' },
+  extension_cord: { name: 'Extension cord', unit: 'pc', weight: 1.5, kind: 'junk' },
+  wooden_chair: { name: 'Wooden chair', unit: 'pc', weight: 9, kind: 'junk' },
+  garden_hose: { name: 'Garden hose', unit: 'pc', weight: 5, kind: 'junk' },
+  broken_bike: { name: 'Broken bicycle', unit: 'pc', weight: 25, kind: 'junk' },
   scrap_wood: { name: 'Lumber and plywood', unit: 'pc', weight: 6, kind: 'part' },
   hardware_parts: { name: 'Nails, screws and brackets', unit: 'box', weight: 1, kind: 'part' },
   wiring: { name: 'Electrical wire and connectors', unit: 'roll', weight: 2, kind: 'part' },
