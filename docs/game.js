@@ -2937,14 +2937,30 @@
       return false;
     }
   }
+  var UNREADABLE_KEY = "lastlight.save.v1.unreadable";
+  var problem = null;
   function loadGame() {
+    problem = null;
     const s = store();
     if (!s) return null;
+    let raw;
     try {
-      const raw = s.getItem(KEY);
-      if (!raw) return null;
+      raw = s.getItem(KEY);
+    } catch (err) {
+      problem = String(err);
+      return null;
+    }
+    if (!raw) return null;
+    try {
       return parseSave(raw);
-    } catch {
+    } catch (err) {
+      problem = err?.message || String(err);
+      try {
+        s.setItem(UNREADABLE_KEY, raw);
+        s.removeItem(KEY);
+      } catch {
+      }
+      if (typeof console !== "undefined") console.warn(`Save not loaded (kept as ${UNREADABLE_KEY}): ${problem}`);
       return null;
     }
   }

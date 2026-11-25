@@ -51,13 +51,15 @@ try {
   const play = await (async () => {
     await page.evaluate(() => localStorage.removeItem('lastlight.save.v1'));
     await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(800);
-    const start = page.locator('#startBtn');
-    if (await start.count()) await start.click();
+    // The intro shows after the map loads: wait for it, do not guess a time.
+    await page.locator('#startBtn').waitFor({ timeout: 20000 });
+    await page.locator('#startBtn').click();
+    await page.locator('[data-act="sleep"]').first().waitFor({ timeout: 10000 });
     const read = () => page.evaluate(() => JSON.parse(localStorage.getItem('lastlight.save.v1') || 'null'));
     const before = await read();
     for (let i = 0; i < 2; i++) {
       await page.locator('[data-act="sleep"]').first().click();
+      await page.locator('[data-hours="10"]').waitFor({ timeout: 5000 });
       await page.locator('[data-hours="10"]').click();
       await page.waitForTimeout(300);
       // Close any message (for example the dog) so the next click works.

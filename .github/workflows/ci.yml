@@ -41,7 +41,8 @@ jobs:
           npm run build
           git diff --stat -- docs/game.js docs/inside3d.js
           if ! git diff --quiet -- docs/game.js docs/inside3d.js; then
-            echo "::warning::docs/game.js or docs/inside3d.js differ from a fresh build. Run npm run build and commit the result."
+            echo "::error::docs/game.js or docs/inside3d.js differ from a fresh build. Run npm run build and commit the result."
+            exit 1
           fi
 
       - name: Install browser for the browser check

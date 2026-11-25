@@ -92,6 +92,10 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
   `broken` (the slot has saves, but every copy is bad). A broken slot is never shown as
   an empty slot, so the game cannot start a new run over it by mistake. An upgrade
   error (for example a save from a newer game) is passed up, not hidden by `~prev`.
+- The live game (`src/engine/save.js`, localStorage) does not drop a save it cannot load
+  (for example one from a newer game): `loadGame()` moves it to
+  `lastlight.save.v1.unreadable` before a new run can write over it, and
+  `loadProblem()` says why. `unreadableSave()` gives its text for a backup download.
 - Save timing (`npm run bench:save`, and IndexedDB numbers in `npm run check:browser`),
   2026-11-24: a real 47-day bot save is about 48 KB. In Chromium IndexedDB, a save of
   both copies takes about 27 ms at 1 MB, 158 ms at 5 MB, 292 ms at 10 MB, 708 ms at

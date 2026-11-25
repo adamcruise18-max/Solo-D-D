@@ -85,3 +85,25 @@ test('systems: the game systems list is the one the clock runs', () => {
   assert.equal(GAME_SYSTEMS.length, gameSystems().list().length);
   assert.equal(typeof gameClock().advance, 'function');
 });
+
+test('saves: a live save the game cannot load is kept aside, not written over', async () => {
+  const { loadGame, saveGame, loadProblem, unreadableSave } = await import('../src/engine/save.js');
+  const m = new Map();
+  const prev = globalThis.localStorage;
+  globalThis.localStorage = { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) };
+  try {
+    const g = newGame(31);
+    saveGame(g);
+    assert.equal(loadGame().seed, 31);
+    assert.equal(loadProblem(), null);
+    const newer = { ...g, systemVersions: { weather: 2, legacy: 1 } }; // from a newer game
+    saveGame(newer);
+    assert.equal(loadGame(), null, 'it does not load');
+    assert.match(loadProblem(), /weather v2/);
+    assert.equal(JSON.parse(unreadableSave()).systemVersions.weather, 2, 'it is kept');
+    saveGame(newGame(32)); // the new run
+    assert.equal(JSON.parse(unreadableSave()).seed, 31, 'the new run did not write over it');
+  } finally {
+    globalThis.localStorage = prev;
+  }
+});

@@ -20,13 +20,26 @@ const ALLOWED_RANDOM = [
   /^export function newGame\(seed = Math\.floor\(Math\.random\(\) \* 2 \*\* 31\)/,
 ];
 
+// Files in src/core and src/engine (with subfolders), plus the shared rule
+// helpers they import from src/ (rng.js, sun.js, data/).
 function files() {
   const out = [];
-  for (const d of DIRS) {
-    for (const f of readdirSync(join(ROOT, d))) if (f.endsWith('.js')) out.push(join(d, f));
-  }
+  const walk = (d) => {
+    for (const e of readdirSync(join(ROOT, d), { withFileTypes: true })) {
+      const rel = join(d, e.name);
+      if (e.isDirectory()) walk(rel);
+      else if (e.name.endsWith('.js')) out.push(rel);
+    }
+  };
+  for (const d of DIRS) walk(d);
+  walk('data');
+  for (const f of ['rng.js', 'sun.js']) out.push(f);
   return out;
 }
+
+// Browser storage is reached only in the two save files, through globalThis
+// (a default argument or a guarded lookup), so tests can pass a fake one.
+const STORAGE_FILES = new Set(['core/save.js', 'engine/save.js']);
 
 // Remove comments and string contents so words in text do not count.
 function code(src) {
@@ -50,12 +63,13 @@ test('architecture: no Math.random in rule code (use a seeded rng or a named str
   assert.deepEqual(bad, [], `Math.random found in rule code:\n${bad.join('\n')}`);
 });
 
-test('architecture: rule code uses no browser objects', () => {
+test('architecture: rule code uses no browser objects (storage only in the save files)', () => {
   const bad = [];
   for (const f of files()) {
     const src = code(readFileSync(join(ROOT, f), 'utf8'));
     src.split('\n').forEach((line, i) => {
-      if (/(^|[^.\w])(window|document)\s*\./.test(line)) bad.push(`src/${f}:${i + 1}: ${line.trim()}`);
+      if (/(^|[^.\w])(window|document|navigator)\s*\./.test(line)) bad.push(`src/${f}:${i + 1}: ${line.trim()}`);
+      if (/\b(localStorage|sessionStorage|indexedDB)\b/.test(line) && !STORAGE_FILES.has(f.split('\\').join('/'))) bad.push(`src/${f}:${i + 1}: ${line.trim()}`);
     });
   }
   assert.deepEqual(bad, [], `Browser objects in rule code:\n${bad.join('\n')}`);

@@ -16,6 +16,9 @@
 //   loading   -> failed            (no answer in loadTimeoutMs: the load is abandoned;
 //                                  its late result is freed with unload and ignored)
 //
+// maxInFlight counts live loads only: an abandoned load may still run in the
+// background until it answers.
+//
 // Each load has a generation token. A result whose token is not the key's current
 // token is late and obsolete: it is freed and never shown. unload(key, data) must
 // free that data only (another load of the same key can be live).
@@ -50,6 +53,12 @@ export function createStreamer({
     }
   }
 
+  // Run pump() again after ms of real time (load timeouts, retry waits).
+  function wake(ms) {
+    const timer = setTimeout(() => pump(), ms);
+    timer?.unref?.(); // do not keep Node tests running
+  }
+
   function start(key) {
     const t0 = now();
     const my = ++token;
@@ -57,6 +66,9 @@ export function createStreamer({
     cells.set(key, { status: 'loading', data: null, lastUsed: t0, cost: 0, token: my, tries: prev?.tries || 0, t0 });
     inFlight++;
     stats.requests++;
+    // Wake up when this load is due to time out, even if nothing else happens
+    // (the player may stand still). unref: do not keep Node tests running.
+    if (Number.isFinite(loadTimeoutMs)) wake(loadTimeoutMs + 1);
     Promise.resolve().then(() => load(key)).then(
       (data) => done(key, my, data),
       (err) => fail(key, my, err),
@@ -106,7 +118,9 @@ export function createStreamer({
       else {
         cur.status = 'failed';
         cur.tries += 1;
-        cur.retryAt = now() + Math.min(maxRetryMs, retryMs * 2 ** (cur.tries - 1));
+        const wait = Math.min(maxRetryMs, retryMs * 2 ** (cur.tries - 1));
+        cur.retryAt = now() + wait;
+        wake(wait + 1);
       }
     }
     tell({ type: 'failed', key, error: err });
@@ -139,6 +153,7 @@ export function createStreamer({
     for (const [key, c] of [...cells.entries()]) {
       if ((c.status !== 'loading' && c.status !== 'cancelled') || t - c.t0 < loadTimeoutMs) continue;
       abandoned.add(c.token);
+      if (abandoned.size > 1000) abandoned.delete(abandoned.values().next().value); // loads that never answer
       inFlight--;
       stats.timedOut++;
       stats.failed++;
@@ -146,7 +161,9 @@ export function createStreamer({
       c.status = 'failed';
       c.token = ++token;
       c.tries += 1;
-      c.retryAt = t + Math.min(maxRetryMs, retryMs * 2 ** (c.tries - 1));
+      const wait = Math.min(maxRetryMs, retryMs * 2 ** (c.tries - 1));
+      c.retryAt = t + wait;
+      wake(wait + 1);
       tell({ type: 'failed', key, error: new Error(`load timed out after ${loadTimeoutMs} ms`) });
     }
   }
@@ -237,6 +254,8 @@ export function createStreamer({
   async function idle({ timeoutMs = 10000, clock = () => Date.now() } = {}) {
     const end = clock() + timeoutMs;
     while (inFlight > 0) {
+      pump(); // expire loads past loadTimeoutMs, start due retries
+      if (inFlight === 0) break;
       if (clock() >= end) return false;
       await new Promise((r) => setTimeout(r, 1));
     }

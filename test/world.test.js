@@ -477,3 +477,16 @@ test('streamer: maxLoaded below the active ring keeps the player cell and does n
   assert.ok(s.loadedKeys().length <= 1);
   assert.ok(loads < 20, `loads stay bounded (got ${loads})`);
 });
+
+test('streamer: a stuck load times out while the player stands still (no update call)', async () => {
+  let release;
+  const s = createStreamer({
+    loadTimeoutMs: 30, retryMs: 5,
+    load: (k) => (k === '0,0' && !release ? new Promise((r) => { release = r; }) : Promise.resolve(k)),
+  });
+  s.update(new Map([['0,0', 'active']]));
+  await new Promise((r) => setTimeout(r, 80)); // real time passes; no update()
+  assert.equal(s.report().timedOut, 1, 'the timer expired the load');
+  assert.equal(await s.idle({ timeoutMs: 500 }), true);
+  assert.equal(s.status('0,0'), 'loaded', 'the retry loaded it');
+});
