@@ -87,7 +87,7 @@ export async function start() {
     + '<span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
-    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
+    mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup, center: state?.pos });
     window.__llMap = mapApi.map; // for tests
     const showCoords = () => {
       const c = mapApi.map.getCenter();
@@ -343,7 +343,7 @@ function itemRow(id, q, from, buttons) {
 }
 
 function useButtons(id, from) {
-  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}${u.verb === 'salvage' && u.note ? ` <small>${esc(u.note)}</small>` : ''}</button>`).join('');
+  return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}${u.verb === 'salvage' && u.note ? ` <small>${esc(u.note)}</small>` : ''}</button>${u.disabled && u.note && u.verb !== 'salvage' ? `<small class="need">${esc(u.note)}</small>` : ''}`).join('');
 }
 
 // Auto-sort: items in groups by kind, then by name.
@@ -389,11 +389,20 @@ function renderItems() {
   let cHtml = groupedRows(cIds, (id) => itemRow(id, carried[id], 'carried',
     useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`));
   if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
+  const fill = Math.min(100, Math.round((weight / Math.max(1, limit)) * 100));
+  const hereTag = loc.kind === 'home' ? 'stored' : 'not yours yet';
   $('#items').innerHTML = `
     <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
-    <h3>${hereTitle} ${takeAll}</h3><ul class="items">${hereHtml}</ul>
-    <h3>You carry <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
-    <ul class="items">${cHtml}</ul>`;
+    <section class="bag bag-here${loc.kind === 'home' ? ' bag-home' : ''}">
+      <h3><span class="bag-ico" aria-hidden="true">${loc.kind === 'home' ? '⌂' : '⌕'}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll}</h3>
+      <ul class="items">${hereHtml}</ul>
+    </section>
+    <section class="bag bag-pack">
+      <h3><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span>
+        <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
+      <div class="bag-load${over ? ' over' : ''}"><i style="width:${fill}%"></i></div>
+      <ul class="items">${cHtml}</ul>
+    </section>`;
 }
 
 function renderHome() {
@@ -1146,14 +1155,19 @@ function insidePanel(name) {
     const rows = groupedRows(ids, (id) => {
       const it = ITEMS[id];
       const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
-        .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
+        .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}</button>${u.disabled && u.note ? `<small class="need">${esc(u.note)}</small>` : ''}`).join('');
       return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
     }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
     const hereIds = Object.keys(here);
-    const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
-      <button class="primary small" data-in="take">Take all that fits (F)</button>` : '';
-    return `<h4>Inventory · ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><p class="stock">${esc(stockLine(state))}</p><ul class="inv">${rows}</ul>${hereList}`;
+    const hereList = hereIds.length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">⌕</span>Found here <span class="bag-tag">not yours yet</span></h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
+      <button class="primary small" data-in="take">Take all that fits (F)</button></section>` : '';
+    const w = bagWeight(state.carried);
+    const lim = carryLimit(state);
+    const fill = Math.min(100, Math.round((w / Math.max(1, lim)) * 100));
+    return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>
+      <section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? 'bad' : ''}">${w} / ${lim} lb</span></h5>
+      <div class="bag-load${w > lim ? ' over' : ''}"><i style="width:${fill}%"></i></div><ul class="inv">${rows}</ul></section>${hereList}`;
   }
   if (name === 'character') {
     const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')

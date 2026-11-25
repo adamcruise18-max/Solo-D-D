@@ -4126,10 +4126,21 @@
     if (it.kind === "drink") uses.push({ verb: "drink", label: "Drink" });
     if (it.kind === "med") uses.push({ verb: "med", label: "Use" });
     if (it.kind === "wear") uses.push({ verb: "wear", label: "Wear" });
-    if (it.kind === "batteries") uses.push({ verb: "batteries", label: "Put in flashlight" });
+    if (it.kind === "batteries") {
+      const noLamp = !has2(state2, "flashlight");
+      uses.push({ verb: "batteries", label: "Put in flashlight", disabled: noLamp, note: noLamp ? "Needs a flashlight (you have none)" : void 0 });
+    }
     if (it.kind === "comfort") uses.push({ verb: "comfort", label: "Use" });
     if (it.kind === "warm") uses.push({ verb: "warm", label: "Use" });
-    if (it.kind === "book") uses.push({ verb: "read", label: hasRead(state2, id) ? "Read again" : "Read", note: `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}` });
+    if (it.kind === "book") {
+      const dark = environment(state2, "work").dark && !hasLight(state2);
+      uses.push({
+        verb: "read",
+        label: hasRead(state2, id) ? "Read again" : "Read",
+        disabled: dark,
+        note: dark ? "Too dark: needs a light (flashlight with batteries, candle or lamp)" : `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}`
+      });
+    }
     if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
     if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
     if (id === "car_battery" && state2.location.kind === "home") {
@@ -5423,7 +5434,19 @@
   function furnishRoom(plan, cat, name, zone, room, r, opts) {
     const { cx, cz, side, RW, RD, xout } = room;
     const wallX = xout - side * 0.55;
-    const put = (type, x, z, w, d, h2, extra = {}) => plan.fixtures.push({ type, x, z, w, d, h: h2, zone, solid: true, ...extra });
+    const zMin = cz - RD / 2 + 0.15;
+    const zMax = cz + RD / 2 - 0.15;
+    const hits = (x, z, w, d) => plan.fixtures.some((f) => f.zone === zone && f.solid && Math.abs(x - f.x) < (w + f.w) / 2 - 0.02 && Math.abs(z - f.z) < (d + f.d) / 2 - 0.02);
+    const put = (type, x, z, w, d, h2, extra = {}) => {
+      let zz = z;
+      if (hits(x, zz, w, d)) {
+        const tries = [];
+        for (let k = 1; k <= 12; k++) tries.push(z + k * 0.25, z - k * 0.25);
+        zz = tries.find((t) => t - d / 2 >= zMin && t + d / 2 <= zMax && !hits(x, t, w, d));
+        if (zz == null) return;
+      }
+      plan.fixtures.push({ type, x, z: zz, w, d, h: h2, zone, solid: true, ...extra });
+    };
     let items;
     if (cat === "house") items = HOUSE_FURNITURE[name] || ["cabinet"];
     else if (cat === "hospital") items = ["bed", "bed", "cart"];
@@ -6550,14 +6573,15 @@
     }
     return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
   }
-  async function createMap(container, { places, onPlaceClick, onCarClick }) {
+  async function createMap(container, { places, onPlaceClick, onCarClick, center }) {
     const maplibregl = window.maplibregl;
     const { style, online } = await pickStyle();
     const map = new maplibregl.Map({
       container,
       style,
-      center: [HOME.lon, HOME.lat],
-      zoom: 12.5,
+      // Open over the player (a saved game), else over home.
+      center: center && Number.isFinite(center.lat) ? [center.lon, center.lat] : [HOME.lon, HOME.lat],
+      zoom: center ? 15 : 12.5,
       minZoom: 9,
       maxZoom: 18,
       maxBounds: [[HOME.lon - 0.75, HOME.lat - 0.5], [HOME.lon + 0.75, HOME.lat + 0.5]],
@@ -6974,7 +6998,7 @@
     fx = createFx($("#mapwrap"));
     $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span><span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span><span><i class="edge"></i>15-mile edge</span>';
     try {
-      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup });
+      mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup, onCarClick: showCarPopup, center: state?.pos });
       window.__llMap = mapApi.map;
       const showCoords = () => {
         const c = mapApi.map.getCenter();
@@ -7202,7 +7226,7 @@
     return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
   }
   function useButtons(id, from) {
-    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc(u.note)}</small>` : ""}</button>`).join("");
+    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc(u.note)}</small>` : ""}</button>${u.disabled && u.note && u.verb !== "salvage" ? `<small class="need">${esc(u.note)}</small>` : ""}`).join("");
   }
   var KIND_GROUPS = [
     ["Food", ["food", "dogfood"]],
@@ -7256,11 +7280,20 @@
       useButtons(id, "carried") + `<button data-drop="${id}">${loc.kind === "home" ? "Store" : "Drop"}</button>`
     ));
     if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
+    const fill = Math.min(100, Math.round(weight / Math.max(1, limit) * 100));
+    const hereTag = loc.kind === "home" ? "stored" : "not yours yet";
     $("#items").innerHTML = `
     <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
-    <h3>${hereTitle} ${takeAll2}</h3><ul class="items">${hereHtml}</ul>
-    <h3>You carry <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
-    <ul class="items">${cHtml}</ul>`;
+    <section class="bag bag-here${loc.kind === "home" ? " bag-home" : ""}">
+      <h3><span class="bag-ico" aria-hidden="true">${loc.kind === "home" ? "\u2302" : "\u2315"}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll2}</h3>
+      <ul class="items">${hereHtml}</ul>
+    </section>
+    <section class="bag bag-pack">
+      <h3><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span>
+        <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
+      <div class="bag-load${over ? " over" : ""}"><i style="width:${fill}%"></i></div>
+      <ul class="items">${cHtml}</ul>
+    </section>`;
   }
   function renderHome() {
     const h2 = state.home;
@@ -7990,14 +8023,19 @@
       const ids = sortedIds(c);
       const rows = groupedRows(ids, (id) => {
         const it = ITEMS[id];
-        const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join("");
+        const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}</button>${u.disabled && u.note ? `<small class="need">${esc(u.note)}</small>` : ""}`).join("");
         return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
       }) || '<li class="empty">You carry nothing.</li>';
       const here = hereBag(state);
       const hereIds = Object.keys(here);
-      const hereList = hereIds.length ? `<h5>Found here, not taken</h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join("")}</ul>
-      <button class="primary small" data-in="take">Take all that fits (F)</button>` : "";
-      return `<h4>Inventory \xB7 ${bagWeight(state.carried)} / ${carryLimit(state)} lb</h4><p class="stock">${esc(stockLine(state))}</p><ul class="inv">${rows}</ul>${hereList}`;
+      const hereList = hereIds.length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">\u2315</span>Found here <span class="bag-tag">not yours yet</span></h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join("")}</ul>
+      <button class="primary small" data-in="take">Take all that fits (F)</button></section>` : "";
+      const w = bagWeight(state.carried);
+      const lim = carryLimit(state);
+      const fill = Math.min(100, Math.round(w / Math.max(1, lim) * 100));
+      return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>
+      <section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? "bad" : ""}">${w} / ${lim} lb</span></h5>
+      <div class="bag-load${w > lim ? " over" : ""}"><i style="width:${fill}%"></i></div><ul class="inv">${rows}</ul></section>${hereList}`;
     }
     if (name === "character") {
       const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc(r.text)}</div>`).join("");

@@ -474,3 +474,26 @@ b.ok, b.warn, b.bad { background: none; }
 #modal .row button.risky { border-color: #c96a3a; }
 #modal .row button.risky small { color: #e3a06b; }
 .badge-new { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #2a2205; background: #e3b04b; border-radius: 2px; vertical-align: middle; }
+
+/* Found here vs in your pack (Adam's playtest, item 8): two boxes that do not look alike. */
+.bag { margin: 8px 0 12px; padding: 6px 10px 4px; border-radius: 3px; }
+.bag h3, .bag h5 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 6px; }
+.bag-ico { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 12px; }
+.bag-tag { font: 600 10px/1 var(--cond); letter-spacing: .12em; text-transform: uppercase; padding: 3px 6px; border-radius: 2px; }
+.bag-here { border: 1px dashed var(--warn); background: rgba(227, 176, 75, .06); }
+.bag-here .bag-ico { background: rgba(227, 176, 75, .2); color: var(--warn); }
+.bag-here .bag-tag { background: rgba(227, 176, 75, .18); color: var(--warn); }
+.bag-here.bag-home { border-color: var(--signal); background: rgba(233, 207, 150, .05); }
+.bag-home .bag-ico, .bag-home .bag-tag { color: var(--signal); background: rgba(233, 207, 150, .16); }
+.bag-pack { border: 1px solid var(--ok); border-left-width: 4px; background: rgba(124, 201, 138, .07); }
+.bag-pack .bag-ico { background: rgba(124, 201, 138, .22); color: var(--ok); }
+.bag-pack .bag-tag { background: rgba(124, 201, 138, .18); color: var(--ok); }
+.bag-load { height: 5px; background: rgba(255, 255, 255, .08); border-radius: 3px; margin: 0 0 6px; overflow: hidden; }
+.bag-load i { display: block; height: 100%; background: var(--ok); }
+.bag-load.over i { background: var(--bad); }
+.bag .items li:last-child, .bag .inv li:last-child { border-bottom: 0; }
+small.need { color: var(--warn); align-self: center; font-size: 11px; }
+small.need::before { content: '⚠ '; }
+.bag-here h3, .bag-here h5 { color: var(--warn); }
+.bag-home h3 { color: var(--signal); }
+.bag-pack h3, .bag-pack h5 { color: var(--ok); }

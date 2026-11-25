@@ -120,10 +120,18 @@ export function itemUses(state, id) {
   if (it.kind === 'drink') uses.push({ verb: 'drink', label: 'Drink' });
   if (it.kind === 'med') uses.push({ verb: 'med', label: 'Use' });
   if (it.kind === 'wear') uses.push({ verb: 'wear', label: 'Wear' });
-  if (it.kind === 'batteries') uses.push({ verb: 'batteries', label: 'Put in flashlight' });
+  if (it.kind === 'batteries') {
+    const noLamp = !has(state, 'flashlight');
+    uses.push({ verb: 'batteries', label: 'Put in flashlight', disabled: noLamp, note: noLamp ? 'Needs a flashlight (you have none)' : undefined });
+  }
   if (it.kind === 'comfort') uses.push({ verb: 'comfort', label: 'Use' });
   if (it.kind === 'warm') uses.push({ verb: 'warm', label: 'Use' });
-  if (it.kind === 'book') uses.push({ verb: 'read', label: hasRead(state, id) ? 'Read again' : 'Read', note: `${READ_MINUTES / 60} h · ${SKILLS[it.skill].name}` });
+  if (it.kind === 'book') {
+    // Reading needs light: say so on the button instead of a button that does nothing.
+    const dark = environment(state, 'work').dark && !hasLight(state);
+    uses.push({ verb: 'read', label: hasRead(state, id) ? 'Read again' : 'Read', disabled: dark,
+      note: dark ? 'Too dark: needs a light (flashlight with batteries, candle or lamp)' : `${READ_MINUTES / 60} h · ${SKILLS[it.skill].name}` });
+  }
   if (it.kind === 'food' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Give to dog' });
   if (it.kind === 'dogfood' && state.dog.stage === 'joined') uses.push({ verb: 'feeddog', label: 'Feed dog' });
   if (id === 'car_battery' && state.location.kind === 'home') {

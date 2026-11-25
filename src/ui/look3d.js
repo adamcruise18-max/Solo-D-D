@@ -1690,6 +1690,64 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     return spot;
   }
 
+  // A window in a side wall of a room (houses, clinics). (x, z): centre on the inside face of
+  // the wall; side: -1 = wall on the left (the room is toward +x), 1 = on the right.
+  // Glass with the sky colour, a frame, a light patch on the floor and (light budget allows)
+  // a soft spot light into the room. At night: dark glass only.
+  const winFrameMat = keep(new MeshStandardMaterial({ color: 0xe8e2d6, roughness: 0.8 }));
+  function addSideWindow(x, z, w, side, o = {}) {
+    const sill = o.sill ?? 0.9;
+    const h = o.h ?? 1.25;
+    const rotY = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+    const inX = -side; // into the room
+    const glassCol = night ? 0x18222e : sky.sky;
+    const glass = new Mesh(new PlaneGeometry(w, h), keep(new MeshBasicMaterial({ color: glassCol, fog: false, toneMapped: false })));
+    glass.rotation.y = rotY;
+    glass.position.set(x + inX * 0.012, sill + h / 2, z);
+    group.add(glass);
+    // frame: sill, head, two jambs, a cross
+    const bars = [
+      [w + 0.12, 0.07, 0, sill - 0.02], [w + 0.12, 0.07, 0, sill + h + 0.02],
+      [0.07, h, -w / 2, sill + h / 2], [0.07, h, w / 2, sill + h / 2],
+      [0.045, h, 0, sill + h / 2], [w, 0.045, 0, sill + h * 0.55],
+    ];
+    for (const [bw, bh, dz, y] of bars) {
+      const b = new Mesh(new BoxGeometry(0.06, bh, bw), winFrameMat);
+      b.position.set(x + inX * 0.03, y, z + dz);
+      group.add(b);
+    }
+    // a deeper sill board inside
+    const board = new Mesh(new BoxGeometry(0.18, 0.035, w + 0.2), winFrameMat);
+    board.position.set(x + inX * 0.09, sill - 0.04, z);
+    group.add(board);
+    if (night || dayK <= 0.02) return;
+    addOpening(x, z, w / 2 + 0.5);
+    const L = o.length ?? 2.6;
+    if (!lowQ) {
+      const m = new Mesh(new PlaneGeometry(L, w * 1.1), keep(new MeshBasicMaterial({
+        map: patchTexture(), color: sky.color, transparent: true, opacity: Math.min(0.5, 0.36 * dayK),
+        blending: AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -5,
+      })));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(x + inX * (L / 2 + 0.25), 0.006, z);
+      m.renderOrder = 2;
+      group.add(m);
+    }
+    if (takeLight()) {
+      const spot = new SpotLight(sky.color, 14 * dayK, 9, 1.05, 1, 1.5);
+      spot.position.set(x + inX * 0.3, sill + h, z);
+      const tgt = new Object3D();
+      tgt.position.set(x + inX * 3.5, 0, z);
+      group.add(spot, tgt);
+      spot.target = tgt;
+    } else {
+      // no light left: a weak glow by the window so the room is not black
+      const p = new PointLight(sky.color, 1.6 * dayK, 4.5, 2);
+      p.position.set(x + inX * 0.8, sill + h * 0.7, z);
+      group.add(p);
+    }
+  }
+
   // Bounce light near an opening: the ceiling and upper walls are not black near daylight.
   // A tint on the ceiling (all but low) and, on high, a weak point light under the ceiling.
   function addBounce(x, z, w, ceilY, o = {}) {
@@ -1945,7 +2003,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     quality, group, fill, flashlight,
     update, dispose,
     addCeilingLight, addExitSign, addDoorLight, addDust, addWallNotice, addDecal, addBrokenGlass, addRoomShade,
-    addWindowLight, addBounce, addOpening, addContactShadows, sky,
+    addWindowLight, addSideWindow, addBounce, addOpening, addContactShadows, sky,
     setExposure: (e) => { baseExposure = e; renderer.toneMappingExposure = e; },
     exposure: () => renderer.toneMappingExposure,
     lightsUsed: () => usedLights,

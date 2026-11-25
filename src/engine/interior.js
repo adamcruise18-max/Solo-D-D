@@ -172,7 +172,22 @@ function roomsPlan(cat, zones, r, opts) {
 function furnishRoom(plan, cat, name, zone, room, r, opts) {
   const { cx, cz, side, RW, RD, xout } = room;
   const wallX = xout - side * 0.55; // near the outer wall
-  const put = (type, x, z, w, d, h, extra = {}) => plan.fixtures.push({ type, x, z, w, d, h, zone, solid: true, ...extra });
+  // Furniture must not stand in other furniture (Adam's playtest: clipping). If the planned
+  // place overlaps a piece already in this room, slide it along the wall to a free place.
+  const zMin = cz - RD / 2 + 0.15;
+  const zMax = cz + RD / 2 - 0.15;
+  const hits = (x, z, w, d) => plan.fixtures.some((f) => f.zone === zone && f.solid
+    && Math.abs(x - f.x) < (w + f.w) / 2 - 0.02 && Math.abs(z - f.z) < (d + f.d) / 2 - 0.02);
+  const put = (type, x, z, w, d, h, extra = {}) => {
+    let zz = z;
+    if (hits(x, zz, w, d)) {
+      const tries = [];
+      for (let k = 1; k <= 12; k++) tries.push(z + k * 0.25, z - k * 0.25);
+      zz = tries.find((t) => t - d / 2 >= zMin && t + d / 2 <= zMax && !hits(x, t, w, d));
+      if (zz == null) return; // no room left: leave it out
+    }
+    plan.fixtures.push({ type, x, z: zz, w, d, h, zone, solid: true, ...extra });
+  };
   let items;
   if (cat === 'house') items = HOUSE_FURNITURE[name] || ['cabinet'];
   else if (cat === 'hospital') items = ['bed', 'bed', 'cart'];
