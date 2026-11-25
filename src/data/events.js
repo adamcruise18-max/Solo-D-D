@@ -1,7 +1,9 @@
 // Pacer events (content). The builder thread owns this file and adds events;
 // the engine thread owns the pacer that picks them (src/engine/pacer.js).
 //
-// { id, size: 'small'|'medium'|'big', where: 'home'|'outside'|'inside'|'any',
+// { id, size: 'small'|'medium'|'big', where: 'home'|'outside'|'inside'|'any'|'asleep',
+//   ('any' = awake anywhere; 'asleep' = only while the player sleeps: write it as
+//   something that wakes you)
 //   months: [min, max] (months since the collapse; the game starts at month 3),
 //   text: journal line, kind: log kind, when(state, ctx)?: extra condition,
 //   apply(state, ctx)?: the effect (ctx.rng is the 'pacer' stream) }
@@ -17,5 +19,9 @@ export const EVENTS = [
   { id: 'crows', size: 'small', where: 'outside', months: [3, 99], text: 'A crowd of crows lifts off a yard as you pass, shouting at you.' },
   { id: 'distant_smoke', size: 'medium', where: 'any', months: [3, 99], text: 'A column of smoke rises far to the east. Something is burning, and nobody will put it out.' },
   { id: 'dogs_howl', size: 'medium', where: 'any', months: [3, 99], text: 'A pack of dogs howls not far away. They sound hungry.' },
+  { id: 'night_crash', size: 'small', where: 'asleep', months: [3, 99], text: 'A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again.' },
+  { id: 'night_owls', size: 'small', where: 'asleep', months: [3, 99], text: 'Owls call to each other outside. You wake, and lie listening until they stop.' },
+  { id: 'night_dogs', size: 'medium', where: 'asleep', months: [3, 99], text: 'Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while.' },
+  { id: 'ice_trees_down', size: 'big', where: 'any', months: [3, 99], when: (s) => s.weather?.type === 'ice_storm', text: 'All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it.' },
   { id: 'power_line_down', size: 'big', where: 'any', months: [3, 99], text: 'A loud crack and a crash: a power pole goes down somewhere close. The street will be blocked.' },
 ];

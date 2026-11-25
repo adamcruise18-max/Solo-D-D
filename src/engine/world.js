@@ -57,7 +57,7 @@ export function rollWeather(state, day) {
   const month = monthOfDay(day);
   const c = CLIMATE[month];
   const old = state.weather;
-  const type = rollType(state, month, old.type);
+  const type = rollType(state, month, old.baseType || old.type); // a rare spell (rareweather.js) keeps its normal type in baseType
   const low = old.nextLow;
   state.weather = finishDay(state, {
     day,
@@ -102,7 +102,7 @@ export function weatherInfo(state) {
 }
 
 export function isBadWeather(state) {
-  return ['heavy_rain', 'windstorm', 'snow'].includes(state.weather.type);
+  return ['heavy_rain', 'windstorm', 'snow', 'ice_storm', 'smoke'].includes(state.weather.type);
 }
 
 export function solarToday(state) {

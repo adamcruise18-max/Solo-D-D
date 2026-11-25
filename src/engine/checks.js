@@ -18,7 +18,7 @@ export function standardMods(state, { outside = false } = {}) {
 // Advantage (roll 2d20, keep the higher) and disadvantage (keep the lower). One of each cancels.
 // opts.outside: weather and light count. opts.adv / opts.dis: extra reasons from the caller
 // (for example the right tool).
-const RAIN = ['rain', 'heavy_rain', 'windstorm'];
+const RAIN = ['rain', 'heavy_rain', 'windstorm', 'ice_storm'];
 export function edges(state, opts = {}) {
   const p = state.player;
   const adv = [...(opts.adv || [])];

@@ -534,7 +534,11 @@
     rain: { label: "Rain", solar: 0.5, wetAfter: 30 },
     heavy_rain: { label: "Heavy rain", solar: 0.3, wetAfter: 10 },
     windstorm: { label: "Windstorm", solar: 0.5, wetAfter: 30 },
-    snow: { label: "Snow", solar: 0.1, speed: 0.6 }
+    snow: { label: "Snow", solar: 0.1, speed: 0.6 },
+    // Rare weather spells (src/engine/rareweather.js).
+    ice_storm: { label: "Ice storm", solar: 0.2, wetAfter: 20, speed: 0.5 },
+    heat_wave: { label: "Heat wave", solar: 1.5 },
+    smoke: { label: "Wildfire smoke", solar: 0.4 }
   };
 
   // src/engine/world.js
@@ -584,7 +588,7 @@
     const month = monthOfDay(day);
     const c = CLIMATE[month];
     const old = state2.weather;
-    const type = rollType(state2, month, old.type);
+    const type = rollType(state2, month, old.baseType || old.type);
     const low = old.nextLow;
     state2.weather = finishDay(state2, {
       day,
@@ -622,7 +626,7 @@
     return WEATHER_TYPES[state2.weather.type];
   }
   function isBadWeather(state2) {
-    return ["heavy_rain", "windstorm", "snow"].includes(state2.weather.type);
+    return ["heavy_rain", "windstorm", "snow", "ice_storm", "smoke"].includes(state2.weather.type);
   }
   function solarToday(state2) {
     const month = monthOfDay(state2.weather.day);
@@ -877,6 +881,101 @@
   var DEHYDRATED_DAMAGE = 2;
   var SEARCH_INJURY_CHANCE = 0.03;
 
+  // src/core/rng.js
+  function next(pos) {
+    let a = pos + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return { pos: a, value: ((t ^ t >>> 14) >>> 0) / 4294967296 };
+  }
+  function stream(state2, name) {
+    if (!name || typeof name !== "string") throw new Error("A random stream needs a name");
+    if (state2.seed == null) throw new Error("A random stream needs a game seed");
+    const start2 = () => hashString(`${state2.seed}:stream:${name}`) | 0;
+    return function rng() {
+      const all = state2.rngStreams = state2.rngStreams || {};
+      const r = next(all[name] ?? start2());
+      all[name] = r.pos;
+      return r.value;
+    };
+  }
+
+  // src/engine/rareweather.js
+  var monthOfDay2 = (day) => new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
+  var SPELLS = {
+    ice_storm: {
+      months: [11, 0, 1],
+      fits: (w) => ["rain", "heavy_rain", "snow"].includes(w.type) && w.low <= 34,
+      chance: 0.02,
+      days: [1, 2],
+      shape: (w, r) => {
+        w.high = Math.min(w.high, 33);
+        w.low = Math.min(w.low, 28);
+        w.wind = 15 + Math.floor(r() * 21);
+        delete w.snowInches;
+      },
+      start: "Freezing rain. Every branch and wire wears a coat of ice. Trees and power lines will come down, and the roads are glass."
+    },
+    heat_wave: {
+      months: [6, 7],
+      fits: (w) => ["clear", "cloudy"].includes(w.type),
+      chance: 0.012,
+      days: [3, 5],
+      shape: (w, r) => {
+        w.high = 98 + Math.floor(r() * 9);
+        w.low = Math.max(w.low, 62);
+        w.nextLow = Math.max(w.nextLow, 64);
+        w.wind = Math.floor(r() * 6);
+      },
+      start: "A heat wave. It will be over 100\xB0F in the afternoon. Drink more, and stay in the shade from noon to evening."
+    },
+    smoke: {
+      months: [7, 8],
+      fits: (w) => ["clear", "cloudy", "fog"].includes(w.type),
+      chance: 0.012,
+      days: [3, 7],
+      shape: (w) => {
+        w.high -= 4;
+      },
+      start: "Wildfire smoke. The sky is orange and the sun is a red disc. The air burns your throat outside; an N95 mask helps."
+    }
+  };
+  var pickInt = (r, [a, b]) => a + Math.floor(r() * (b - a + 1));
+  var SNOW_KEEP = 0.28;
+  function rollSpell(state2, day, old = {}) {
+    const prev = old.spell;
+    const w = state2.weather;
+    const r = stream(state2, "weather-rare");
+    const month = monthOfDay2(day);
+    if (w.type === "snow") {
+      const keep = old.type === "snow" || r() < SNOW_KEEP;
+      if (!keep) {
+        w.type = "rain";
+        delete w.snowInches;
+      }
+    }
+    let spell = null;
+    if (prev && prev.daysLeft > 1) spell = { id: prev.id, daysLeft: prev.daysLeft - 1, started: false };
+    else {
+      for (const [id, s] of Object.entries(SPELLS)) {
+        if (!s.months.includes(month) || !s.fits(w)) continue;
+        if (r() < s.chance) {
+          spell = { id, daysLeft: pickInt(r, s.days), started: true };
+          break;
+        }
+      }
+    }
+    if (!spell) return null;
+    w.baseType = w.type;
+    w.type = spell.id;
+    SPELLS[spell.id].shape(w, r);
+    w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
+    return spell;
+  }
+  function spellStartText(id) {
+    return SPELLS[id]?.start || "";
+  }
+
   // src/engine/placesdb.js
   var LIST = [];
   var INDEX = {};
@@ -1058,25 +1157,6 @@
     return api;
   }
 
-  // src/core/rng.js
-  function next(pos) {
-    let a = pos + 1831565813 | 0;
-    let t = Math.imul(a ^ a >>> 15, 1 | a);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-    return { pos: a, value: ((t ^ t >>> 14) >>> 0) / 4294967296 };
-  }
-  function stream(state2, name) {
-    if (!name || typeof name !== "string") throw new Error("A random stream needs a name");
-    if (state2.seed == null) throw new Error("A random stream needs a game seed");
-    const start2 = () => hashString(`${state2.seed}:stream:${name}`) | 0;
-    return function rng() {
-      const all = state2.rngStreams = state2.rngStreams || {};
-      const r = next(all[name] ?? start2());
-      all[name] = r.pos;
-      return r.value;
-    };
-  }
-
   // src/core/save.js
   function migrate(state2, { version, gameMigrations = {}, systems = null } = {}) {
     let s = structuredCloneSafe(state2);
@@ -1131,6 +1211,10 @@
     { id: "crows", size: "small", where: "outside", months: [3, 99], text: "A crowd of crows lifts off a yard as you pass, shouting at you." },
     { id: "distant_smoke", size: "medium", where: "any", months: [3, 99], text: "A column of smoke rises far to the east. Something is burning, and nobody will put it out." },
     { id: "dogs_howl", size: "medium", where: "any", months: [3, 99], text: "A pack of dogs howls not far away. They sound hungry." },
+    { id: "night_crash", size: "small", where: "asleep", months: [3, 99], text: "A crash in the night wakes you. A gutter, or a tree limb. You listen for a long time, then sleep again." },
+    { id: "night_owls", size: "small", where: "asleep", months: [3, 99], text: "Owls call to each other outside. You wake, and lie listening until they stop." },
+    { id: "night_dogs", size: "medium", where: "asleep", months: [3, 99], text: "Dogs fight somewhere in the street. The noise wakes you, and your heart pounds for a while." },
+    { id: "ice_trees_down", size: "big", where: "any", months: [3, 99], when: (s) => s.weather?.type === "ice_storm", text: "All night and day, branches heavy with ice crack and fall. A big tree comes down across a road near you, and takes the power lines with it." },
     { id: "power_line_down", size: "big", where: "any", months: [3, 99], text: "A loud crack and a crash: a power pole goes down somewhere close. The street will be blocked." }
   ];
 
@@ -1221,6 +1305,7 @@
     state2.pacer = { tension: 0, hourAcc: 0, quietHours: 0, lastEventDay: null, lastBigDay: null, recent: [], count: 0 };
   }
   function whereNow(state2, mode) {
+    if (mode === "sleep") return "asleep";
     if (mode === "walk") return "outside";
     const k = state2.location?.kind;
     if (k === "home") return "home";
@@ -1239,7 +1324,7 @@
     const month = monthOf(state2.time);
     const where = whereNow(state2, mode);
     return events.filter((e) => {
-      if (e.where !== "any" && e.where !== where) return false;
+      if (e.where !== where && !(e.where === "any" && where !== "asleep")) return false;
       if (e.months && (month < e.months[0] || month > e.months[1])) return false;
       if (p.recent.some((r) => r.id === e.id && day - r.day < REPEAT_GAP_DAYS)) return false;
       if (e.size === "big" && p.lastBigDay != null && day - p.lastBigDay < BIG_GAP_DAYS) return false;
@@ -1359,10 +1444,16 @@
     // state.weather was in saves before the engine
     owns: ["weather"],
     // One roll per game day from the shared game rng; nothing changes inside a day.
-    // Skipping days must still roll each day in order, so the result is exact.
+    // Then rare weather (ice storm, heat wave, smoke) from its own stream
+    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
+    // so the result is exact.
     catchUp: "exact",
     init: (state2) => initWeather(state2),
-    daily: (state2, day) => rollWeather(state2, day)
+    daily: (state2, day) => {
+      const old = state2.weather;
+      rollWeather(state2, day);
+      rollSpell(state2, day, old);
+    }
   };
   var legacySystem = {
     id: "legacy",
@@ -1580,6 +1671,7 @@
     let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state2);
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
+    if (state2.weather.type === "heat_wave" && env.outside && !env.dark) waterLoss *= 1.5;
     p.food = clamp(p.food - foodLoss * dt, 0, 100);
     p.water = clamp(p.water - waterLoss * dt, 0, 100);
     if (sleeping) {
@@ -1599,6 +1691,7 @@
     if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
     if (p.water <= 0) damage(state2, DEHYDRATED_DAMAGE * dt, "dehydration");
     if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
+    if (state2.weather.type === "smoke" && env.outside && !has(state2, "n95")) damage(state2, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
     for (const inj of p.injuries) {
       if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
       inj.ageH += dt;
@@ -1715,6 +1808,9 @@
     log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
     if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
     if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
+    const spell = state2.weather.spell;
+    if (spell?.first) log(state2, spellStartText(spell.id), "warn");
+    else if (spell) log(state2, `${weatherInfo(state2).label} again today.`, "warn");
     const filtered = runAutoFilter(state2);
     if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
     p.morale -= 2;
@@ -1802,11 +1898,13 @@
     state2.player.energy = Math.max(0, state2.player.energy - 20);
     log(state2, "Stomach cramps. The water was bad. You have a stomach bug.", "danger");
   }
+  var SMOKE_DAMAGE_PER_HOUR = 1.5;
   var CAUSE_TEXT = {
     starvation: "starvation",
     dehydration: "dehydration (no water)",
     hypothermia: "the cold",
     bleeding: "blood loss",
+    smoke: "wildfire smoke",
     infection: "an infected wound",
     "an injury": "an injury",
     "an animal attack": "an animal attack",
@@ -2359,7 +2457,7 @@
     if (p.morale < 25) mods.push(["despair", -2]);
     return mods;
   }
-  var RAIN = ["rain", "heavy_rain", "windstorm"];
+  var RAIN = ["rain", "heavy_rain", "windstorm", "ice_storm"];
   function edges(state2, opts = {}) {
     const p = state2.player;
     const adv = [...opts.adv || []];
@@ -2462,7 +2560,8 @@
     };
     if (p.weak) apply(0.7, "weak");
     if (isNight(t) && !hasLight(state2)) apply(0.6, "dark, no light");
-    if (state2.weather.type === "snow") apply(0.6, "snow");
+    const wx = WEATHER_TYPES[state2.weather.type];
+    if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
     if (bagWeight(state2.carried) > carryLimit(state2)) apply(0.7, "heavy pack");
     if (p.injuries.some((i) => i.type === "sprain")) apply(0.7, "sprain");
     if (p.warmth < 25) apply(0.8, "hypothermia");

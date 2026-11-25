@@ -4,6 +4,7 @@
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
 import { airTemp, isNight, sunFor, solarToday, weatherInfo } from './world.js';
+import { spellStartText } from './rareweather.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
@@ -111,6 +112,8 @@ export function tickStep(state, dt, mode) {
   let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state);
   let waterLoss = V.WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
   if (felt > 90 && working) waterLoss *= 2;
+  // Heat wave (rare weather): thirst x1.5 outside in the day.
+  if (state.weather.type === 'heat_wave' && env.outside && !env.dark) waterLoss *= 1.5;
   p.food = clamp(p.food - foodLoss * dt, 0, 100);
   p.water = clamp(p.water - waterLoss * dt, 0, 100);
 
@@ -134,6 +137,8 @@ export function tickStep(state, dt, mode) {
   if (p.food <= 0) damage(state, V.STARVING_DAMAGE * dt, 'starvation');
   if (p.water <= 0) damage(state, V.DEHYDRATED_DAMAGE * dt, 'dehydration');
   if (p.warmth <= 0) damage(state, 5 * dt, 'hypothermia');
+  // Wildfire smoke (rare weather): outside air hurts without an N95 mask.
+  if (state.weather.type === 'smoke' && env.outside && !has(state, 'n95')) damage(state, SMOKE_DAMAGE_PER_HOUR * dt, 'smoke');
   for (const inj of p.injuries) {
     if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, 2 * dt, 'bleeding');
     inj.ageH += dt;
@@ -272,6 +277,9 @@ export function dailyRollover(state, day) {
   log(state, `A new day. Weather: ${weatherInfo(state).label}, high ${Math.round(state.weather.high)}°F, low ${Math.round(state.weather.low)}°F.`, 'day');
   if (state.weather.type === 'snow') log(state, `Snow: ${state.weather.snowInches} inches. Walking is slow today.`, 'warn');
   if (state.weather.type === 'windstorm') log(state, `Windstorm. Wind ${state.weather.wind} mph. Stay inside if you can.`, 'warn');
+  const spell = state.weather.spell;
+  if (spell?.first) log(state, spellStartText(spell.id), 'warn');
+  else if (spell) log(state, `${weatherInfo(state).label} again today.`, 'warn');
 
   // The water chain: the filter station cleans rain water by itself.
   const filtered = runAutoFilter(state);
@@ -372,9 +380,11 @@ export function startStomachBug(state) {
   log(state, 'Stomach cramps. The water was bad. You have a stomach bug.', 'danger');
 }
 
+const SMOKE_DAMAGE_PER_HOUR = 1.5;
+
 const CAUSE_TEXT = {
   starvation: 'starvation', dehydration: 'dehydration (no water)', hypothermia: 'the cold',
-  bleeding: 'blood loss', infection: 'an infected wound', 'an injury': 'an injury',
+  bleeding: 'blood loss', smoke: 'wildfire smoke', infection: 'an infected wound', 'an injury': 'an injury',
   'an animal attack': 'an animal attack', unknown: 'unknown causes',
 };
 

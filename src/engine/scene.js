@@ -11,6 +11,7 @@
 //     weather, cloud, precip,     weather type, cloud cover 0..1, 'none' | 'rain' | 'snow'
 //     precipStrength,             0..1 (heavy rain 1)
 //     windMph, fog,               wind and fog (0..1)
+//     haze, ice                   sky tint color or null (smoke, heat wave); true in an ice storm
 //     airF, season,               outside air temperature (°F) and season id
 //     outdoorLight,               daylight × (1 − 0.6 × cloud): light at a window or door
 //   }
@@ -28,6 +29,9 @@ export const WEATHER_LOOK = {
   heavy_rain: { cloud: 0.95, precip: 'rain', strength: 1, fog: 0.3 },
   windstorm: { cloud: 0.8, precip: 'rain', strength: 0.4, fog: 0 },
   snow: { cloud: 0.9, precip: 'snow', strength: 0.6, fog: 0.2 },
+  ice_storm: { cloud: 0.95, precip: 'rain', strength: 0.6, fog: 0.2, ice: true },
+  heat_wave: { cloud: 0, precip: 'none', strength: 0, fog: 0.1, haze: '#f3d9a4' },
+  smoke: { cloud: 0.4, precip: 'none', strength: 0, fog: 0.5, haze: '#d9822b' },
 };
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -61,6 +65,8 @@ export function sceneEnv(state, t = state.time) {
     precip: look.precip,
     precipStrength: look.strength,
     fog: look.fog,
+    haze: look.haze || null, // sky tint for smoke or heat (CSS color), or null
+    ice: !!look.ice, // ice storm: glazed surfaces
     windMph: w.wind || 0,
     airF: Math.round(airTemp(state, t)),
     season: seasonOf(t),
