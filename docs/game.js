@@ -1163,6 +1163,12 @@
     if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
     return h2.rooms[room].temp;
   }
+  function breakWindow(state2, room) {
+    var _a;
+    const h2 = ensureRooms(state2.home);
+    const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
+    w.broken += 1;
+  }
   var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
   function sleepSpot(state2) {
     return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
@@ -1171,7 +1177,21 @@
     const spot = sleepSpot(state2);
     return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
   }
+  var WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
+  var WINDOW_ROOMS = ["living", "kitchen", "bedroom", "bath"];
+  function stormWindows(state2) {
+    const p = WINDOW_BREAK[state2.weather?.type];
+    if (!p) return null;
+    const r = stream(state2, "home");
+    if (r() >= p) return null;
+    const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
+    breakWindow(state2, room);
+    const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
+    log(state2, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
+    return room;
+  }
   function homeDaily(state2) {
+    stormWindows(state2);
     const filtered = runAutoFilter(state2);
     if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
   }
@@ -2277,14 +2297,19 @@
   var LEAK_WET = 0.25;
   var WET_OUTSIDE = 8;
   var ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
+  var WARMTH_CURVE = [[5, -28], [15, -22], [28, -12], [40, -6], [50, -2.5], [60, 2], [72, 10]];
   function warmthRate(felt) {
-    if (felt >= 72) return 10;
-    if (felt >= 60) return 3;
-    if (felt >= 50) return -2;
-    if (felt >= 40) return -5;
-    if (felt >= 28) return -10;
-    if (felt >= 15) return -18;
-    return -28;
+    const c = WARMTH_CURVE;
+    if (felt <= c[0][0]) return c[0][1];
+    if (felt >= c[c.length - 1][0]) return c[c.length - 1][1];
+    for (let i = 1; i < c.length; i++) {
+      if (felt <= c[i][0]) {
+        const [x0, y0] = c[i - 1];
+        const [x1, y1] = c[i];
+        return y0 + (felt - x0) / (x1 - x0) * (y1 - y0);
+      }
+    }
+    return 0;
   }
   function damage(state2, amount, cause) {
     if (amount <= 0) return;
@@ -2292,18 +2317,31 @@
     state2._damage = state2._damage || {};
     state2._damage[cause] = (state2._damage[cause] || 0) + amount;
   }
-  function advanceTime(state2, minutes, mode = "rest") {
-    if (!(minutes > 0)) return;
-    if (mode !== "sleep") return gameClock().advance(state2, minutes, mode);
+  function advanceTime(state2, minutes, mode = "rest", opts = {}) {
+    if (!(minutes > 0)) return false;
+    if (mode === "walk" || mode !== "sleep" && !opts.stopAtDanger) {
+      gameClock().advance(state2, minutes, mode);
+      return false;
+    }
     const p = state2.player;
-    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health };
+    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+    const t0 = state2.time;
     try {
       gameClock().advance(state2, minutes, mode);
     } finally {
       delete state2._sleepFrom;
     }
+    return !state2.dead && state2.time - t0 < minutes - 0.01;
   }
   var WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+  var STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
+  var STOP_TEXT = {
+    water: "You stop. Your mouth is dry and your head pounds. You need water.",
+    food: "You stop, weak with hunger. You need to eat.",
+    warmth: "You stop. You are shaking with cold and your hands do not work. Get warm now.",
+    health: "You stop. You feel worse; this is not the time to go on.",
+    energy: "You stop. You are too tired to go on; you need to rest."
+  };
   var WAKE_TEXT = {
     water: "You wake with a dry mouth and a pounding head. You need water now.",
     food: "You wake, weak and shaking with hunger. You need to eat.",
@@ -2314,9 +2352,11 @@
     const from = state2._sleepFrom;
     if (!from || state2.dead) return;
     const p = state2.player;
-    for (const k of Object.keys(WAKE_AT)) {
-      if (from[k] >= WAKE_AT[k] && p[k] < WAKE_AT[k]) {
-        log(state2, WAKE_TEXT[k], "danger");
+    const asleep = from.mode === "sleep";
+    const lines = asleep ? WAKE_AT : STOP_AT;
+    for (const k of Object.keys(lines)) {
+      if (from[k] >= lines[k] && p[k] < lines[k]) {
+        log(state2, (asleep ? WAKE_TEXT : STOP_TEXT)[k], "danger");
         state2._stop = true;
         delete state2._sleepFrom;
         return;
@@ -2412,7 +2452,7 @@
       p.lightHours = Math.max(0, p.lightHours - dt);
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
-    if (sleeping) checkWake(state2);
+    checkWake(state2);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
@@ -2924,6 +2964,10 @@
       places: {},
       houses: {},
       houseAreas: {},
+      wild: {},
+      // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
+      cars: {},
+      // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
       dog: {
         stage: "none",
         arriveDay: 1 + Math.floor(r() * 4),
@@ -4841,6 +4885,7 @@
   function parseSave(raw) {
     const st = JSON.parse(raw);
     if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
+    for (const k of ["wild", "cars"]) if (!st[k] || typeof st[k] !== "object") st[k] = {};
     return migrate(st, { systems: gameSystems() });
   }
   function clearGame() {

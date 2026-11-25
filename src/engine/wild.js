@@ -131,8 +131,7 @@ export function fish(state) {
   if (why) { log(state, why + '.'); return { ok: false, fish: 0 }; }
   const f = fishSetup(state);
   log(state, `You fish from the bank at ${f.spot.name} for two hours.`);
-  advanceTime(state, FISH_MINUTES, 'rest');
-  if (state.dead) return { ok: false, fish: 0 };
+  if (advanceTime(state, FISH_MINUTES, 'rest', { stopAtDanger: true }) || state.dead) return { ok: false, fish: 0, stopped: !state.dead };
   const r = check(state, 'Fishing', FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
   let n = 0;
   let what = '';
@@ -160,18 +159,25 @@ export function fish(state) {
 }
 
 // ---------- hunting ----------
+// Arrows and rounds left: the open set or box (state.wild) plus the closed ones.
+const count = (state, id) => (state.carried[id] || 0) + (state.home.storage[id] || 0);
+export function arrowsLeft(state) { return (state.wild?.arrows || 0) + 6 * count(state, 'arrows'); }
+export function roundsLeft(state) { return (state.wild?.rounds || 0) + 20 * count(state, 'rifle_rounds'); }
+const canBow = (state) => has(state, 'bow') && arrowsLeft(state) > 0;
+const canRifle = (state) => has(state, 'rifle') && roundsLeft(state) > 0;
+
 export function huntMethods(state) {
   const m = [];
-  if (hasAll(state, GEAR.bow)) m.push('bow');
-  if (hasAll(state, GEAR.rifle)) m.push('rifle');
+  if (canBow(state)) m.push('bow');
+  if (canRifle(state)) m.push('rifle');
   return m;
 }
 
 export function canHunt(state, method) {
   const s = spotHere(state);
   if (!s || s.kind !== 'hunt') return 'Go to a park, wetland or the edge of the woods first';
-  if (method === 'bow' && !hasAll(state, GEAR.bow)) return 'You need a bow and arrows';
-  if (method === 'rifle' && !hasAll(state, GEAR.rifle)) return 'You need a rifle and rounds';
+  if (method === 'bow' && !canBow(state)) return 'You need a bow and arrows';
+  if (method === 'rifle' && !canRifle(state)) return 'You need a rifle and rounds';
   if (method !== 'bow' && method !== 'rifle') return 'Hunt with a bow or a rifle';
   return null;
 }
@@ -236,7 +242,6 @@ function loseArrow(state) {
   const w = wildOf(state);
   if (!(w.arrows > 0)) { useOne(state, 'arrows'); w.arrows = 6; }
   w.arrows--;
-  if (w.arrows === 0) w.arrows = null; // the set is used up (the next one opens on the next loss)
 }
 
 // Clean the animal and take the meat. A knife is needed for a clean job; with no
@@ -259,8 +264,7 @@ export function hunt(state, method) {
   const s = spotHere(state);
   log(state, `You move slowly through ${s.name} with the ${method}, and wait.`);
   const findP = findChance(state);
-  advanceTime(state, HUNT_MINUTES, 'work');
-  if (state.dead) return { ok: false };
+  if (advanceTime(state, HUNT_MINUTES, 'work', { stopAtDanger: true }) || state.dead) return { ok: false, stopped: !state.dead };
   const list = gameHere(state);
   if (!list.length || !chance(state, findP)) {
     log(state, isScared(state) ? 'Nothing moves. The game here is still wary after the shot.' : 'You see tracks and droppings, but no animal comes in range.');

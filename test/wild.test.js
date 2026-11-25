@@ -140,3 +140,32 @@ test('snares: set, wait a night, check; rabbits now and then', () => {
   }
   assert.ok(rabbits >= 2 && rabbits <= 9, `${rabbits} rabbits in 10 nights`);
 });
+
+test('playtest 2: the rifle and bow work again after the first shot; a box gives 20 rounds', async () => {
+  const { roundsLeft, arrowsLeft, huntMethods } = await import('../src/engine/wild.js');
+  const s = at('cooper_mountain', 62, 7);
+  s.carried.rifle = 1; s.carried.rifle_rounds = 1; s.carried.bow = 1; s.carried.arrows = 1;
+  assert.equal(roundsLeft(s), 20);
+  assert.equal(arrowsLeft(s), 6);
+  let shots = 0;
+  for (let i = 0; i < 4 && !s.dead; i++) {
+    s.player.food = s.player.water = s.player.warmth = s.player.energy = s.player.health = 90;
+    s.wild.scared = {};
+    if (!huntMethods(s).includes('rifle')) break;
+    hunt(s, 'rifle'); shots++;
+  }
+  assert.equal(shots, 4, 'four hunts with one box');
+  assert.ok(roundsLeft(s) >= 16 && roundsLeft(s) < 20);
+  assert.ok(huntMethods(s).includes('bow'));
+});
+
+test('playtest 2: a long hunt stops at a danger line with a journal line', () => {
+  const s = at('cooper_mountain', 63, 7);
+  s.carried.bow = 1; s.carried.arrows = 1;
+  s.player.water = 16; // will cross 15 in the 3 hours
+  const t0 = s.time;
+  const r = hunt(s, 'bow');
+  assert.equal(r.stopped, true);
+  assert.ok(s.time - t0 < 180);
+  assert.match(s.log.map((l) => l.text || l).join('\n'), /You stop\. Your mouth is dry/);
+});

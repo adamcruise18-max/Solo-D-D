@@ -75,14 +75,20 @@ export const ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
 // Warmth points per hour from the felt temperature. Retuned (playtest list 1):
 // a cold house in normal clothes now chills you, and a wet, windy walk below
 // freezing with poor gear is a real hypothermia risk in a few hours.
+// Piecewise linear (browser playtest 2: a few degrees colder must matter, also in sleep).
+const WARMTH_CURVE = [[5, -28], [15, -22], [28, -12], [40, -6], [50, -2.5], [60, 2], [72, 10]];
 export function warmthRate(felt) {
-  if (felt >= 72) return 10;
-  if (felt >= 60) return 3;
-  if (felt >= 50) return -2;
-  if (felt >= 40) return -5;
-  if (felt >= 28) return -10;
-  if (felt >= 15) return -18;
-  return -28;
+  const c = WARMTH_CURVE;
+  if (felt <= c[0][0]) return c[0][1];
+  if (felt >= c[c.length - 1][0]) return c[c.length - 1][1];
+  for (let i = 1; i < c.length; i++) {
+    if (felt <= c[i][0]) {
+      const [x0, y0] = c[i - 1];
+      const [x1, y1] = c[i];
+      return y0 + ((felt - x0) / (x1 - x0)) * (y1 - y0);
+    }
+  }
+  return 0;
 }
 
 function damage(state, amount, cause) {
@@ -96,18 +102,33 @@ function damage(state, amount, cause) {
 // (src/engine/systems.js): steps of at most 10 minutes; at 5 AM each system's
 // daily hook runs before the step. Weather is a system of its own; the rules
 // below still run as one "legacy" system until they move out too.
-export function advanceTime(state, minutes, mode = 'rest') {
-  if (!(minutes > 0)) return; // as before: no time, nothing happens
-  if (mode !== 'sleep') return gameClock().advance(state, minutes, mode);
-  // Sleep: remember the needs at the start, to wake when one crosses a danger line.
+// Returns true when the action stopped early at a danger line (see checkDanger).
+// Sleep always wakes at a danger line; other modes stop only when the caller
+// asks for it ({ stopAtDanger: true }: fishing, hunting, long work).
+export function advanceTime(state, minutes, mode = 'rest', opts = {}) {
+  if (!(minutes > 0)) return false; // as before: no time, nothing happens
+  // Walking keeps its own rules (you walk on, or fall asleep by a wall at 0 energy).
+  if (mode === 'walk' || (mode !== 'sleep' && !opts.stopAtDanger)) { gameClock().advance(state, minutes, mode); return false; }
+  // Remember the needs at the start, to stop when one crosses a danger line.
   const p = state.player;
-  state._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health };
+  state._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+  const t0 = state.time;
   try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; }
+  return !state.dead && state.time - t0 < minutes - 0.01;
 }
 
 // Auto-wake (browser playtest 1): you wake when a need falls past its danger line
 // during the sleep (not when you went to sleep below it already).
 export const WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
+// Awake, long actions (fishing, hunting, work) stop at these lines (browser playtest 2).
+export const STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
+const STOP_TEXT = {
+  water: 'You stop. Your mouth is dry and your head pounds. You need water.',
+  food: 'You stop, weak with hunger. You need to eat.',
+  warmth: 'You stop. You are shaking with cold and your hands do not work. Get warm now.',
+  health: 'You stop. You feel worse; this is not the time to go on.',
+  energy: 'You stop. You are too tired to go on; you need to rest.',
+};
 const WAKE_TEXT = {
   water: 'You wake with a dry mouth and a pounding head. You need water now.',
   food: 'You wake, weak and shaking with hunger. You need to eat.',
@@ -118,9 +139,11 @@ function checkWake(state) {
   const from = state._sleepFrom;
   if (!from || state.dead) return;
   const p = state.player;
-  for (const k of Object.keys(WAKE_AT)) {
-    if (from[k] >= WAKE_AT[k] && p[k] < WAKE_AT[k]) {
-      log(state, WAKE_TEXT[k], 'danger');
+  const asleep = from.mode === 'sleep';
+  const lines = asleep ? WAKE_AT : STOP_AT;
+  for (const k of Object.keys(lines)) {
+    if (from[k] >= lines[k] && p[k] < lines[k]) {
+      log(state, (asleep ? WAKE_TEXT : STOP_TEXT)[k], 'danger');
       state._stop = true;
       delete state._sleepFrom; // once a sleep
       return;
@@ -242,7 +265,7 @@ export function tickStep(state, dt, mode) {
   // The home and the dog are their own systems now (src/engine/home.js, dog.js),
   // right after these rules.
 
-  if (sleeping) checkWake(state);
+  checkWake(state);
 
   if (p.health <= 0) {
     p.health = 0;

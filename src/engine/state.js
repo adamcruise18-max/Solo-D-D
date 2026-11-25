@@ -81,6 +81,8 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     places: {},
     houses: {},
     houseAreas: {},
+    wild: {}, // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
+    cars: {}, // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
     dog: {
       stage: 'none',
       arriveDay: 1 + Math.floor(r() * 4), // day 2 to 5

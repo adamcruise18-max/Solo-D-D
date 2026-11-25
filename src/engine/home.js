@@ -7,6 +7,7 @@
 // Projects (build, work blocks) are player actions in base.js; their data is
 // src/data/projects.js. Only this system and those actions change state.home.
 import { log, dayIndex } from './state.js';
+import { stream } from '../core/rng.js';
 import { sunFor, solarToday } from './world.js';
 import { built, fireHeat, heatLossFactor, runAutoFilter } from './base.js';
 import { environment } from './tick.js';
@@ -181,7 +182,23 @@ export function homeHeat(state) {
   };
 }
 
+// Storms break windows now and then (browser playtest 2). Stream 'home'.
+export const WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
+const WINDOW_ROOMS = ['living', 'kitchen', 'bedroom', 'bath'];
+export function stormWindows(state) {
+  const p = WINDOW_BREAK[state.weather?.type];
+  if (!p) return null;
+  const r = stream(state, 'home');
+  if (r() >= p) return null;
+  const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
+  breakWindow(state, room);
+  const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
+  log(state, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, 'warn');
+  return room;
+}
+
 export function homeDaily(state) {
+  stormWindows(state);
   const filtered = runAutoFilter(state);
   if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
 }

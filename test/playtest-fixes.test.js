@@ -131,3 +131,42 @@ test('sleep: you wake when water falls past the danger line, not hours later', (
   advanceTime(s, 60, 'sleep');
   assert.equal(s.time - t1, 60);
 });
+
+test('save shape: newGame has wild and cars; an old save without them loads with empty ones', async () => {
+  const { newGame } = await import('../src/engine/state.js');
+  const { parseSave } = await import('../src/engine/save.js');
+  const st = newGame(7);
+  assert.deepEqual(st.wild, {});
+  assert.deepEqual(st.cars, {});
+  const old = JSON.parse(JSON.stringify(st));
+  delete old.wild; delete old.cars;
+  const back = parseSave(JSON.stringify(old));
+  assert.deepEqual(back.wild, {});
+  assert.deepEqual(back.cars, {});
+});
+
+test('playtest 2: a storm night can break a window (stream "home"); calm nights never do', async () => {
+  const { stormWindows } = await import('../src/engine/home.js');
+  let broke = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const s = newGame(seed);
+    s.weather.type = 'clear';
+    assert.equal(stormWindows(s), null);
+    s.weather.type = 'windstorm';
+    if (stormWindows(s)) { broke++; assert.ok(Object.values(s.home.windows).some((w) => w.broken > 0)); }
+  }
+  assert.ok(broke > 4 && broke < 40, `broke ${broke} of 200`);
+});
+
+test('playtest 2: sleeping in a cold room costs much more warmth than a warm one', async () => {
+  const { advanceTime } = await import('../src/engine/tick.js');
+  const run = (temp) => {
+    const s = newGame(81); fed(s); s.player.warmth = 70;
+    s.home.indoorTemp = temp; s.home.fireHours = 0; s.home.heaterOn = false;
+    const before = s.player.warmth;
+    advanceTime(s, 60, 'sleep');
+    return before - s.player.warmth;
+  };
+  const cold = run(30), warm = run(60);
+  assert.ok(cold > warm + 5, `cold ${cold} warm ${warm}`);
+});

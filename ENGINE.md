@@ -373,3 +373,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
    as one ten-day advance. Each system now declares `catchUp`.
 4. A small diagnostics overlay (frame ms, sections, memory) behind a key, with the
    pick-up items thread, which owns the 3D view.
+
+## Browser playtest 2 fixes
+
+- **Ammo:** `arrowsLeft` / `roundsLeft` count the open set or box (`state.wild.arrows`, `state.wild.rounds`) plus the closed ones. A box of `rifle_rounds` is 20 shots, a set of `arrows` is 6. The rifle and bow work until the last shot.
+- **Storm windows:** `stormWindows(state)` in home.js runs in the home daily hook. On a windstorm (8%), ice storm (10%) or heavy rain (1%) night it breaks one window (stream `home`) and logs a line.
+- **Cold sleep:** `warmthRate` uses the piecewise curve `WARMTH_CURVE` (5 °F: −28/h to 72 °F: +10/h), so a cold bedroom costs much more warmth than a warm one.
+- **Danger stop:** `advanceTime(state, min, mode, { stopAtDanger: true })` ends the action when a need crosses a `STOP_AT` line (water 15, food 10, warmth 25, health 30, energy 10) and returns true, with a journal line. Sleep always does this (`WAKE_AT`). Fishing and hunting pass the flag; other calls do not, so plain rest and the tests run as before.
+- **Save shape:** `newGame` has `wild: {}` and `cars: {}` (cars are owned by the builder's engine/cars.js). `parseSave` adds empty ones to older saves.
