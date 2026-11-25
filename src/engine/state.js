@@ -55,7 +55,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     homeLabel: opts.homeLabel || null,
     pos: { ...homePos },
     location: { kind: 'home' },
-    carried: { backpack: 1 },
+    carried: {}, // no backpack at the start: find one (outdoor stores, abandoned packs by the road)
     home: {
       storage: {
         formula: 4, saline: 2, first_aid: 1, antibiotics: 1, pain_pills: 1,
@@ -166,8 +166,11 @@ export function bagWeight(bag) {
   return Math.round(w * 10) / 10;
 }
 
+export const BASE_CARRY = 15;
+export const BACKPACK_CARRY = 15;
 export function carryLimit(state) {
-  let lim = state.carried.backpack ? 30 : 10;
+  // Adam (playtest): 15 lb without a pack; a backpack found in the world adds 15 lb.
+  let lim = BASE_CARRY + (state.carried.backpack ? BACKPACK_CARRY : 0);
   if (state.player.weak) lim *= 0.5;
   if (state.player.food < 25) lim *= 0.9;
   lim -= carryMinus(state) * (state.player.weak ? 0.5 : 1);

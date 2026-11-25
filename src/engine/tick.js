@@ -2,6 +2,7 @@
 // Modes: 'rest' (awake, light activity), 'work' (searching), 'heavy' (hard work),
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
+import { stream } from '../core/rng.js';
 import * as V from './vitals.js';
 import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
@@ -112,8 +113,9 @@ export function advanceTime(state, minutes, mode = 'rest', opts = {}) {
   // Remember the needs at the start, to stop when one crosses a danger line.
   const p = state.player;
   state._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+  if (opts.restPerHour) state._restPerHour = opts.restPerHour;
   const t0 = state.time;
-  try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; }
+  try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; delete state._restPerHour; }
   return !state.dead && state.time - t0 < minutes - 0.01;
 }
 
@@ -197,6 +199,9 @@ export function tickStep(state, dt, mode) {
     if (p.food < 25) gain *= 0.75;
     gain *= sleepGainFactor(state);
     p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
+  } else if (mode === 'rest' && state._restPerHour) {
+    // The Rest action: sit down and get your breath back (Adam: 25% of max energy an hour).
+    p.energy = clamp(p.energy + state._restPerHour * p.energyMax * dt, 0, p.energyMax);
   } else {
     let loss = V.ENERGY_LOSS[mode] || V.ENERGY_LOSS.rest;
     if (cold) loss *= 1.5;
@@ -224,7 +229,7 @@ export function tickStep(state, dt, mode) {
     }
   }
   const healed = p.injuries.filter((i) => i.healH <= 0);
-  for (const i of healed) log(state, `Your ${INJURY_NAMES[i.type].toLowerCase()} has healed.`, 'good');
+  for (const i of healed) log(state, `Your ${injuryName(i).toLowerCase()} has healed.`, 'good');
   p.injuries = p.injuries.filter((i) => i.healH > 0);
 
   const inf = p.illness.infection;
@@ -324,21 +329,64 @@ export const INJURY_NAMES = {
   small_cut: 'Small cut', deep_cut: 'Deep cut', sprain: 'Sprain', bite: 'Animal bite',
 };
 
+// Base numbers are for a "moderate" injury; severity scales them (SEVERITY).
+// Adam (playtest): a small cut is not a sprained wrist.
 const INJURY_DATA = {
-  small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
-  deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
-  sprain: { hp: 5, healH: 120, infectRisk: 0 },
+  small_cut: { hp: 2, healH: 36, infectRisk: 0.2 },
+  deep_cut: { hp: 12, healH: 168, infectRisk: 0.2 },
+  sprain: { hp: 4, healH: 120, infectRisk: 0 },
   // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
   bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 },
 };
 
-export function addInjury(state, type) {
+// Severity (Adam): minor, moderate or serious. It scales the health lost, the
+// healing time and the slow-down (a sprained ankle slows walking, a sprained
+// wrist slows searching and work). Rolled on its own rng stream ('injury').
+export const SEVERITY = [
+  { id: 'minor', w: 0.6, hp: 0.5, heal: 0.5, slow: 0.9 },
+  { id: 'moderate', w: 0.3, hp: 1, heal: 1, slow: 0.75 },
+  { id: 'serious', w: 0.1, hp: 1.8, heal: 1.6, slow: 0.6 },
+];
+const SPRAIN_PART = { ankle: 'Sprained ankle', wrist: 'Sprained wrist' };
+
+export function injuryName(inj) {
+  const base = inj.type === 'sprain' ? (SPRAIN_PART[inj.part] || 'Sprain') : INJURY_NAMES[inj.type] || inj.type;
+  return inj.severity && inj.severity !== 'moderate' ? `${base} (${inj.severity})` : base;
+}
+
+// Walking ('leg') or hand work ('hand'): the factor from the worst sprain (1 = none).
+export function injuryFactor(state, limb) {
+  let f = 1;
+  for (const i of state.player.injuries) {
+    if (i.type !== 'sprain') continue;
+    const part = i.part || (limb === 'leg' ? 'ankle' : 'wrist'); // old saves: a sprain counts for both
+    if ((limb === 'leg') !== (part === 'ankle')) continue;
+    f = Math.min(f, SEVERITY.find((s) => s.id === i.severity)?.slow ?? 0.7);
+  }
+  return f;
+}
+
+// opts: { part: 'ankle' | 'wrist', severity, always } — `always` skips the 90% luck roll (tests).
+export function addInjury(state, type, opts = {}) {
   const d = INJURY_DATA[type];
-  state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false });
-  const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state.player.health - 1)) : d.hp; // a cut never kills
+  const r = stream(state, 'injury');
+  // Adam (playtest): injuries 90% less often. Most near misses end as a scare.
+  if (!opts.always && r() >= V.INJURY_RATE) {
+    log(state, type === 'bite' ? 'Teeth snap at you, but you pull free unhurt.' : 'A close call. You are not hurt.');
+    return null;
+  }
+  let sev = opts.severity ? SEVERITY.find((s) => s.id === opts.severity) : null;
+  if (!sev) { const x = r(); let acc = 0; sev = SEVERITY.find((s) => (acc += s.w) > x) || SEVERITY[0]; }
+  const part = type === 'sprain' ? (opts.part || (r() < 0.5 ? 'ankle' : 'wrist')) : undefined;
+  const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d.healH * sev.heal, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false };
+  if (part) inj.part = part;
+  state.player.injuries.push(inj);
+  const full = d.hp * sev.hp;
+  const hp = CUTS.has(type) ? Math.min(full, Math.max(0, state.player.health - 1)) : full; // a cut never kills
   damage(state, hp, type === 'bite' ? 'an animal attack' : 'an injury');
-  log(state, `Injury: ${INJURY_NAMES[type]} (Health −${Math.round(hp)}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
+  log(state, `Injury: ${injuryName(inj)} (Health −${Math.round(hp)}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
   if (state.player.health <= 0) die(state, type === 'bite' ? 'an animal attack' : 'an injury');
+  return inj;
 }
 
 // Adam (2026-11-25): cuts never kill. A cut can bleed and get infected, but its

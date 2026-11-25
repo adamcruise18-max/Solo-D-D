@@ -1,6 +1,6 @@
 // Walking on the real map. First version: route length = straight line × 1.25.
 import { randInt, chance } from '../rng.js';
-import { advanceTime, addInjury, environment } from './tick.js';
+import { advanceTime, addInjury, environment, injuryFactor } from './tick.js';
 import { check } from './checks.js';
 import { isNight, isBadWeather } from './world.js';
 import { WEATHER_TYPES } from '../data/climate.js';
@@ -37,7 +37,8 @@ export function walkSpeed(state, t = state.time) {
   const wx = WEATHER_TYPES[state.weather.type];
   if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
   if (bagWeight(state.carried) > carryLimit(state)) apply(0.7, 'heavy pack');
-  if (p.injuries.some((i) => i.type === 'sprain')) apply(0.7, 'sprain');
+  const legF = injuryFactor(state, 'leg');
+  if (legF < 1) apply(legF, 'sprained ankle');
   if (p.warmth < 25) apply(0.8, 'hypothermia');
   if (p.energy < 25) apply(0.7, 'exhausted');
   if (p.health < 25) apply(0.7, 'badly hurt');
@@ -158,7 +159,7 @@ export function roadEvent(state) {
     }
   } else if (roll <= 91) {
     log(state, 'A fallen tree and a downed line block the road.');
-    if (!check(state, 'Climb over the tree', 10, [], out).success) addInjury(state, 'sprain');
+    if (!check(state, 'Climb over the tree', 10, [], out).success) addInjury(state, 'sprain', { part: 'ankle' });
   } else if (roll <= 95) {
     log(state, 'A pack of loose dogs runs at you, barking.', 'danger');
     const mods = [...animalMods];
@@ -188,6 +189,7 @@ export function roadEvent(state) {
       names.push(`${itemName(id)}${q > 1 ? ' ×' + q : ''}`);
     }
     log(state, `You find an abandoned backpack by the road. Inside: ${names.join(', ') || 'nothing useful'}.`, 'good');
+    if (!state.carried.backpack) { addItem(state.carried, 'backpack', 1); log(state, 'You put the backpack on. You can carry 15 lb more.', 'good'); }
   }
 }
 

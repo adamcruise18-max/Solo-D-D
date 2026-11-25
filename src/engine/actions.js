@@ -12,7 +12,7 @@ import { isNight } from './world.js';
 import { placeState, rollZone } from './loot.js';
 import { travel } from './travel.js';
 import { getPlace } from './placesdb.js';
-import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE } from './vitals.js';
+import { CAL_PER_FOOD_POINT, WATER_PER_QUART, SEARCH_INJURY_CHANCE, REST_ENERGY_PER_HOUR } from './vitals.js';
 import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.js';
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
@@ -383,7 +383,7 @@ export function storeAll(state) {
 // ---------- rest and sleep ----------
 export function rest(state, hours) {
   log(state, `You rest for ${hours} h.`);
-  advanceTime(state, hours * 60, 'rest', { stopAtDanger: true });
+  advanceTime(state, hours * 60, 'rest', { stopAtDanger: true, restPerHour: REST_ENERGY_PER_HOUR });
 }
 
 export function sleep(state, hours) {

@@ -35,10 +35,11 @@ test('same seed gives the same game', () => {
 test('stats go down with time, and water at 0 hurts health', () => {
   const s = newGame(1);
   advanceTime(s, 60);
-  assert.ok(Math.abs(s.player.food - 38.5) < 0.3, `food ${s.player.food}`);
-  assert.ok(Math.abs(s.player.water - 32.5) < 0.3, `water ${s.player.water}`);
+  // Adam: needs drain 25% slower (food 1.125/h, water 1.875/h at rest).
+  assert.ok(Math.abs(s.player.food - 38.875) < 0.3, `food ${s.player.food}`);
+  assert.ok(Math.abs(s.player.water - 33.125) < 0.3, `water ${s.player.water}`);
   const hp = s.player.health;
-  advanceTime(s, 14 * 60);
+  advanceTime(s, 19 * 60);
   assert.equal(s.player.water, 0);
   assert.ok(s.player.health < hp);
 });
