@@ -450,7 +450,7 @@
 
   // src/rng.js
   function mulberry32(a) {
-    return function next() {
+    return function next2() {
       a |= 0;
       a = a + 1831565813 | 0;
       let t = Math.imul(a ^ a >>> 15, 1 | a);
@@ -958,18 +958,18 @@
     return Object.freeze({ order: 100, ...sys, version, migrations });
   }
   function createSystems(list = [], { dev = false } = {}) {
-    const byId = /* @__PURE__ */ new Map();
+    const byId2 = /* @__PURE__ */ new Map();
     const owner = /* @__PURE__ */ new Map();
     let ordered = [];
     function add(sys) {
       const s = defineSystem(sys);
-      if (byId.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
+      if (byId2.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
       for (const f of s.owns || []) {
         if (owner.has(f)) throw new Error(`Field "${f}" is owned by both "${owner.get(f)}" and "${s.id}"`);
       }
       for (const f of s.owns || []) owner.set(f, s.id);
-      byId.set(s.id, s);
-      ordered = [...byId.values()].sort((a, b) => a.order - b.order);
+      byId2.set(s.id, s);
+      ordered = [...byId2.values()].sort((a, b) => a.order - b.order);
       return s;
     }
     for (const s of list) add(s);
@@ -996,7 +996,7 @@
     }
     return {
       add,
-      get: (id) => byId.get(id),
+      get: (id) => byId2.get(id),
       ids: () => ordered.map((s) => s.id),
       ownerOf: (field) => owner.get(field) || null,
       // Systems that have not said how they catch up: reduced or abstract
@@ -1058,6 +1058,25 @@
     return api;
   }
 
+  // src/core/rng.js
+  function next(pos) {
+    let a = pos + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return { pos: a, value: ((t ^ t >>> 14) >>> 0) / 4294967296 };
+  }
+  function stream(state2, name) {
+    if (!name || typeof name !== "string") throw new Error("A random stream needs a name");
+    if (state2.seed == null) throw new Error("A random stream needs a game seed");
+    const start2 = () => hashString(`${state2.seed}:stream:${name}`) | 0;
+    return function rng() {
+      const all = state2.rngStreams = state2.rngStreams || {};
+      const r = next(all[name] ?? start2());
+      all[name] = r.pos;
+      return r.value;
+    };
+  }
+
   // src/core/save.js
   function migrate(state2, { version, gameMigrations = {}, systems = null } = {}) {
     let s = structuredCloneSafe(state2);
@@ -1102,6 +1121,234 @@
   // src/core/profiler.js
   var FRAME_BUDGET_MS = 1e3 / 30;
 
+  // src/data/events.js
+  var EVENTS = [
+    { id: "geese", size: "small", where: "outside", months: [3, 99], text: "A long line of geese flies over, very low and loud. Then it is quiet again." },
+    { id: "frost_windows", size: "small", where: "home", months: [3, 6], text: "Frost makes ferns on the inside of the windows." },
+    { id: "car_alarm_dies", size: "small", where: "any", months: [3, 5], text: "Far away, a car alarm that has cried for days goes weak, then stops." },
+    { id: "shelf_falls", size: "small", where: "inside", months: [3, 99], text: "Somewhere in the building, a shelf gives way with a crash. You hold still until the dust settles." },
+    { id: "wind_chimes", size: "small", where: "home", months: [3, 99], text: "A neighbor\u2019s wind chimes ring in the wind. For a moment it sounds like a normal street." },
+    { id: "crows", size: "small", where: "outside", months: [3, 99], text: "A crowd of crows lifts off a yard as you pass, shouting at you." },
+    { id: "distant_smoke", size: "medium", where: "any", months: [3, 99], text: "A column of smoke rises far to the east. Something is burning, and nobody will put it out." },
+    { id: "dogs_howl", size: "medium", where: "any", months: [3, 99], text: "A pack of dogs howls not far away. They sound hungry." },
+    { id: "power_line_down", size: "big", where: "any", months: [3, 99], text: "A loud crack and a crash: a power pole goes down somewhere close. The street will be blocked." }
+  ];
+
+  // src/engine/status.js
+  var STAGES = {
+    food: [
+      [50, "", ""],
+      [25, "Hungry", "Below 25: wounds heal at half speed and health stops refilling."],
+      [0.01, "Very hungry", "Wounds heal at half speed. Health does not refill. Sleep rests you less."],
+      [0, "Starving", "You lose health every hour."]
+    ],
+    water: [
+      [50, "", ""],
+      [25, "Thirsty", "Below 25: \u22122 on d20 rolls and health stops refilling."],
+      [0.01, "Very thirsty", "\u22122 on d20 rolls. Wounds heal at half speed. Health does not refill."],
+      [0, "Dehydrated", "You lose 2 health every hour."]
+    ],
+    warmth: [
+      [50, "", ""],
+      [25, "Cold", "You get hungry and tired faster."],
+      [0.01, "Hypothermia", "\u22123 on d20 rolls. Health does not refill."],
+      [0, "Freezing", "You lose 5 health every hour."]
+    ],
+    energy: [
+      [50, "", ""],
+      [25, "Tired", "\u22122 on d20 rolls."],
+      [0.01, "Exhausted", "\u22122 on d20 rolls. Sleep soon."],
+      [0, "Asleep", "You fall asleep where you are."]
+    ],
+    health: [
+      [50, "", ""],
+      [25, "Hurt", "Sleep rests you less."],
+      [0.01, "Badly hurt", "\u22123 on d20 rolls. Sleep rests you less."],
+      [0, "Dead", ""]
+    ],
+    morale: [
+      [50, "", ""],
+      [25, "Low", "Sleep rests you less."],
+      [0.01, "Despair", "\u22122 on d20 rolls. Sleep rests you less."],
+      [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
+    ]
+  };
+  function statStage(key, v) {
+    const rows = STAGES[key];
+    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
+    const last = rows.length - 1;
+    return { stage: last, word: rows[last][1], effect: rows[last][2] };
+  }
+  function needWarnings(state2) {
+    const p = state2.player;
+    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
+  }
+  function risks(state2) {
+    const p = state2.player;
+    const out = [];
+    if (!p.illness.infection) {
+      const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
+      if (open.length) {
+        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
+        out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
+      }
+    }
+    const rate = warmthRate(feltTemp(state2, "rest"));
+    if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
+      const h = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
+    }
+    if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
+    if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
+    if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
+    return out;
+  }
+  var RAW_WATER_SICK = 0.3;
+
+  // src/engine/pacer.js
+  var START_MONTH = 3;
+  var RISE_PER_HOUR = 0.3;
+  var RISE_OUTSIDE = 0.3;
+  var THRESHOLD = 20;
+  var SLOPE = 200;
+  var WEIGHT = { small: 25, medium: 50, big: 100 };
+  var QUIET_LIMIT_HOURS = 96;
+  var BIG_GAP_DAYS = 3;
+  var REPEAT_GAP_DAYS = 2;
+  var MAX_SMALL_CHANCE = 0.12;
+  var monthOf = (t) => START_MONTH + Math.floor(Math.max(0, gameDay(t)) / 30);
+  function initPacer(state2) {
+    state2.pacer = { tension: 0, hourAcc: 0, quietHours: 0, lastEventDay: null, lastBigDay: null, recent: [], count: 0 };
+  }
+  function whereNow(state2, mode) {
+    if (mode === "walk") return "outside";
+    const k = state2.location?.kind;
+    if (k === "home") return "home";
+    return "inside";
+  }
+  function eventChance(tension) {
+    return Math.max(0, Math.min(MAX_SMALL_CHANCE, (tension - THRESHOLD) / SLOPE));
+  }
+  function inTrouble(state2) {
+    const fresh = (state2.player.injuries || []).some((i) => (i.ageH ?? 99) < 24);
+    return fresh || needWarnings(state2).length >= 2;
+  }
+  function candidates(state2, mode, events = EVENTS) {
+    const p = state2.pacer;
+    const day = gameDay(state2.time);
+    const month = monthOf(state2.time);
+    const where = whereNow(state2, mode);
+    return events.filter((e) => {
+      if (e.where !== "any" && e.where !== where) return false;
+      if (e.months && (month < e.months[0] || month > e.months[1])) return false;
+      if (p.recent.some((r) => r.id === e.id && day - r.day < REPEAT_GAP_DAYS)) return false;
+      if (e.size === "big" && p.lastBigDay != null && day - p.lastBigDay < BIG_GAP_DAYS) return false;
+      if (e.when && !e.when(state2, { mode })) return false;
+      return true;
+    });
+  }
+  function pick(state2, list, rng) {
+    const mercy = inTrouble(state2);
+    const w = (e) => e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8;
+    const total = list.reduce((a, e) => a + w(e), 0);
+    let r = rng() * total;
+    for (const e of list) {
+      r -= w(e);
+      if (r < 0) return e;
+    }
+    return list[list.length - 1];
+  }
+  function fire(state2, e, rng, mode) {
+    const p = state2.pacer;
+    const day = gameDay(state2.time);
+    if (e.apply) e.apply(state2, { rng, mode });
+    log(state2, e.text, e.kind || (e.size === "big" ? "warn" : "story"));
+    p.tension = Math.max(0, p.tension - WEIGHT[e.size]);
+    p.lastEventDay = day;
+    if (e.size === "big") p.lastBigDay = day;
+    p.recent.push({ id: e.id, day });
+    if (p.recent.length > 10) p.recent.shift();
+    p.count += 1;
+    p.quietHours = 0;
+  }
+  function pacerHour(state2, mode, events = EVENTS) {
+    const p = state2.pacer;
+    p.tension = Math.min(100, p.tension + RISE_PER_HOUR + (mode === "walk" ? RISE_OUTSIDE : 0));
+    p.quietHours = (p.quietHours || 0) + 1;
+    const rng = stream(state2, "pacer");
+    const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
+    if (rng() >= eventChance(p.tension) && !overdue) return null;
+    let list = candidates(state2, mode, events);
+    if (overdue) list = list.filter((e2) => e2.size === "small");
+    if (!list.length) return null;
+    const e = pick(state2, list, rng);
+    fire(state2, e, rng, mode);
+    return e;
+  }
+  var pacerSystem = {
+    id: "pacer",
+    label: "Event pacer",
+    order: 1100,
+    // after the rules: the mercy rule reads this step's vitals
+    version: 1,
+    owns: ["pacer"],
+    // Hour by hour with thresholds: time must be played, not skipped.
+    catchUp: "event",
+    init: (state2) => initPacer(state2),
+    step: (state2, dtHours, ctx) => {
+      if (!state2.pacer) initPacer(state2);
+      const p = state2.pacer;
+      p.hourAcc += dtHours;
+      while (p.hourAcc >= 1 - 1e-9 && !state2.dead) {
+        p.hourAcc -= 1;
+        pacerHour(state2, ctx.mode);
+      }
+    }
+  };
+
+  // src/data/decay.js
+  var DECAY = [
+    { id: "water_pressure", month: 3, chanceByDay: 0.08, text: "Taps on the hills are dry now. Low streets still trickle, for a while." },
+    { id: "cell_towers", month: 4, chanceByDay: 0.15, text: "The last cell towers on backup power have gone dark. Phones are only lights and cameras now." },
+    { id: "store_fridges", month: 4, chanceByDay: 0.05, text: "Store fridges are past saving. Nothing fresh is left in them, only the smell." },
+    { id: "stale_gas", month: 6, chanceByDay: 0.04, text: "Old gasoline is going bad. A can from a car may not start an engine now." },
+    { id: "roof_leaks", month: 6, chanceByDay: 0.01, text: "Clogged gutters and leaking roofs: more buildings are open to the rain each month." },
+    { id: "battery_drain", month: 12, chanceByDay: 0.02, text: "Batteries you find now are often half empty." },
+    { id: "trees_on_roads", month: 12, chanceByDay: 5e-3, text: "Storms have put trees across some roads. Nobody clears them." },
+    { id: "old_medicine", month: 24, chanceByDay: 0.01, text: "Most medicine is past its date now. It still works, but less." }
+  ];
+
+  // src/engine/decay.js
+  var byId = new Map(DECAY.map((r) => [r.id, r]));
+  var monthStartDay = (m) => (m - START_MONTH) * 30;
+  function initDecay(state2) {
+    state2.decay = { started: {} };
+  }
+  function decayDaily(state2, day, rows = DECAY) {
+    if (!state2.decay) initDecay(state2);
+    const st = state2.decay.started;
+    for (const row of rows) {
+      if (st[row.id] != null) continue;
+      const days = day - monthStartDay(row.month) + 1;
+      if (days <= 0) continue;
+      if (1 - (1 - row.chanceByDay) ** days < 0.02) continue;
+      st[row.id] = day;
+      log(state2, row.text, row.kind || "story");
+    }
+  }
+  var decaySystem = {
+    id: "decay",
+    label: "Slow breakdown",
+    order: 20,
+    // after the weather, before the old daily rules
+    version: 1,
+    owns: ["decay"],
+    catchUp: "exact",
+    // fail days come from a hash: skipping days changes nothing
+    init: (state2) => initDecay(state2),
+    daily: (state2, day) => decayDaily(state2, day)
+  };
+
   // src/engine/systems.js
   var weatherSystem = {
     id: "weather",
@@ -1128,7 +1375,7 @@
     step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
     daily: (state2, day) => dailyRollover(state2, day)
   };
-  var GAME_SYSTEMS = [weatherSystem, legacySystem];
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, pacerSystem];
   var devChecks = false;
   var cached = null;
   function gameSystems() {
@@ -1144,6 +1391,9 @@
   }
   function systemVersions() {
     return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
+  }
+  function initNewSystems(state2) {
+    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
   }
 
   // src/engine/food.js
@@ -1200,11 +1450,11 @@
   function normalizeWorn(p) {
     const w = p.worn || {};
     if (!w._v) {
-      const next = { _v: 2 };
-      for (const s of SLOTS) next[s] = false;
-      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next[slot] = id;
-      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next[s] = w[s];
-      p.worn = next;
+      const next2 = { _v: 2 };
+      for (const s of SLOTS) next2[s] = false;
+      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next2[slot] = id;
+      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next2[s] = w[s];
+      p.worn = next2;
     }
     if (typeof p.wetness !== "number") p.wetness = p.wet ? 80 : 0;
     return p.worn;
@@ -2005,6 +2255,7 @@
       pendingPrompt: null
     };
     initWeather(state2);
+    initNewSystems(state2);
     state2.systemVersions = systemVersions();
     applyBackground(state2, opts.job, opts.traits);
     applyLegacy(state2, opts.legacy);
@@ -2155,77 +2406,6 @@
     const edge = o.mode === "adv" ? ` adv. (${o.adv.join(", ")})` : o.mode === "dis" ? ` disadv. (${o.dis.join(", ")})` : "";
     return `d20${edge}${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
   }
-
-  // src/engine/status.js
-  var STAGES = {
-    food: [
-      [50, "", ""],
-      [25, "Hungry", "Below 25: wounds heal at half speed and health stops refilling."],
-      [0.01, "Very hungry", "Wounds heal at half speed. Health does not refill. Sleep rests you less."],
-      [0, "Starving", "You lose health every hour."]
-    ],
-    water: [
-      [50, "", ""],
-      [25, "Thirsty", "Below 25: \u22122 on d20 rolls and health stops refilling."],
-      [0.01, "Very thirsty", "\u22122 on d20 rolls. Wounds heal at half speed. Health does not refill."],
-      [0, "Dehydrated", "You lose 2 health every hour."]
-    ],
-    warmth: [
-      [50, "", ""],
-      [25, "Cold", "You get hungry and tired faster."],
-      [0.01, "Hypothermia", "\u22123 on d20 rolls. Health does not refill."],
-      [0, "Freezing", "You lose 5 health every hour."]
-    ],
-    energy: [
-      [50, "", ""],
-      [25, "Tired", "\u22122 on d20 rolls."],
-      [0.01, "Exhausted", "\u22122 on d20 rolls. Sleep soon."],
-      [0, "Asleep", "You fall asleep where you are."]
-    ],
-    health: [
-      [50, "", ""],
-      [25, "Hurt", "Sleep rests you less."],
-      [0.01, "Badly hurt", "\u22123 on d20 rolls. Sleep rests you less."],
-      [0, "Dead", ""]
-    ],
-    morale: [
-      [50, "", ""],
-      [25, "Low", "Sleep rests you less."],
-      [0.01, "Despair", "\u22122 on d20 rolls. Sleep rests you less."],
-      [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
-    ]
-  };
-  function statStage(key, v) {
-    const rows = STAGES[key];
-    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
-    const last = rows.length - 1;
-    return { stage: last, word: rows[last][1], effect: rows[last][2] };
-  }
-  function needWarnings(state2) {
-    const p = state2.player;
-    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
-  }
-  function risks(state2) {
-    const p = state2.player;
-    const out = [];
-    if (!p.illness.infection) {
-      const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
-      if (open.length) {
-        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
-        out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
-      }
-    }
-    const rate = warmthRate(feltTemp(state2, "rest"));
-    if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
-      const h = (p.warmth - 25) / -rate;
-      out.push({ id: "hypothermia", text: `Hypothermia in about ${h < 1 ? `${Math.max(5, Math.round(h * 60 / 5) * 5)} min` : `${Math.round(h)} h`} here: get warm` });
-    }
-    if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
-    if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
-    if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
-    return out;
-  }
-  var RAW_WATER_SICK = 0.3;
 
   // src/engine/loot.js
   function placeState(state2, place) {
@@ -3661,7 +3841,7 @@
   }
   function weatherOutlook(state2, t = state2.time) {
     const w = state2.weather;
-    const next = nextDayStart(t);
+    const next2 = nextDayStart(t);
     return {
       type: w.type,
       label: WEATHER_TYPES[w.type].label,
@@ -3673,20 +3853,20 @@
       effects: weatherEffects(state2),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
-      next: { at: next, atText: formatClock(next), inMinutes: Math.round(next - t), lowF: Math.round(w.nextLow) }
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow) }
     };
   }
   function actionTiming(state2, minutes) {
     const end = state2.time + minutes;
-    const next = nextDayStart(state2.time);
-    const crosses = end >= next;
+    const next2 = nextDayStart(state2.time);
+    const crosses = end >= next2;
     return {
       minutes,
       durationText: formatDuration(minutes),
       end,
       endText: formatClock(end),
       crossesDayStart: crosses,
-      dayStartText: crosses ? `The new day starts at ${formatClock(next)}: the weather can change.` : null
+      dayStartText: crosses ? `The new day starts at ${formatClock(next2)}: the weather can change.` : null
     };
   }
   function tripPreview(state2, dest) {
@@ -4664,8 +4844,8 @@
   function skillsHtml(open) {
     const rows = allSkills(state).map((k) => {
       const sk = SKILLS[k.key];
-      const next = k.next == null ? "max level" : `${k.next} xp to level ${k.level + 1}`;
-      return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
+      const next2 = k.next == null ? "max level" : `${k.next} xp to level ${k.level + 1}`;
+      return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next2)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
     }).join("");
     const read = (state.skills && state.skills.books || []).length;
     const bg = backgroundText(state);
