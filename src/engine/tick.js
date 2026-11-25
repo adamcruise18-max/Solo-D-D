@@ -9,7 +9,7 @@ import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
-import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
+import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
 import { infectRiskFactor } from './skills.js';
 import { ageFood } from './food.js';
 import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
@@ -275,6 +275,10 @@ function dailyRollover(state, day) {
   log(state, `A new day. Weather: ${weatherInfo(state).label}, high ${Math.round(state.weather.high)}°F, low ${Math.round(state.weather.low)}°F.`, 'day');
   if (state.weather.type === 'snow') log(state, `Snow: ${state.weather.snowInches} inches. Walking is slow today.`, 'warn');
   if (state.weather.type === 'windstorm') log(state, `Windstorm. Wind ${state.weather.wind} mph. Stay inside if you can.`, 'warn');
+
+  // The water chain: the filter station cleans rain water by itself.
+  const filtered = runAutoFilter(state);
+  if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
 
   // Morale
   p.morale -= 2;

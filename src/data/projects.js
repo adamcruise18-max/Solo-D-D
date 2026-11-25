@@ -35,7 +35,7 @@ export const PROJECTS = [
   },
   {
     id: 'filter_station', wing: 'water', name: 'Water filter station',
-    effect: 'Filter 2 gal of unsafe water in 10 min, with no fire or power.',
+    effect: 'Each night it filters up to 12 gal of rain water into clean water by itself (tank holds 40 gal). You can also filter 2 gal by hand in 10 min, with no fire or power.',
     needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 }, tools: [], requires: ['rain_barrels'], hours: 2,
   },
   // ---- Heat ----

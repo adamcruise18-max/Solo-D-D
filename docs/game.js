@@ -1172,7 +1172,7 @@
       id: "filter_station",
       wing: "water",
       name: "Water filter station",
-      effect: "Filter 2 gal of unsafe water in 10 min, with no fire or power.",
+      effect: "Each night it filters up to 12 gal of rain water into clean water by itself (tank holds 40 gal). You can also filter 2 gal by hand in 10 min, with no fire or power.",
       needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 },
       tools: [],
       requires: ["rain_barrels"],
@@ -1342,6 +1342,20 @@
   var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
   var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
   var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
+  var AUTO_FILTER_GAL_PER_DAY = 12;
+  var SAFE_TANK_GAL = 40;
+  function autoFilterToday(state2) {
+    const h = state2.home;
+    if (!built(state2, "rain_barrels") || !built(state2, "filter_station")) return 0;
+    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h.rawGal, SAFE_TANK_GAL - h.safeGal));
+  }
+  function runAutoFilter(state2) {
+    const g = autoFilterToday(state2);
+    if (g <= 0) return 0;
+    state2.home.rawGal -= g;
+    state2.home.safeGal += g;
+    return g;
+  }
   function foodItemsStored(state2) {
     return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
   }
@@ -1675,6 +1689,8 @@
     log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
     if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
     if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
@@ -4439,8 +4455,9 @@
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
-      <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
-      <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
+      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h.rawGal.toFixed(1)} gal</b>
+      ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
       <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
     ${renderBase()}`;

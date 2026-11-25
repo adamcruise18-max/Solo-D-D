@@ -25,7 +25,7 @@ import { createMap } from './map.js';
 import { createFx } from './fx.js';
 import { PROJECTS } from '../data/projects.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
-import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H } from '../engine/base.js';
+import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
 let state = null;
 let mapApi = null;
@@ -325,8 +325,9 @@ function renderHome() {
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW · battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on · heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
-      <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
-      <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>${built(state, 'filter_station') ? 'Clean water tank' : 'Boiled water'}</span><b>${h.safeGal.toFixed(1)} gal${built(state, 'filter_station') ? ` of ${SAFE_TANK_GAL}` : ''}</b>
+      <span>${built(state, 'rain_barrels') ? 'Rain barrels (unsafe)' : 'Unsafe water'}</span><b>${h.rawGal.toFixed(1)} gal</b>
+      ${built(state, 'filter_station') ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ''}
       <span>Kitchen tap</span><b>${h.tapWorks ? 'weak flow' : 'stopped'}</b>
     </div>
     ${renderBase()}`;

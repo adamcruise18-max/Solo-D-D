@@ -78,6 +78,11 @@ This is the **first playable version**: a small part of the full game.
 - Each job gives start skill levels, one item at home and one real weakness. No job is better than the others.
 - Traits use points. You start with 1. Good traits (Fast learner, Dog person) cost points; bad traits (Slow learner, Light sleeper, Asthmatic) give points.
 
+### Water that runs by itself
+
+- Build the rain barrels and the filter station. Each night the station filters up to 12 gal of rain water into the clean-water tank (40 gal). You do nothing.
+- The Home base panel shows the barrels, the clean tank and how much the station filters tonight.
+
 ### Food that spoils
 
 - Cans, dry food and snacks keep. Fresh fish and raw meat spoil: Fresh, then Stale, then Spoiled.
