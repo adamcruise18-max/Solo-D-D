@@ -78,3 +78,35 @@ test('breakdown: batteries and medicine weaken slowly, months after the start', 
   assert.equal(batteryHours(s), 3);
   assert.ok(Math.abs(medicineFactor(s) - 0.7) < 0.01);
 });
+
+test('store fridges: cold-case cheese only until the store fridges fail', async () => {
+  const { rollZone } = await import('../src/engine/loot.js');
+  const s = newGame(11);
+  const count = () => {
+    let n = 0;
+    for (let k = 0; k < 60; k++) for (let z = 0; z < 8; z++) n += rollZone(s, `shop${k}`, 'supermarket', 1, z).waxed_cheese || 0;
+    return n;
+  };
+  assert.ok(count() > 0, 'some cheese at the start');
+  s.time += 400 * 24 * 60; // long after month 4: every store has failed
+  assert.equal(count(), 0, 'no cheese after the fridges fail');
+});
+
+test('stale gas: the generator charges the battery; old gas may not start it', async () => {
+  const { doAction: act } = await import('../src/engine/actions.js');
+  const { gasStartChance, GEN_KWH_PER_GAL } = await import('../src/engine/breakdown.js');
+  const s = newGame(12);
+  assert.ok(!listActions(s).some((a) => a.id === 'run_generator'), 'no generator, no action');
+  s.home.storage.generator = 1;
+  s.home.storage.gas_can = 1;
+  s.home.battery = 2;
+  assert.equal(gasStartChance(s), 1);
+  const a = listActions(s).find((x) => x.id === 'run_generator');
+  assert.ok(a && !a.disabled);
+  act(s, 'run_generator');
+  assert.equal(s.home.storage.gas_can || 0, 0);
+  assert.ok(s.home.battery > 2 + GEN_KWH_PER_GAL * 0.8, `battery ${s.home.battery}`); // the house uses a little in the 2 h
+  assert.ok(listActions(s).find((x) => x.id === 'run_generator').disabled, 'no gas left');
+  s.time += 900 * 24 * 60;
+  assert.ok(gasStartChance(s) < 0.35, 'old gas mostly fails late');
+});

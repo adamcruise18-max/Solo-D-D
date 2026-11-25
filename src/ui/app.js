@@ -29,6 +29,7 @@ import { createFx } from './fx.js';
 import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
 import { PROJECTS } from '../data/projects.js';
+import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostics.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
@@ -896,6 +897,9 @@ async function walkInside() {
     isDone: (z) => zoneList().includes(z),
     isCounterOpen: () => (loc.kind === 'place' ? placeState(state, getPlace(loc.id)).counterOpen : true),
     isDead: () => !!state.dead,
+    // F3: engine diagnostics (systems, random streams, last actions with changed paths).
+    onDebug: (on) => setDeepActivity(on),
+    gameDiag: () => diagText(state),
     getStatus: () => {
       const p = state.player;
       const low = needWarnings(state).map((n) => n.word);
@@ -1089,4 +1093,21 @@ function bindEvents() {
     if (e.target.open) openWings.add(w); else openWings.delete(w);
   }, true);
   window.addEventListener('beforeunload', () => { if (state) saveGame(state); });
+}
+
+// F3 text from the engine diagnostics: weather, pacer, breakdown, systems, random streams,
+// save size and the last 3 actions (with changed paths while F3 is open).
+function diagText(state) {
+  const d = diagnostics(state, { records: 3 });
+  const w = d.weather;
+  const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join('  ');
+  const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(' ');
+  return [
+    `day ${d.day}  ${w.label} ${w.low}-${w.high}°F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ''}`,
+    `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
+    `breakdown: ${shares || 'none yet'}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ''}`,
+    `systems: ${d.systems.map((x) => x.id).join(' ')}`,
+    `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? '?' : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? '  deep log on' : ''}`,
+    ...d.activity.slice(-3).flatMap((r) => activityText(r).split('\n').slice(0, 6)),
+  ];
 }

@@ -11,6 +11,8 @@
     canned_fruit: { name: "Canned fruit", unit: "can", weight: 1, kind: "food", cal: 300, water: 6, portion: 1 },
     instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
     chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
+    // From store cold cases, only until the store's fridges fail (decay row store_fridges).
+    waxed_cheese: { name: "Waxed hard cheese", unit: "block", weight: 1, kind: "food", cal: 1600, portion: 0.25 },
     jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
@@ -41,6 +43,9 @@
     cotton_hoodie: { name: "Cotton hoodie", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 6, wind: 0.1, wetWarm: false, short: "hoodie" },
     windbreaker: { name: "Windbreaker", unit: "pc", weight: 0.6, kind: "wear", slot: "shell", warmth: 2, wind: 0.7, wetWarm: true, short: "windbreaker" },
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
+    // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
+    gas_can: { name: "Gas can (1 gal)", unit: "can", weight: 7, kind: "fuel" },
+    generator: { name: "Small generator", unit: "pc", weight: 45, kind: "tool" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
     bleach: { name: "Unscented bleach", unit: "jug", weight: 8, kind: "misc" },
@@ -132,6 +137,7 @@
         { id: "cooking_pot", w: 1 },
         { id: "vitamins", w: 1 },
         { id: "book_cooking", w: 0.6 },
+        { id: "waxed_cheese", w: 5, fridge: true },
         { id: "cotton_hoodie", w: 0.8 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
@@ -158,7 +164,8 @@
         { id: "instant_noodles", w: 5 },
         { id: "matches", w: 3 },
         { id: "ibuprofen", w: 3 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "waxed_cheese", w: 3, fridge: true }
       ],
       entryText: "The glass door is broken. Shelves are half empty."
     },
@@ -186,7 +193,8 @@
         { id: "sports_drink", w: 5 },
         { id: "duct_tape", w: 3 },
         { id: "paper_map", w: 4 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "gas_can", w: 6 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -309,7 +317,9 @@
         { id: "matches", w: 3 },
         { id: "trash_bags", w: 5 },
         { id: "radio", w: 2 },
-        { id: "book_repair", w: 1.5 }
+        { id: "book_repair", w: 1.5 },
+        { id: "gas_can", w: 3 },
+        { id: "generator", w: 1.2 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -414,6 +424,8 @@
         { id: "metal_bin", w: 2 },
         { id: "rain_barrel", w: 1 },
         { id: "battery_module", w: 0.6 },
+        { id: "gas_can", w: 1.5 },
+        { id: "generator", w: 0.4 },
         { id: "canned_fruit", w: 5 },
         { id: "instant_noodles", w: 4 },
         { id: "oatmeal", w: 3 },
@@ -562,7 +574,7 @@
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
   }
   function hazardColder(state2, t = state2.time) {
-    return activeHazards(state2, t).reduce((a, h) => a + (h.colder || 0), 0);
+    return activeHazards(state2, t).reduce((a, h2) => a + (h2.colder || 0), 0);
   }
   function clearOldHazards(state2) {
     const hz = state2.flags?.hazards;
@@ -1530,6 +1542,17 @@
     fire(state2, e, rng, mode);
     return e;
   }
+  function pacerInfo(state2) {
+    const p = state2.pacer || {};
+    return {
+      tension: Math.round(p.tension || 0),
+      chancePerHour: eventChance(p.tension || 0),
+      lastEventDay: p.lastEventDay ?? null,
+      lastBigDay: p.lastBigDay ?? null,
+      events: p.count || 0,
+      month: monthOf(state2.time)
+    };
+  }
   var pacerSystem = {
     id: "pacer",
     label: "Event pacer",
@@ -1596,6 +1619,19 @@
       st[row.id] = day;
       log(state2, row.text, row.kind || "story");
     }
+  }
+  function decayInfo(state2, t = state2.time) {
+    const day = gameDay(t);
+    const started = state2.decay?.started || {};
+    const next2 = DECAY.filter((r) => started[r.id] == null).map((r) => {
+      const k = r.chanceByDay >= 0.02 ? 1 : Math.ceil(Math.log(0.98) / Math.log(1 - r.chanceByDay));
+      return { id: r.id, day: Math.max(day, monthStartDay(r.month) + k - 1) };
+    }).sort((a, b) => a.day - b.day)[0] || null;
+    return {
+      shown: Object.keys(started),
+      next: next2,
+      shares: Object.fromEntries(DECAY.map((r) => [r.id, Math.round(decayShare(state2, r.id, t) * 100) / 100]))
+    };
   }
   var decaySystem = {
     id: "decay",
@@ -2750,10 +2786,12 @@
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
+    const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
+      if (e.fridge && fridgesGone) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -2788,7 +2826,7 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h of activeHazards(state2, t)) if (h.walk) apply(h.walk, h.label);
+    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -2903,6 +2941,10 @@
   function medicineFactor(state2) {
     return 1 - 0.3 * decayShare(state2, "old_medicine");
   }
+  function gasStartChance(state2) {
+    return 1 - 0.7 * decayShare(state2, "stale_gas");
+  }
+  var GEN_KWH_PER_GAL = 3;
 
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
@@ -3213,6 +3255,11 @@
         return;
       }
       case "collect_tap":
+        if (!tapRuns(state2)) {
+          h2.tapWorks = false;
+          log(state2, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
+          return;
+        }
         h2.rawGal += 2;
         log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
         advanceTime(state2, 15);
@@ -3306,6 +3353,22 @@
         log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         practice(state2, "survival", lit ? 1 : 2);
+        return;
+      }
+      case "run_generator": {
+        const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
+        addItem(bag, "gas_can", -1);
+        advanceTime(state2, 120, "work");
+        if (state2.dead) return;
+        if (!chance(state2, gasStartChance(state2))) {
+          log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
+          p.morale = clamp3(p.morale - 2, 0, 100);
+          return;
+        }
+        const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
+        h2.battery += kwh;
+        log(state2, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
+        practice(state2, "tinkering", 1);
         return;
       }
       case "break_furniture":
@@ -3806,7 +3869,7 @@
       add("drink_tank", "Drink from the water heater tank", { disabled: h2.tankGal < 0.25 && "The tank is empty", note: `${h2.tankGal.toFixed(1)} gal left` });
       if (h2.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h2.safeGal.toFixed(1)} gal` });
       add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h2.safeGal < 1 && h2.tankGal < 1 && "No clean water" });
-      if (h2.tapWorks) add("collect_tap", "Collect tap water (2 gal, unsafe)");
+      if (tapRuns(state2)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
       if (h2.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
       if (h2.rawGal > 0) {
         add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h2.rawGal.toFixed(1)} gal unsafe` });
@@ -3816,6 +3879,11 @@
       }
       const fuel = (h2.storage.firewood || 0) + (state2.carried.firewood || 0);
       add("add_wood", h2.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      if (has2(state2, "generator")) {
+        const gas = (h2.storage.gas_can || 0) + (state2.carried.gas_can || 0);
+        const startP = gasStartChance(state2);
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+      }
       if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
       add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
       const cookId = COOK_ORDER().find((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
@@ -4255,10 +4323,10 @@
     if (chill >= 3) {
       out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
     }
-    for (const h of activeHazards(state2)) {
-      const left = formatDuration(h.endsAt - state2.time);
-      if (h.walk) out.push({ id: `hz_${h.id}`, text: `Walking is slower: ${h.label} (about ${left} more).`, level: "warn" });
-      if (h.colder) out.push({ id: `hz_${h.id}`, text: `Cold snap: outside is ${h.colder} \xB0F colder (about ${left} more).`, level: "danger" });
+    for (const h2 of activeHazards(state2)) {
+      const left = formatDuration(h2.endsAt - state2.time);
+      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} (about ${left} more).`, level: "warn" });
+      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder (about ${left} more).`, level: "danger" });
     }
     return out;
   }
@@ -5423,6 +5491,48 @@
     });
   }
 
+  // src/engine/diagnostics.js
+  function diagnostics(state2, { records = 20 } = {}) {
+    const w = state2.weather || {};
+    let saveBytes = null;
+    try {
+      saveBytes = JSON.stringify(state2).length;
+    } catch {
+    }
+    return {
+      day: dayIndex(state2.time) + 1,
+      time: state2.time,
+      weather: {
+        type: w.type,
+        label: weatherInfo(state2)?.label || w.type,
+        high: Math.round(w.high),
+        low: Math.round(w.low),
+        wind: w.wind,
+        spell: w.spell ? { id: w.spell.id, daysLeft: w.spell.daysLeft } : null,
+        baseType: w.baseType || w.type
+      },
+      pacer: pacerInfo(state2),
+      decay: decayInfo(state2),
+      systems: gameSystems().list().map((s) => ({ id: s.id, order: s.order, version: s.version, saved: state2.systemVersions?.[s.id] ?? null, catchUp: s.catchUp || null })),
+      rng: { shared: state2.rngState, streams: { ...state2.rngStreams || {} } },
+      saveBytes,
+      deep: activity.isDeep(),
+      activity: activity.records(records)
+    };
+  }
+  function setDeepActivity(on) {
+    activity.setDeep(on);
+  }
+  function activityText(r) {
+    const head = `#${r.n} ${r.action} (${r.minutes} min)`;
+    const rng = r.rng ? [r.rng.shared ? "game rng" : null, ...r.rng.streams].filter(Boolean).join(", ") : "";
+    const out = [head];
+    for (const l of r.lines) out.push(`  [${l.sys ? `${l.sys}.${l.hook}` : "action"}] ${l.text}`);
+    if (rng) out.push(`  rng: ${rng}`);
+    if (r.changed) out.push(`  changed: ${r.changed.join(", ") || "(none)"}`);
+    return out.join("\n");
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
@@ -6252,6 +6362,9 @@
       isDone: (z) => zoneList().includes(z),
       isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
       isDead: () => !!state.dead,
+      // F3: engine diagnostics (systems, random streams, last actions with changed paths).
+      onDebug: (on) => setDeepActivity(on),
+      gameDiag: () => diagText(state),
       getStatus: () => {
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
@@ -6438,6 +6551,20 @@
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });
+  }
+  function diagText(state2) {
+    const d = diagnostics(state2, { records: 3 });
+    const w = d.weather;
+    const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join("  ");
+    const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(" ");
+    return [
+      `day ${d.day}  ${w.label} ${w.low}-${w.high}\xB0F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ""}`,
+      `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
+      `breakdown: ${shares || "none yet"}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ""}`,
+      `systems: ${d.systems.map((x) => x.id).join(" ")}`,
+      `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
+      ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
+    ];
   }
 
   // src/main.js

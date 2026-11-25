@@ -17,7 +17,7 @@ import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
-import { batteryHours, medicineFactor } from './breakdown.js';
+import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -423,6 +423,22 @@ function homeAction(state, id) {
       log(state, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, 'good');
       advanceTime(state, lit ? 5 : 15);
       practice(state, 'survival', lit ? 1 : 2);
+      return;
+    }
+    case 'run_generator': {
+      const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state.carried;
+      addItem(bag, 'gas_can', -1);
+      advanceTime(state, 120, 'work');
+      if (state.dead) return;
+      if (!chance(state, gasStartChance(state))) {
+        log(state, 'You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.', 'warn');
+        p.morale = clamp(p.morale - 2, 0, 100);
+        return;
+      }
+      const kwh = Math.min(GEN_KWH_PER_GAL, h.batteryMax - h.battery);
+      h.battery += kwh;
+      log(state, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, 'good');
+      practice(state, 'tinkering', 1);
       return;
     }
     case 'break_furniture':
@@ -987,6 +1003,11 @@ export function listActions(state) {
     }
     const fuel = (h.storage.firewood || 0) + (state.carried.firewood || 0);
     add('add_wood', h.fireHours > 0 ? 'Add wood to the fire' : `Light a fire in the ${built(state, 'wood_stove') ? 'wood stove' : 'fireplace'}`, { disabled: fuel < 1 && 'No firewood', note: `${fuel} bundles` });
+    if (has(state, 'generator')) {
+      const gas = (h.storage.gas_can || 0) + (state.carried.gas_can || 0);
+      const startP = gasStartChance(state);
+      add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
+    }
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0);
