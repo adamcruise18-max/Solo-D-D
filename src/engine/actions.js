@@ -22,7 +22,7 @@ import { plant, waterGarden, harvest } from './garden.js';
 import { SALVAGE } from '../data/salvage.js';
 import { treatDog, canTreatDog } from './dog.js';
 import { carHere, goToCar, searchCar, siphonGas, takeCarBattery, stripCarWire, addCarBattery, SIPHON_TOOLS, WRENCH_TOOLS, CAR_SEARCH_MIN, SIPHON_MIN, BATTERY_MIN, WIRE_MIN, MAX_CAR_BATTERIES } from './cars.js';
-import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
+import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS, sleepSpot } from './home.js';
 import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
@@ -372,7 +372,9 @@ export function rest(state, hours) {
 }
 
 export function sleep(state, hours) {
-  const where = state.location.kind === 'home' ? 'in your bed' : 'on the floor';
+  const k = state.location.kind;
+  const where = k === 'home' ? (sleepSpot(state) === 'living' ? 'by the fire' : 'in your bed')
+    : k === 'wild' ? 'on the ground' : k === 'car' ? 'in the car' : 'on the floor';
   log(state, `You sleep ${where} for ${hours} h.`);
   advanceTime(state, hours * 60, 'sleep');
   if (!state.dead) log(state, 'You wake up.');
@@ -1153,7 +1155,7 @@ export function listActions(state) {
     add('go_home', 'Walk home');
   }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? (sleepSpot(state) === 'living' ? 'Sleep by the fire…' : 'Sleep in your bed…') : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
     if (state.dog.sick) { const why = canTreatDog(state); add('treat_dog', `Treat ${state.dog.name} (antibiotics)`, { disabled: why, note: why ? undefined : '1 course of antibiotics' }); }

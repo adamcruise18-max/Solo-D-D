@@ -4261,7 +4261,8 @@
     advanceTime(state2, hours * 60, "rest");
   }
   function sleep(state2, hours) {
-    const where = state2.location.kind === "home" ? "in your bed" : "on the floor";
+    const k = state2.location.kind;
+    const where = k === "home" ? sleepSpot(state2) === "living" ? "by the fire" : "in your bed" : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
     log(state2, `You sleep ${where} for ${hours} h.`);
     advanceTime(state2, hours * 60, "sleep");
     if (!state2.dead) log(state2, "You wake up.");
@@ -4992,7 +4993,7 @@
       add("go_home", "Walk home");
     }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? sleepSpot(state2) === "living" ? "Sleep by the fire\u2026" : "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
       if (state2.dog.sick) {
