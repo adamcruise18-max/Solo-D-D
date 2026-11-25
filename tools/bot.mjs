@@ -111,8 +111,6 @@ function turn(state) {
     eatDrink(state);
     if (state.home.indoorTemp < 55 && can(state, 'add_wood')) { perform(state, 'action', 'add_wood'); return 'fire'; }
     if (state.home.indoorTemp < 50 && state.home.fireHours <= 0 && can(state, 'break_furniture')) { perform(state, 'action', 'break_furniture'); return 'furniture'; }
-    if (!process.env.BOT_PLAIN && !isNight(state.time)) { const g = gardenWork(state); if (g) return g; }
-    if (!process.env.BOT_PLAIN && (lowFood || foodKcal(state) < LOW_FOOD_KCAL * 2)) { const w = wildTrip(state); if (w) return w; }
     const spare = Object.keys(state.home.storage).filter((id) => ITEMS[id]?.kind === 'food' && id !== 'formula');
     if (spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
     if (isNight(state.time) || p.energy < 30) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
@@ -232,8 +230,8 @@ export function smartTurn(state) {
     if (state.home.indoorTemp < 55 && can(state, 'add_wood')) { perform(state, 'action', 'add_wood'); return 'fire'; }
     if (state.home.indoorTemp < 50 && state.home.fireHours <= 0 && can(state, 'break_furniture')) { perform(state, 'action', 'break_furniture'); return 'furniture'; }
     if (p.food < 50 && can(state, 'cook')) { perform(state, 'action', 'cook'); return 'cook'; }
-    if (!process.env.BOT_PLAIN && !isNight(state.time)) { const g = gardenWork(state); if (g) return g; }
-    if (!process.env.BOT_PLAIN && (lowFood || foodKcal(state) < LOW_FOOD_KCAL * 2)) { const w = wildTrip(state); if (w) return w; }
+    if (!isNight(state.time)) { const g = gardenWork(state); if (g) return g; }
+    if ((lowFood || foodKcal(state) < LOW_FOOD_KCAL * 2)) { const w = wildTrip(state); if (w) return w; }
     const spare = Object.keys(state.home.storage).filter((id) => ITEMS[id]?.kind === 'food' && id !== 'formula');
     if (!lowFood && spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
     if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
