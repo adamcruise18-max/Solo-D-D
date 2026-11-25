@@ -9,8 +9,11 @@ import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
-import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
-import { gameClock } from './systems.js';
+import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
+import { infectRiskFactor } from './skills.js';
+import { ageFood } from './food.js';
+import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
+import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -94,12 +97,17 @@ export function tickStep(state, dt, mode) {
 
   // Warmth
   const felt = feltTemp(state, mode, env);
-  p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
+  // "Warm and fed" after a hot meal: heat loss is halved for a few hours.
+  let wr = warmthRate(felt);
+  if (p.warmFedH > 0) { if (wr < 0) wr *= 0.5; p.warmFedH = Math.max(0, p.warmFedH - dt); }
+  p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+  // Fresh food spoils, by the temperature where most of it is.
+  ageFood(state, dt, (where) => (where === 'storage' ? state.home.indoorTemp : env.temp));
 
   // Food and water
   const cold = p.warmth < 50;
   const pace = working ? V.WORK_FACTOR : sleeping ? V.SLEEP_FACTOR : 1;
-  let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+  let foodLoss = V.FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state);
   let waterLoss = V.WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
   if (felt > 90 && working) waterLoss *= 2;
   p.food = clamp(p.food - foodLoss * dt, 0, 100);
@@ -111,10 +119,12 @@ export function tickStep(state, dt, mode) {
     if (p.morale < 50) gain *= 0.75;
     if (p.health < 50) gain *= 0.75;
     if (p.food < 25) gain *= 0.75;
+    gain *= sleepGainFactor(state);
     p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
   } else {
     let loss = V.ENERGY_LOSS[mode] || V.ENERGY_LOSS.rest;
     if (cold) loss *= 1.5;
+    loss *= energyUseFactor(state, mode);
     if (mode === 'walk' && bagWeight(state.carried) > carryLimit(state)) loss *= 1.5;
     p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
   }
@@ -261,6 +271,10 @@ export function dailyRollover(state, day) {
   log(state, `A new day. Weather: ${weatherInfo(state).label}, high ${Math.round(state.weather.high)}°F, low ${Math.round(state.weather.low)}°F.`, 'day');
   if (state.weather.type === 'snow') log(state, `Snow: ${state.weather.snowInches} inches. Walking is slow today.`, 'warn');
   if (state.weather.type === 'windstorm') log(state, `Windstorm. Wind ${state.weather.wind} mph. Stay inside if you can.`, 'warn');
+
+  // The water chain: the filter station cleans rain water by itself.
+  const filtered = runAutoFilter(state);
+  if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
 
   // Morale
   p.morale -= 2;

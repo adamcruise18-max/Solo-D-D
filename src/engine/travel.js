@@ -6,6 +6,7 @@ import { isNight, isBadWeather } from './world.js';
 import { HOME, MAP_RADIUS_MILES, bagWeight, carryLimit, hasLight, log, addItem, formatDuration } from './state.js';
 import { rollZone } from './loot.js';
 import { itemName } from '../data/items.js';
+import { walkSpeedFactor, energyUseFactor } from './background.js';
 
 export const ROUTE_FACTOR = 1.25;
 
@@ -33,6 +34,7 @@ export function walkSpeed(state, t = state.time) {
   if (p.warmth < 25) apply(0.8, 'hypothermia');
   if (p.energy < 25) apply(0.7, 'exhausted');
   if (p.health < 25) apply(0.7, 'badly hurt');
+  if (walkSpeedFactor(state) < 1) apply(walkSpeedFactor(state), 'bad knees');
   return { mph, why };
 }
 
@@ -41,7 +43,7 @@ export function estimateTrip(state, dest) {
   const { mph, why } = walkSpeed(state);
   const minutes = (miles / mph) * 60;
   const overload = bagWeight(state.carried) > carryLimit(state);
-  const energy = (minutes / 60) * 8 * (overload ? 1.5 : 1) * (state.player.warmth < 50 ? 1.5 : 1);
+  const energy = (minutes / 60) * 8 * (overload ? 1.5 : 1) * (state.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state, 'walk');
   return { miles, minutes, energy, mph, why };
 }
 

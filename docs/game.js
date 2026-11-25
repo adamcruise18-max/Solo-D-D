@@ -12,6 +12,9 @@
     instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
     chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
     jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
+    // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
+    fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
+    raw_meat: { name: "Raw meat", unit: "lb", weight: 1, kind: "food", cal: 900, portion: 1, needsCooking: true, perish: 2 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
@@ -626,241 +629,128 @@
     return CLIMATE[month].solar * WEATHER_TYPES[state2.weather.type].solar;
   }
 
-  // src/core/systems.js
-  var HOOKS = ["init", "step", "daily"];
-  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
-  var CATCH_UP = ["exact", "approx", "event"];
-  function defineSystem(sys) {
-    if (!sys || typeof sys.id !== "string" || !sys.id) throw new Error("A system needs an id");
-    for (const k of Object.keys(sys)) {
-      if (!KNOWN.has(k)) throw new Error(`System "${sys.id}": unknown field "${k}"`);
+  // src/engine/skills.js
+  var SKILLS = {
+    scavenging: {
+      name: "Scavenging",
+      how: "Take items, search shelves and rooms, open boxes.",
+      perLevel: "Searches take 8% less time per level.",
+      notice: ["", "You notice how many items are near you.", "You hear how many items are in a closed box.", "You notice items a little further away.", "", "You see loot from far away."]
+    },
+    tinkering: {
+      name: "Tinkering",
+      how: "Force doors and gates, break furniture for wood.",
+      perLevel: "+1 to force doors and gates per level.",
+      notice: []
+    },
+    first_aid: {
+      name: "First aid",
+      how: "Bandage wounds, treat illness.",
+      perLevel: "A bandaged wound heals 8% faster per level. Wound infection risk is 10% lower per level.",
+      notice: []
+    },
+    cooking: {
+      name: "Cooking",
+      how: "Cook hot meals, boil and treat water.",
+      perLevel: "Hot meals give +1 morale per level. Boiling takes 10% less time per level.",
+      notice: []
+    },
+    survival: {
+      name: "Survival",
+      how: "Keep a fire, collect and filter water.",
+      perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
+      notice: []
     }
-    for (const h of HOOKS) {
-      if (sys[h] != null && typeof sys[h] !== "function") throw new Error(`System "${sys.id}": ${h} must be a function`);
-    }
-    const version = sys.version ?? 1;
-    if (!Number.isInteger(version) || version < 1) throw new Error(`System "${sys.id}": version must be a whole number from 1`);
-    if (sys.owns != null && (!Array.isArray(sys.owns) || sys.owns.some((f) => typeof f !== "string" || !f))) {
-      throw new Error(`System "${sys.id}": owns must be a list of state field names`);
-    }
-    if (sys.catchUp != null && !CATCH_UP.includes(sys.catchUp)) {
-      throw new Error(`System "${sys.id}": catchUp must be one of ${CATCH_UP.join(", ")}`);
-    }
-    const migrations = sys.migrations || {};
-    for (let v = 2; v <= version; v++) {
-      if (typeof migrations[v] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v}`);
-    }
-    return Object.freeze({ order: 100, ...sys, version, migrations });
-  }
-  function createSystems(list = [], { dev = false } = {}) {
-    const byId = /* @__PURE__ */ new Map();
-    const owner = /* @__PURE__ */ new Map();
-    let ordered = [];
-    function add(sys) {
-      const s = defineSystem(sys);
-      if (byId.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
-      for (const f of s.owns || []) {
-        if (owner.has(f)) throw new Error(`Field "${f}" is owned by both "${owner.get(f)}" and "${s.id}"`);
-      }
-      for (const f of s.owns || []) owner.set(f, s.id);
-      byId.set(s.id, s);
-      ordered = [...byId.values()].sort((a, b) => a.order - b.order);
-      return s;
-    }
-    for (const s of list) add(s);
-    const snapOthers = (state2, id) => {
-      const out = {};
-      for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
-      return out;
-    };
-    function run(hook, state2, arg, ctx) {
-      for (const s of ordered) {
-        if (!s[hook]) continue;
-        if (!dev || !owner.size) {
-          s[hook](state2, arg, ctx);
-          continue;
-        }
-        const before = snapOthers(state2, s.id);
-        s[hook](state2, arg, ctx);
-        for (const [f, v] of Object.entries(before)) {
-          if (JSON.stringify(state2[f] ?? null) !== v) {
-            throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);
-          }
-        }
-      }
-    }
-    return {
-      add,
-      get: (id) => byId.get(id),
-      ids: () => ordered.map((s) => s.id),
-      ownerOf: (field) => owner.get(field) || null,
-      // Systems that have not said how they catch up: reduced or abstract
-      // simulation must not skip time for these.
-      missingCatchUp: () => ordered.filter((s) => !s.catchUp).map((s) => s.id),
-      list: () => ordered.slice(),
-      init: (state2, ctx) => {
-        run("init", state2, void 0, ctx);
-        state2.systemVersions = Object.fromEntries(ordered.map((s) => [s.id, s.version]));
-      },
-      step: (state2, dtHours, ctx) => run("step", state2, dtHours, ctx),
-      daily: (state2, day, ctx) => run("daily", state2, day, ctx)
-    };
-  }
-
-  // src/core/clock.js
-  var STEP_MINUTES = 10;
-  var DAY_START_MINUTE = 5 * 60;
-  var dayIndex = (t) => Math.floor(t / 1440);
-  var gameDay = (t) => dayIndex(t - DAY_START_MINUTE);
-  function sendDeath(state2, events) {
-    if (!state2.dead || !events || state2.deathSent) return;
-    state2.deathSent = true;
-    events.emit("player.died", { cause: state2.dead.cause, days: state2.dead.days, time: state2.time });
-  }
-  function createClock({ systems, events = null, stepMinutes = STEP_MINUTES } = {}) {
-    if (!systems) throw new Error("The clock needs a systems list");
-    let running = false;
-    function advance(state2, minutes, mode = "rest") {
-      if (!(minutes >= 0)) throw new Error(`Bad number of minutes: ${minutes}`);
-      if (running) throw new Error("Time was moved inside a clock step (time charged twice)");
-      running = true;
-      try {
-        return run(state2, minutes, mode);
-      } finally {
-        running = false;
-      }
-    }
-    function run(state2, minutes, mode) {
-      let left = minutes;
-      const ctx = { mode, events, clock: api };
-      while (left > 1e-4 && !state2.dead) {
-        const step = Math.min(stepMinutes, left);
-        const before = state2.time;
-        state2.time += step;
-        left -= step;
-        const dBefore = gameDay(before);
-        const dAfter = gameDay(state2.time);
-        for (let d = dBefore + 1; d <= dAfter; d++) {
-          systems.daily(state2, d, ctx);
-          events?.emit("day.start", { day: d, time: state2.time });
-        }
-        systems.step(state2, step / 60, ctx);
-      }
-      sendDeath(state2, events);
-      return state2;
-    }
-    const api = { advance, stepMinutes };
-    return api;
-  }
-
-  // src/core/save.js
-  function migrate(state2, { version, gameMigrations = {}, systems = null } = {}) {
-    let s = structuredCloneSafe(state2);
-    if (s.version == null) s.version = 1;
-    s.version = Number(s.version);
-    if (!Number.isInteger(s.version) || s.version < 1) throw new Error(`Bad save version: ${state2.version}`);
-    if (version != null) {
-      if (s.version > version) throw new Error(`This save is from a newer game (v${s.version}). Update the game first.`);
-      while (s.version < version) {
-        const to = s.version + 1;
-        const fn = gameMigrations[to];
-        if (typeof fn !== "function") throw new Error(`No upgrade from save v${s.version} to v${to}`);
-        s = fn(s) || s;
-        s.version = to;
-      }
-    }
-    if (systems) {
-      if (!s.systemVersions) {
-        s.systemVersions = Object.fromEntries(systems.list().filter((sys) => sys.legacy).map((sys) => [sys.id, 1]));
-      }
-      for (const sys of systems.list()) {
-        let v = s.systemVersions[sys.id];
-        if (v == null) {
-          if (sys.init) sys.init(s, {});
-          s.systemVersions[sys.id] = sys.version;
-          continue;
-        }
-        if (v > sys.version) throw new Error(`Save has ${sys.id} v${v}, game has v${sys.version}`);
-        while (v < sys.version) {
-          v += 1;
-          s = sys.migrations[v](s) || s;
-        }
-        s.systemVersions[sys.id] = v;
-      }
-    }
+  };
+  var LEVEL_XP = [0, 15, 40, 80, 140, 220];
+  var MAX_LEVEL = 5;
+  var BOOK_XP = 25;
+  var READ_MINUTES = 120;
+  function skillsOf(state2) {
+    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
+    const s = state2.skills;
+    if (!s.xp || typeof s.xp !== "object") s.xp = {};
+    if (!Array.isArray(s.books)) s.books = [];
     return s;
   }
-  function structuredCloneSafe(o) {
-    return typeof structuredClone === "function" ? structuredClone(o) : JSON.parse(JSON.stringify(o));
+  function levelFor(xp) {
+    let lvl = 0;
+    for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
+    return lvl;
   }
-
-  // src/core/profiler.js
-  var FRAME_BUDGET_MS = 1e3 / 30;
-
-  // src/engine/vitals.js
-  var CAL_PER_FOOD_POINT = 70;
-  var WATER_PER_QUART = 25;
-  var FOOD_LOSS_PER_HOUR = 1.5;
-  var WATER_LOSS_PER_HOUR = 2.5;
-  var WORK_FACTOR = 1.5;
-  var SLEEP_FACTOR = 0.75;
-  var ENERGY_LOSS = { rest: 3, work: 5, walk: 6, heavy: 9 };
-  var STARVING_DAMAGE = 0.2;
-  var DEHYDRATED_DAMAGE = 2;
-  var SEARCH_INJURY_CHANCE = 0.03;
-
-  // src/engine/placesdb.js
-  var LIST = [];
-  var INDEX = {};
-  function setPlaces(list) {
-    LIST = list;
-    INDEX = Object.fromEntries(list.map((p) => [p.id, p]));
+  function skillLevel(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    return levelFor(xp);
   }
-  var getPlace = (id) => INDEX[id];
-  var allPlaces = () => LIST;
-
-  // src/engine/season.js
-  var SEASONS = {
-    winter: { label: "Winter", months: [10, 11, 0, 1] },
-    // Nov to Feb: cold, wet, dark
-    spring: { label: "Spring", months: [2, 3, 4] },
-    summer: { label: "Summer", months: [5, 6, 7] },
-    fall: { label: "Fall", months: [8, 9] }
-  };
-  function seasonOf(t) {
-    const m = calendar(t).month;
-    return Object.keys(SEASONS).find((k) => SEASONS[k].months.includes(m));
-  }
-  function overgrowth(t) {
-    const days = Math.max(0, dayIndex2(t));
-    return Math.min(1, 0.08 + days / 730);
-  }
-  var SEASON_START_TEXT = {
-    spring: "Spring. The days are longer. Green shoots push up through the cracks in the roads.",
-    summer: "Summer. The city is green and quiet. Grass grows tall in the streets and on the lawns.",
-    fall: "Fall. The leaves turn and drop. They pile up on the cars and fill the gutters.",
-    winter: "Winter. Cold rain and short days. Dead weeds bend over the sidewalks."
-  };
-  var GROWTH_TEXT = [
-    "Moss grows on the north side of the parked cars.",
-    "Weeds come up in the cracks of the parking lots.",
-    "Blackberry vines climb over the fences on your street.",
-    "Ivy covers the walls of the stores. Some windows are green now.",
-    "Small trees grow in the gutters and on the flat roofs.",
-    "The lawns are fields now. Deer walk down the middle of the street.",
-    "Grass hides the road lines. Some side streets look like trails.",
-    "Young alder trees stand in the parking lots, taller than the cars."
-  ];
-  function seasonDaily(state2, day) {
-    const t = day * 1440;
-    const prev = state2.season || seasonOf(t);
-    const now = seasonOf(t);
-    if (now !== prev) log(state2, SEASON_START_TEXT[now], "story");
-    state2.season = now;
-    if (calendar(t).date === 24 && day > 0) {
-      const n = Math.round(day / 30.4) - 1;
-      log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
+  var DAILY_FULL = 20;
+  function practice(state2, key, amount = 1, { book = false } = {}) {
+    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
+    const s = skillsOf(state2);
+    if (!book) {
+      const day = dayIndex(state2.time);
+      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
+      const n = (s.today.uses[key] || 0) + 1;
+      s.today.uses[key] = n;
+      if (n > DAILY_FULL) amount /= 2;
     }
+    amount *= xpFactor(state2);
+    const before = levelFor(s.xp[key] || 0);
+    s.xp[key] = (s.xp[key] || 0) + amount;
+    const after = levelFor(s.xp[key]);
+    if (after > before) {
+      const sk = SKILLS[key];
+      const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
+      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
+    }
+    return after;
+  }
+  function skillProgress(state2, key) {
+    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+    const lvl = levelFor(xp);
+    if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
+    const lo = LEVEL_XP[lvl];
+    const hi = LEVEL_XP[lvl + 1];
+    return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
+  }
+  function allSkills(state2) {
+    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
+  }
+  function hasRead(state2, bookId) {
+    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
+  }
+  function searchTimeFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "scavenging");
+  }
+  function forceBonus(state2) {
+    const l = skillLevel(state2, "tinkering");
+    return l ? [["tinkering", l]] : [];
+  }
+  function bandageHealFactor(state2) {
+    return 1 - 0.08 * skillLevel(state2, "first_aid");
+  }
+  function infectRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "first_aid");
+  }
+  function cookMoraleBonus(state2) {
+    return skillLevel(state2, "cooking");
+  }
+  function boilTimeFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "cooking");
+  }
+  function fireBonusFactor(state2) {
+    return 1 + 0.06 * skillLevel(state2, "survival");
+  }
+  function rawWaterRiskFactor(state2) {
+    return 1 - 0.1 * skillLevel(state2, "survival");
+  }
+  function noticeOf(state2) {
+    const l = skillLevel(state2, "scavenging");
+    return {
+      level: l,
+      countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
+      boxCount: l >= 2,
+      lootGlow: l >= 5 ? 1 : l >= 3 ? 0.5 : 0
+    };
   }
 
   // src/data/projects.js
@@ -906,7 +796,7 @@
       id: "filter_station",
       wing: "water",
       name: "Water filter station",
-      effect: "Filter 2 gal of unsafe water in 10 min, with no fire or power.",
+      effect: "Each night it filters up to 12 gal of rain water into clean water by itself (tank holds 40 gal). You can also filter 2 gal by hand in 10 min, with no fire or power.",
       needs: { water_filter: 1, pipe_fittings: 1, scrap_wood: 1 },
       tools: [],
       requires: ["rain_barrels"],
@@ -975,232 +865,115 @@
   ];
   var PROJECT_BY_ID = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
 
-  // src/engine/base.js
-  var WORK_BLOCK_H = 2;
-  var MIN_WORK_ENERGY = 15;
-  function base(state2) {
-    const h = state2.home;
-    if (!h.projects) h.projects = {};
-    if (!h.work) h.work = {};
-    return h;
+  // src/engine/vitals.js
+  var CAL_PER_FOOD_POINT = 70;
+  var WATER_PER_QUART = 25;
+  var FOOD_LOSS_PER_HOUR = 1.5;
+  var WATER_LOSS_PER_HOUR = 2.5;
+  var WORK_FACTOR = 1.5;
+  var SLEEP_FACTOR = 0.75;
+  var ENERGY_LOSS = { rest: 3, work: 5, walk: 6, heavy: 9 };
+  var STARVING_DAMAGE = 0.2;
+  var DEHYDRATED_DAMAGE = 2;
+  var SEARCH_INJURY_CHANCE = 0.03;
+
+  // src/engine/placesdb.js
+  var LIST = [];
+  var INDEX = {};
+  function setPlaces(list) {
+    LIST = list;
+    INDEX = Object.fromEntries(list.map((p) => [p.id, p]));
   }
-  function built(state2, id) {
-    return !!(state2.home.projects && state2.home.projects[id]);
+  var getPlace = (id) => INDEX[id];
+  var allPlaces = () => LIST;
+
+  // src/engine/season.js
+  var SEASONS = {
+    winter: { label: "Winter", months: [10, 11, 0, 1] },
+    // Nov to Feb: cold, wet, dark
+    spring: { label: "Spring", months: [2, 3, 4] },
+    summer: { label: "Summer", months: [5, 6, 7] },
+    fall: { label: "Fall", months: [8, 9] }
+  };
+  function seasonOf(t) {
+    const m = calendar(t).month;
+    return Object.keys(SEASONS).find((k) => SEASONS[k].months.includes(m));
   }
-  function builtCount(state2) {
-    return PROJECTS.filter((p) => built(state2, p.id)).length;
+  function overgrowth(t) {
+    const days = Math.max(0, dayIndex(t));
+    return Math.min(1, 0.08 + days / 730);
   }
-  function haveQty(state2, id) {
-    return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
-  }
-  function projectStatus(state2, proj) {
-    const h = base(state2);
-    const started = h.work[proj.id] != null;
-    const doneH = h.work[proj.id] || 0;
-    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
-    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
-    const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
-    const partsOk = started || parts.every((x) => x.have >= x.need);
-    const toolsOk = tools.every((t) => t.have);
-    let blocked = null;
-    if (built(state2, proj.id)) blocked = "Built";
-    else if (missingReq.length) blocked = `Build first: ${missingReq.map((r) => PROJECT_BY_ID[r].name).join(", ")}`;
-    else if (!partsOk) blocked = "Missing parts";
-    else if (!toolsOk) blocked = `Needs ${tools.filter((t) => !t.have).map((t) => itemName(t.id).toLowerCase()).join(", ")}`;
-    else if (state2.location.kind !== "home") blocked = "Go home to work on it";
-    else if (state2.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
-    return {
-      built: built(state2, proj.id),
-      started,
-      doneH,
-      leftH: Math.max(0, proj.hours - doneH),
-      parts,
-      tools,
-      missingReq,
-      blocked,
-      canWork: !blocked
-    };
-  }
-  function wingSummary(state2) {
-    return Object.entries(WINGS).map(([id, w]) => {
-      const list = PROJECTS.filter((p) => p.wing === id);
-      return { id, ...w, projects: list, built: list.filter((p) => built(state2, p.id)).length };
-    });
-  }
-  function takeParts(state2, needs) {
-    for (const [id, need] of Object.entries(needs)) {
-      let left = need;
-      for (const bag of [state2.home.storage, state2.carried]) {
-        const take = Math.min(left, bag[id] || 0);
-        if (take > 0) addItem(bag, id, -take);
-        left -= take;
-      }
+  var SEASON_START_TEXT = {
+    spring: "Spring. The days are longer. Green shoots push up through the cracks in the roads.",
+    summer: "Summer. The city is green and quiet. Grass grows tall in the streets and on the lawns.",
+    fall: "Fall. The leaves turn and drop. They pile up on the cars and fill the gutters.",
+    winter: "Winter. Cold rain and short days. Dead weeds bend over the sidewalks."
+  };
+  var GROWTH_TEXT = [
+    "Moss grows on the north side of the parked cars.",
+    "Weeds come up in the cracks of the parking lots.",
+    "Blackberry vines climb over the fences on your street.",
+    "Ivy covers the walls of the stores. Some windows are green now.",
+    "Small trees grow in the gutters and on the flat roofs.",
+    "The lawns are fields now. Deer walk down the middle of the street.",
+    "Grass hides the road lines. Some side streets look like trails.",
+    "Young alder trees stand in the parking lots, taller than the cars."
+  ];
+  function seasonDaily(state2, day) {
+    const t = day * 1440;
+    const prev = state2.season || seasonOf(t);
+    const now = seasonOf(t);
+    if (now !== prev) log(state2, SEASON_START_TEXT[now], "story");
+    state2.season = now;
+    if (calendar(t).date === 24 && day > 0) {
+      const n = Math.round(day / 30.4) - 1;
+      log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
-  }
-  function workOnProject(state2, id) {
-    const proj = PROJECT_BY_ID[id];
-    if (!proj) return;
-    const h = base(state2);
-    const st = projectStatus(state2, proj);
-    if (!st.canWork) {
-      log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
-      return;
-    }
-    if (!st.started) {
-      takeParts(state2, proj.needs);
-      h.work[id] = 0;
-      log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
-    }
-    const hours = Math.min(WORK_BLOCK_H, st.leftH);
-    advanceTime(state2, Math.round(hours * 60), "heavy");
-    if (state2.dead) return;
-    h.work[id] += hours;
-    if (h.work[id] >= proj.hours - 1e-9) {
-      delete h.work[id];
-      h.projects[id] = true;
-      finishProject(state2, proj);
-    } else {
-      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h.work[id]) * 60)} of work left.`);
-    }
-  }
-  function finishProject(state2, proj) {
-    const h = state2.home;
-    const p = state2.player;
-    if (proj.id === "second_battery") h.batteryMax = 27;
-    let morale = 5;
-    if (proj.id === "sealed_store") morale += 5;
-    p.morale = Math.min(100, p.morale + morale);
-    log(state2, `Project done: ${proj.name}. ${proj.effect}`, "good");
-  }
-  var fireHoursPerBundle = (state2) => built(state2, "wood_stove") ? 4 : 2;
-  var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
-  var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
-  var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
-  function foodItemsStored(state2) {
-    return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
   }
 
-  // src/engine/skills.js
-  var SKILLS = {
-    scavenging: {
-      name: "Scavenging",
-      how: "Take items, search shelves and rooms, open boxes.",
-      perLevel: "Searches take 8% less time per level.",
-      notice: ["", "You notice how many items are near you.", "You hear how many items are in a closed box.", "You notice items a little further away.", "", "You see loot from far away."]
-    },
-    tinkering: {
-      name: "Tinkering",
-      how: "Force doors and gates, break furniture for wood.",
-      perLevel: "+1 to force doors and gates per level.",
-      notice: []
-    },
-    first_aid: {
-      name: "First aid",
-      how: "Bandage wounds, treat illness.",
-      perLevel: "A bandaged wound heals 8% faster per level. Wound infection risk is 10% lower per level.",
-      notice: []
-    },
-    cooking: {
-      name: "Cooking",
-      how: "Cook hot meals, boil and treat water.",
-      perLevel: "Hot meals give +1 morale per level. Boiling takes 10% less time per level.",
-      notice: []
-    },
-    survival: {
-      name: "Survival",
-      how: "Keep a fire, collect and filter water.",
-      perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
-      notice: []
+  // src/engine/food.js
+  var STALE_AT = 0.5;
+  var RISK = { fresh: 0, stale: 0.1, spoiled: 0.5 };
+  var WARM_FED_HOURS = 6;
+  function isPerishable(id) {
+    return !!(ITEMS[id] && ITEMS[id].perish);
+  }
+  function spoilRate(tempF) {
+    if (tempF <= 34) return 0.14;
+    if (tempF >= 75) return 1.5;
+    if (tempF >= 65) return 1 + (tempF - 65) * 0.05;
+    return 0.14 + (tempF - 34) / (65 - 34) * 0.86;
+  }
+  function freshOf(state2) {
+    if (!state2.fresh || typeof state2.fresh !== "object") state2.fresh = {};
+    return state2.fresh;
+  }
+  function stageOf(state2, id) {
+    if (!isPerishable(id)) return "keeps";
+    const s = freshOf(state2)[id] || 0;
+    return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
+  }
+  function ageFood(state2, dt, tempAt) {
+    const f = freshOf(state2);
+    for (const id of Object.keys(ITEMS)) {
+      if (!isPerishable(id)) continue;
+      const c = state2.carried[id] || 0;
+      const st = state2.home && state2.home.storage[id] || 0;
+      if (c + st <= 0) {
+        delete f[id];
+        continue;
+      }
+      const temp = st > c ? tempAt("storage") : tempAt("carried");
+      f[id] = (f[id] || 0) + dt / 24 / ITEMS[id].perish * spoilRate(temp);
     }
-  };
-  var LEVEL_XP = [0, 15, 40, 80, 140, 220];
-  var MAX_LEVEL = 5;
-  var BOOK_XP = 25;
-  var READ_MINUTES = 120;
-  function skillsOf(state2) {
-    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
-    const s = state2.skills;
-    if (!s.xp || typeof s.xp !== "object") s.xp = {};
-    if (!Array.isArray(s.books)) s.books = [];
-    return s;
   }
-  function levelFor(xp) {
-    let lvl = 0;
-    for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
-    return lvl;
+  function eatRisk(state2, id, cooked = false) {
+    const r = RISK[stageOf(state2, id)] || 0;
+    return cooked ? r / 2 : r;
   }
-  function skillLevel(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
-    return levelFor(xp);
-  }
-  var DAILY_FULL = 20;
-  function practice(state2, key, amount = 1, { book = false } = {}) {
-    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
-    const s = skillsOf(state2);
-    if (!book) {
-      const day = dayIndex(state2.time);
-      if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
-      const n = (s.today.uses[key] || 0) + 1;
-      s.today.uses[key] = n;
-      if (n > DAILY_FULL) amount /= 2;
-    }
-    const before = levelFor(s.xp[key] || 0);
-    s.xp[key] = (s.xp[key] || 0) + amount;
-    const after = levelFor(s.xp[key]);
-    if (after > before) {
-      const sk = SKILLS[key];
-      const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
-      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
-    }
-    return after;
-  }
-  function skillProgress(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
-    const lvl = levelFor(xp);
-    if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
-    const lo = LEVEL_XP[lvl];
-    const hi = LEVEL_XP[lvl + 1];
-    return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
-  }
-  function allSkills(state2) {
-    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
-  }
-  function hasRead(state2, bookId) {
-    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
-  }
-  function searchTimeFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "scavenging");
-  }
-  function forceBonus(state2) {
-    const l = skillLevel(state2, "tinkering");
-    return l ? [["tinkering", l]] : [];
-  }
-  function bandageHealFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "first_aid");
-  }
-  function infectRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "first_aid");
-  }
-  function cookMoraleBonus(state2) {
-    return skillLevel(state2, "cooking");
-  }
-  function boilTimeFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "cooking");
-  }
-  function fireBonusFactor(state2) {
-    return 1 + 0.06 * skillLevel(state2, "survival");
-  }
-  function rawWaterRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "survival");
-  }
-  function noticeOf(state2) {
-    const l = skillLevel(state2, "scavenging");
-    return {
-      level: l,
-      countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
-      boxCount: l >= 2,
-      lootGlow: l >= 5 ? 1 : l >= 3 ? 0.5 : 0
-    };
+  function stageLabel(state2, id) {
+    const st = stageOf(state2, id);
+    return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
   }
 
   // src/engine/clothes.js
@@ -1313,8 +1086,17 @@
     state2._damage[cause] = (state2._damage[cause] || 0) + amount;
   }
   function advanceTime(state2, minutes, mode = "rest") {
-    if (!(minutes > 0)) return;
-    gameClock().advance(state2, minutes, mode);
+    let left = minutes;
+    while (left > 1e-4 && !state2.dead) {
+      const step = Math.min(10, left);
+      const before = state2.time;
+      state2.time += step;
+      left -= step;
+      const dBefore = dayIndex(before - 300);
+      const dAfter = dayIndex(state2.time - 300);
+      for (let d = dBefore + 1; d <= dAfter; d++) dailyRollover(state2, d);
+      tickStep(state2, step / 60, mode);
+    }
   }
   function tickStep(state2, dt, mode) {
     const p = state2.player;
@@ -1330,10 +1112,16 @@
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
     if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
     const felt = feltTemp(state2, mode, env);
-    p.warmth = clamp(p.warmth + warmthRate(felt) * dt, 0, 100);
+    let wr = warmthRate(felt);
+    if (p.warmFedH > 0) {
+      if (wr < 0) wr *= 0.5;
+      p.warmFedH = Math.max(0, p.warmFedH - dt);
+    }
+    p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+    ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
-    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1);
+    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state2);
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
     p.food = clamp(p.food - foodLoss * dt, 0, 100);
@@ -1343,10 +1131,12 @@
       if (p.morale < 50) gain *= 0.75;
       if (p.health < 50) gain *= 0.75;
       if (p.food < 25) gain *= 0.75;
+      gain *= sleepGainFactor(state2);
       p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
+      loss *= energyUseFactor(state2, mode);
       if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
       p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
     }
@@ -1435,7 +1225,7 @@
       const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
       if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
     }
-    if (h.tapWorks && (air < 25 || dayIndex2(state2.time) >= h.tapStopDay)) {
+    if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
       h.tapWorks = false;
       log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
@@ -1465,10 +1255,13 @@
   }
   function dailyRollover(state2, day) {
     const p = state2.player;
+    rollWeather(state2, day);
     seasonDaily(state2, day);
     log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
     if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
     if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
@@ -1576,9 +1369,526 @@
     state2.dead = {
       cause: CAUSE_TEXT[cause] || cause,
       time: state2.time,
-      days: dayIndex2(state2.time) + 1
+      days: dayIndex(state2.time) + 1
     };
     log(state2, `You died of ${state2.dead.cause}.`, "danger");
+  }
+
+  // src/engine/base.js
+  var WORK_BLOCK_H = 2;
+  var MIN_WORK_ENERGY = 15;
+  function base(state2) {
+    const h = state2.home;
+    if (!h.projects) h.projects = {};
+    if (!h.work) h.work = {};
+    return h;
+  }
+  function built(state2, id) {
+    return !!(state2.home.projects && state2.home.projects[id]);
+  }
+  function builtCount(state2) {
+    return PROJECTS.filter((p) => built(state2, p.id)).length;
+  }
+  function haveQty(state2, id) {
+    return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
+  }
+  function projectStatus(state2, proj) {
+    const h = base(state2);
+    const started = h.work[proj.id] != null;
+    const doneH = h.work[proj.id] || 0;
+    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
+    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
+    const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
+    const partsOk = started || parts.every((x) => x.have >= x.need);
+    const toolsOk = tools.every((t) => t.have);
+    let blocked = null;
+    if (built(state2, proj.id)) blocked = "Built";
+    else if (missingReq.length) blocked = `Build first: ${missingReq.map((r) => PROJECT_BY_ID[r].name).join(", ")}`;
+    else if (!partsOk) blocked = "Missing parts";
+    else if (!toolsOk) blocked = `Needs ${tools.filter((t) => !t.have).map((t) => itemName(t.id).toLowerCase()).join(", ")}`;
+    else if (state2.location.kind !== "home") blocked = "Go home to work on it";
+    else if (state2.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
+    return {
+      built: built(state2, proj.id),
+      started,
+      doneH,
+      leftH: Math.max(0, proj.hours - doneH),
+      parts,
+      tools,
+      missingReq,
+      blocked,
+      canWork: !blocked
+    };
+  }
+  function wingSummary(state2) {
+    return Object.entries(WINGS).map(([id, w]) => {
+      const list = PROJECTS.filter((p) => p.wing === id);
+      return { id, ...w, projects: list, built: list.filter((p) => built(state2, p.id)).length };
+    });
+  }
+  function takeParts(state2, needs) {
+    for (const [id, need] of Object.entries(needs)) {
+      let left = need;
+      for (const bag of [state2.home.storage, state2.carried]) {
+        const take = Math.min(left, bag[id] || 0);
+        if (take > 0) addItem(bag, id, -take);
+        left -= take;
+      }
+    }
+  }
+  function workOnProject(state2, id) {
+    const proj = PROJECT_BY_ID[id];
+    if (!proj) return;
+    const h = base(state2);
+    const st = projectStatus(state2, proj);
+    if (!st.canWork) {
+      log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
+      return;
+    }
+    if (!st.started) {
+      takeParts(state2, proj.needs);
+      h.work[id] = 0;
+      log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
+    }
+    const hours = Math.min(WORK_BLOCK_H, st.leftH);
+    advanceTime(state2, Math.round(hours * 60), "heavy");
+    if (state2.dead) return;
+    h.work[id] += hours;
+    if (h.work[id] >= proj.hours - 1e-9) {
+      delete h.work[id];
+      h.projects[id] = true;
+      finishProject(state2, proj);
+    } else {
+      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h.work[id]) * 60)} of work left.`);
+    }
+  }
+  function finishProject(state2, proj) {
+    const h = state2.home;
+    const p = state2.player;
+    if (proj.id === "second_battery") h.batteryMax = 27;
+    let morale = 5;
+    if (proj.id === "sealed_store") morale += 5;
+    p.morale = Math.min(100, p.morale + morale);
+    log(state2, `Project done: ${proj.name}. ${proj.effect}`, "good");
+  }
+  var fireHoursPerBundle = (state2) => built(state2, "wood_stove") ? 4 : 2;
+  var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
+  var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
+  var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
+  var AUTO_FILTER_GAL_PER_DAY = 12;
+  var SAFE_TANK_GAL = 40;
+  function autoFilterToday(state2) {
+    const h = state2.home;
+    if (!built(state2, "rain_barrels") || !built(state2, "filter_station")) return 0;
+    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h.rawGal, SAFE_TANK_GAL - h.safeGal));
+  }
+  function runAutoFilter(state2) {
+    const g = autoFilterToday(state2);
+    if (g <= 0) return 0;
+    state2.home.rawGal -= g;
+    state2.home.safeGal += g;
+    return g;
+  }
+  function foodItemsStored(state2) {
+    return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
+  }
+
+  // src/engine/legacy.js
+  var MAX_SLOTS = 3;
+  var LEGACY = {
+    long_haul: {
+      name: "Long haul",
+      deed: "Live 30 days in one run.",
+      bonus: "Start with 3 more cans of food.",
+      earned: (r) => r.best.days >= 30,
+      progress: (r) => `${Math.min(30, r.best.days)} / 30 days`
+    },
+    road_legs: {
+      name: "Road legs",
+      deed: "Walk 100 miles over all runs.",
+      bonus: "Walking uses 5% less energy.",
+      earned: (r) => r.totals.miles >= 100,
+      progress: (r) => `${Math.floor(Math.min(100, r.totals.miles))} / 100 mi`
+    },
+    sharp_eyes: {
+      name: "Sharp eyes",
+      deed: "Search 50 places over all runs.",
+      bonus: "Searching takes 5% less time.",
+      earned: (r) => r.totals.places >= 50,
+      progress: (r) => `${Math.min(50, r.totals.places)} / 50 places`
+    },
+    handy: {
+      name: "Handy",
+      deed: "Build 5 home projects in one run.",
+      bonus: "Start with a box of nails and screws and a pipe fittings set.",
+      earned: (r) => r.best.built >= 5,
+      progress: (r) => `${Math.min(5, r.best.built)} / 5 projects`
+    },
+    old_friend: {
+      name: "Old friend",
+      deed: "Have a dog join you.",
+      bonus: "The dog trusts you a little sooner (+10 bond).",
+      earned: (r) => r.dogJoined,
+      progress: (r) => r.dogJoined ? "done" : "not yet"
+    }
+  };
+  function emptyRecord() {
+    return { enabled: false, totals: { miles: 0, places: 0 }, best: { days: 0, built: 0 }, dogJoined: false };
+  }
+  function normalizeRecord(r) {
+    const e = emptyRecord();
+    if (!r || typeof r !== "object") return e;
+    return {
+      enabled: !!r.enabled,
+      totals: { ...e.totals, ...r.totals || {} },
+      best: { ...e.best, ...r.best || {} },
+      dogJoined: !!r.dogJoined
+    };
+  }
+  function addRun(record, state2) {
+    const r = normalizeRecord(record);
+    r.totals.miles += state2.stats.miles || 0;
+    r.totals.places += (state2.stats.placesSearched || 0) + (state2.stats.housesSearched || 0);
+    const days = state2.dead ? state2.dead.days : 0;
+    r.best.days = Math.max(r.best.days, days);
+    r.best.built = Math.max(r.best.built, builtCount(state2));
+    if (state2.dog && state2.dog.stage === "joined") r.dogJoined = true;
+    return r;
+  }
+  function earnedIds(record) {
+    const r = normalizeRecord(record);
+    return Object.keys(LEGACY).filter((k) => LEGACY[k].earned(r));
+  }
+  function validLegacy(ids, record) {
+    const ok = earnedIds(record);
+    return [...new Set(ids || [])].filter((k) => ok.includes(k)).slice(0, MAX_SLOTS);
+  }
+  function applyLegacy(state2, ids) {
+    state2.player.legacy = Object.keys(LEGACY).filter((k) => (ids || []).includes(k)).slice(0, MAX_SLOTS);
+    const st = state2.home.storage;
+    const add = (id, n) => {
+      st[id] = (st[id] || 0) + n;
+    };
+    if (hasLegacy(state2, "long_haul")) add("canned_food", 3);
+    if (hasLegacy(state2, "handy")) {
+      add("hardware_parts", 1);
+      add("pipe_fittings", 1);
+    }
+  }
+  function hasLegacy(state2, id) {
+    return !!(state2.player && Array.isArray(state2.player.legacy) && state2.player.legacy.includes(id));
+  }
+
+  // src/engine/background.js
+  var JOBS = {
+    nurse: {
+      name: "Nurse",
+      text: "Twelve years on a hospital ward.",
+      skills: { first_aid: 2 },
+      item: ["bandages", 2],
+      weakness: "Bad back from lifting patients: you carry 4 lb less."
+    },
+    tow_driver: {
+      name: "Tow-truck driver",
+      text: "You pulled cars out of ditches on Highway 26.",
+      skills: { tinkering: 2 },
+      item: ["pry_bar", 1],
+      weakness: "Years in a truck cab: walking uses 15% more energy."
+    },
+    fishing_guide: {
+      name: "Fishing guide",
+      text: "You took clients out on the Willamette and the Sandy.",
+      skills: { survival: 2 },
+      item: ["water_filter", 1],
+      weakness: "Not at home in town: searching takes 10% longer."
+    },
+    line_cook: {
+      name: "Line cook",
+      text: "Ten years on the grill in a busy Portland kitchen.",
+      skills: { cooking: 2 },
+      item: ["knife", 1],
+      weakness: "Big appetite: you get hungry 10% faster."
+    },
+    roofer: {
+      name: "Roofer",
+      text: "You put roofs on houses all over Washington County.",
+      skills: { tinkering: 1, scavenging: 1 },
+      item: ["tarp", 1],
+      weakness: "Bad knees from ladders: you walk 10% slower."
+    }
+  };
+  var FREE_POINTS = 1;
+  var TRAITS = {
+    fast_learner: { name: "Fast learner", cost: 2, text: "+30% skill xp.", not: ["slow_learner"] },
+    dog_person: { name: "Dog person", cost: 1, text: "A dog finds you on day 2 and trusts you sooner." },
+    slow_learner: { name: "Slow learner", cost: -2, text: "\u221230% skill xp.", not: ["fast_learner"] },
+    light_sleeper: { name: "Light sleeper", cost: -1, text: "Sleep gives 15% less energy." },
+    asthmatic: { name: "Asthmatic", cost: -2, text: "Walking and hard work use 20% more energy." }
+  };
+  function jobOf(state2) {
+    return state2.player && JOBS[state2.player.job] ? state2.player.job : null;
+  }
+  function hasTrait(state2, id) {
+    return !!(state2.player && Array.isArray(state2.player.traits) && state2.player.traits.includes(id));
+  }
+  function pointsLeft(traits) {
+    return FREE_POINTS - traits.reduce((n, t) => n + (TRAITS[t] ? TRAITS[t].cost : 0), 0);
+  }
+  function validTraits(traits) {
+    const out = [];
+    for (const t of traits || []) {
+      if (!TRAITS[t] || out.includes(t)) continue;
+      if ((TRAITS[t].not || []).some((x) => out.includes(x))) continue;
+      out.push(t);
+    }
+    return pointsLeft(out) >= 0 ? out : [];
+  }
+  function applyBackground(state2, job, traits) {
+    const p = state2.player;
+    p.job = JOBS[job] ? job : null;
+    p.traits = validTraits(traits);
+    if (p.job) {
+      const J = JOBS[p.job];
+      if (!state2.skills) state2.skills = { xp: {}, books: [] };
+      for (const [k, lvl] of Object.entries(J.skills)) state2.skills.xp[k] = Math.max(state2.skills.xp[k] || 0, LEVEL_XP[lvl]);
+      const [id, n] = J.item;
+      state2.home.storage[id] = (state2.home.storage[id] || 0) + n;
+    }
+    if (p.traits.includes("dog_person")) state2.dog.arriveDay = 1;
+  }
+  function xpFactor(state2) {
+    return hasTrait(state2, "fast_learner") ? 1.3 : hasTrait(state2, "slow_learner") ? 0.7 : 1;
+  }
+  function carryMinus(state2) {
+    return jobOf(state2) === "nurse" ? 4 : 0;
+  }
+  function walkSpeedFactor(state2) {
+    return jobOf(state2) === "roofer" ? 0.9 : 1;
+  }
+  function searchJobFactor(state2) {
+    return (jobOf(state2) === "fishing_guide" ? 1.1 : 1) * (hasLegacy(state2, "sharp_eyes") ? 0.95 : 1);
+  }
+  function foodLossFactor(state2) {
+    return jobOf(state2) === "line_cook" ? 1.1 : 1;
+  }
+  function sleepGainFactor(state2) {
+    return hasTrait(state2, "light_sleeper") ? 0.85 : 1;
+  }
+  function energyUseFactor(state2, mode) {
+    let f = 1;
+    if (mode === "walk" && jobOf(state2) === "tow_driver") f *= 1.15;
+    if (mode === "walk" && hasLegacy(state2, "road_legs")) f *= 0.95;
+    if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state2, "asthmatic")) f *= 1.2;
+    return f;
+  }
+  function dogBondBonus(state2) {
+    return (hasTrait(state2, "dog_person") ? 20 : 0) + (hasLegacy(state2, "old_friend") ? 10 : 0);
+  }
+  function backgroundText(state2) {
+    const j = jobOf(state2);
+    const t = (state2.player.traits || []).filter((x) => TRAITS[x]).map((x) => TRAITS[x].name);
+    if (!j && !t.length) return "";
+    return [j ? JOBS[j].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
+  }
+
+  // src/engine/state.js
+  var SAVE_VERSION = 1;
+  var START_MINUTE = 9 * 60 + 5;
+  var HOME = { lat: HOME_LAT, lon: HOME_LON };
+  var MAP_RADIUS_MILES = 15;
+  var homeOf = (state2) => state2.homePos || HOME;
+  function randomStartPoint(rng = Math.random) {
+    const r = 12 * Math.sqrt(rng());
+    const a = rng() * 2 * Math.PI;
+    return {
+      lat: HOME.lat + r * Math.sin(a) / 69.09,
+      lon: HOME.lon + r * Math.cos(a) / (69.09 * Math.cos(HOME.lat * Math.PI / 180))
+    };
+  }
+  function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
+    const homePos = opts.home ? { lat: +opts.home.lat, lon: +opts.home.lon } : { ...HOME };
+    const r = mulberry32(hashString("setup" + seed));
+    const state2 = {
+      version: SAVE_VERSION,
+      seed,
+      rngState: seed,
+      time: START_MINUTE,
+      player: {
+        food: 40,
+        water: 35,
+        warmth: 60,
+        energy: 40,
+        health: 70,
+        morale: 40,
+        energyMax: 60,
+        weak: true,
+        weakGoodHours: 0,
+        wet: false,
+        wetMinutes: 0,
+        dryMinutes: 0,
+        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
+        wetness: 0,
+        injuries: [],
+        illness: { stomachH: 0, infection: null },
+        painH: 0,
+        lightHours: 10,
+        lastComfortDay: -1,
+        bodySeenDay: -1,
+        lastDogPlayDay: -1
+      },
+      homePos,
+      homeLabel: opts.homeLabel || null,
+      pos: { ...homePos },
+      location: { kind: "home" },
+      carried: { backpack: 1 },
+      home: {
+        storage: {
+          formula: 4,
+          saline: 2,
+          first_aid: 1,
+          antibiotics: 1,
+          pain_pills: 1,
+          canned_food: 6,
+          snacks: 1,
+          dry_food: 1,
+          flashlight: 1,
+          winter_coat: 1,
+          firewood: 3
+        },
+        indoorTemp: 47,
+        fireHours: 0,
+        heaterOn: false,
+        battery: 5.4,
+        batteryMax: 13.5,
+        tapWorks: true,
+        tapStopDay: 9 + Math.floor(r() * 21),
+        // day 10 to 30
+        tankGal: 40,
+        toiletGal: 3,
+        rawGal: 0,
+        safeGal: 0,
+        furniture: 12,
+        fridgeOpened: false,
+        projects: {},
+        // built home base projects (see data/projects.js)
+        work: {}
+        // hours of work done on started projects
+      },
+      places: {},
+      houses: {},
+      houseAreas: {},
+      dog: {
+        stage: "none",
+        arriveDay: 1 + Math.floor(r() * 4),
+        // day 2 to 5
+        revisitUsed: false,
+        revisitDay: null,
+        feedDays: [],
+        name: null,
+        food: 60,
+        water: 80,
+        health: 80,
+        bond: 30,
+        withPlayer: true,
+        warned: 0
+      },
+      weather: null,
+      stats: { miles: 0, placesSearched: 0, zonesSearched: 0, housesSearched: 0 },
+      flags: {},
+      log: [],
+      dead: null,
+      pendingPrompt: null
+    };
+    initWeather(state2);
+    applyBackground(state2, opts.job, opts.traits);
+    applyLegacy(state2, opts.legacy);
+    if (opts.homeLabel) log(state2, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
+    log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
+    log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
+    log(state2, "Hint: drink, eat, and get the house warm before the first night.", "hint");
+    return state2;
+  }
+  var dayIndex = (t) => Math.floor(t / 1440);
+  var minuteOfDay = (t) => (t % 1440 + 1440) % 1440;
+  function formatClock(t) {
+    const m = Math.floor(minuteOfDay(t));
+    let h = Math.floor(m / 60);
+    const mm = String(m % 60).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${mm} ${ampm}`;
+  }
+  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function calendar(t) {
+    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
+  }
+  function formatDate(t) {
+    const c = calendar(t);
+    return `${DAYS[c.weekday]} ${c.date} ${MONTHS[c.month]} ${c.year}`;
+  }
+  function formatDuration(min) {
+    min = Math.round(min);
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
+  }
+  function addItem(bag, id, qty = 1) {
+    bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
+    if (bag[id] <= 1e-4) delete bag[id];
+  }
+  function bagWeight(bag) {
+    let w = 0;
+    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
+    return Math.round(w * 10) / 10;
+  }
+  function carryLimit(state2) {
+    let lim = state2.carried.backpack ? 30 : 10;
+    if (state2.player.weak) lim *= 0.5;
+    if (state2.player.food < 25) lim *= 0.9;
+    lim -= carryMinus(state2) * (state2.player.weak ? 0.5 : 1);
+    return Math.round(lim);
+  }
+  function has(state2, id) {
+    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  }
+  function hasLight(state2) {
+    return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0 && !state2.player.lightOff;
+  }
+  function log(state2, text, kind = "info") {
+    state2.log.push({ t: state2.time, text, kind });
+    if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
+    journalNote(state2, text, kind);
+  }
+  function journalNote(state2, text, kind) {
+    if (!state2.journal) state2.journal = [];
+    const day = dayIndex(state2.time);
+    let d = state2.journal[state2.journal.length - 1];
+    if (!d || d.day !== day) {
+      d = { day, places: [], taken: 0, searched: 0, events: [] };
+      state2.journal.push(d);
+    }
+    const arrive = /^You arrive at (.+)\.$/.exec(text);
+    if (arrive) {
+      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      return;
+    }
+    if (/^You walk to a house/.test(text)) {
+      if (!d.places.includes("a house")) d.places.push("a house");
+      return;
+    }
+    if (/^You take: /.test(text)) {
+      d.taken += 1;
+      return;
+    }
+    if (/^You search the /.test(text)) {
+      d.searched = (d.searched || 0) + 1;
+      return;
+    }
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
   }
 
   // src/engine/systems.js
@@ -2013,6 +2323,7 @@
     if (p.warmth < 25) apply(0.8, "hypothermia");
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
+    if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -2020,7 +2331,7 @@
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
     const overload = bagWeight(state2.carried) > carryLimit(state2);
-    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1);
+    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state2, "walk");
     return { miles, minutes, energy, mph, why };
   }
   function lerp(a, b, f) {
@@ -2121,6 +2432,7 @@
   }
 
   // src/engine/actions.js
+  var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
   var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
@@ -2197,11 +2509,16 @@
           advanceTime(state2, 2);
           return;
         }
+        const risk = eatRisk(state2, id);
         addItem(bag, id, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         if (it.water) addWater(state2, it.water);
         log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
         advanceTime(state2, 15);
+        if (risk > 0 && chance(state2, risk)) {
+          log(state2, "It tasted off. Your stomach turns.", "warn");
+          startStomachBug(state2);
+        }
         return;
       }
       case "drink": {
@@ -2477,7 +2794,7 @@
         advanceTime(state2, 5);
         return;
       case "cook": {
-        const food = ["dry_food", "canned_food"].find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+        const food = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
         const bag = (h.storage[food] || 0) > 0 ? h.storage : state2.carried;
         const it = ITEMS[food];
         if (food === "dry_food") {
@@ -2489,13 +2806,20 @@
           h[water] -= 0.125;
         }
         const how = useHeat(state2, 0.5);
+        const risk = eatRisk(state2, food, true);
+        const stage = stageLabel(state2, food);
         addItem(bag, food, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         p.warmth = clamp2(p.warmth + 10, 0, 100);
         p.morale = clamp2(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
-        log(state2, `You cook a hot meal (${it.name.toLowerCase()}) ${how}. It feels good to eat hot food.`, "good");
+        log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
         advanceTime(state2, 30);
+        if (risk > 0 && chance(state2, risk)) {
+          log(state2, "The food was bad. Your stomach turns.", "warn");
+          startStomachBug(state2);
+        }
         return;
       }
       case "add_wood": {
@@ -2524,6 +2848,7 @@
         return;
       case "dry_clothes":
         p.wet = false;
+        p.wetness = 0;
         p.wetMinutes = 0;
         p.dryMinutes = 0;
         log(state2, "You change into dry clothes and hang the wet ones up.");
@@ -2563,7 +2888,7 @@
     if (days >= 3) {
       d.stage = "joined";
       d.food = 70;
-      d.bond = 30;
+      d.bond = 30 + dogBondBonus(state2);
       log(state2, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
       state2.pendingPrompt = "name_dog";
     } else if (days === 1) {
@@ -2664,7 +2989,7 @@
   }
   function searchMinutes(state2, base2, dark) {
     const p = state2.player;
-    let m = base2 * searchTimeFactor(state2);
+    let m = base2 * searchTimeFactor(state2) * searchJobFactor(state2);
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     if (p.injuries.some((i) => i.type === "sprain")) m *= 1.3;
@@ -3019,8 +3344,10 @@
       add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
       add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
-      const food = ["dry_food", "canned_food"].some((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
-      add("cook", "Cook a hot meal", { disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
+      const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
+      const food = !!cookId;
+      const cr = cookId ? eatRisk(state2, cookId, true) : 0;
+      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
       if (!h.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
@@ -3333,6 +3660,81 @@
     };
   }
 
+  // src/core/clock.js
+  var DAY_START_MINUTE = 5 * 60;
+  var dayIndex2 = (t) => Math.floor(t / 1440);
+  var gameDay = (t) => dayIndex2(t - DAY_START_MINUTE);
+
+  // src/engine/preview.js
+  var DAY_START = 300;
+  function weatherEffects(state2) {
+    const w = state2.weather;
+    const info = weatherInfo(state2);
+    const p = state2.player;
+    const out = [];
+    if (w.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
+    if (info.wetAfter) {
+      const perHour = wetGainPerHour(p, w.type, info.wetAfter);
+      const toWet = perHour > 0 ? Math.max(0, (WET_LIMIT - (p.wetness || 0)) / perHour) * 60 : Infinity;
+      if (perHour <= 0) out.push({ id: "wet", text: "You stay dry outside.", level: "ok" });
+      else if (toWet === 0) out.push({ id: "wet", text: "You are wet already. Outside you get wetter.", level: "danger" });
+      else out.push({ id: "wet", text: `Outside you are wet through after about ${formatDuration(toWet)}.`, level: toWet < 60 ? "warn" : "ok" });
+    }
+    const env = environment(state2, "walk");
+    const chill = Math.round(feltTemp(state2, "walk", { ...env, wind: 0 }) - feltTemp(state2, "walk", env));
+    if (chill >= 3) {
+      out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
+    }
+    return out;
+  }
+  function nextDayStart(t) {
+    return (gameDay(t) + 1) * 1440 + DAY_START;
+  }
+  function weatherOutlook(state2, t = state2.time) {
+    const w = state2.weather;
+    const next = nextDayStart(t);
+    return {
+      type: w.type,
+      label: WEATHER_TYPES[w.type].label,
+      airF: Math.round(airTemp(state2, t)),
+      windMph: w.wind,
+      highF: Math.round(w.high),
+      lowF: Math.round(w.low),
+      night: isNight(t),
+      effects: weatherEffects(state2),
+      // The next weather change: the weather rolls once a day at 5 AM.
+      // Tomorrow's low is known now (it is the end of today's temperature curve).
+      next: { at: next, atText: formatClock(next), inMinutes: Math.round(next - t), lowF: Math.round(w.nextLow) }
+    };
+  }
+  function actionTiming(state2, minutes) {
+    const end = state2.time + minutes;
+    const next = nextDayStart(state2.time);
+    const crosses = end >= next;
+    return {
+      minutes,
+      durationText: formatDuration(minutes),
+      end,
+      endText: formatClock(end),
+      crossesDayStart: crosses,
+      dayStartText: crosses ? `The new day starts at ${formatClock(next)}: the weather can change.` : null
+    };
+  }
+  function tripPreview(state2, dest) {
+    const trip = estimateTrip(state2, dest);
+    const timing = actionTiming(state2, trip.minutes);
+    return {
+      miles: trip.miles,
+      minutes: trip.minutes,
+      energy: trip.energy,
+      mph: trip.mph,
+      slowBecause: trip.why,
+      weather: weatherOutlook(state2),
+      darkOnArrival: isNight(timing.end),
+      ...timing
+    };
+  }
+
   // src/engine/game.js
   function perform(state2, kind, a, b, c) {
     if (state2.dead) return;
@@ -3370,6 +3772,7 @@
   // src/engine/save.js
   var KEY = "lastlight.save.v1";
   var RUNS_KEY = "lastlight.runs.v1";
+  var LEGACY_KEY = "lastlight.legacy.v1";
   function store() {
     try {
       return globalThis.localStorage || null;
@@ -3439,6 +3842,7 @@
       runs.push({ seed: state2.seed, time: state2.dead.time, days: state2.dead.days, cause: state2.dead.cause, miles: Math.round(state2.stats.miles * 10) / 10, dog: state2.dog.name });
       runs.sort((a, b) => b.days - a.days);
       runs = runs.slice(0, 10);
+      saveLegacy(addRun(loadLegacy(), state2));
       try {
         s.setItem(RUNS_KEY, JSON.stringify(runs));
       } catch {
@@ -3453,6 +3857,25 @@
       return JSON.parse(s.getItem(RUNS_KEY) || "[]");
     } catch {
       return [];
+    }
+  }
+  function loadLegacy() {
+    const s = store();
+    if (!s) return normalizeRecord(null);
+    try {
+      return normalizeRecord(JSON.parse(s.getItem(LEGACY_KEY) || "null"));
+    } catch {
+      return normalizeRecord(null);
+    }
+  }
+  function saveLegacy(record) {
+    const s = store();
+    if (!s) return false;
+    try {
+      s.setItem(LEGACY_KEY, JSON.stringify(normalizeRecord(record)));
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -4231,7 +4654,22 @@
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex2(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
+    ${outlookHtml()}`;
+  }
+  function outlookHtml() {
+    const o = weatherOutlook(state);
+    const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join("");
+    return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}\xB0F.</div>${fx2 ? `<ul class="wx-fx">${fx2}</ul>` : ""}`;
+  }
+  function tripHtml(dest) {
+    const t = tripPreview(state, dest);
+    const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
+    return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
+  }
+  function freshTag(id) {
+    const l = stageLabel(state, id);
+    return l ? ` <small class="fresh-${l.toLowerCase()}">${l}</small>` : "";
   }
   function clothesHtml() {
     const p = state.player;
@@ -4261,7 +4699,8 @@
       return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
     }).join("");
     const read = (state.skills && state.skills.books || []).length;
-    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
+    const bg = backgroundText(state);
+    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ""}.</p></details>`;
   }
   function renderStats() {
     const p = state.player;
@@ -4273,6 +4712,7 @@
     if (p.illness.infection) chips.push(["bad", `Infection${p.illness.infection.abxH != null ? " (on antibiotics)" : ""}`]);
     if (p.illness.stomachH > 0) chips.push(["bad", "Stomach bug"]);
     if (p.painH > 0) chips.push(["ok", "Pain pills"]);
+    if (p.warmFedH > 0) chips.push(["ok", `Warm and fed (${Math.ceil(p.warmFedH)} h)`]);
     const felt = Math.round(feltTemp(state, "rest"));
     chips.push(["", `Feels like ${felt}\xB0F`]);
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
@@ -4302,7 +4742,7 @@
   function itemRow(id, q, from, buttons) {
     const it = ITEMS[id];
     const w = Math.round(it.weight * q * 10) / 10;
-    return `<li><span class="in">${esc(it.name)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
+    return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
   }
   function useButtons(id, from) {
     return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}">${esc(u.label)}</button>`).join("");
@@ -4381,8 +4821,9 @@
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
-      <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
-      <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
+      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h.rawGal.toFixed(1)} gal</b>
+      ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
       <span>Kitchen tap</span><b>${h.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
     ${renderBase()}`;
@@ -4459,8 +4900,7 @@
     if (id === "__home") {
       pos = homeOf(state);
       const atHome = state.location.kind === "home";
-      const est = estimateTrip(state, pos);
-      html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
+      html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
     } else {
       const p = getPlace(id);
       pos = p;
@@ -4468,10 +4908,9 @@
       const ps = state.places[p.id];
       const status = !ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched: nothing left" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
       const here = state.location.kind === "place" && state.location.id === id;
-      const est = estimateTrip(state, p);
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
       html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
-      ${here ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(", ")}</small>` : ""}</p>
+      ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(p)}
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
     }
     popup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px" }).setLngLat(lngLat || [pos.lon, pos.lat]).setHTML(html).addTo(mapApi.map);
@@ -4518,15 +4957,16 @@
     </ul>
     <button class="primary" id="startBtn">Wake up</button>`, (m) => {
       m.querySelector("#startBtn").addEventListener("click", () => {
-        state = newGame();
-        closeModal();
-        commit(true);
+        showBackground({});
       });
     });
   }
   function showSleep() {
-    const opts = [1, 2, 4, 6, 8, 10].map((h) => `<button data-hours="${h}">${h} h</button>`).join("");
-    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+    const opts = [1, 2, 4, 6, 8, 10].map((h) => {
+      const a = actionTiming(state, h * 60);
+      return `<button data-hours="${h}" title="${esc(a.dayStartText || "")}">${h} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
+    }).join("");
+    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
         closeModal();
         act("action", "sleep", Number(b.dataset.hours));
@@ -4591,10 +5031,77 @@
     return bestD < 0.3 ? `near ${best.name}` : `${bestD.toFixed(1)} mi from ${best.name}`;
   }
   function beginRun(opts) {
-    clearGame();
-    state = newGame(void 0, opts);
-    closeModal();
-    commit(true);
+    showBackground(opts);
+  }
+  function showBackground(opts) {
+    let job = "nurse";
+    let traits = [];
+    const rec = loadLegacy();
+    let legacy = earnedIds(rec).slice(0, MAX_SLOTS);
+    const render2 = (m) => {
+      const left = pointsLeft(traits);
+      const jobs = Object.entries(JOBS).map(([id, J]) => {
+        const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
+        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc(J.name)}</b><small>${esc(J.text)}</small>
+        <small class="good">${esc(sk)} \xB7 starts with ${esc(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc(J.weakness)}</small></button>`;
+      }).join("");
+      const tr = Object.entries(TRAITS).map(([id, T2]) => {
+        const on = traits.includes(id);
+        const blocked = !on && ((T2.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
+        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc(T2.text)}</small></button>`;
+      }).join("");
+      m.querySelector(".box").innerHTML = `<h2>Who were you?</h2>
+      <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
+      <div class="bg-jobs">${jobs}</div>
+      <h3>Traits <small>(${left} point${left === 1 ? "" : "s"} left; you start with ${FREE_POINTS})</small></h3>
+      <p class="hint">Good traits cost points. Bad traits give points.</p>
+      <div class="bg-traits">${tr}</div>
+      ${legacyHtml()}
+      <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
+      m.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", () => {
+        job = b.dataset.job;
+        render2(m);
+      }));
+      m.querySelectorAll("[data-trait]").forEach((b) => b.addEventListener("click", () => {
+        const id = b.dataset.trait;
+        traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+        while (pointsLeft(traits) < 0) {
+          const good = traits.filter((x) => TRAITS[x].cost > 0);
+          if (!good.length) break;
+          traits = traits.filter((x) => x !== good[good.length - 1]);
+        }
+        render2(m);
+      }));
+      const opt = m.querySelector("#legacyOn");
+      if (opt) opt.addEventListener("change", () => {
+        rec.enabled = opt.checked;
+        saveLegacy(rec);
+        render2(m);
+      });
+      m.querySelectorAll("[data-legacy]").forEach((b) => b.addEventListener("click", () => {
+        const id = b.dataset.legacy;
+        legacy = legacy.includes(id) ? legacy.filter((x) => x !== id) : [...legacy, id].slice(0, MAX_SLOTS);
+        render2(m);
+      }));
+      m.querySelector("#bgGo").addEventListener("click", () => {
+        clearGame();
+        state = newGame(void 0, { ...opts, job, traits: validTraits(traits), legacy: rec.enabled ? validLegacy(legacy, rec) : [] });
+        closeModal();
+        commit(true);
+      });
+    };
+    const legacyHtml = () => {
+      const earned = earnedIds(rec);
+      const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L]) => {
+        const has3 = earned.includes(id);
+        const on = has3 && legacy.includes(id);
+        const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
+        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc(L.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc(L.progress(rec))}</span><small>${esc(L.deed)}</small><small class="good">${esc(L.bonus)}</small></button>`;
+      }).join("")}</div>` : "";
+      return `<h3>Carry-over bonuses <small>(game option)</small></h3>
+      <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? "checked" : ""}> Use small bonuses earned in earlier runs</label>${list}`;
+    };
+    modal("", render2);
   }
   var picking = false;
   function pickStart() {
@@ -4916,7 +5423,7 @@
       const rows = groupedRows(ids, (id) => {
         const it = ITEMS[id];
         const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join("");
-        return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
+        return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
       }) || '<li class="empty">You carry nothing.</li>';
       const here = hereBag(state);
       const hereIds = Object.keys(here);

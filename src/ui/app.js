@@ -11,18 +11,22 @@ import { buildInterior } from '../engine/interior.js';
 import { odds, oddsText } from '../engine/checks.js';
 import { allSkills, SKILLS, noticeOf, forceBonus } from '../engine/skills.js';
 import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js';
+import { stageLabel } from '../engine/food.js';
+import { JOBS, TRAITS, FREE_POINTS, pointsLeft, backgroundText, validTraits } from '../engine/background.js';
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
+import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
 import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
-import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns } from '../engine/save.js';
+import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns, loadLegacy, saveLegacy } from '../engine/save.js';
+import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
 import { createFx } from './fx.js';
 import { PROJECTS } from '../data/projects.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
-import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H } from '../engine/base.js';
+import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
 let state = null;
 let mapApi = null;
@@ -146,11 +150,33 @@ function renderHeader() {
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} · <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>
+    ${outlookHtml()}`;
+}
+
+// Weather effects now and the next change (src/engine/preview.js: same rules as the game).
+function outlookHtml() {
+  const o = weatherOutlook(state);
+  const fx = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join('');
+  return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}°F.</div>${fx ? `<ul class="wx-fx">${fx}</ul>` : ''}`;
+}
+
+// A walk: time, energy, finish time, the 5 AM change and the weather on the way.
+function tripHtml(dest) {
+  const t = tripPreview(state, dest);
+  const fx = t.weather.effects.filter((e) => e.level !== 'ok').map((e) => esc(e.text)).join('<br>');
+  return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
+    + `${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(', ')}</small></p>` : ''}${fx ? `<p class="wx-trip"><small>${fx}</small></p>` : ''}`;
 }
 
 // Skills: level 0..5, a bar to the next level, and what the skill does.
 // Clothes by layer, with the warmth each gives, the wetness and the "feels like" number.
+// Fresh, Stale or Spoiled, for food that spoils.
+function freshTag(id) {
+  const l = stageLabel(state, id);
+  return l ? ` <small class="fresh-${l.toLowerCase()}">${l}</small>` : '';
+}
+
 function clothesHtml() {
   const p = state.player;
   normalizeWorn(p);
@@ -180,7 +206,8 @@ function skillsHtml(open) {
     return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
   }).join('');
   const read = (state.skills && state.skills.books || []).length;
-  return `<details class="skills"${open || skillsOpen ? ' open' : ''}><summary>Skills</summary>${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ''}.</p></details>`;
+  const bg = backgroundText(state);
+  return `<details class="skills"${open || skillsOpen ? ' open' : ''}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ''}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read ? ` (${read} read)` : ''}.</p></details>`;
 }
 
 function renderStats() {
@@ -193,6 +220,7 @@ function renderStats() {
   if (p.illness.infection) chips.push(['bad', `Infection${p.illness.infection.abxH != null ? ' (on antibiotics)' : ''}`]);
   if (p.illness.stomachH > 0) chips.push(['bad', 'Stomach bug']);
   if (p.painH > 0) chips.push(['ok', 'Pain pills']);
+  if (p.warmFedH > 0) chips.push(['ok', `Warm and fed (${Math.ceil(p.warmFedH)} h)`]);
   const felt = Math.round(feltTemp(state, 'rest'));
   chips.push(['', `Feels like ${felt}°F`]);
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
@@ -225,7 +253,7 @@ function qtyText(q) {
 function itemRow(id, q, from, buttons) {
   const it = ITEMS[id];
   const w = Math.round(it.weight * q * 10) / 10;
-  return `<li><span class="in">${esc(it.name)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
+  return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
 }
 
 function useButtons(id, from) {
@@ -298,8 +326,9 @@ function renderHome() {
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW · battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on · heater would run ${hrs(pw.heaterHoursFull)}`}</b>
       <span>Water heater tank</span><b>${h.tankGal.toFixed(1)} gal (clean)</b>
-      <span>Boiled water</span><b>${h.safeGal.toFixed(1)} gal</b>
-      <span>Unsafe water</span><b>${h.rawGal.toFixed(1)} gal</b>
+      <span>${built(state, 'filter_station') ? 'Clean water tank' : 'Boiled water'}</span><b>${h.safeGal.toFixed(1)} gal${built(state, 'filter_station') ? ` of ${SAFE_TANK_GAL}` : ''}</b>
+      <span>${built(state, 'rain_barrels') ? 'Rain barrels (unsafe)' : 'Unsafe water'}</span><b>${h.rawGal.toFixed(1)} gal</b>
+      ${built(state, 'filter_station') ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ''}
       <span>Kitchen tap</span><b>${h.tapWorks ? 'weak flow' : 'stopped'}</b>
     </div>
     ${renderBase()}`;
@@ -384,9 +413,8 @@ function showPlacePopup(id, lngLat) {
   if (id === '__home') {
     pos = homeOf(state);
     const atHome = state.location.kind === 'home';
-    const est = estimateTrip(state, pos);
     html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
-      : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
+      : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
   } else {
     const p = getPlace(id);
     pos = p;
@@ -394,10 +422,9 @@ function showPlacePopup(id, lngLat) {
     const ps = state.places[p.id];
     const status = !ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched: nothing left' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
     const here = state.location.kind === 'place' && state.location.id === id;
-    const est = estimateTrip(state, p);
     const fromHome = straightMiles(homeOf(state), p).toFixed(1);
     html = `<h4>${esc(p.name)}</h4><p>${cat.label} · ${fromHome} mi from home</p><p><i>${status}</i></p>
-      ${here ? '<p><i>You are here.</i></p>' : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(', ')}</small>` : ''}</p>
+      ${here ? '<p><i>You are here.</i></p>' : `${tripHtml(p)}
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
   }
   popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
@@ -446,16 +473,17 @@ function showIntro() {
     </ul>
     <button class="primary" id="startBtn">Wake up</button>`, (m) => {
     m.querySelector('#startBtn').addEventListener('click', () => {
-      state = newGame();
-      closeModal();
-      commit(true);
+      showBackground({});
     });
   });
 }
 
 function showSleep() {
-  const opts = [1, 2, 4, 6, 8, 10].map((h) => `<button data-hours="${h}">${h} h</button>`).join('');
-  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+  const opts = [1, 2, 4, 6, 8, 10].map((h) => {
+    const a = actionTiming(state, h * 60);
+    return `<button data-hours="${h}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}</small></button>`;
+  }).join('');
+  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
     m.querySelectorAll('[data-hours]').forEach((b) => b.addEventListener('click', () => {
       closeModal();
       act('action', 'sleep', Number(b.dataset.hours));
@@ -519,10 +547,74 @@ function nearLabel(pos) {
 }
 
 function beginRun(opts) {
-  clearGame();
-  state = newGame(undefined, opts);
-  closeModal();
-  commit(true);
+  showBackground(opts);
+}
+
+// "Who were you?" Pick a past job and traits, then the run starts.
+function showBackground(opts) {
+  let job = 'nurse';
+  let traits = [];
+  const rec = loadLegacy();
+  let legacy = earnedIds(rec).slice(0, MAX_SLOTS);
+  const render = (m) => {
+    const left = pointsLeft(traits);
+    const jobs = Object.entries(JOBS).map(([id, J]) => {
+      const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(', ');
+      return `<button class="bg-job${id === job ? ' on' : ''}" data-job="${id}"><b>${esc(J.name)}</b><small>${esc(J.text)}</small>
+        <small class="good">${esc(sk)} · starts with ${esc(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` ×${J.item[1]}` : ''}</small><small class="bad">${esc(J.weakness)}</small></button>`;
+    }).join('');
+    const tr = Object.entries(TRAITS).map(([id, T]) => {
+      const on = traits.includes(id);
+      const blocked = !on && ((T.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
+      return `<button class="bg-trait${on ? ' on' : ''}" data-trait="${id}" ${blocked ? 'disabled' : ''}><b>${esc(T.name)}</b> <span class="${T.cost > 0 ? 'bad' : 'good'}">${T.cost > 0 ? `costs ${T.cost}` : `gives ${-T.cost}`}</span><small>${esc(T.text)}</small></button>`;
+    }).join('');
+    m.querySelector('.box').innerHTML = `<h2>Who were you?</h2>
+      <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
+      <div class="bg-jobs">${jobs}</div>
+      <h3>Traits <small>(${left} point${left === 1 ? '' : 's'} left; you start with ${FREE_POINTS})</small></h3>
+      <p class="hint">Good traits cost points. Bad traits give points.</p>
+      <div class="bg-traits">${tr}</div>
+      ${legacyHtml()}
+      <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
+    m.querySelectorAll('[data-job]').forEach((b) => b.addEventListener('click', () => { job = b.dataset.job; render(m); }));
+    m.querySelectorAll('[data-trait]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.trait;
+      traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+      // Taking off a bad trait can leave too few points: drop good traits until it fits.
+      while (pointsLeft(traits) < 0) {
+        const good = traits.filter((x) => TRAITS[x].cost > 0);
+        if (!good.length) break;
+        traits = traits.filter((x) => x !== good[good.length - 1]);
+      }
+      render(m);
+    }));
+    const opt = m.querySelector('#legacyOn');
+    if (opt) opt.addEventListener('change', () => { rec.enabled = opt.checked; saveLegacy(rec); render(m); });
+    m.querySelectorAll('[data-legacy]').forEach((b) => b.addEventListener('click', () => {
+      const id = b.dataset.legacy;
+      legacy = legacy.includes(id) ? legacy.filter((x) => x !== id) : [...legacy, id].slice(0, MAX_SLOTS);
+      render(m);
+    }));
+    m.querySelector('#bgGo').addEventListener('click', () => {
+      clearGame();
+      state = newGame(undefined, { ...opts, job, traits: validTraits(traits), legacy: rec.enabled ? validLegacy(legacy, rec) : [] });
+      closeModal();
+      commit(true);
+    });
+  };
+  // Carry-over bonuses: a game option, off by default.
+  const legacyHtml = () => {
+    const earned = earnedIds(rec);
+    const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L]) => {
+      const has = earned.includes(id);
+      const on = has && legacy.includes(id);
+      const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
+      return `<button class="bg-trait${on ? ' on' : ''}" data-legacy="${id}" ${!has || full ? 'disabled' : ''}><b>${esc(L.name)}</b> <span class="${has ? 'good' : ''}">${has ? 'earned' : esc(L.progress(rec))}</span><small>${esc(L.deed)}</small><small class="good">${esc(L.bonus)}</small></button>`;
+    }).join('')}</div>` : '';
+    return `<h3>Carry-over bonuses <small>(game option)</small></h3>
+      <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? 'checked' : ''}> Use small bonuses earned in earlier runs</label>${list}`;
+  };
+  modal('', render);
 }
 
 let picking = false;
@@ -851,7 +943,7 @@ function insidePanel(name) {
       const it = ITEMS[id];
       const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
         .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}">${esc(u.label)}</button>`).join('');
-      return `<li><span>${esc(it.name)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
+      return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
     }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
     const hereIds = Object.keys(here);

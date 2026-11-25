@@ -113,6 +113,23 @@ export const fireHeat = (state) => (built(state, 'wood_stove') ? 30 : 20);
 export const heatLossFactor = (state) => (built(state, 'insulate_living') ? 0.5 : 1);
 export const painPillHours = (state) => (built(state, 'med_cabinet') ? 9 : 6);
 
+// The water chain runs by itself once the barrels and the filter station are built:
+// each day the station filters rain water into the clean-water tank, up to its size.
+export const AUTO_FILTER_GAL_PER_DAY = 12;
+export const SAFE_TANK_GAL = 40;
+export function autoFilterToday(state) {
+  const h = state.home;
+  if (!built(state, 'rain_barrels') || !built(state, 'filter_station')) return 0;
+  return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h.rawGal, SAFE_TANK_GAL - h.safeGal));
+}
+export function runAutoFilter(state) {
+  const g = autoFilterToday(state);
+  if (g <= 0) return 0;
+  state.home.rawGal -= g;
+  state.home.safeGal += g;
+  return g;
+}
+
 export function foodItemsStored(state) {
   return Object.entries(state.home.storage)
     .filter(([id]) => ITEMS[id] && ITEMS[id].kind === 'food')

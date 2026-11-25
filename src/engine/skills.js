@@ -3,6 +3,7 @@
 // State: state.skills = { xp: { scavenging: 12, ... }, books: ['book_repair', ...] }.
 // Old saves have no state.skills: skillsOf() makes it on first use.
 import { log, dayIndex } from './state.js';
+import { xpFactor } from './background.js';
 
 export const SKILLS = {
   scavenging: {
@@ -75,6 +76,7 @@ export function practice(state, key, amount = 1, { book = false } = {}) {
     s.today.uses[key] = n;
     if (n > DAILY_FULL) amount /= 2;
   }
+  amount *= xpFactor(state);
   const before = levelFor(s.xp[key] || 0);
   s.xp[key] = (s.xp[key] || 0) + amount;
   const after = levelFor(s.xp[key]);
