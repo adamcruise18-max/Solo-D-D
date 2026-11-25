@@ -17,6 +17,12 @@
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
     raw_meat: { name: "Raw meat", unit: "lb", weight: 1, kind: "food", cal: 900, portion: 1, needsCooking: true, perish: 2 },
+    // From the garden (engine/garden.js, data/crops.js). Fresh: they spoil.
+    kale: { name: "Kale (bunch)", unit: "bunch", weight: 0.5, kind: "food", cal: 100, portion: 1, perish: 7 },
+    potatoes: { name: "Potatoes (lb)", unit: "lb", weight: 1, kind: "food", cal: 350, portion: 1, needsCooking: true, perish: 60 },
+    green_beans: { name: "Green beans (lb)", unit: "lb", weight: 1, kind: "food", cal: 140, portion: 1, perish: 6 },
+    squash: { name: "Winter squash", unit: "squash", weight: 3, kind: "food", cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+    garlic: { name: "Garlic (head)", unit: "head", weight: 0.1, kind: "food", cal: 60, portion: 1, perish: 120 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
@@ -849,6 +855,16 @@
       tools: [],
       requires: ["rain_barrels"],
       hours: 2
+    },
+    // ---- Garden ----
+    {
+      id: "garden_beds",
+      wing: "food",
+      name: "Raised garden beds",
+      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).",
+      needs: { scrap_wood: 4, hardware_parts: 1 },
+      tools: [],
+      hours: 6
     },
     // ---- Heat ----
     {
@@ -1840,58 +1856,14 @@
     }
   };
 
-  // src/engine/systems.js
-  var weatherSystem = {
-    id: "weather",
-    label: "Weather",
-    order: 10,
-    version: 1,
-    legacy: true,
-    // state.weather was in saves before the engine
-    owns: ["weather"],
-    // One roll per game day from the shared game rng; nothing changes inside a day.
-    // Then rare weather (ice storm, heat wave, smoke) from its own stream
-    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
-    // so the result is exact.
-    catchUp: "exact",
-    init: (state2) => initWeather(state2),
-    daily: (state2, day) => {
-      const old = state2.weather;
-      rollWeather(state2, day);
-      rollSpell(state2, day, old);
-    }
+  // src/data/crops.js
+  var CROPS = {
+    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8], days: 55, frostF: null, minF: 40, yield: ["kale", 8] },
+    potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
+    beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
+    squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
+    garlic: { name: "Garlic", plant: [9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
-  var legacySystem = {
-    id: "legacy",
-    label: "Rules not yet moved into systems",
-    order: 1e3,
-    version: 1,
-    legacy: true,
-    // Death checks, wounds and illness thresholds happen inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
-    daily: (state2, day) => dailyRollover(state2, day)
-  };
-  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, dogSystem, pacerSystem];
-  var devChecks = false;
-  var cached = null;
-  function gameSystems() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
-  }
-  function gameClock() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
-  }
-  function createGameSystems({ dev = false, events = null } = {}) {
-    const systems = createSystems(GAME_SYSTEMS, { dev });
-    const clock = createClock({ systems, events });
-    return { systems, clock };
-  }
-  function systemVersions() {
-    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
-  }
-  function initNewSystems(state2) {
-    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
-  }
 
   // src/engine/food.js
   var STALE_AT = 0.5;
@@ -1936,6 +1908,120 @@
   function stageLabel(state2, id) {
     const st = stageOf(state2, id);
     return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
+  }
+
+  // src/engine/garden.js
+  var ROT_DAYS = 30;
+  var DRY_PER_DAY = 0.35;
+  var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
+  function initGarden(state2) {
+    state2.garden = { beds: [] };
+  }
+  function garden(state2) {
+    if (!state2.garden) initGarden(state2);
+    return state2.garden;
+  }
+  function dayGrowth(crop, meanF, water) {
+    const c = CROPS[crop];
+    let warm = 0;
+    if (meanF >= c.minF + 15) warm = meanF > 92 ? 0.5 : 1;
+    else if (meanF >= c.minF + 7) warm = 0.7;
+    else if (meanF >= c.minF) warm = 0.3;
+    const wet = water > 0.2 ? 1 : 0.2;
+    return warm * wet / c.days;
+  }
+  function gardenDaily(state2, day) {
+    const g = garden(state2);
+    if (!g.beds.length) return;
+    const w = state2.weather;
+    const mean = (w.high + w.low) / 2;
+    const rained = RAIN.has(w.type);
+    for (const b of g.beds) {
+      if (!b.crop || b.dead) continue;
+      const c = CROPS[b.crop];
+      if (c.frostF != null && w.low <= c.frostF) {
+        b.dead = true;
+        log(state2, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
+        continue;
+      }
+      b.water = rained ? 1 : Math.max(0, b.water - DRY_PER_DAY * (w.type === "heat_wave" ? 1.7 : 1));
+      if (b.growth < 1) {
+        b.growth = Math.min(1, b.growth + dayGrowth(b.crop, mean, b.water));
+        if (b.growth >= 1 - 1e-9) {
+          b.growth = 1;
+          b.ripeDay = day;
+          log(state2, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
+        }
+      } else if (b.ripeDay != null && day - b.ripeDay >= ROT_DAYS) {
+        b.dead = true;
+        log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
+      }
+    }
+  }
+  var gardenSystem = {
+    id: "garden",
+    label: "Garden",
+    order: 1008,
+    // after the home, before the dog
+    version: 1,
+    owns: ["garden"],
+    // One step per day, in order: skipping days must run each day (exact).
+    catchUp: "exact",
+    init: (state2) => initGarden(state2),
+    daily: (state2, day) => gardenDaily(state2, day)
+  };
+
+  // src/engine/systems.js
+  var weatherSystem = {
+    id: "weather",
+    label: "Weather",
+    order: 10,
+    version: 1,
+    legacy: true,
+    // state.weather was in saves before the engine
+    owns: ["weather"],
+    // One roll per game day from the shared game rng; nothing changes inside a day.
+    // Then rare weather (ice storm, heat wave, smoke) from its own stream
+    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
+    // so the result is exact.
+    catchUp: "exact",
+    init: (state2) => initWeather(state2),
+    daily: (state2, day) => {
+      const old = state2.weather;
+      rollWeather(state2, day);
+      rollSpell(state2, day, old);
+    }
+  };
+  var legacySystem = {
+    id: "legacy",
+    label: "Rules not yet moved into systems",
+    order: 1e3,
+    version: 1,
+    legacy: true,
+    // Death checks, wounds and illness thresholds happen inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
+    daily: (state2, day) => dailyRollover(state2, day)
+  };
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, gardenSystem, dogSystem, pacerSystem];
+  var devChecks = false;
+  var cached = null;
+  function gameSystems() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
+  }
+  function gameClock() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
+  }
+  function createGameSystems({ dev = false, events = null } = {}) {
+    const systems = createSystems(GAME_SYSTEMS, { dev });
+    const clock = createClock({ systems, events });
+    return { systems, clock };
+  }
+  function systemVersions() {
+    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
+  }
+  function initNewSystems(state2) {
+    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
   }
 
   // src/engine/clothes.js
@@ -2776,7 +2862,7 @@
     if (p.morale < 25) mods.push(["despair", -2]);
     return mods;
   }
-  var RAIN = ["rain", "heavy_rain", "windstorm", "ice_storm"];
+  var RAIN2 = ["rain", "heavy_rain", "windstorm", "ice_storm"];
   function edges(state2, opts = {}) {
     const p = state2.player;
     const adv = [...opts.adv || []];
@@ -2786,7 +2872,7 @@
     if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
     const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
     if (limb && p.painH <= 0) dis.push("injured");
-    if (opts.outside && state2.weather && RAIN.includes(state2.weather.type)) dis.push("rain");
+    if (opts.outside && state2.weather && RAIN2.includes(state2.weather.type)) dis.push("rain");
     if (opts.outside && isNight(state2.time)) dis.push("night");
     if (p.energy < 25) dis.push("very tired");
     const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
