@@ -31,6 +31,11 @@ function finishDay(state, w, month) {
   if ((w.type === 'rain' || w.type === 'heavy_rain') && w.low <= 32 && (month === 11 || month <= 1)) {
     w.type = 'snow';
     w.snowInches = randInt(state, 1, 6);
+  } else if (w.type === 'snow') {
+    // A snow day carried forward from yesterday (rollType keeps the type):
+    // snow only when it can freeze; then it needs a depth of its own.
+    if (w.low > 34 || !(month === 11 || month <= 1)) { w.type = 'rain'; delete w.snowInches; }
+    else if (w.snowInches == null) w.snowInches = randInt(state, 1, 6);
   }
   if (w.type === 'clear') w.nextLow -= 5;
   // The night after a day is not warmer than the day's high: the "low tonight"

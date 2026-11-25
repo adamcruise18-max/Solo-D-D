@@ -301,8 +301,10 @@ export function dailyRollover(state, day) {
   // Weak status
   if (p.weak) {
     if (p.weakGoodHours >= 12) {
+      const before = p.energyMax;
       p.energyMax = Math.min(100, p.energyMax + 2);
-      log(state, 'Your body is a little stronger today.', 'good');
+      // A line only at each 10 points (not every good day).
+      if (Math.floor(p.energyMax / 10) > Math.floor(before / 10) && p.energyMax < 100) log(state, `Your body is stronger: you can do more before you tire (${p.energyMax} of 100).`, 'good');
     }
     p.weakGoodHours = 0;
     if (p.energyMax >= 100) {

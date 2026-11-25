@@ -381,3 +381,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 - **Cold sleep:** `warmthRate` uses the piecewise curve `WARMTH_CURVE` (5 °F: −28/h to 72 °F: +10/h), so a cold bedroom costs much more warmth than a warm one.
 - **Danger stop:** `advanceTime(state, min, mode, { stopAtDanger: true })` ends the action when a need crosses a `STOP_AT` line (water 15, food 10, warmth 25, health 30, energy 10) and returns true, with a journal line. Sleep always does this (`WAKE_AT`). Fishing and hunting pass the flag; other calls do not, so plain rest and the tests run as before.
 - **Save shape:** `newGame` has `wild: {}` and `cars: {}` (cars are owned by the builder's engine/cars.js). `parseSave` adds empty ones to older saves.
+
+## Playtest 3 fixes
+
+- **Snow:** a snow day carried forward by `rollType` gets its own depth (`snowInches`), and turns to rain when the low is above 34 °F or outside December to February (world.js `finishDay`). No more "Snow: undefined inches".
+- **Fishing spot text:** `waterText(state)` in wild.js picks the arrival line from the weather and the month (rain, ice, summer low water, spring melt, winter).
+- **Journal:** "You reach …" (hunting and fishing spots) counts as a place visited.
+- **Getting stronger:** the line comes only when the energy max passes a multiple of 10, not on each good day.
+- **Water warning:** `waterWarning(state)` in the home daily hook warns once when the stored clean water (tank + safe) falls below 10 gal and once below 3 gal, after the tap stops. A refill above the level arms it again (`home.waterWarned`).
