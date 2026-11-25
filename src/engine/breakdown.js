@@ -12,3 +12,12 @@ export function batteryHours(state) {
 export function medicineFactor(state) {
   return 1 - 0.3 * decayShare(state, 'old_medicine');
 }
+
+// Chance that a can of old gas starts the generator: sure at first; after month 6
+// gas goes stale, down to 30% when it has spread everywhere.
+export function gasStartChance(state) {
+  return 1 - 0.7 * decayShare(state, 'stale_gas');
+}
+
+// kWh one gallon puts into the home battery (a small generator, about 2 h run).
+export const GEN_KWH_PER_GAL = 3;

@@ -11,6 +11,8 @@
     canned_fruit: { name: "Canned fruit", unit: "can", weight: 1, kind: "food", cal: 300, water: 6, portion: 1 },
     instant_noodles: { name: "Instant noodles", unit: "pack", weight: 0.2, kind: "food", cal: 380, portion: 1 },
     chips: { name: "Bag of chips", unit: "bag", weight: 0.6, kind: "food", cal: 1400, portion: 0.5 },
+    // From store cold cases, only until the store's fridges fail (decay row store_fridges).
+    waxed_cheese: { name: "Waxed hard cheese", unit: "block", weight: 1, kind: "food", cal: 1600, portion: 0.25 },
     jerky: { name: "Beef jerky", unit: "pack", weight: 0.2, kind: "food", cal: 400, portion: 0.5 },
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
@@ -41,6 +43,9 @@
     cotton_hoodie: { name: "Cotton hoodie", unit: "pc", weight: 1, kind: "wear", slot: "mid", warmth: 6, wind: 0.1, wetWarm: false, short: "hoodie" },
     windbreaker: { name: "Windbreaker", unit: "pc", weight: 0.6, kind: "wear", slot: "shell", warmth: 2, wind: 0.7, wetWarm: true, short: "windbreaker" },
     firewood: { name: "Firewood bundle", unit: "bundle", weight: 20, kind: "fuel" },
+    // Gasoline goes stale (decay row stale_gas): an old can may not start the generator.
+    gas_can: { name: "Gas can (1 gal)", unit: "can", weight: 7, kind: "fuel" },
+    generator: { name: "Small generator", unit: "pc", weight: 45, kind: "tool" },
     propane_1lb: { name: "Propane cylinder (1 lb)", unit: "can", weight: 1.5, kind: "misc" },
     tarp: { name: "Tarp", unit: "pc", weight: 3, kind: "misc" },
     bleach: { name: "Unscented bleach", unit: "jug", weight: 8, kind: "misc" },
@@ -132,6 +137,7 @@
         { id: "cooking_pot", w: 1 },
         { id: "vitamins", w: 1 },
         { id: "book_cooking", w: 0.6 },
+        { id: "waxed_cheese", w: 5, fridge: true },
         { id: "cotton_hoodie", w: 0.8 }
       ],
       entryText: "The doors are open. The air smells of rotten food. It is dark inside."
@@ -158,7 +164,8 @@
         { id: "instant_noodles", w: 5 },
         { id: "matches", w: 3 },
         { id: "ibuprofen", w: 3 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "waxed_cheese", w: 3, fridge: true }
       ],
       entryText: "The glass door is broken. Shelves are half empty."
     },
@@ -186,7 +193,8 @@
         { id: "sports_drink", w: 5 },
         { id: "duct_tape", w: 3 },
         { id: "paper_map", w: 4 },
-        { id: "hand_warmers", w: 2 }
+        { id: "hand_warmers", w: 2 },
+        { id: "gas_can", w: 6 }
       ],
       entryText: "The pumps have no power. The small shop is still closed."
     },
@@ -309,7 +317,9 @@
         { id: "matches", w: 3 },
         { id: "trash_bags", w: 5 },
         { id: "radio", w: 2 },
-        { id: "book_repair", w: 1.5 }
+        { id: "book_repair", w: 1.5 },
+        { id: "gas_can", w: 3 },
+        { id: "generator", w: 1.2 }
       ],
       entryText: "Long dark aisles. The tool racks are partly empty."
     },
@@ -414,6 +424,8 @@
         { id: "metal_bin", w: 2 },
         { id: "rain_barrel", w: 1 },
         { id: "battery_module", w: 0.6 },
+        { id: "gas_can", w: 1.5 },
+        { id: "generator", w: 0.4 },
         { id: "canned_fruit", w: 5 },
         { id: "instant_noodles", w: 4 },
         { id: "oatmeal", w: 3 },
@@ -2608,10 +2620,12 @@
     const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
+    const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
       const e = weightedPick(r, cat.loot);
+      if (e.fridge && fridgesGone) continue;
       found[e.id] = (found[e.id] || 0) + 1;
     }
     return found;
@@ -2761,6 +2775,10 @@
   function medicineFactor(state2) {
     return 1 - 0.3 * decayShare(state2, "old_medicine");
   }
+  function gasStartChance(state2) {
+    return 1 - 0.7 * decayShare(state2, "stale_gas");
+  }
+  var GEN_KWH_PER_GAL = 3;
 
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
@@ -3169,6 +3187,22 @@
         log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state2, lit ? 5 : 15);
         practice(state2, "survival", lit ? 1 : 2);
+        return;
+      }
+      case "run_generator": {
+        const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state2.carried;
+        addItem(bag, "gas_can", -1);
+        advanceTime(state2, 120, "work");
+        if (state2.dead) return;
+        if (!chance(state2, gasStartChance(state2))) {
+          log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
+          p.morale = clamp2(p.morale - 2, 0, 100);
+          return;
+        }
+        const kwh = Math.min(GEN_KWH_PER_GAL, h.batteryMax - h.battery);
+        h.battery += kwh;
+        log(state2, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
+        practice(state2, "tinkering", 1);
         return;
       }
       case "break_furniture":
@@ -3679,6 +3713,11 @@
       }
       const fuel = (h.storage.firewood || 0) + (state2.carried.firewood || 0);
       add("add_wood", h.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      if (has2(state2, "generator")) {
+        const gas = (h.storage.gas_can || 0) + (state2.carried.gas_can || 0);
+        const startP = gasStartChance(state2);
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h.batteryMax - h.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+      }
       if (h.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h.furniture} left` });
       add("heater", h.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h.heaterOn && h.battery < 1 && "Battery too low" });
       const cookId = COOK_ORDER().find((f) => (h.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);

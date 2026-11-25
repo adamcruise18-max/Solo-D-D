@@ -2,6 +2,7 @@
 // Loot never comes back.
 import { hashString, mulberry32, weightedPick } from '../rng.js';
 import { CATEGORIES, BIG_BRANDS } from '../data/places.js';
+import { decayActive } from './decay.js';
 
 export function placeState(state, place) {
   let ps = state.places[place.id];
@@ -29,10 +30,13 @@ export function rollZone(state, key, catId, stock, zone, extraRolls = 0) {
   const r = mulberry32(hashString(`${state.seed}:${key}:zone${zone}`));
   const cat = CATEGORIES[catId];
   const n = 2 + Math.floor(r() * 4) + extraRolls; // 2 to 5 rolls
+  // Cold-case food (fridge: true) is there only until this store's fridges fail.
+  const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state, 'store_fridges', key);
   const found = {};
   for (let i = 0; i < n; i++) {
     if (r() >= stock) continue;
     const e = weightedPick(r, cat.loot);
+    if (e.fridge && fridgesGone) continue;
     found[e.id] = (found[e.id] || 0) + 1;
   }
   return found;
