@@ -3726,11 +3726,11 @@ const HOME_PROPS = {
     add(g, gCyl(0.1, 0.09, 0.22, 14), col(0xecebe6, 0.45), -0.3, 0, 0.25);
   },
   proj_med_cabinet(g) {
-    // wall cabinet with a red cross and a small padlock
+    // wall cabinet with a green first-aid cross (never a red cross) and a small padlock
     add(g, gBox(0.6, 0.8, 0.28), col(0xf2f0ea, 0.5), 0, 0, 0);
     add(g, gBox(0.58, 0.78, 0.01), col(0xe8e6e0, 0.45), 0, 0.01, 0.14);
-    add(g, gBox(0.2, 0.06, 0.004), col(0xc4221c, 0.5), 0, 0.42, 0.147);
-    add(g, gBox(0.06, 0.2, 0.004), col(0xc4221c, 0.5), 0, 0.35, 0.147);
+    add(g, gBox(0.2, 0.06, 0.004), col(0x2f8a4a, 0.5), 0, 0.42, 0.147);
+    add(g, gBox(0.06, 0.2, 0.004), col(0x2f8a4a, 0.5), 0, 0.35, 0.147);
     add(g, gBox(0.05, 0.06, 0.03), M.brass, 0.24, 0.35, 0.16);
   },
 };

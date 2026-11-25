@@ -1126,9 +1126,43 @@
   function sleepSpot(state2) {
     return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
   }
+  function setSleepSpot(state2, spot) {
+    if (!SLEEP_SPOTS[spot]) return false;
+    state2.home.sleepSpot = spot;
+    return true;
+  }
   function sleepTemp(state2) {
     const spot = sleepSpot(state2);
     return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  }
+  function setDoor(state2, room, closed) {
+    const h2 = ensureRooms(state2.home);
+    if (!h2.rooms[room]) return false;
+    h2.doorsClosed[room] = !!closed;
+    return true;
+  }
+  function homeHeat(state2) {
+    const h2 = state2.home;
+    const air = environment(state2, "rest").air;
+    return {
+      outside: Math.round(air),
+      sources: { fire: h2.fireHours > 0 ? fireHeat(state2) : 0, fireHours: h2.fireHours, heater: h2.heaterOn ? 20 : 0, stove: built(state2, "wood_stove") },
+      insulated: built(state2, "insulate_living"),
+      sleepSpot: sleepSpot(state2),
+      rooms: ROOMS.map((r) => {
+        const w = h2.windows?.[r.id] || { broken: 0, boarded: 0 };
+        return {
+          id: r.id,
+          label: r.label,
+          temp: Math.round(roomTemp(state2, r.id) * 10) / 10,
+          brokenWindows: (w.broken || 0) - (w.boarded || 0),
+          boardedWindows: w.boarded || 0,
+          doorClosed: r.id === "living" ? null : !!h2.doorsClosed?.[r.id],
+          loss: Math.round(windowLoss(h2, r.id) * 100) / 100
+          // 1 = a whole, closed-up room
+        };
+      })
+    };
   }
   function homeDaily(state2) {
     const filtered = runAutoFilter(state2);
@@ -1887,6 +1921,12 @@
     const s = freshOf(state2)[id] || 0;
     return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
   }
+  function addFresh(state2, bags, id, qty, spoil = 0) {
+    if (!isPerishable(id)) return;
+    const f = freshOf(state2);
+    const have = bags.reduce((n, b) => n + (b[id] || 0), 0);
+    f[id] = have + qty > 0 ? ((f[id] || 0) * have + spoil * qty) / (have + qty) : spoil;
+  }
   function ageFood(state2, dt, tempAt) {
     const f = freshOf(state2);
     for (const id of Object.keys(ITEMS)) {
@@ -1911,15 +1951,21 @@
   }
 
   // src/engine/garden.js
+  var BEDS = 4;
   var ROT_DAYS = 30;
+  var WATER_GAL = 2;
   var DRY_PER_DAY = 0.35;
   var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
+  var monthOfDay3 = (day) => new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
   function initGarden(state2) {
     state2.garden = { beds: [] };
   }
   function garden(state2) {
     if (!state2.garden) initGarden(state2);
     return state2.garden;
+  }
+  function bedCount(state2) {
+    return built(state2, "garden_beds") ? BEDS : 0;
   }
   function dayGrowth(crop, meanF, water) {
     const c = CROPS[crop];
@@ -1957,6 +2003,85 @@
         log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
       }
     }
+  }
+  function canPlant(state2, cropId) {
+    const c = CROPS[cropId];
+    if (!c) return "No such crop";
+    if (!bedCount(state2)) return "Build the garden beds first";
+    if (!has(state2, "seeds")) return "You need a seed packet";
+    const g = garden(state2);
+    const free = g.beds.filter((b) => b.crop && !b.dead).length < bedCount(state2);
+    if (!free) return "All beds are in use";
+    if (!c.plant.includes(monthOfDay3(dayIndex(state2.time)))) return `Not the season to sow ${c.name.toLowerCase()}`;
+    return null;
+  }
+  function plant(state2, cropId) {
+    const why = canPlant(state2, cropId);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    const g = garden(state2);
+    g.beds = g.beds.filter((b) => b.crop && !b.dead);
+    g.beds.push({ crop: cropId, day: dayIndex(state2.time), growth: 0, water: 0.6, ripeDay: null, dead: false });
+    const bag = (state2.carried.seeds || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, "seeds", -1);
+    log(state2, `You sow ${CROPS[cropId].name.toLowerCase()} in a garden bed.`, "good");
+    return true;
+  }
+  function waterGarden(state2) {
+    const g = garden(state2);
+    const beds = g.beds.filter((b) => b.crop && !b.dead && b.growth < 1 && b.water < 1);
+    if (!beds.length) {
+      log(state2, "The beds do not need water.");
+      return 0;
+    }
+    const h2 = state2.home;
+    let n = 0;
+    for (const b of beds) {
+      if (h2.rawGal >= WATER_GAL) h2.rawGal -= WATER_GAL;
+      else if (h2.tankGal >= WATER_GAL) h2.tankGal -= WATER_GAL;
+      else break;
+      b.water = 1;
+      n++;
+    }
+    log(state2, n ? `You water ${n} garden bed${n > 1 ? "s" : ""} (${n * WATER_GAL} gal).` : "You have no water to spare for the garden.");
+    return n;
+  }
+  function harvest(state2) {
+    const g = garden(state2);
+    const ripe = g.beds.filter((b) => b.crop && !b.dead && b.growth >= 1);
+    if (!ripe.length) {
+      log(state2, "Nothing in the garden is ready.");
+      return {};
+    }
+    const got = {};
+    for (const b of ripe) {
+      const [id, qty] = CROPS[b.crop].yield;
+      addFresh(state2, [state2.home.storage, state2.carried], id, qty, 0);
+      addItem(state2.home.storage, id, qty);
+      got[id] = (got[id] || 0) + qty;
+      b.dead = true;
+    }
+    g.beds = g.beds.filter((b) => !b.dead);
+    log(state2, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
+    return got;
+  }
+  function gardenInfo(state2) {
+    const g = garden(state2);
+    const month = monthOfDay3(dayIndex(state2.time));
+    return {
+      beds: bedCount(state2),
+      planted: g.beds.map((b) => ({
+        crop: b.crop,
+        name: CROPS[b.crop]?.name,
+        growth: Math.round(b.growth * 100),
+        water: Math.round(b.water * 100),
+        ready: b.growth >= 1 && !b.dead,
+        dead: b.dead
+      })),
+      canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id)
+    };
   }
   var gardenSystem = {
     id: "garden",
@@ -4111,6 +4236,27 @@
         return searchRoom(state2, arg);
       case "walk_inside":
         return walkInside(state2, arg);
+      // Garden and heat (engine garden.js and home.js rules; the time cost is here).
+      case "garden_plant":
+        if (state2.location.kind === "home" && plant(state2, String(arg))) advanceTime(state2, 30, "work");
+        return;
+      case "garden_water":
+        if (state2.location.kind === "home" && waterGarden(state2) > 0) advanceTime(state2, 15, "work");
+        return;
+      case "garden_harvest":
+        if (state2.location.kind === "home" && Object.keys(harvest(state2)).length) advanceTime(state2, 30, "work");
+        return;
+      case "sleep_spot":
+        if (setSleepSpot(state2, String(arg))) log(state2, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
+        return;
+      case "door": {
+        const [room, closed] = String(arg).split(":");
+        if (state2.location.kind === "home" && setDoor(state2, room, closed === "1")) {
+          log(state2, closed === "1" ? "You close the door." : "You open the door.");
+          advanceTime(state2, 1);
+        }
+        return;
+      }
       case "flashlight":
         return toggleFlashlight(state2);
       case "pickup":
@@ -6103,6 +6249,8 @@
       ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
       <span>Kitchen tap</span><b>${h2.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
+    ${renderHeat(atHome)}
+    ${renderGarden(atHome)}
     ${renderBase()}`;
   }
   function renderBase() {
@@ -6791,6 +6939,11 @@
       else if (b.dataset.drop) act("drop", b.dataset.drop);
       else if (b.dataset.build) act("action", "build", b.dataset.build);
       else if (b.dataset.goalboard) showGoalBoard();
+      else if (b.dataset.garden) {
+        const [what, crop] = b.dataset.garden.split(":");
+        act("action", `garden_${what}`, crop);
+      } else if (b.dataset.sleepspot) act("action", "sleep_spot", b.dataset.sleepspot);
+      else if (b.dataset.door) act("action", "door", b.dataset.door);
       else if (b.dataset.goaldrop) {
         const why = dropGoal(state, b.dataset.goaldrop);
         if (why) alert(why);
@@ -6836,6 +6989,65 @@
     const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
     if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
     return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} \xB7 <kbd>E</kbd> details</small>`;
+  }
+  function renderHeat(atHome) {
+    const hh = homeHeat(state);
+    const src = [];
+    if (hh.sources.fireHours > 0) src.push(`${hh.sources.stove ? "Wood stove" : "Fireplace"} (${formatDuration(hh.sources.fireHours * 60)} left)`);
+    if (hh.sources.heater) src.push("Electric heater");
+    const tcls = (t) => t < 40 ? "bad" : t < 55 ? "warn" : "ok";
+    const rows = hh.rooms.map((r) => {
+      const leaks = [];
+      if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? "s" : ""}`);
+      if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
+      if (r.id === "living" && hh.insulated) leaks.push("insulated");
+      const door = r.doorClosed == null ? "" : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? "" : "disabled"}>${r.doorClosed ? "Open door" : "Close door"}</button>`;
+      const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
+      const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
+      return `<div class="heat-row">
+      <span class="hn">${esc(r.label)}</span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
+      <small>${esc(leaks.join(" \xB7 ") || (r.loss > 1.2 ? "drafty" : "closed up"))}</small>
+      <span class="hb">${door}${bed}</span>
+    </div>`;
+    }).join("");
+    return `<div class="heat">
+    <h3>Heat <small>outside ${hh.outside}\xB0F</small></h3>
+    <p class="sub">Heat from: ${src.length ? esc(src.join(", ")) : "nothing now (light a fire or turn on the heater)"} \u2192 living room \u2192 rooms with open doors. Closed doors keep a room's heat in or out.</p>
+    ${rows}
+  </div>`;
+  }
+  function renderGarden(atHome) {
+    const g = gardenInfo(state);
+    if (!g.beds) return "";
+    const beds = [];
+    for (let i = 0; i < g.beds; i++) {
+      const b = g.planted[i];
+      if (!b) {
+        beds.push('<div class="bed empty"><span>Empty bed</span></div>');
+        continue;
+      }
+      const stage = b.dead ? "dead" : b.ready ? "ready" : b.growth < 30 ? "sprouts" : b.growth < 70 ? "growing" : "almost ready";
+      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b><span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
+    }
+    const sow = g.canSow.map((id) => {
+      const why = canPlant(state, id);
+      return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc(why || "")}">Sow ${esc(CROPS[id].name.toLowerCase())}</button>`;
+    }).join("");
+    const any = g.planted.some((b) => !b.dead && !b.ready);
+    const ripe = g.planted.some((b) => b.ready);
+    return `<div class="garden">
+    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <div class="beds">${beds.join("")}</div>
+    <div class="row">
+      ${any ? `<button class="small" data-garden="water" ${atHome ? "" : "disabled"}>Water the beds (15 min)</button>` : ""}
+      ${ripe ? `<button class="small primary" data-garden="harvest" ${atHome ? "" : "disabled"}>Harvest (30 min)</button>` : ""}
+    </div>
+    <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : "Nothing to sow this month."}</p>
+    <div class="row">${sow}</div>
+  </div>`;
   }
 
   // src/main.js

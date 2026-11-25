@@ -18,6 +18,8 @@ import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
+import { plant, waterGarden, harvest } from './garden.js';
+import { setSleepSpot, setDoor, SLEEP_SPOTS } from './home.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -1081,6 +1083,18 @@ export function doAction(state, id, arg) {
     case 'house': return enterNearbyHouse(state);
     case 'room': return searchRoom(state, arg);
     case 'walk_inside': return walkInside(state, arg);
+    // Garden and heat (engine garden.js and home.js rules; the time cost is here).
+    case 'garden_plant': if (state.location.kind === 'home' && plant(state, String(arg))) advanceTime(state, 30, 'work'); return;
+    case 'garden_water': if (state.location.kind === 'home' && waterGarden(state) > 0) advanceTime(state, 15, 'work'); return;
+    case 'garden_harvest': if (state.location.kind === 'home' && Object.keys(harvest(state)).length) advanceTime(state, 30, 'work'); return;
+    case 'sleep_spot':
+      if (setSleepSpot(state, String(arg))) log(state, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
+      return;
+    case 'door': {
+      const [room, closed] = String(arg).split(':');
+      if (state.location.kind === 'home' && setDoor(state, room, closed === '1')) { log(state, closed === '1' ? 'You close the door.' : 'You open the door.'); advanceTime(state, 1); }
+      return;
+    }
     case 'flashlight': return toggleFlashlight(state);
     case 'pickup': return pickUp(state, arg);
     case 'see_zone': return seeZone(state, Number(arg));

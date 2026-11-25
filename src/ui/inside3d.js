@@ -182,7 +182,7 @@ export function openInside(opts) {
   // high where the building is open to the weather (plan.exposed: a broken window or a collapsed roof).
   // ?grime=low|medium|high in the page address forces a level (to compare looks).
   const forceGrime = typeof location !== 'undefined' && (/[?&]grime=(low|medium|high)\b/.exec(location.search || '') || [])[1];
-  const grime = forceGrime || grimeLevel(plan.cat, { exposed: !!plan.exposed });
+  const grime = forceGrime || (plan.home ? 'clean' : grimeLevel(plan.cat, { exposed: !!plan.exposed }));
   const surf = (part) => surfaceFor(plan.cat, part, null, quality, grime);
   const floor = new Mesh(new PlaneGeometry(W, D), surf('floor'));
   floor.rotation.x = -Math.PI / 2;

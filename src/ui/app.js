@@ -30,6 +30,9 @@ import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
 import { PROJECTS } from '../data/projects.js';
 import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostics.js';
+import { homeHeat } from '../engine/home.js';
+import { gardenInfo, canPlant } from '../engine/garden.js';
+import { CROPS } from '../data/crops.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
@@ -389,6 +392,8 @@ function renderHome() {
       ${built(state, 'filter_station') ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ''}
       <span>Kitchen tap</span><b>${h.tapWorks ? 'weak flow' : 'stopped'}</b>
     </div>
+    ${renderHeat(atHome)}
+    ${renderGarden(atHome)}
     ${renderBase()}`;
 }
 
@@ -1093,6 +1098,11 @@ function bindEvents() {
     else if (b.dataset.drop) act('drop', b.dataset.drop);
     else if (b.dataset.build) act('action', 'build', b.dataset.build);
     else if (b.dataset.goalboard) showGoalBoard();
+    else if (b.dataset.garden) {
+      const [what, crop] = b.dataset.garden.split(':');
+      act('action', `garden_${what}`, crop);
+    } else if (b.dataset.sleepspot) act('action', 'sleep_spot', b.dataset.sleepspot);
+    else if (b.dataset.door) act('action', 'door', b.dataset.door);
     else if (b.dataset.goaldrop) {
       const why = dropGoal(state, b.dataset.goaldrop);
       if (why) alert(why); else commit();
@@ -1140,4 +1150,67 @@ function homeProjectText(state, id, long) {
   const req = st.missingReq.length ? ` · build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(', ')}` : '';
   if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
   return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} · <kbd>E</kbd> details</small>`;
+}
+
+// Heat path (engine home.js homeHeat): where the heat comes from, each room's temperature,
+// what lets it out, and where you sleep.
+function renderHeat(atHome) {
+  const hh = homeHeat(state);
+  const src = [];
+  if (hh.sources.fireHours > 0) src.push(`${hh.sources.stove ? 'Wood stove' : 'Fireplace'} (${formatDuration(hh.sources.fireHours * 60)} left)`);
+  if (hh.sources.heater) src.push('Electric heater');
+  const tcls = (t) => (t < 40 ? 'bad' : t < 55 ? 'warn' : 'ok');
+  const rows = hh.rooms.map((r) => {
+    const leaks = [];
+    if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? 's' : ''}`);
+    if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
+    if (r.id === 'living' && hh.insulated) leaks.push('insulated');
+    const door = r.doorClosed == null ? '' : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? '' : 'disabled'}>${r.doorClosed ? 'Open door' : 'Close door'}</button>`;
+    const bed = r.id === 'bedroom' || r.id === 'living'
+      ? (hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? '' : 'disabled'}>Sleep here</button>`)
+      : '';
+    const w = Math.max(4, Math.min(100, ((r.temp - 20) / 50) * 100));
+    return `<div class="heat-row">
+      <span class="hn">${esc(r.label)}</span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <b class="${tcls(r.temp)}">${Math.round(r.temp)}°F</b>
+      <small>${esc(leaks.join(' · ') || (r.loss > 1.2 ? 'drafty' : 'closed up'))}</small>
+      <span class="hb">${door}${bed}</span>
+    </div>`;
+  }).join('');
+  return `<div class="heat">
+    <h3>Heat <small>outside ${hh.outside}°F</small></h3>
+    <p class="sub">Heat from: ${src.length ? esc(src.join(', ')) : 'nothing now (light a fire or turn on the heater)'} → living room → rooms with open doors. Closed doors keep a room's heat in or out.</p>
+    ${rows}
+  </div>`;
+}
+
+// Garden (engine garden.js): beds, what grows, and what you can sow this month.
+function renderGarden(atHome) {
+  const g = gardenInfo(state);
+  if (!g.beds) return '';
+  const beds = [];
+  for (let i = 0; i < g.beds; i++) {
+    const b = g.planted[i];
+    if (!b) { beds.push('<div class="bed empty"><span>Empty bed</span></div>'); continue; }
+    const stage = b.dead ? 'dead' : b.ready ? 'ready' : b.growth < 30 ? 'sprouts' : b.growth < 70 ? 'growing' : 'almost ready';
+    beds.push(`<div class="bed ${b.dead ? 'dead' : b.ready ? 'ready' : ''}"><b>${esc(b.name)}</b><span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
+  }
+  const sow = g.canSow.map((id) => {
+    const why = canPlant(state, id);
+    return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? '' : 'disabled'} title="${esc(why || '')}">Sow ${esc(CROPS[id].name.toLowerCase())}</button>`;
+  }).join('');
+  const any = g.planted.some((b) => !b.dead && !b.ready);
+  const ripe = g.planted.some((b) => b.ready);
+  return `<div class="garden">
+    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <div class="beds">${beds.join('')}</div>
+    <div class="row">
+      ${any ? `<button class="small" data-garden="water" ${atHome ? '' : 'disabled'}>Water the beds (15 min)</button>` : ''}
+      ${ripe ? `<button class="small primary" data-garden="harvest" ${atHome ? '' : 'disabled'}>Harvest (30 min)</button>` : ''}
+    </div>
+    <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : 'Nothing to sow this month.'}</p>
+    <div class="row">${sow}</div>
+  </div>`;
 }
