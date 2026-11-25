@@ -25,11 +25,20 @@ import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
 const COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === 'food'), 'dry_food', 'oatmeal', 'canned_food'];
 // Rice, pasta and oatmeal cook in water (1/8 gal a meal).
 const COOK_NEEDS_WATER = new Set(['dry_food', 'oatmeal']);
-const cookWater = (h) => (h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal' : null);
+// Home water first, then bottled water (1 gal a bottle) at home or in the bag.
+const cookWater = (h, carried = {}) => (h.safeGal >= 0.125 ? 'safeGal' : h.rawGal >= 0.125 ? 'rawGal' : h.tankGal >= 0.125 ? 'tankGal'
+  : (h.storage.water_bottle || 0) >= 0.125 ? 'storage' : (carried.water_bottle || 0) >= 0.125 ? 'carried' : null);
+function useCookWater(state) {
+  const h = state.home;
+  const w = cookWater(h, state.carried);
+  if (w === 'storage') addItem(h.storage, 'water_bottle', -0.125);
+  else if (w === 'carried') addItem(state.carried, 'water_bottle', -0.125);
+  else h[w] -= 0.125;
+}
 // The first food you can cook now: skip foods that need water when there is none.
 function cookPick(state) {
   const h = state.home;
-  const water = cookWater(h);
+  const water = cookWater(h, state.carried);
   return COOK_ORDER().find((f) => ((h.storage[f] || 0) > 0 || (state.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
 }
 import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
@@ -404,7 +413,7 @@ function homeAction(state, id) {
       if (!food) { log(state, 'You have nothing you can cook now.'); return; }
       const bag = (h.storage[food] || 0) > 0 ? h.storage : state.carried;
       const it = ITEMS[food];
-      if (COOK_NEEDS_WATER.has(food)) h[cookWater(h)] -= 0.125;
+      if (COOK_NEEDS_WATER.has(food)) useCookWater(state);
       const how = useHeat(state, 0.5);
       const risk = eatRisk(state, food, true);
       const stage = stageLabel(state, food);

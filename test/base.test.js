@@ -109,7 +109,7 @@ test('you can cook oatmeal, and cooking skips water foods when there is no water
   perform(s, 'action', 'cook');
   assert.ok(s.home.storage.oatmeal < before, 'oatmeal was cooked');
   // No water: rice and oatmeal are skipped, the can is cooked.
-  s.home.safeGal = 0; s.home.rawGal = 0; s.home.tankGal = 0;
+  s.home.safeGal = 0; s.home.rawGal = 0; s.home.tankGal = 0; delete s.home.storage.water_bottle; delete s.carried.water_bottle;
   give(s, { dry_food: 1, canned_food: 1 });
   const t = s.time;
   perform(s, 'action', 'cook');
