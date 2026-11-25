@@ -4262,7 +4262,7 @@
         if (state2.location.kind === "home" && Object.keys(harvest(state2)).length) advanceTime(state2, 30, "work");
         return;
       case "sleep_spot":
-        if (setSleepSpot(state2, String(arg))) log(state2, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
+        if (setSleepSpot(state2, String(arg))) log(state2, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
         return;
       case "board_window": {
         if (state2.location.kind !== "home") return;

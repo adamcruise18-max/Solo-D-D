@@ -1088,7 +1088,7 @@ export function doAction(state, id, arg) {
     case 'garden_water': if (state.location.kind === 'home' && waterGarden(state) > 0) advanceTime(state, 15, 'work'); return;
     case 'garden_harvest': if (state.location.kind === 'home' && Object.keys(harvest(state)).length) advanceTime(state, 30, 'work'); return;
     case 'sleep_spot':
-      if (setSleepSpot(state, String(arg))) log(state, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
+      if (setSleepSpot(state, String(arg))) log(state, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
       return;
     case 'board_window': {
       // One board-up: 1 scrap wood and 30 min (the rule is engine home.js boardWindow).
