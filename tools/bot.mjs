@@ -165,9 +165,28 @@ function smartNextPlace(state, wantFood) {
 }
 
 // ---------- renewable food for the careful bot: garden, fishing, hunting ----------
+// Projects a careful player builds first, when the parts are at hand.
+const BUILD_ORDER = ['rain_barrels', 'garden_beds', 'filter_station', 'wood_stove', 'insulate_living', 'sealed_store', 'rocket_stove'];
+function buildWork(state) {
+  for (const id of BUILD_ORDER) {
+    const proj = PROJECT_BY_ID[id];
+    if (proj && !state.home.projects?.[id] && projectStatus(state, proj).canWork) { perform(state, 'action', 'build', id); return `build ${id}`; }
+  }
+  return null;
+}
+
+// Keep 2+ gal of safe water: filter or boil the raw water; collect from the tap or toilet tanks.
+function waterWork(state) {
+  const h = state.home;
+  if (h.safeGal >= 2) return null;
+  if (h.rawGal >= 1 && can(state, 'filter_water')) { perform(state, 'action', 'filter_water'); return 'filter'; }
+  if (h.rawGal >= 1 && can(state, 'boil')) { perform(state, 'action', 'boil'); return 'boil'; }
+  if (h.rawGal < 2 && can(state, 'collect_tap')) { perform(state, 'action', 'collect_tap'); return 'tap'; }
+  if (h.rawGal < 2 && can(state, 'collect_toilet')) { perform(state, 'action', 'collect_toilet'); return 'toilet'; }
+  return null;
+}
+
 function gardenWork(state) {
-  const gs = projectStatus(state, PROJECT_BY_ID.garden_beds);
-  if (!bedCount(state) && gs.canWork) { perform(state, 'action', 'build', 'garden_beds'); return 'build garden'; }
   if (!bedCount(state)) return null;
   const info = gardenInfo(state);
   // The garden actions take no time in the engine; the UI charges it (plant 30, water 15, harvest 30 min).
@@ -179,7 +198,7 @@ function gardenWork(state) {
 
 const hasFishGear = (state) => (state.carried.fishing_rod || state.home.storage.fishing_rod || state.carried.fishing_line || state.home.storage.fishing_line) > 0;
 const wild = new WeakMap(); // tries on this trip
-const WILD_MILES = 3.5;
+const WILD_MILES = 5;
 
 // Go out to fish or hunt: daylight, food low-ish, the gear in hand.
 function wildTrip(state) {
@@ -230,6 +249,8 @@ export function smartTurn(state) {
     if (state.home.indoorTemp < 55 && can(state, 'add_wood')) { perform(state, 'action', 'add_wood'); return 'fire'; }
     if (state.home.indoorTemp < 50 && state.home.fireHours <= 0 && can(state, 'break_furniture')) { perform(state, 'action', 'break_furniture'); return 'furniture'; }
     if (p.food < 50 && can(state, 'cook')) { perform(state, 'action', 'cook'); return 'cook'; }
+    { const w = waterWork(state); if (w) return w; }
+    if (!isNight(state.time)) { const b = buildWork(state); if (b) return b; }
     if (!isNight(state.time)) { const g = gardenWork(state); if (g) return g; }
     if ((lowFood || foodKcal(state) < LOW_FOOD_KCAL * 2)) { const w = wildTrip(state); if (w) return w; }
     const spare = Object.keys(state.home.storage).filter((id) => ITEMS[id]?.kind === 'food' && id !== 'formula');
