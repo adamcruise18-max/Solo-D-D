@@ -12,6 +12,7 @@ export { createClock, sendDeath, STEP_MINUTES, DAY_START_MINUTE, dayIndex, minut
 export { createActions, defineAction, legacyActions } from './actions.js';
 export { stream, streamInt, streamChance } from './rng.js';
 export { checkContent } from './content.js';
+export { createActivity, currentSource, withSource, fieldHashes, changedPaths } from './activity.js';
 export * from './save.js';
 
 // One engine object: the systems, the clock that runs them, the actions and the events.
