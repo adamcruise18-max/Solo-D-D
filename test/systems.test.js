@@ -145,3 +145,17 @@ test('home: its own system owns state.home; the fire, battery and water chain st
     setDevChecks(false);
   }
 });
+
+test('effects: pacer events may change home and dog on purpose; other writes still stop', async () => {
+  const { createSystems } = await import('../src/core/index.js');
+  const a = { id: 'a', order: 1, owns: ['x'], step: (s) => { s.x += 1; } };
+  const b = { id: 'b', order: 2, owns: ['y'], effects: ['x'], step: (s) => { s.x += 1; } };
+  const c = { id: 'c', order: 3, owns: ['z'], step: (s) => { s.x += 1; } };
+  const ok = createSystems([a, b], { dev: true });
+  const st = { x: 0, y: 0 };
+  ok.step(st, 1, {});
+  assert.equal(st.x, 2);
+  const bad = createSystems([a, c], { dev: true });
+  assert.throws(() => bad.step({ x: 0, z: 0 }, 1, {}), /Dual write/);
+  assert.deepEqual(GAME_SYSTEMS.find((s) => s.id === 'pacer').effects, ['home', 'dog']);
+});
