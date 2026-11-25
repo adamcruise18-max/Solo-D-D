@@ -211,6 +211,28 @@ request that says which rule change is meant and why.
   `setDeepActivity(true)` while the F3 view is open; `activityText(r)` for a
   bug report. The F3 view itself is UI (builder).
 
+## Heat by room (research step 8)
+
+- `src/engine/home.js`: the living room is `home.indoorTemp` (fire, stove and heater
+  are there). Kitchen, bedroom and bath (`home.rooms[id].temp`) trade heat with the
+  outside (loss 0.05/h, more per broken window: +1.5 each, a boarded one +0.45)
+  and with the living room through the door (0.15/h open, 0.02/h closed).
+- `breakWindow`, `boardWindow`, `setDoor` for actions and events; `homeHeat(state)`
+  gives the heat panel: outside air, sources, and each room's temp, windows, door, loss.
+- Heat flows both ways through a door (a cold living room pulls the rooms down).
+- Sleep uses the sleep spot (`sleepSpot`, `setSleepSpot`; bedroom bed or living-room
+  couch): `tick.js` `feltTemp` uses `sleepTemp(state)` when you sleep at home.
+
+## Garden (research step 8)
+
+- `src/engine/garden.js`, system `garden` (order 1008, owns `garden`, catch-up exact).
+  Crops in `src/data/crops.js` (sow months, days, frost line `frostF`, warmth `minF`, yield).
+- Needs the `garden_beds` project (4 beds). Each day at 5 AM: rain waters a bed,
+  dry days dry it (0.35 a day, 1.7x in a heat wave); growth = warmth x water / days;
+  frost at or below `frostF` kills the crop; a ripe crop rots after 30 days.
+- Player actions for the UI: `canPlant`, `plant` (uses one `seeds`), `waterGarden`
+  (2 gal raw water a bed), `harvest` (fresh food into storage), `gardenInfo`.
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).

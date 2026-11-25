@@ -17,6 +17,12 @@
     // Fresh food spoils (perish: days at room temperature; engine/food.js). From fishing and hunting.
     fresh_fish: { name: "Fresh fish", unit: "fish", weight: 1.5, kind: "food", cal: 700, portion: 1, needsCooking: true, perish: 2 },
     raw_meat: { name: "Raw meat", unit: "lb", weight: 1, kind: "food", cal: 900, portion: 1, needsCooking: true, perish: 2 },
+    // From the garden (engine/garden.js, data/crops.js). Fresh: they spoil.
+    kale: { name: "Kale (bunch)", unit: "bunch", weight: 0.5, kind: "food", cal: 100, portion: 1, perish: 7 },
+    potatoes: { name: "Potatoes (lb)", unit: "lb", weight: 1, kind: "food", cal: 350, portion: 1, needsCooking: true, perish: 60 },
+    green_beans: { name: "Green beans (lb)", unit: "lb", weight: 1, kind: "food", cal: 140, portion: 1, perish: 6 },
+    squash: { name: "Winter squash", unit: "squash", weight: 3, kind: "food", cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+    garlic: { name: "Garlic (head)", unit: "head", weight: 0.1, kind: "food", cal: 60, portion: 1, perish: 120 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
     saline: { name: "Saline bag (sterile)", unit: "bag", weight: 2.2, kind: "drink", water: 27, portion: 1 },
@@ -850,6 +856,16 @@
       requires: ["rain_barrels"],
       hours: 2
     },
+    // ---- Garden ----
+    {
+      id: "garden_beds",
+      wing: "food",
+      name: "Raised garden beds",
+      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).",
+      needs: { scrap_wood: 4, hardware_parts: 1 },
+      tools: [],
+      hours: 6
+    },
     // ---- Heat ----
     {
       id: "insulate_living",
@@ -1020,6 +1036,119 @@
     return SPELLS[id]?.start || "";
   }
 
+  // src/engine/home.js
+  function homeStep(state2, dt, env) {
+    const h2 = state2.home;
+    const air = env.air;
+    let heat = 0;
+    if (h2.fireHours > 0) {
+      heat += fireHeat(state2);
+      h2.fireHours = Math.max(0, h2.fireHours - dt);
+      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    }
+    if (h2.heaterOn) {
+      h2.battery -= 1.5 * dt;
+      heat += 20;
+      if (h2.battery <= 0) {
+        h2.battery = 0;
+        h2.heaterOn = false;
+        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      }
+    }
+    const passive = air + 6;
+    const lw = windowLoss(h2, "living");
+    const target = Math.min(75, passive + heat / lw);
+    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
+    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h2, passive, dt);
+    const m = (state2.time % 1440 + 1440) % 1440;
+    const s = sunFor(state2.time);
+    if (m > s.rise && m < s.set) {
+      const hours = (s.set - s.rise) / 60;
+      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+    }
+    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
+      h2.tapWorks = false;
+      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  var ROOMS = [
+    { id: "living", label: "Living room" },
+    { id: "kitchen", label: "Kitchen" },
+    { id: "bedroom", label: "Bedroom" },
+    { id: "bath", label: "Bathroom" }
+  ];
+  var OUT_RATE = 0.05;
+  var DOOR_OPEN = 0.15;
+  var DOOR_CLOSED = 0.02;
+  var BROKEN = 1.5;
+  var BOARDED = 0.3;
+  function ensureRooms(h2) {
+    if (!h2.rooms) {
+      h2.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+    }
+    if (!h2.windows) h2.windows = {};
+    if (!h2.doorsClosed) h2.doorsClosed = {};
+    return h2;
+  }
+  function windowLoss(h2, room) {
+    const w = h2.windows?.[room];
+    if (!w) return 1;
+    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  }
+  var LIVING_SHARE = 1 / 3;
+  function roomsStep(h2, passive, dt) {
+    ensureRooms(h2);
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kDoor = (h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+      h2.indoorTemp += (r.temp - h2.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+    }
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h2, id);
+      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+      const rate = Math.min(0.9, kOut + kDoor);
+      r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
+    }
+  }
+  function roomTemp(state2, room) {
+    const h2 = state2.home;
+    if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
+    return h2.rooms[room].temp;
+  }
+  var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
+  function sleepSpot(state2) {
+    return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
+  }
+  function sleepTemp(state2) {
+    const spot = sleepSpot(state2);
+    return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  }
+  function homeDaily(state2) {
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
+  }
+  var homeSystem = {
+    id: "home",
+    label: "Home base",
+    order: 1005,
+    // right after the legacy rules, before the dog: the same order as before
+    version: 1,
+    legacy: true,
+    // state.home was in saves before the engine; newGame() makes it
+    owns: ["home"],
+    // The fire and the battery run out inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
+    daily: (state2) => homeDaily(state2)
+  };
+
   // src/engine/placesdb.js
   var LIST = [];
   var INDEX = {};
@@ -1173,7 +1302,7 @@
 
   // src/core/systems.js
   var HOOKS = ["init", "step", "daily"];
-  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
+  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "effects", "catchUp", ...HOOKS]);
   var CATCH_UP = ["exact", "approx", "event"];
   function defineSystem(sys) {
     if (!sys || typeof sys.id !== "string" || !sys.id) throw new Error("A system needs an id");
@@ -1214,8 +1343,9 @@
     }
     for (const s of list) add(s);
     const snapOthers = (state2, id) => {
+      const allowed = new Set(byId3.get(id)?.effects || []);
       const out = {};
-      for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
+      for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state2[f] ?? null);
       return out;
     };
     function run2(hook, state2, arg, ctx) {
@@ -1560,6 +1690,9 @@
     // after the rules: the mercy rule reads this step's vitals
     version: 1,
     owns: ["pacer"],
+    // Event effects (src/data/events.js apply) may change these on purpose:
+    // a roof leak (home), the dog finds a bone (dog).
+    effects: ["home", "dog"],
     // Hour by hour with thresholds: time must be played, not skipped.
     catchUp: "event",
     init: (state2) => initPacer(state2),
@@ -1723,116 +1856,14 @@
     }
   };
 
-  // src/engine/home.js
-  function homeStep(state2, dt, env) {
-    const h2 = state2.home;
-    const air = env.air;
-    let heat = 0;
-    if (h2.fireHours > 0) {
-      heat += fireHeat(state2);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
-    }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
-      heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
-        log(state2, "The home battery is empty. The electric heater stops.", "warn");
-      }
-    }
-    const passive = air + 6;
-    const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    const m = (state2.time % 1440 + 1440) % 1440;
-    const s = sunFor(state2.time);
-    if (m > s.rise && m < s.set) {
-      const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
-    }
-    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
-      const t = state2.weather.type;
-      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
-    }
-    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
-      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
-    }
-  }
-  function homeDaily(state2) {
-    const filtered = runAutoFilter(state2);
-    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
-  }
-  var homeSystem = {
-    id: "home",
-    label: "Home base",
-    order: 1005,
-    // right after the legacy rules, before the dog: the same order as before
-    version: 1,
-    legacy: true,
-    // state.home was in saves before the engine; newGame() makes it
-    owns: ["home"],
-    // The fire and the battery run out inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
-    daily: (state2) => homeDaily(state2)
+  // src/data/crops.js
+  var CROPS = {
+    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8], days: 55, frostF: null, minF: 40, yield: ["kale", 8] },
+    potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
+    beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
+    squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
+    garlic: { name: "Garlic", plant: [9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
-
-  // src/engine/systems.js
-  var weatherSystem = {
-    id: "weather",
-    label: "Weather",
-    order: 10,
-    version: 1,
-    legacy: true,
-    // state.weather was in saves before the engine
-    owns: ["weather"],
-    // One roll per game day from the shared game rng; nothing changes inside a day.
-    // Then rare weather (ice storm, heat wave, smoke) from its own stream
-    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
-    // so the result is exact.
-    catchUp: "exact",
-    init: (state2) => initWeather(state2),
-    daily: (state2, day) => {
-      const old = state2.weather;
-      rollWeather(state2, day);
-      rollSpell(state2, day, old);
-    }
-  };
-  var legacySystem = {
-    id: "legacy",
-    label: "Rules not yet moved into systems",
-    order: 1e3,
-    version: 1,
-    legacy: true,
-    // Death checks, wounds and illness thresholds happen inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
-    daily: (state2, day) => dailyRollover(state2, day)
-  };
-  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, dogSystem, pacerSystem];
-  var devChecks = false;
-  var cached = null;
-  function gameSystems() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
-  }
-  function gameClock() {
-    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
-  }
-  function createGameSystems({ dev = false, events = null } = {}) {
-    const systems = createSystems(GAME_SYSTEMS, { dev });
-    const clock = createClock({ systems, events });
-    return { systems, clock };
-  }
-  function systemVersions() {
-    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
-  }
-  function initNewSystems(state2) {
-    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
-  }
 
   // src/engine/food.js
   var STALE_AT = 0.5;
@@ -1877,6 +1908,120 @@
   function stageLabel(state2, id) {
     const st = stageOf(state2, id);
     return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
+  }
+
+  // src/engine/garden.js
+  var ROT_DAYS = 30;
+  var DRY_PER_DAY = 0.35;
+  var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
+  function initGarden(state2) {
+    state2.garden = { beds: [] };
+  }
+  function garden(state2) {
+    if (!state2.garden) initGarden(state2);
+    return state2.garden;
+  }
+  function dayGrowth(crop, meanF, water) {
+    const c = CROPS[crop];
+    let warm = 0;
+    if (meanF >= c.minF + 15) warm = meanF > 92 ? 0.5 : 1;
+    else if (meanF >= c.minF + 7) warm = 0.7;
+    else if (meanF >= c.minF) warm = 0.3;
+    const wet = water > 0.2 ? 1 : 0.2;
+    return warm * wet / c.days;
+  }
+  function gardenDaily(state2, day) {
+    const g = garden(state2);
+    if (!g.beds.length) return;
+    const w = state2.weather;
+    const mean = (w.high + w.low) / 2;
+    const rained = RAIN.has(w.type);
+    for (const b of g.beds) {
+      if (!b.crop || b.dead) continue;
+      const c = CROPS[b.crop];
+      if (c.frostF != null && w.low <= c.frostF) {
+        b.dead = true;
+        log(state2, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
+        continue;
+      }
+      b.water = rained ? 1 : Math.max(0, b.water - DRY_PER_DAY * (w.type === "heat_wave" ? 1.7 : 1));
+      if (b.growth < 1) {
+        b.growth = Math.min(1, b.growth + dayGrowth(b.crop, mean, b.water));
+        if (b.growth >= 1 - 1e-9) {
+          b.growth = 1;
+          b.ripeDay = day;
+          log(state2, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
+        }
+      } else if (b.ripeDay != null && day - b.ripeDay >= ROT_DAYS) {
+        b.dead = true;
+        log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
+      }
+    }
+  }
+  var gardenSystem = {
+    id: "garden",
+    label: "Garden",
+    order: 1008,
+    // after the home, before the dog
+    version: 1,
+    owns: ["garden"],
+    // One step per day, in order: skipping days must run each day (exact).
+    catchUp: "exact",
+    init: (state2) => initGarden(state2),
+    daily: (state2, day) => gardenDaily(state2, day)
+  };
+
+  // src/engine/systems.js
+  var weatherSystem = {
+    id: "weather",
+    label: "Weather",
+    order: 10,
+    version: 1,
+    legacy: true,
+    // state.weather was in saves before the engine
+    owns: ["weather"],
+    // One roll per game day from the shared game rng; nothing changes inside a day.
+    // Then rare weather (ice storm, heat wave, smoke) from its own stream
+    // (src/engine/rareweather.js). Skipping days must still roll each day in order,
+    // so the result is exact.
+    catchUp: "exact",
+    init: (state2) => initWeather(state2),
+    daily: (state2, day) => {
+      const old = state2.weather;
+      rollWeather(state2, day);
+      rollSpell(state2, day, old);
+    }
+  };
+  var legacySystem = {
+    id: "legacy",
+    label: "Rules not yet moved into systems",
+    order: 1e3,
+    version: 1,
+    legacy: true,
+    // Death checks, wounds and illness thresholds happen inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
+    daily: (state2, day) => dailyRollover(state2, day)
+  };
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, gardenSystem, dogSystem, pacerSystem];
+  var devChecks = false;
+  var cached = null;
+  function gameSystems() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
+  }
+  function gameClock() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
+  }
+  function createGameSystems({ dev = false, events = null } = {}) {
+    const systems = createSystems(GAME_SYSTEMS, { dev });
+    const clock = createClock({ systems, events });
+    return { systems, clock };
+  }
+  function systemVersions() {
+    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
+  }
+  function initNewSystems(state2) {
+    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
   }
 
   // src/engine/clothes.js
@@ -1965,10 +2110,11 @@
     return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
-    let felt = env.temp + clothingRating(state2);
+    const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state2);
     if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
     if (mode === "sleep") {
-      if (env.home) felt += 10;
+      if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
       const d = state2.dog;
       if (d.stage === "joined" && d.bond >= 80) felt += 5;
@@ -2040,14 +2186,14 @@
     if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
     if (state2.weather.type === "smoke" && env.outside && !has(state2, "n95")) damage(state2, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
     for (const inj of p.injuries) {
-      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
+      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), "bleeding");
       inj.ageH += dt;
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
       if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
       if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        if (chance(state2, inj.infectRisk)) startInfection(state2);
+        if (chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -2056,7 +2202,7 @@
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state2, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
@@ -2114,7 +2260,7 @@
       }
     }
     for (const inj of p.injuries) {
-      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
+      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
     }
   }
   var INJURY_NAMES = {
@@ -2132,13 +2278,16 @@
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];
     state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
-    damage(state2, d.hp, type === "bite" ? "an animal attack" : "an injury");
-    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state2.player.health - 1)) : d.hp;
+    damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
+    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
   }
-  function startInfection(state2) {
+  var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);
+  var BLEED_FLOOR = 10;
+  function startInfection(state2, from = null) {
     if (state2.player.illness.infection) return;
-    state2.player.illness.infection = { ageH: 0, abxH: null };
+    state2.player.illness.infection = { ageH: 0, abxH: null, from };
     log(state2, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
   }
   function startStomachBug(state2) {
@@ -2713,7 +2862,7 @@
     if (p.morale < 25) mods.push(["despair", -2]);
     return mods;
   }
-  var RAIN = ["rain", "heavy_rain", "windstorm", "ice_storm"];
+  var RAIN2 = ["rain", "heavy_rain", "windstorm", "ice_storm"];
   function edges(state2, opts = {}) {
     const p = state2.player;
     const adv = [...opts.adv || []];
@@ -2723,7 +2872,7 @@
     if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
     const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
     if (limb && p.painH <= 0) dis.push("injured");
-    if (opts.outside && state2.weather && RAIN.includes(state2.weather.type)) dis.push("rain");
+    if (opts.outside && state2.weather && RAIN2.includes(state2.weather.type)) dis.push("rain");
     if (opts.outside && isNight(state2.time)) dis.push("night");
     if (p.energy < 25) dis.push("very tired");
     const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
