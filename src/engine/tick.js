@@ -3,14 +3,14 @@
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
-import { airTemp, isNight, sunFor, solarToday, weatherInfo } from './world.js';
+import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
-import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
+import { built, foodItemsStored } from './base.js';
 import { infectRiskFactor } from './skills.js';
 import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
@@ -187,8 +187,8 @@ export function tickStep(state, dt, mode) {
     if (p.lightHours === 0) log(state, 'The flashlight goes dark. The batteries are empty.', 'warn');
   }
 
-  homeStep(state, dt, env);
-  // The dog is its own system now (src/engine/dog.js), right after these rules.
+  // The home and the dog are their own systems now (src/engine/home.js, dog.js),
+  // right after these rules.
 
   if (p.health <= 0) {
     p.health = 0;
@@ -196,53 +196,6 @@ export function tickStep(state, dt, mode) {
     die(state, causes.length ? causes[0][0] : 'unknown');
   }
   state._damage = {};
-}
-
-function homeStep(state, dt, env) {
-  const h = state.home;
-  const air = env.air;
-  let heat = 0;
-  if (h.fireHours > 0) {
-    heat += fireHeat(state);
-    h.fireHours = Math.max(0, h.fireHours - dt);
-    if (h.fireHours === 0 && state.location.kind === 'home') log(state, 'The fire in the fireplace burns out.');
-  }
-  if (h.heaterOn) {
-    h.battery -= 1.5 * dt;
-    heat += 20;
-    if (h.battery <= 0) {
-      h.battery = 0;
-      h.heaterOn = false;
-      log(state, 'The home battery is empty. The electric heater stops.', 'warn');
-    }
-  }
-  const passive = air + 6;
-  const target = Math.min(75, passive + heat);
-  const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state);
-  h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-
-  // Solar charge in daylight
-  const m = ((state.time % 1440) + 1440) % 1440;
-  const s = sunFor(state.time);
-  if (m > s.rise && m < s.set) {
-    const hours = (s.set - s.rise) / 60;
-    h.battery = Math.min(h.batteryMax, h.battery + (solarToday(state) / hours) * dt);
-  }
-
-  // Rain barrels fill from the gutter (rain water is unsafe until boiled or filtered)
-  if (built(state, 'rain_barrels') && h.rawGal < 110) {
-    const t = state.weather.type;
-    const perH = t === 'heavy_rain' ? 5 : t === 'rain' || t === 'windstorm' ? 2 : 0;
-    if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
-  }
-
-  // City water stops on a hard freeze or on a random day
-  if (h.tapWorks && (air < 25 || dayIndex(state.time) >= h.tapStopDay)) {
-    h.tapWorks = false;
-    log(state, air < 25
-      ? 'Hard freeze. The water pipes are frozen. The kitchen tap stops.'
-      : 'The kitchen tap coughs and stops. The city water is gone now.', 'warn');
-  }
 }
 
 // Legacy system: the 5 AM rules that are not systems yet. The weather system
@@ -257,9 +210,7 @@ export function dailyRollover(state, day) {
   if (spell?.first) log(state, spellStartText(spell.id), 'warn');
   else if (spell) log(state, `${weatherInfo(state).label} again today.`, 'warn');
 
-  // The water chain: the filter station cleans rain water by itself.
-  const filtered = runAutoFilter(state);
-  if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
+  // The water chain (filter station) is in the home system (src/engine/home.js).
 
   // Morale
   p.morale -= 2;

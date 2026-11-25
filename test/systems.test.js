@@ -12,11 +12,11 @@ loadPlaces();
 
 test('systems: weather is a registered, versioned system that runs before the legacy rules', () => {
   const sys = gameSystems();
-  assert.deepEqual(sys.ids(), ['weather', 'decay', 'legacy', 'dog', 'pacer']);
+  assert.deepEqual(sys.ids(), ['weather', 'decay', 'legacy', 'home', 'dog', 'pacer']);
   assert.equal(sys.get('weather').version, 1);
   assert.equal(sys.ownerOf('weather'), 'weather');
   assert.deepEqual(sys.missingCatchUp(), [], 'every game system says how it catches up');
-  assert.deepEqual(newGame(3).systemVersions, { weather: 1, decay: 1, legacy: 1, dog: 1, pacer: 1 });
+  assert.deepEqual(newGame(3).systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, dog: 1, pacer: 1 });
 });
 
 test('systems: the weather changes at 5 AM through the clock, not inside a day', () => {
@@ -77,7 +77,7 @@ test('saves: a save from before the engine (no systemVersions) upgrades and play
   delete old.pacer; // systems added later: their init runs on load
   delete old.decay;
   const up = parseSave(JSON.stringify(old));
-  assert.deepEqual(up.systemVersions, { weather: 1, decay: 1, legacy: 1, dog: 1, pacer: 1 });
+  assert.deepEqual(up.systemVersions, { weather: 1, decay: 1, legacy: 1, home: 1, dog: 1, pacer: 1 });
   assert.deepEqual(up.pacer, now.pacer, 'the pacer starts as in a new game');
   assert.deepEqual(up.weather, now.weather, 'weather is kept, not rolled again');
   for (let i = 0; i < 150 && !now.dead; i++) { botTurn(now); botTurn(up); }
@@ -124,6 +124,23 @@ test('dog: its own system owns state.dog; the rules do not write it', async () =
     advanceTime(s, 48 * 60, 'rest'); // dual writes would throw here
     assert.ok(s.dog.food === 0 && s.dog.health < 100, 'a hungry dog gets weak');
     assert.ok(s.dog.bond < 30 + 1, 'the bond falls when the dog is hungry');
+  } finally {
+    setDevChecks(false);
+  }
+});
+
+test('home: its own system owns state.home; the fire, battery and water chain still run', () => {
+  setDevChecks(true);
+  try {
+    assert.equal(gameSystems().ownerOf('home'), 'home');
+    const s = newGame(22);
+    s.home.fireHours = 3;
+    s.home.projects = { ...(s.home.projects || {}), rain_barrels: true, filter_station: true };
+    s.home.rawGal = 30;
+    s.home.safeGal = 0;
+    advanceTime(s, 30 * 60, 'rest'); // passes 5 AM; dual writes would throw
+    assert.equal(s.home.fireHours, 0);
+    assert.ok(s.home.safeGal >= 12, `filtered ${s.home.safeGal} gal`);
   } finally {
     setDevChecks(false);
   }

@@ -76,7 +76,7 @@ test('diagnostics: one object with weather, pacer, decay, systems, rng and activ
   assert.ok(d.weather.label);
   assert.equal(typeof d.pacer.tension, 'number');
   assert.ok('next' in d.decay);
-  assert.deepEqual(d.systems.map((x) => x.id), ['weather', 'decay', 'legacy', 'dog', 'pacer']);
+  assert.deepEqual(d.systems.map((x) => x.id), ['weather', 'decay', 'legacy', 'home', 'dog', 'pacer']);
   assert.ok(d.saveBytes > 1000);
   assert.equal(d.activity.length, 1);
   assert.equal(JSON.stringify(s), JSON.stringify(s)); // read only
