@@ -84,6 +84,7 @@ export const ITEMS = {
   rifle: { name: 'Hunting rifle', unit: 'pc', weight: 8, kind: 'tool' },
   rifle_rounds: { name: 'Rifle rounds (box of 20)', unit: 'box', weight: 1, kind: 'tool' },
   snare_wire: { name: 'Snare wire', unit: 'coil', weight: 0.2, kind: 'tool' },
+  phone: { name: 'Smartphone (charged)', unit: 'pc', weight: 0.4, kind: 'tool' },
   knife: { name: 'Folding knife', unit: 'pc', weight: 0.3, kind: 'misc' },
   multitool: { name: 'Multitool', unit: 'pc', weight: 0.5, kind: 'misc' },
   can_opener: { name: 'Can opener', unit: 'pc', weight: 0.2, kind: 'misc' },

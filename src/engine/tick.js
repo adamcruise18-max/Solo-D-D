@@ -16,6 +16,7 @@ import { infectRiskFactor } from './skills.js';
 import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
 import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
+import { decayActive } from './decay.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -40,14 +41,22 @@ export function environment(state, mode, t = state.time) {
     const p = getPlace(state.location.id);
     if (p && CATEGORIES[p.cat]?.dark) dark = true;
   }
-  return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
+  // A leaking roof (decay row roof_leaks) in the rain: cold drips, no shelter warmth.
+  const key = state.location.kind === 'place' || state.location.kind === 'house' ? state.location.id : null;
+  const leak = !!(key && weatherInfo(state).wetAfter && decayActive(state, 'roof_leaks', key, t));
+  return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
 }
 
 export function feltTemp(state, mode, env = environment(state, mode)) {
   // Asleep at home: the room you sleep in (bedroom, or by the fire), not the living room.
   const sleepHome = mode === 'sleep' && env.home ? sleepTemp(state) : null;
-  let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state);
+  // Clothes count at 80%: they slow heat loss, they do not make heat (playtest list 1).
+  let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state);
   if (env.outside) felt -= (env.wind / 10) * 7 * (1 - windBlock(state.player));
+  // Wet through outside: the wind dries you and takes the heat with it.
+  if (env.outside && (state.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+  // Moving makes body heat.
+  felt += ACTIVITY_HEAT[mode] || 0;
   if (mode === 'sleep') {
     if (sleepHome) felt += sleepHome.bed; // a bed (+10) or the couch by the fire (+6)
     // The best sleeping gear you have (a sleeping bag, a wool blanket).
@@ -58,12 +67,22 @@ export function feltTemp(state, mode, env = environment(state, mode)) {
   return felt;
 }
 
+export const CLOTHES_SHARE = 0.8;
+export const LEAK_WET = 0.25; // under a leaking roof you get wet at a quarter of the outside rate
+export const WET_OUTSIDE = 8;
+export const ACTIVITY_HEAT = { walk: 8, work: 6, heavy: 8 };
+
+// Warmth points per hour from the felt temperature. Retuned (playtest list 1):
+// a cold house in normal clothes now chills you, and a wet, windy walk below
+// freezing with poor gear is a real hypothermia risk in a few hours.
 export function warmthRate(felt) {
-  if (felt >= 70) return 10;
-  if (felt >= 55) return 3;
-  if (felt >= 40) return -3;
-  if (felt >= 25) return -7;
-  return -12;
+  if (felt >= 72) return 10;
+  if (felt >= 60) return 3;
+  if (felt >= 50) return -2;
+  if (felt >= 40) return -5;
+  if (felt >= 28) return -10;
+  if (felt >= 15) return -18;
+  return -28;
 }
 
 function damage(state, amount, cause) {
@@ -94,7 +113,7 @@ export function tickStep(state, dt, mode) {
   const wx = weatherInfo(state);
   normalizeWorn(p);
   const wasWet = p.wetness >= WET_LIMIT;
-  if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state.weather.type, wx.wetAfter) * dt, 0, 100);
+  if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
   else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state.home.fireHours > 0) * dt, 0, 100);
   p.wet = p.wetness >= WET_LIMIT;
   if (p.wet && !wasWet) log(state, 'Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.', 'warn');
@@ -148,9 +167,10 @@ export function tickStep(state, dt, mode) {
     let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
     if (sleeping && state.location.kind === 'home' && built(state, 'sick_room')) slow *= 1.5;
     inj.healH -= dt * slow;
-    if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+    if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
       inj.infectRolled = true;
-      if (chance(state, inj.infectRisk)) startInfection(state, inj.type);
+      const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state) : inj.infectRisk;
+      if (risk > 0 && chance(state, risk)) startInfection(state, inj.type);
     }
   }
   const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -160,7 +180,8 @@ export function tickStep(state, dt, mode) {
   const inf = p.illness.infection;
   if (inf) {
     inf.ageH += dt;
-    if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state, 1 * dt, 'infection'); // an infected cut never kills
+    // An infected cut never kills; once antibiotics start, the infection does no more harm.
+    if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state, 1 * dt, 'infection');
     if (inf.abxH != null) {
       inf.abxH += dt;
       if (inf.abxH >= 72) {
@@ -176,7 +197,8 @@ export function tickStep(state, dt, mode) {
   if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
 
   // Health refill
-  const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && !p.illness.infection && p.illness.stomachH <= 0;
+  const treated = !p.illness.infection || p.illness.infection.abxH != null;
+  const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
   const sickRoom = sleeping && state.location.kind === 'home' && built(state, 'sick_room');
   if (ok) p.health += (sleeping ? (sickRoom ? 1.5 : 1) : 0.25) * dt;
   p.health = Math.min(100, p.health);
@@ -252,7 +274,8 @@ const INJURY_DATA = {
   small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
   deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
   sprain: { hp: 5, healH: 120, infectRisk: 0 },
-  bite: { hp: 10, healH: 168, infectRisk: 0.4 },
+  // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+  bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 },
 };
 
 export function addInjury(state, type) {

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame } from '../src/engine/state.js';
 import { SPOTS, GAME } from '../src/data/wild.js';
-import { canFish, fish, fishOdds, canHunt, hunt, huntOdds, gameHere, isScared, setSnare, checkSnare, canSetSnare, spotsNear } from '../src/engine/wild.js';
+import { spotPressure, catchFactor, canFish, fish, fishOdds, canHunt, hunt, huntOdds, gameHere, isScared, setSnare, checkSnare, canSetSnare, spotsNear } from '../src/engine/wild.js';
 import { environment } from '../src/engine/tick.js';
 import { whereNow } from '../src/engine/pacer.js';
 import { skillLevel } from '../src/engine/skills.js';
@@ -44,18 +44,34 @@ test('fishing: needs the water and gear; takes two hours; fish are fresh; XP', (
   s.carried.knife = 1;
   assert.equal(canFish(s), null);
   assert.ok(fishOdds(s).pct > 0);
+  s.time = 150 * 1440 + 6 * 60; // late April, fresh spot
   let caught = 0;
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 6; i++) {
     const t0 = s.time;
     const r = fish(s);
     assert.ok(s.time - t0 >= 120);
     caught += r.fish;
     s.player.food = s.player.water = s.player.energy = 90;
   }
-  assert.ok(caught >= 3, `${caught} fish in 12 tries`);
+  assert.ok(caught >= 2, `${caught} fish in 6 tries`);
   assert.equal(s.carried.fresh_fish, caught);
   assert.equal(stageOf(s, 'fresh_fish'), 'fresh');
   assert.ok(skillLevel(s, 'fishing') >= 1);
+});
+
+test('fishing: spot pressure lowers the odds and recovers in 2 to 3 weeks; winter halves the catch', () => {
+  const s = at('commonwealth_lake');
+  s.carried.fishing_rod = 1;
+  s.time = 150 * 1440 + 8 * 60;
+  const fresh = fishOdds(s).pct;
+  for (let i = 0; i < 4; i++) { fish(s); s.player.food = s.player.water = s.player.energy = 90; s.time = 150 * 1440 + 8 * 60 + (i + 1) * 1440; }
+  assert.ok(spotPressure(s, 'commonwealth_lake') > 2);
+  assert.ok(fishOdds(s).pct < fresh, `${fishOdds(s).pct} vs ${fresh}`);
+  assert.ok(catchFactor(s, 'commonwealth_lake') < 0.8);
+  s.time += 18 * 1440;
+  assert.equal(spotPressure(s, 'commonwealth_lake'), 0);
+  const w = at('commonwealth_lake'); // early December
+  assert.equal(catchFactor(w, 'commonwealth_lake'), 0.5);
 });
 
 test('fishing: a salmon run month on the Willamette gives better odds', () => {

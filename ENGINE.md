@@ -268,6 +268,39 @@ request that says which rule change is meant and why.
 - Odds for buttons: `fishOdds`, `huntOdds` (find % and shot odds).
 - Replay recorded again: new gear in outdoor store and house loot.
 
+## Year sim tuning (research, 2026-11-25)
+
+- Fishing spot pressure: each trip adds 1 (`state.wild.pressure[spot]`), recovering
+  0.25 a day; catch × (1 − 0.15 × pressure), and −1 to −4 on the roll ("fished out").
+  Winter (Dec to Feb) halves the catch; a salmon run is a salmon half the time.
+  Catch is 1 to 3 fish by the roll. A skilled angler who rotates spots gets about
+  500 kcal an hour at the bank, about 300 with the walk.
+- Hunting gear: more bows and arrows in outdoor stores, a few in houses; snare wire in
+  hardware stores.
+- Bites: 25% infection if open for 6 h, 10% even if bandaged in time.
+
+## Playtest list 1 fixes (research, 700 bot runs)
+
+- Antibiotics: once a course starts (`infection.abxH`), the infection does no more
+  damage and health refills again (it took health until cured before).
+- Cold retune (`tick.js`): clothes count at 80% (`CLOTHES_SHARE`), walking +8°F and
+  work +6°F of body heat (`ACTIVITY_HEAT`), wet through outside −8°F (`WET_OUTSIDE`),
+  new `warmthRate` bands down to −28/h. Week 1 with no fire in normal clothes now
+  drops warmth to about 36; a soaked ice-storm walk in only a down coat loses about
+  10 warmth an hour; full gear with a rain jacket stays warm.
+- Pacer: events are 0.4x as likely asleep (`ASLEEP_RATE`); an event may carry its own
+  weight factor `w` (events.js).
+- Decay rows with rule effects:
+  - `roof_leaks` (area = place or house key): paper items (`SOAKS`) are gone from the
+    loot; in the rain you get damp inside (25% of outside rate) and it is 1°F over
+    the air, not 5°F.
+  - `trees_on_roads` (area `road:<place id>`): the walk there is 1.3x longer (1.1x
+    with a phone signal); the first time, a world change `road:<id>` / `tree` is recorded.
+  - `cell_towers` (area: grid cell of about 3 miles): `phoneSignal(state)` with a
+    `phone` item. After that, a phone is only a light and a camera (UI).
+- Tools: the careful bot gets the same idle guard as the replay bot, goes home for
+  antibiotics; `sim` reports stuck runs (turn limit) instead of "alive".
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).

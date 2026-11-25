@@ -47,7 +47,7 @@ test('a player who does nothing dies, with a cause', () => {
   const s = newGame(3);
   advanceTime(s, 5 * 24 * 60);
   assert.ok(s.dead);
-  assert.match(s.dead.cause, /dehydration/);
+  assert.match(s.dead.cause, /dehydration|cold/); // no water, no fire, normal clothes: thirst or the cold
 });
 
 test('drinking and eating from home storage', () => {
