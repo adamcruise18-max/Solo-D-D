@@ -210,6 +210,16 @@ export function openInside(opts) {
   scene.add(worldUV(lintel));
   // Daylight (or night) through the open door, a shaft, dust in the air.
   lk.addDoorLight(0, 0, !!opts.night, { width: 1.8, height: 2.2 });
+  // Daylight through the front windows of a dark store: strong at the front, fading toward
+  // the back (no black back half). Added at build time so no shader rebuild later.
+  if (dark && !opts.night && plan.kind === 'hall') {
+    const n = W > 20 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const L = new PointLight(0xc9d3de, 14, D * 1.1, 1.1);
+      L.position.set(n === 1 ? 0 : -W / 3 + (i * (2 * W / 3)) / (n - 1), H - 0.6, -1.2);
+      scene.add(L);
+    }
+  }
   if (plan.cat !== 'house') lk.addExitSign(0, Math.min(H - 0.25, 2.55), -0.14, Math.PI);
   lk.addDust({ minX: -W / 2 + 0.3, maxX: W / 2 - 0.3, minY: 0.1, maxY: H - 0.2, minZ: -D + 0.3, maxZ: -0.3 });
   // Notices by the door (no brands, no real names), dirt and paper on the floor.
@@ -376,7 +386,8 @@ export function openInside(opts) {
   function buildFace(face, done) {
     if (face.group) { scene.remove(face.group); face.group.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); }
     const { f, side } = face;
-    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.85));
+    // Picked over after 3 months: front shelves are 20-50% full.
+    const fill = Math.max(0.03, opts.stock * (done ? 0.12 : 0.6));
     const g = makeShelfFill(FILL_KIND, f.d - 0.1, [0.12, 0.62, 1.12, 1.57], fill, hashString(`${opts.title}:${f.x}:${f.z}:${side}`));
     g.position.set(f.x + side * 0.05, 0, f.z);
     g.rotation.y = side > 0 ? 0 : Math.PI;
