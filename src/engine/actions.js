@@ -47,6 +47,8 @@ function cookPick(state) {
 import { practice, searchTimeFactor, forceBonus, bandageHealFactor, cookMoraleBonus, boilTimeFactor, fireBonusFactor, rawWaterRiskFactor, hasRead, skillsOf, SKILLS, BOOK_XP, READ_MINUTES } from './skills.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// Scavenging is used all the time; half xp per use so level 5 comes in month 3 or 4, not month 2.
+const SCAV_XP = 0.5;
 
 // ---------- helpers ----------
 function source(state, from) {
@@ -768,7 +770,7 @@ export function pickUp(state, pid) {
   ctx.holder.taken.push(pid);
   addItem(state.carried, it.item, 1);
   log(state, `You take: ${itemName(it.item)}.`);
-  practice(state, 'scavenging', 1);
+  practice(state, 'scavenging', SCAV_XP);
   if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
     markZoneDone(ctx, zone);
     state.stats.zonesSearched += 1;
@@ -803,7 +805,7 @@ export function openContainer(state, cid) {
   if (state.dead) return true;
   h.opened.push(cid);
   log(state, 'You open it and look inside.');
-  practice(state, 'scavenging', 1);
+  practice(state, 'scavenging', SCAV_XP);
   return true;
 }
 export function openedContainers(state) {
@@ -837,7 +839,7 @@ export function searchZone(state, index) {
   markZoneDone(ctx, zone);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-  practice(state, 'scavenging', 2);
+  practice(state, 'scavenging', 2 * SCAV_XP);
   reportFound(state, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
   state.lastFound = found;
   return true;
@@ -968,7 +970,7 @@ export function searchRoom(state, index) {
   markZoneDone(ctx, room);
   state.stats.zonesSearched += 1;
   for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-  practice(state, 'scavenging', 2);
+  practice(state, 'scavenging', 2 * SCAV_XP);
   reportFound(state, found, HOUSE_ROOMS[room]);
   state.lastFound = found;
   return true;

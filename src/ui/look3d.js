@@ -1402,7 +1402,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   const keep = (x) => (disposables.push(x), x);
 
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = dim ? 1.25 : 1.0;
+  renderer.toneMappingExposure = dark && night ? 0.6 : dim ? 1.25 : 1.0; // a dark store at night: only your light
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = high ? PCFSoftShadowMap : PCFShadowMap;
@@ -1440,7 +1440,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
     pm.dispose();
     roomGeo.dispose(); roomMat.dispose(); door.geometry.dispose(); door.material.dispose();
     scene.environment = envRT.texture;
-    scene.environmentIntensity = dark ? 0.35 : night ? 0.3 : 0.6;
+    scene.environmentIntensity = dark ? (night ? 0.06 : 0.35) : night ? 0.3 : 0.6;
   } catch { envRT = null; }
 
   // Fill light: what bounces around the room. Low in the dark so the flashlight matters.
@@ -1448,7 +1448,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   if (opts.fill !== false) {
     // A dark store in the daytime still gets some grey light from the doors and front windows.
     fill = dark
-      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.55 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
+      ? new HemisphereLight(real ? 0x7a8aa0 : 0x9a96a0, real ? 0x1d1813 : 0x2a2018, night ? 0.12 : 0.95 * (0.4 + 0.6 * Math.min(1, dayK)))
       : night
         ? new HemisphereLight(0x5d6f8c, 0x15120e, 0.6)
         : new HemisphereLight(real ? 0xd6dee8 : 0xfff0de, real ? 0x8c877e : 0x9a8670, 1.5 * (0.35 + 0.65 * Math.min(1, dayK)));
@@ -1461,7 +1461,7 @@ export function setupLook(renderer, scene, camera, opts = {}) {
   let flashlight = null;
   let flashOn = false;
   let flashPower = 1;
-  const FLASH_I = 70;
+  const FLASH_I = dark && night ? 140 : 70; // stronger to match the lower exposure in a dark store at night
   const flashTarget = new Object3D();
   if (opts.flashlight !== false) {
     const spot = new SpotLight(0xfff1dc, 0, 26, 0.48, 0.55, 2);

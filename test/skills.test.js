@@ -76,7 +76,7 @@ test('searching gives scavenging xp, and scavenging makes searches faster', () =
   s.location = { kind: 'place', id: 'sk1' };
   const m0 = searchMinutes(s, 20, false);
   perform(s, 'action', 'search', 0);
-  assert.ok(s.skills.xp.scavenging >= 2);
+  assert.ok(s.skills.xp.scavenging >= 1); // half xp per use (SCAV_XP)
   practice(s, 'scavenging', LEVEL_XP[2]);
   assert.ok(searchMinutes(s, 20, false) < m0);
 });

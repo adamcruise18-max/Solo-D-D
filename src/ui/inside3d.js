@@ -220,7 +220,7 @@ export function openInside(opts) {
     const spots = [];
     for (let z = -3; z > -D + 1; z -= 5) for (let x = -W / 2 + 3; x < W / 2 - 1; x += 6) spots.push([x, z]);
     if (plan.cat === 'house' || plan.kind !== 'hall') spots.splice(0, spots.length, ...spots.filter((_, i) => i % 2 === 0));
-    let emergency = dark ? 1 + Math.floor(lrnd() * 2) : 0;
+    let emergency = dark && !opts.night ? 1 + Math.floor(lrnd() * 2) : 0; // at night the emergency batteries are long dead
     spots.forEach(([x, z], i) => {
       const r = lrnd();
       const state = emergency > 0 && r < 0.18 ? (emergency--, 'emergency') : plan.cat !== 'house' && r > 0.86 ? 'flicker' : 'dead';
@@ -817,7 +817,8 @@ export function openInside(opts) {
       // Loot is a little brighter than the room, so the eye finds it.
       // The item lights itself with its own colors (emissive map = its texture), so it stays
       // bright and saturated in a dim store and reads above the darker shelf stock.
-      const glow = 0.32 + 0.18 * notice.lootGlow;
+      // In a dark store at night the glow is faint: you need your flashlight to find loot.
+      const glow = (0.32 + 0.18 * notice.lootGlow) * (dark && opts.night ? 0.2 : 1);
       obj.traverse((m) => {
         if (!m.isMesh || !m.material) return;
         const fix = (mt) => {

@@ -3758,6 +3758,7 @@
     return COOK_ORDER().find((f) => ((h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
   }
   var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var SCAV_XP = 0.5;
   function source2(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
   }
@@ -4456,7 +4457,7 @@
     ctx.holder.taken.push(pid);
     addItem(state2.carried, it.item, 1);
     log(state2, `You take: ${itemName(it.item)}.`);
-    practice(state2, "scavenging", 1);
+    practice(state2, "scavenging", SCAV_XP);
     if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
       markZoneDone(ctx, zone);
       state2.stats.zonesSearched += 1;
@@ -4486,7 +4487,7 @@
     if (state2.dead) return true;
     h2.opened.push(cid);
     log(state2, "You open it and look inside.");
-    practice(state2, "scavenging", 1);
+    practice(state2, "scavenging", SCAV_XP);
     return true;
   }
   function openedContainers(state2) {
@@ -4518,7 +4519,7 @@
     markZoneDone(ctx, zone);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-    practice(state2, "scavenging", 2);
+    practice(state2, "scavenging", 2 * SCAV_XP);
     reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
     state2.lastFound = found;
     return true;
@@ -4638,7 +4639,7 @@
     markZoneDone(ctx, room);
     state2.stats.zonesSearched += 1;
     for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-    practice(state2, "scavenging", 2);
+    practice(state2, "scavenging", 2 * SCAV_XP);
     reportFound(state2, found, HOUSE_ROOMS[room]);
     state2.lastFound = found;
     return true;
