@@ -575,6 +575,10 @@
     const hz = (_a = state2.flags).hazards || (_a.hazards = {});
     hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
   }
+  function hazardOn(state2, id, t = state2.time) {
+    const end = state2.flags?.hazards?.[id];
+    return end != null && t < end;
+  }
   function activeHazards(state2, t = state2.time) {
     const hz = state2.flags?.hazards || {};
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
@@ -1202,6 +1206,12 @@
       log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
   }
+  var LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
+  function overgrowthWalk(t) {
+    const og = overgrowth(t);
+    if (og <= 0.25) return 1;
+    return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
+  }
 
   // src/core/activity.js
   var source = { sys: null, hook: null };
@@ -1787,7 +1797,12 @@
     d.food = clamp(d.food - 4 * dt, 0, 100);
     d.water = 80;
     if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.sick) d.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d.health > 0) {
+      feralWarning(state2, d);
+      sniff(state2, d, dt);
+    }
     if (d.health <= 50 && d.warned < 1) {
       d.warned = 1;
       log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
@@ -1802,6 +1817,66 @@
       d.stage = "dead";
       log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
       state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  var SICK_PER_HOUR = 0.25;
+  var FIND_BOND = 40;
+  var FINDS = [
+    ["canned_food", 3],
+    ["jerky", 2],
+    ["snacks", 2],
+    ["dog_food", 1],
+    ["rope", 1],
+    ["gloves", 1],
+    ["wool_socks", 1],
+    ["batteries", 1],
+    ["raw_meat", 1]
+  ];
+  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
+  function dogWarns(state2) {
+    const d = state2.dog;
+    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+  }
+  function feralWarning(state2, d) {
+    if (!dogWarns(state2) || !hazardOn(state2, "feral_dogs")) return;
+    const end = state2.flags.hazards.feral_dogs;
+    if (d.feralWarned === end) return;
+    d.feralWarned = end;
+    log(state2, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+  }
+  function sniff(state2, d, dt) {
+    const loc = state2.location;
+    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    const key = `${loc.kind}:${loc.id}:${Math.floor(state2.time / 1440)}`;
+    if (d.foundAt === key) return;
+    const r = stream(state2, "dog");
+    if (r() >= 0.12 * (d.bond / 100) * dt) return;
+    d.foundAt = key;
+    const total = FINDS.reduce((a, [, w]) => a + w, 0);
+    let x = r() * total;
+    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
+    addItem(state2.carried, id, 1);
+    d.finds = (d.finds || 0) + 1;
+    log(state2, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+  }
+  function dogSickDaily(state2, day) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    const r = stream(state2, "dog");
+    if (d.sick) {
+      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
+        d.sick = null;
+        log(state2, `${d.name} eats with interest again. The sickness is over.`, "good");
+      }
+      return;
+    }
+    const w = state2.weather || {};
+    let p = 0.012;
+    if (d.food < 25) p += 0.03;
+    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (r() < p) {
+      d.sick = { since: day };
+      log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
   }
   function dogBondDaily(state2) {
@@ -1853,6 +1928,7 @@
     daily: (state2, day) => {
       dogBondDaily(state2);
       dogDaily(state2, day);
+      dogSickDaily(state2, day);
     }
   };
 
@@ -2975,7 +3051,13 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
+    const og = overgrowthWalk(t);
+    if (og < 0.99) apply(og, "overgrown streets");
+    for (const h2 of activeHazards(state2, t)) {
+      if (!h2.walk) continue;
+      if (h2.id === "feral_dogs" && dogWarns(state2)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h2.walk, h2.label);
+    }
     return { mph, why };
   }
   function estimateTrip(state2, dest) {

@@ -233,6 +233,21 @@ request that says which rule change is meant and why.
 - Player actions for the UI: `canPlant`, `plant` (uses one `seeds`), `waterGarden`
   (2 gal raw water a bed), `harvest` (fresh food into storage), `gardenInfo`.
 
+## Overgrowth effects and a deeper dog (research step 9)
+
+- `src/engine/season.js`: `overgrowthWalk(t)` (1 until a quarter grown in, then down
+  to 0.85 in a grown-in summer; used by `walkSpeed` as "overgrown streets"),
+  `animalCover(t)` 0..1 and `forageFactor(t)` (summer most, winter almost none)
+  for hunting and foraging when they come.
+- `src/engine/dog.js` (stream `dog`, the shared rng does not move):
+  - finds: in a store or house, a dog with bond 40+ may find one item a visit;
+  - warns: with bond 30+, the pacer's `feral_dogs` hazard costs 4% speed, not 10%,
+    with one warning line a pack (`dogWarns`);
+  - sickness: about 1% a day (more when hungry or in cold rain); a sick dog loses
+    about 6 health a day and does not heal in sleep; it gets well by itself after
+    4+ days if fed, or at once with antibiotics (`canTreatDog`, `treatDog`).
+- Replay recorded again (only the new `dog` stream moved).
+
 ## Moving old code into the engine
 
 Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).

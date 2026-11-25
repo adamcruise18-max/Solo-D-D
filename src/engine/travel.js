@@ -9,6 +9,8 @@ import { rollZone } from './loot.js';
 import { itemName } from '../data/items.js';
 import { walkSpeedFactor, energyUseFactor } from './background.js';
 import { activeHazards } from './hazards.js';
+import { overgrowthWalk } from './season.js';
+import { dogWarns } from './dog.js';
 
 export const ROUTE_FACTOR = 1.25;
 
@@ -38,7 +40,13 @@ export function walkSpeed(state, t = state.time) {
   if (p.energy < 25) apply(0.7, 'exhausted');
   if (p.health < 25) apply(0.7, 'badly hurt');
   if (walkSpeedFactor(state) < 1) apply(walkSpeedFactor(state), 'bad knees');
-  for (const h of activeHazards(state, t)) if (h.walk) apply(h.walk, h.label);
+  const og = overgrowthWalk(t);
+  if (og < 0.99) apply(og, 'overgrown streets');
+  for (const h of activeHazards(state, t)) {
+    if (!h.walk) continue;
+    if (h.id === 'feral_dogs' && dogWarns(state)) apply(0.96, 'loose dogs, your dog warns you early');
+    else apply(h.walk, h.label);
+  }
   return { mph, why };
 }
 
