@@ -132,6 +132,15 @@ export function harvest(state) {
   return got;
 }
 
+// Growth stage for the UI (and the 3D beds): one word per bed.
+export function stageOf(b) {
+  if (b.dead) return 'dead';
+  if (b.growth >= 1) return 'ready';
+  if (b.growth >= 0.6) return 'nearly';
+  if (b.growth >= 0.2) return 'growing';
+  return 'seedling';
+}
+
 // For the UI: each bed, and what you can sow this month.
 export function gardenInfo(state) {
   const g = garden(state);
@@ -145,6 +154,7 @@ export function gardenInfo(state) {
       water: Math.round(b.water * 100),
       ready: b.growth >= 1 && !b.dead,
       dead: b.dead,
+      stage: stageOf(b),
     })),
     canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id),
   };
