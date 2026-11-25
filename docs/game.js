@@ -2815,9 +2815,11 @@
       h2.work[id] = 0;
       log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
     }
-    const hours = Math.min(WORK_BLOCK_H, st.leftH);
-    advanceTime(state2, Math.round(hours * 60), "heavy");
+    let hours = Math.min(WORK_BLOCK_H, st.leftH);
+    const t0 = state2.time;
+    const stopped = advanceTime(state2, Math.round(hours * 60), "heavy", { stopAtDanger: true });
     if (state2.dead) return;
+    if (stopped) hours = Math.max(0, (state2.time - t0) / 60);
     h2.work[id] += hours;
     if (h2.work[id] >= proj.hours - 1e-9) {
       delete h2.work[id];
@@ -3552,8 +3554,7 @@
     extension_cord: { parts: { wiring: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "wire" },
     wooden_chair: { parts: { scrap_wood: 1, hardware_parts: 0.25 }, tools: ["toolkit", "pry_bar"], min: 30, what: "wood and screws" },
     garden_hose: { parts: { pipe_fittings: 0.5 }, tools: ["multitool", "toolkit", "knife"], min: 10, what: "hose and fittings" },
-    broken_bike: { parts: { hardware_parts: 0.5, pipe_fittings: 0.25, wiring: 0.25 }, tools: ["toolkit", "multitool"], min: 30, what: "screws, tube and cable" },
-    radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ["multitool", "toolkit", "knife"], min: 15, what: "wire and screws" }
+    broken_bike: { parts: { hardware_parts: 0.5, pipe_fittings: 0.25, wiring: 0.25 }, tools: ["toolkit", "multitool"], min: 30, what: "screws, tube and cable" }
   };
 
   // src/engine/cars-loot.js
@@ -3610,15 +3611,15 @@
     log(state2, "You reach the abandoned car. Leaves and dust cover the glass.", "travel");
     return true;
   }
-  var hasAny = (state2, ids) => ids.find((t) => has(state2, t)) || null;
+  var whole = (state2, id) => (state2.carried[id] || 0) >= 1 || state2.location.kind === "home" && (state2.home.storage[id] || 0) >= 1;
+  var hasAny = (state2, ids) => ids.find((t) => whole(state2, t)) || null;
   var SIPHON_TOOLS = ["garden_hose", "pipe_fittings"];
   var WRENCH_TOOLS = ["toolkit", "multitool"];
   function searchCar(state2) {
     const c = carHere(state2);
     if (!c || c.searched) return;
+    if (advanceTime(state2, CAR_SEARCH_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
     c.searched = true;
-    advanceTime(state2, CAR_SEARCH_MIN, "work");
-    if (state2.dead) return;
     const found = rollTable(state2);
     for (const id of found) addItem(state2.carried, id, 1);
     practice(state2, "scavenging", 1);
@@ -3631,9 +3632,8 @@
       log(state2, "You need a hose to siphon gas.");
       return;
     }
+    if (advanceTime(state2, SIPHON_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
     c.siphoned = true;
-    advanceTime(state2, SIPHON_MIN, "work");
-    if (state2.dead) return;
     const gal = chance(state2, 0.35) ? 0 : randInt(state2, 1, 3);
     if (!gal) {
       log(state2, "You feed the hose into the tank. It is dry.");
@@ -3641,7 +3641,7 @@
     }
     addItem(state2.carried, "gas_can", gal);
     const stale = decayShare(state2, "stale_gas");
-    log(state2, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min). It smells sour.${stale > 0.3 ? " Old gas: it may not start an engine." : ""}`, "good");
+    log(state2, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min).${stale > 0.3 ? " It smells sour. Old gas: it may not start an engine." : ""}`, "good");
   }
   function takeCarBattery(state2) {
     const c = carHere(state2);
@@ -3651,9 +3651,8 @@
       log(state2, "You need a wrench (tool kit or multitool) to take the battery out.");
       return;
     }
+    if (advanceTime(state2, BATTERY_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
     c.battery = true;
-    advanceTime(state2, BATTERY_MIN, "work");
-    if (state2.dead) return;
     addItem(state2.carried, "car_battery", 1);
     practice(state2, "tinkering", 2);
     log(state2, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, "good");
@@ -3666,9 +3665,8 @@
       log(state2, "You need a knife or a tool to cut the wire.");
       return;
     }
+    if (advanceTime(state2, WIRE_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
     c.wire = true;
-    advanceTime(state2, WIRE_MIN, "work");
-    if (state2.dead) return;
     addItem(state2.carried, "wiring", 0.5);
     addItem(state2.carried, "hardware_parts", 0.25);
     practice(state2, "tinkering", 2);
@@ -3677,6 +3675,7 @@
   function addCarBattery(state2, bag) {
     const h2 = state2.home;
     h2.carBatteries = h2.carBatteries || 0;
+    if (!((bag.car_battery || 0) >= 1)) return;
     if (h2.carBatteries >= MAX_CAR_BATTERIES) {
       log(state2, "The bank has no room for more car batteries.");
       return;
@@ -4122,16 +4121,25 @@
     const sv = SALVAGE[id];
     const tool = salvageTool(state2, id);
     if (!tool) {
-      log(state2, `You need ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")} to take this apart.`);
+      log(state2, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or a ")} to take this apart.`);
       return;
     }
     const min = salvageMinutes(state2, id);
+    if (advanceTime(state2, min, "work", { stopAtDanger: true }) || state2.dead) return;
     addItem(bag, id, -1);
     for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
-    advanceTime(state2, min, "work");
     practice(state2, "tinkering", 2);
-    log(state2, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => `${q} ${ITEMS[pid].unit} ${itemName(pid).toLowerCase()}`).join(", ")}.`, "good");
+    log(state2, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(", ")}.`, "good");
   }
+  var endDot = (t) => /[.!?]$/.test(t) ? t : `${t}.`;
+  var plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, "");
+  var QTY_WORDS = { 0.25: "a quarter", 0.5: "half a", 0.75: "three quarters of a" };
+  function partText(pid, q) {
+    const it = ITEMS[pid];
+    const w = QTY_WORDS[q];
+    return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+  }
+  var sleepWhere = (state2) => sleepSpot(state2) !== "living" ? "in your bed" : state2.home.fireHours > 0 ? "by the fire" : "on the couch";
   function useItem(state2, id, verb, from = "carried") {
     const bag = source2(state2, from);
     const it = ITEMS[id];
@@ -4149,7 +4157,7 @@
         addItem(bag, id, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
         if (it.water) addWater(state2, it.water);
-        log(state2, `You eat: ${it.name}${it.portion < 1 ? " (one portion)" : ""}.`);
+        log(state2, `You eat: ${plainName(id)}${it.portion < 1 ? " (one portion)" : ""}.`);
         advanceTime(state2, 15);
         if (risk > 0 && chance(state2, risk)) {
           log(state2, "It tasted off. Your stomach turns.", "warn");
@@ -4169,6 +4177,10 @@
       case "salvage":
         return salvage(state2, id, bag);
       case "carbattery":
+        if (state2.location.kind !== "home") {
+          log(state2, "You can wire the car battery into the bank only at home.");
+          return;
+        }
         return addCarBattery(state2, bag);
       case "wear": {
         addItem(bag, id, -1);
@@ -4316,18 +4328,21 @@
   function takeAll(state2) {
     const bag = hereBag(state2);
     const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+    const took = [];
     let left = false;
     for (const id of ids) {
       const before = bag[id];
       const w = ITEMS[id].weight;
-      const maxN = Math.floor(freeWeight(state2) / w);
-      const n = Math.min(Math.floor(before), maxN);
+      const room = freeWeight(state2) / w;
+      const n = before < 1 ? room >= before ? before : 0 : Math.min(Math.floor(before), Math.floor(room));
       if (n > 0) {
         addItem(bag, id, -n);
         addItem(state2.carried, id, n);
+        took.push(itemName(id).toLowerCase());
       }
       if (bag[id]) left = true;
     }
+    if (took.length) log(state2, `You take: ${took.join(", ")}.`);
     if (left) log(state2, "Your pack is full. Some items stay here.", "warn");
     advanceTime(state2, 2);
   }
@@ -4351,11 +4366,11 @@
   }
   function rest(state2, hours) {
     log(state2, `You rest for ${hours} h.`);
-    advanceTime(state2, hours * 60, "rest");
+    advanceTime(state2, hours * 60, "rest", { stopAtDanger: true });
   }
   function sleep(state2, hours) {
     const k = state2.location.kind;
-    const where = k === "home" ? sleepSpot(state2) === "living" ? "by the fire" : "in your bed" : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
+    const where = k === "home" ? sleepWhere(state2) : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
     log(state2, `You sleep ${where} for ${hours} h.`);
     advanceTime(state2, hours * 60, "sleep");
     if (!state2.dead) log(state2, "You wake up.");
@@ -4457,7 +4472,7 @@
         p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
         p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
-        log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
+        log(state2, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
         advanceTime(state2, 30);
         if (risk > 0 && chance(state2, risk)) {
           log(state2, "The food was bad. Your stomach turns.", "warn");
@@ -4479,9 +4494,8 @@
       }
       case "run_generator": {
         const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
+        if (advanceTime(state2, 120, "work", { stopAtDanger: true }) || state2.dead) return;
         addItem(bag, "gas_can", -1);
-        advanceTime(state2, 120, "work");
-        if (state2.dead) return;
         if (!chance(state2, gasStartChance(state2))) {
           log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
           p.morale = clamp3(p.morale - 2, 0, 100);
@@ -4494,10 +4508,10 @@
         return;
       }
       case "break_furniture":
+        if (advanceTime(state2, 60, "heavy", { stopAtDanger: true }) || state2.dead) return;
         h2.furniture -= 1;
         addItem(h2.storage, "firewood", 1);
         log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
-        advanceTime(state2, 60, "heavy");
         practice(state2, "tinkering", 2);
         return;
       case "heater":
@@ -4910,7 +4924,7 @@
     state2.houses[id].pos = pos;
     state2.pos = { ...pos };
     advanceTime(state2, 5, "walk");
-    log(state2, `You walk to a house ${near}.`);
+    log(state2, endDot(`You walk to a house ${near}`));
     if (chance(state2, 0.7)) {
       if (has2(state2, "pry_bar")) {
         log(state2, "The door is locked. You open it with the pry bar.");
@@ -4931,9 +4945,22 @@
     }
     state2.stats.housesSearched += 1;
     state2.location = { kind: "house", id, label, parent };
-    if (state2.houses[id].body) seeBody(state2, "Someone is in the bedroom. You close the door.");
-    else log(state2, "The house is empty and cold. A family lived here.");
+    const hn = state2.stats.housesSearched;
+    if (state2.houses[id].body) seeBody(state2, BODY_LINES[hn % BODY_LINES.length]);
+    else log(state2, EMPTY_LINES[hn % EMPTY_LINES.length]);
   }
+  var BODY_LINES = [
+    "Someone is in the bedroom. You close the door.",
+    "Someone lies under a blanket on the couch. You do not look long.",
+    "A door upstairs is shut, and the air is bad. You leave it shut."
+  ];
+  var EMPTY_LINES = [
+    "The house is empty and cold. A family lived here.",
+    "The house is quiet. Dust covers the table.",
+    "Coats still hang by the door. Nobody is here.",
+    "The rooms are cold and dark. The clocks have stopped.",
+    "Toys lie on the floor. The house is empty."
+  ];
   function searchRoom(state2, index) {
     const ctx = zoneCtx(state2);
     if (!ctx || !ctx.house) return false;
@@ -4972,7 +4999,7 @@
     const ok = travel(state2, place, place.name);
     if (!ok) return;
     state2.location = { kind: "place", id: placeId };
-    log(state2, `You arrive at ${place.name}.`, "travel");
+    log(state2, endDot(`You arrive at ${place.name}`), "travel");
     enterPlace(state2, place);
   }
   function goHome(state2) {
@@ -5086,7 +5113,7 @@
       add("go_home", "Walk home");
     }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? sleepSpot(state2) === "living" ? "Sleep by the fire\u2026" : "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? `Sleep ${sleepWhere(state2)}\u2026` : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
       if (state2.dog.sick) {

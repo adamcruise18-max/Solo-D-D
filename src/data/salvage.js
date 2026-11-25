@@ -10,5 +10,4 @@ export const SALVAGE = {
   wooden_chair: { parts: { scrap_wood: 1, hardware_parts: 0.25 }, tools: ['toolkit', 'pry_bar'], min: 30, what: 'wood and screws' },
   garden_hose: { parts: { pipe_fittings: 0.5 }, tools: ['multitool', 'toolkit', 'knife'], min: 10, what: 'hose and fittings' },
   broken_bike: { parts: { hardware_parts: 0.5, pipe_fittings: 0.25, wiring: 0.25 }, tools: ['toolkit', 'multitool'], min: 30, what: 'screws, tube and cable' },
-  radio: { parts: { wiring: 0.25, hardware_parts: 0.25 }, tools: ['multitool', 'toolkit', 'knife'], min: 15, what: 'wire and screws' },
 };

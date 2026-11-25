@@ -84,9 +84,12 @@ export function workOnProject(state, id) {
     h.work[id] = 0;
     log(state, `You start a project: ${proj.name}. You lay out the parts.`);
   }
-  const hours = Math.min(WORK_BLOCK_H, st.leftH);
-  advanceTime(state, Math.round(hours * 60), 'heavy');
+  let hours = Math.min(WORK_BLOCK_H, st.leftH);
+  const t0 = state.time;
+  // Stop at a danger line (thirst, hunger, cold); only the time worked counts.
+  const stopped = advanceTime(state, Math.round(hours * 60), 'heavy', { stopAtDanger: true });
   if (state.dead) return;
+  if (stopped) hours = Math.max(0, (state.time - t0) / 60);
   h.work[id] += hours;
   if (h.work[id] >= proj.hours - 1e-9) {
     delete h.work[id];

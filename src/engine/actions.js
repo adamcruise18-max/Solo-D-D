@@ -155,15 +155,26 @@ export function salvageMinutes(state, id) {
 function salvage(state, id, bag) {
   const sv = SALVAGE[id];
   const tool = salvageTool(state, id);
-  if (!tool) { log(state, `You need ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or ')} to take this apart.`); return; }
+  if (!tool) { log(state, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(' or a ')} to take this apart.`); return; }
   const min = salvageMinutes(state, id);
+  if (advanceTime(state, min, 'work', { stopAtDanger: true }) || state.dead) return;
   addItem(bag, id, -1);
   // The parts go where the junk was (home storage or your bag).
   for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
-  advanceTime(state, min, 'work');
   practice(state, 'tinkering', 2);
-  log(state, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => `${q} ${ITEMS[pid].unit} ${itemName(pid).toLowerCase()}`).join(', ')}.`, 'good');
+  log(state, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(', ')}.`, 'good');
 }
+
+// Text helpers: no double period after a name like "Inc.", and no nested brackets.
+const endDot = (t) => (/[.!?]$/.test(t) ? t : `${t}.`);
+const plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, '');
+const QTY_WORDS = { 0.25: 'a quarter', 0.5: 'half a', 0.75: 'three quarters of a' };
+function partText(pid, q) {
+  const it = ITEMS[pid];
+  const w = QTY_WORDS[q];
+  return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+}
+const sleepWhere = (state) => (sleepSpot(state) !== 'living' ? 'in your bed' : state.home.fireHours > 0 ? 'by the fire' : 'on the couch');
 
 export function useItem(state, id, verb, from = 'carried') {
   const bag = source(state, from);
@@ -182,7 +193,7 @@ export function useItem(state, id, verb, from = 'carried') {
       addItem(bag, id, -it.portion);
       addFood(state, (it.cal * it.portion) / CAL_PER_FOOD_POINT);
       if (it.water) addWater(state, it.water);
-      log(state, `You eat: ${it.name}${it.portion < 1 ? ' (one portion)' : ''}.`);
+      log(state, `You eat: ${plainName(id)}${it.portion < 1 ? ' (one portion)' : ''}.`);
       advanceTime(state, 15);
       if (risk > 0 && chance(state, risk)) { log(state, 'It tasted off. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
@@ -199,6 +210,7 @@ export function useItem(state, id, verb, from = 'carried') {
     case 'salvage':
       return salvage(state, id, bag);
     case 'carbattery':
+      if (state.location.kind !== 'home') { log(state, 'You can wire the car battery into the bank only at home.'); return; }
       return addCarBattery(state, bag);
     case 'wear': {
       // One item per layer; the old one goes back into the same bag.
@@ -332,15 +344,18 @@ export function takeItem(state, id, qty) {
 export function takeAll(state) {
   const bag = hereBag(state);
   const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+  const took = [];
   let left = false;
   for (const id of ids) {
     const before = bag[id];
     const w = ITEMS[id].weight;
-    const maxN = Math.floor(freeWeight(state) / w);
-    const n = Math.min(Math.floor(before), maxN);
-    if (n > 0) { addItem(bag, id, -n); addItem(state.carried, id, n); }
+    const room = freeWeight(state) / w;
+    // Whole units, but a part-unit (0.5 roll of wire) can be taken whole if it fits.
+    const n = before < 1 ? (room >= before ? before : 0) : Math.min(Math.floor(before), Math.floor(room));
+    if (n > 0) { addItem(bag, id, -n); addItem(state.carried, id, n); took.push(itemName(id).toLowerCase()); }
     if (bag[id]) left = true;
   }
+  if (took.length) log(state, `You take: ${took.join(', ')}.`);
   if (left) log(state, 'Your pack is full. Some items stay here.', 'warn');
   advanceTime(state, 2);
 }
@@ -368,12 +383,12 @@ export function storeAll(state) {
 // ---------- rest and sleep ----------
 export function rest(state, hours) {
   log(state, `You rest for ${hours} h.`);
-  advanceTime(state, hours * 60, 'rest');
+  advanceTime(state, hours * 60, 'rest', { stopAtDanger: true });
 }
 
 export function sleep(state, hours) {
   const k = state.location.kind;
-  const where = k === 'home' ? (sleepSpot(state) === 'living' ? 'by the fire' : 'in your bed')
+  const where = k === 'home' ? sleepWhere(state)
     : k === 'wild' ? 'on the ground' : k === 'car' ? 'in the car' : 'on the floor';
   log(state, `You sleep ${where} for ${hours} h.`);
   advanceTime(state, hours * 60, 'sleep');
@@ -475,7 +490,7 @@ function homeAction(state, id) {
       p.morale = clamp(p.morale + 5 + cookMoraleBonus(state), 0, 100);
       p.warmFedH = WARM_FED_HOURS; // "Warm and fed": warmth drops slower for a while
       practice(state, 'cooking', 3);
-      log(state, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== 'Fresh' ? `, ${stage.toLowerCase()}` : ''}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, 'good');
+      log(state, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== 'Fresh' ? `, ${stage.toLowerCase()}` : ''}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, 'good');
       advanceTime(state, 30);
       if (risk > 0 && chance(state, risk)) { log(state, 'The food was bad. Your stomach turns.', 'warn'); startStomachBug(state); }
       return;
@@ -494,9 +509,8 @@ function homeAction(state, id) {
     }
     case 'run_generator': {
       const bag = (h.storage.gas_can || 0) > 0 ? h.storage : state.carried;
+      if (advanceTime(state, 120, 'work', { stopAtDanger: true }) || state.dead) return; // stopped: the gas stays in the can
       addItem(bag, 'gas_can', -1);
-      advanceTime(state, 120, 'work');
-      if (state.dead) return;
       if (!chance(state, gasStartChance(state))) {
         log(state, 'You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.', 'warn');
         p.morale = clamp(p.morale - 2, 0, 100);
@@ -509,10 +523,10 @@ function homeAction(state, id) {
       return;
     }
     case 'break_furniture':
+      if (advanceTime(state, 60, 'heavy', { stopAtDanger: true }) || state.dead) return;
       h.furniture -= 1;
       addItem(h.storage, 'firewood', 1);
       log(state, 'You break up old furniture into firewood (+1 bundle). It is hard work.');
-      advanceTime(state, 60, 'heavy');
       practice(state, 'tinkering', 2);
       return;
     case 'heater':
@@ -970,7 +984,7 @@ export function enterNearbyHouse(state) {
   state.houses[id].pos = pos;
   state.pos = { ...pos };
   advanceTime(state, 5, 'walk');
-  log(state, `You walk to a house ${near}.`);
+  log(state, endDot(`You walk to a house ${near}`));
   // Entry: 70% of doors are locked.
   if (chance(state, 0.7)) {
     if (has(state, 'pry_bar')) {
@@ -992,9 +1006,23 @@ export function enterNearbyHouse(state) {
   }
   state.stats.housesSearched += 1;
   state.location = { kind: 'house', id, label, parent };
-  if (state.houses[id].body) seeBody(state, 'Someone is in the bedroom. You close the door.');
-  else log(state, 'The house is empty and cold. A family lived here.');
+  const hn = state.stats.housesSearched;
+  if (state.houses[id].body) seeBody(state, BODY_LINES[hn % BODY_LINES.length]);
+  else log(state, EMPTY_LINES[hn % EMPTY_LINES.length]);
 }
+
+const BODY_LINES = [
+  'Someone is in the bedroom. You close the door.',
+  'Someone lies under a blanket on the couch. You do not look long.',
+  'A door upstairs is shut, and the air is bad. You leave it shut.',
+];
+const EMPTY_LINES = [
+  'The house is empty and cold. A family lived here.',
+  'The house is quiet. Dust covers the table.',
+  'Coats still hang by the door. Nobody is here.',
+  'The rooms are cold and dark. The clocks have stopped.',
+  'Toys lie on the floor. The house is empty.',
+];
 
 export function searchRoom(state, index) {
   const ctx = zoneCtx(state);
@@ -1037,7 +1065,7 @@ export function goToPlace(state, placeId) {
   const ok = travel(state, place, place.name);
   if (!ok) return;
   state.location = { kind: 'place', id: placeId };
-  log(state, `You arrive at ${place.name}.`, 'travel');
+  log(state, endDot(`You arrive at ${place.name}`), 'travel');
   enterPlace(state, place);
 }
 
@@ -1155,7 +1183,7 @@ export function listActions(state) {
     add('go_home', 'Walk home');
   }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? (sleepSpot(state) === 'living' ? 'Sleep by the fire…' : 'Sleep in your bed…') : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? `Sleep ${sleepWhere(state)}…` : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
     if (state.dog.sick) { const why = canTreatDog(state); add('treat_dog', `Treat ${state.dog.name} (antibiotics)`, { disabled: why, note: why ? undefined : '1 course of antibiotics' }); }

@@ -41,16 +41,18 @@ export function goToCar(state, id, lat, lon) {
   return true;
 }
 
-const hasAny = (state, ids) => ids.find((t) => has(state, t)) || null;
+// A tool counts only as a whole unit (0.25 set of fittings is not a hose).
+const whole = (state, id) => (state.carried[id] || 0) >= 1 || (state.location.kind === 'home' && (state.home.storage[id] || 0) >= 1);
+const hasAny = (state, ids) => ids.find((t) => whole(state, t)) || null;
 export const SIPHON_TOOLS = ['garden_hose', 'pipe_fittings'];
 export const WRENCH_TOOLS = ['toolkit', 'multitool'];
 
 export function searchCar(state) {
   const c = carHere(state);
   if (!c || c.searched) return;
+  // Stop at a danger line: the car keeps what you did not finish.
+  if (advanceTime(state, CAR_SEARCH_MIN, 'work', { stopAtDanger: true }) || state.dead) return;
   c.searched = true;
-  advanceTime(state, CAR_SEARCH_MIN, 'work');
-  if (state.dead) return;
   const found = rollTable(state);
   for (const id of found) addItem(state.carried, id, 1);
   practice(state, 'scavenging', 1);
@@ -62,15 +64,15 @@ export function siphonGas(state) {
   const c = carHere(state);
   if (!c || c.siphoned) return;
   if (!hasAny(state, SIPHON_TOOLS)) { log(state, 'You need a hose to siphon gas.'); return; }
+  // Stop at a danger line: the car keeps what you did not finish.
+  if (advanceTime(state, SIPHON_MIN, 'work', { stopAtDanger: true }) || state.dead) return;
   c.siphoned = true;
-  advanceTime(state, SIPHON_MIN, 'work');
-  if (state.dead) return;
   // Many tanks are near empty, or were already drained in the last weeks.
   const gal = chance(state, 0.35) ? 0 : randInt(state, 1, 3);
   if (!gal) { log(state, 'You feed the hose into the tank. It is dry.'); return; }
   addItem(state.carried, 'gas_can', gal);
   const stale = decayShare(state, 'stale_gas');
-  log(state, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min). It smells sour.${stale > 0.3 ? ' Old gas: it may not start an engine.' : ''}`, 'good');
+  log(state, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min).${stale > 0.3 ? ' It smells sour. Old gas: it may not start an engine.' : ''}`, 'good');
 }
 
 export function takeCarBattery(state) {
@@ -78,9 +80,9 @@ export function takeCarBattery(state) {
   if (!c || c.battery) return;
   const tool = hasAny(state, WRENCH_TOOLS);
   if (!tool) { log(state, 'You need a wrench (tool kit or multitool) to take the battery out.'); return; }
+  // Stop at a danger line: the car keeps what you did not finish.
+  if (advanceTime(state, BATTERY_MIN, 'work', { stopAtDanger: true }) || state.dead) return;
   c.battery = true;
-  advanceTime(state, BATTERY_MIN, 'work');
-  if (state.dead) return;
   addItem(state.carried, 'car_battery', 1);
   practice(state, 'tinkering', 2);
   log(state, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, 'good');
@@ -91,9 +93,9 @@ export function stripCarWire(state) {
   if (!c || c.wire) return;
   const tool = hasAny(state, ['toolkit', 'multitool', 'knife']);
   if (!tool) { log(state, 'You need a knife or a tool to cut the wire.'); return; }
+  // Stop at a danger line: the car keeps what you did not finish.
+  if (advanceTime(state, WIRE_MIN, 'work', { stopAtDanger: true }) || state.dead) return;
   c.wire = true;
-  advanceTime(state, WIRE_MIN, 'work');
-  if (state.dead) return;
   addItem(state.carried, 'wiring', 0.5);
   addItem(state.carried, 'hardware_parts', 0.25);
   practice(state, 'tinkering', 2);
@@ -104,6 +106,7 @@ export function stripCarWire(state) {
 export function addCarBattery(state, bag) {
   const h = state.home;
   h.carBatteries = h.carBatteries || 0;
+  if (!((bag.car_battery || 0) >= 1)) return;
   if (h.carBatteries >= MAX_CAR_BATTERIES) { log(state, 'The bank has no room for more car batteries.'); return; }
   addItem(bag, 'car_battery', -1);
   h.carBatteries += 1;

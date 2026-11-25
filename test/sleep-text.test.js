@@ -10,6 +10,10 @@ test('sleep journal names the chosen sleep spot', () => {
   sleep(s, 1);
   assert.ok(s.log.some((l) => /in your bed/.test(l.text || l)));
   setSleepSpot(s, 'living');
+  s.home.fireHours = 0;
+  sleep(s, 1);
+  assert.ok(s.log.some((l) => /on the couch/.test(l.text || l)), 'no fire: the couch');
+  s.home.fireHours = 5;
   sleep(s, 1);
   assert.ok(s.log.some((l) => /by the fire/.test(l.text || l)));
 });
