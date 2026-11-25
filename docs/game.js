@@ -993,18 +993,6 @@
   ];
   var PROJECT_BY_ID = Object.fromEntries(PROJECTS.map((p) => [p.id, p]));
 
-  // src/engine/vitals.js
-  var CAL_PER_FOOD_POINT = 70;
-  var WATER_PER_QUART = 25;
-  var FOOD_LOSS_PER_HOUR = 1.5;
-  var WATER_LOSS_PER_HOUR = 2.5;
-  var WORK_FACTOR = 1.5;
-  var SLEEP_FACTOR = 0.75;
-  var ENERGY_LOSS = { rest: 3, work: 5, walk: 6, heavy: 9 };
-  var STARVING_DAMAGE = 0.2;
-  var DEHYDRATED_DAMAGE = 2;
-  var SEARCH_INJURY_CHANCE = 0.03;
-
   // src/core/rng.js
   function next(pos) {
     let a = pos + 1831565813 | 0;
@@ -1023,6 +1011,21 @@
       return r.value;
     };
   }
+
+  // src/engine/vitals.js
+  var CAL_PER_FOOD_POINT = 70;
+  var WATER_PER_QUART = 25;
+  var NEED_PACE = 0.75;
+  var FOOD_LOSS_PER_HOUR = 1.5 * NEED_PACE;
+  var WATER_LOSS_PER_HOUR = 2.5 * NEED_PACE;
+  var WORK_FACTOR = 1.5;
+  var SLEEP_FACTOR = 0.75;
+  var ENERGY_LOSS = { rest: 3 * NEED_PACE, work: 5 * NEED_PACE, walk: 6 * NEED_PACE, heavy: 9 * NEED_PACE };
+  var REST_ENERGY_PER_HOUR = 0.25;
+  var INJURY_RATE = 0.1;
+  var STARVING_DAMAGE = 0.2;
+  var DEHYDRATED_DAMAGE = 2;
+  var SEARCH_INJURY_CHANCE = 0.03;
 
   // src/engine/rareweather.js
   var monthOfDay2 = (day) => new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
@@ -2538,11 +2541,13 @@
     }
     const p = state2.player;
     state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+    if (opts.restPerHour) state2._restPerHour = opts.restPerHour;
     const t0 = state2.time;
     try {
       gameClock().advance(state2, minutes, mode);
     } finally {
       delete state2._sleepFrom;
+      delete state2._restPerHour;
     }
     return !state2.dead && state2.time - t0 < minutes - 0.01;
   }
@@ -2612,6 +2617,8 @@
       if (p.food < 25) gain *= 0.75;
       gain *= sleepGainFactor(state2);
       p.energy = clamp2(p.energy + gain * dt, 0, p.energyMax);
+    } else if (mode === "rest" && state2._restPerHour) {
+      p.energy = clamp2(p.energy + state2._restPerHour * p.energyMax * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
@@ -2636,7 +2643,7 @@
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
-    for (const i of healed) log(state2, `Your ${INJURY_NAMES[i.type].toLowerCase()} has healed.`, "good");
+    for (const i of healed) log(state2, `Your ${injuryName(i).toLowerCase()} has healed.`, "good");
     p.injuries = p.injuries.filter((i) => i.healH > 0);
     const inf = p.illness.infection;
     if (inf) {
@@ -2712,19 +2719,55 @@
     bite: "Animal bite"
   };
   var INJURY_DATA = {
-    small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
-    deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
-    sprain: { hp: 5, healH: 120, infectRisk: 0 },
+    small_cut: { hp: 2, healH: 36, infectRisk: 0.2 },
+    deep_cut: { hp: 12, healH: 168, infectRisk: 0.2 },
+    sprain: { hp: 4, healH: 120, infectRisk: 0 },
     // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
     bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 }
   };
-  function addInjury(state2, type) {
+  var SEVERITY = [
+    { id: "minor", w: 0.6, hp: 0.5, heal: 0.5, slow: 0.9 },
+    { id: "moderate", w: 0.3, hp: 1, heal: 1, slow: 0.75 },
+    { id: "serious", w: 0.1, hp: 1.8, heal: 1.6, slow: 0.6 }
+  ];
+  var SPRAIN_PART = { ankle: "Sprained ankle", wrist: "Sprained wrist" };
+  function injuryName(inj) {
+    const base2 = inj.type === "sprain" ? SPRAIN_PART[inj.part] || "Sprain" : INJURY_NAMES[inj.type] || inj.type;
+    return inj.severity && inj.severity !== "moderate" ? `${base2} (${inj.severity})` : base2;
+  }
+  function injuryFactor(state2, limb) {
+    let f = 1;
+    for (const i of state2.player.injuries) {
+      if (i.type !== "sprain") continue;
+      const part = i.part || (limb === "leg" ? "ankle" : "wrist");
+      if (limb === "leg" !== (part === "ankle")) continue;
+      f = Math.min(f, SEVERITY.find((s) => s.id === i.severity)?.slow ?? 0.7);
+    }
+    return f;
+  }
+  function addInjury(state2, type, opts = {}) {
     const d = INJURY_DATA[type];
-    state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
-    const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state2.player.health - 1)) : d.hp;
+    const r = stream(state2, "injury");
+    if (!opts.always && r() >= INJURY_RATE) {
+      log(state2, type === "bite" ? "Teeth snap at you, but you pull free unhurt." : "A close call. You are not hurt.");
+      return null;
+    }
+    let sev = opts.severity ? SEVERITY.find((s) => s.id === opts.severity) : null;
+    if (!sev) {
+      const x = r();
+      let acc = 0;
+      sev = SEVERITY.find((s) => (acc += s.w) > x) || SEVERITY[0];
+    }
+    const part = type === "sprain" ? opts.part || (r() < 0.5 ? "ankle" : "wrist") : void 0;
+    const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d.healH * sev.heal, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false };
+    if (part) inj.part = part;
+    state2.player.injuries.push(inj);
+    const full = d.hp * sev.hp;
+    const hp = CUTS.has(type) ? Math.min(full, Math.max(0, state2.player.health - 1)) : full;
     damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
-    log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    log(state2, `Injury: ${injuryName(inj)} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
+    return inj;
   }
   var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);
   var BLEED_FLOOR = 10;
@@ -3141,7 +3184,8 @@
       homeLabel: opts.homeLabel || null,
       pos: { ...homePos },
       location: { kind: "home" },
-      carried: { backpack: 1 },
+      carried: {},
+      // no backpack at the start: find one (outdoor stores, abandoned packs by the road)
       home: {
         storage: {
           formula: 4,
@@ -3254,8 +3298,10 @@
     for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
     return Math.round(w * 10) / 10;
   }
+  var BASE_CARRY = 15;
+  var BACKPACK_CARRY = 15;
   function carryLimit(state2) {
-    let lim = state2.carried.backpack ? 30 : 10;
+    let lim = BASE_CARRY + (state2.carried.backpack ? BACKPACK_CARRY : 0);
     if (state2.player.weak) lim *= 0.5;
     if (state2.player.food < 25) lim *= 0.9;
     lim -= carryMinus(state2) * (state2.player.weak ? 0.5 : 1);
@@ -3424,7 +3470,8 @@
     const wx = WEATHER_TYPES[state2.weather.type];
     if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
     if (bagWeight(state2.carried) > carryLimit(state2)) apply(0.7, "heavy pack");
-    if (p.injuries.some((i) => i.type === "sprain")) apply(0.7, "sprain");
+    const legF = injuryFactor(state2, "leg");
+    if (legF < 1) apply(legF, "sprained ankle");
     if (p.warmth < 25) apply(0.8, "hypothermia");
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
@@ -3527,7 +3574,7 @@
       }
     } else if (roll <= 91) {
       log(state2, "A fallen tree and a downed line block the road.");
-      if (!check(state2, "Climb over the tree", 10, [], out).success) addInjury(state2, "sprain");
+      if (!check(state2, "Climb over the tree", 10, [], out).success) addInjury(state2, "sprain", { part: "ankle" });
     } else if (roll <= 95) {
       log(state2, "A pack of loose dogs runs at you, barking.", "danger");
       const mods = [...animalMods];
@@ -3557,6 +3604,10 @@
         names.push(`${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
       }
       log(state2, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
+      if (!state2.carried.backpack) {
+        addItem(state2.carried, "backpack", 1);
+        log(state2, "You put the backpack on. You can carry 15 lb more.", "good");
+      }
     }
   }
   function describeTrip(state2, est) {
@@ -4415,7 +4466,7 @@
   }
   function rest(state2, hours) {
     log(state2, `You rest for ${hours} h.`);
-    advanceTime(state2, hours * 60, "rest", { stopAtDanger: true });
+    advanceTime(state2, hours * 60, "rest", { stopAtDanger: true, restPerHour: REST_ENERGY_PER_HOUR });
   }
   function sleep(state2, hours) {
     const k = state2.location.kind;
