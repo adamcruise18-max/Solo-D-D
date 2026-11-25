@@ -1020,6 +1020,119 @@
     return SPELLS[id]?.start || "";
   }
 
+  // src/engine/home.js
+  function homeStep(state2, dt, env) {
+    const h2 = state2.home;
+    const air = env.air;
+    let heat = 0;
+    if (h2.fireHours > 0) {
+      heat += fireHeat(state2);
+      h2.fireHours = Math.max(0, h2.fireHours - dt);
+      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    }
+    if (h2.heaterOn) {
+      h2.battery -= 1.5 * dt;
+      heat += 20;
+      if (h2.battery <= 0) {
+        h2.battery = 0;
+        h2.heaterOn = false;
+        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      }
+    }
+    const passive = air + 6;
+    const lw = windowLoss(h2, "living");
+    const target = Math.min(75, passive + heat / lw);
+    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
+    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h2, passive, dt);
+    const m = (state2.time % 1440 + 1440) % 1440;
+    const s = sunFor(state2.time);
+    if (m > s.rise && m < s.set) {
+      const hours = (s.set - s.rise) / 60;
+      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+    }
+    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
+      h2.tapWorks = false;
+      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  var ROOMS = [
+    { id: "living", label: "Living room" },
+    { id: "kitchen", label: "Kitchen" },
+    { id: "bedroom", label: "Bedroom" },
+    { id: "bath", label: "Bathroom" }
+  ];
+  var OUT_RATE = 0.05;
+  var DOOR_OPEN = 0.15;
+  var DOOR_CLOSED = 0.02;
+  var BROKEN = 1.5;
+  var BOARDED = 0.3;
+  function ensureRooms(h2) {
+    if (!h2.rooms) {
+      h2.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+    }
+    if (!h2.windows) h2.windows = {};
+    if (!h2.doorsClosed) h2.doorsClosed = {};
+    return h2;
+  }
+  function windowLoss(h2, room) {
+    const w = h2.windows?.[room];
+    if (!w) return 1;
+    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  }
+  var LIVING_SHARE = 1 / 3;
+  function roomsStep(h2, passive, dt) {
+    ensureRooms(h2);
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kDoor = (h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+      h2.indoorTemp += (r.temp - h2.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+    }
+    for (const [id, r] of Object.entries(h2.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h2, id);
+      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+      const rate = Math.min(0.9, kOut + kDoor);
+      r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
+    }
+  }
+  function roomTemp(state2, room) {
+    const h2 = state2.home;
+    if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
+    return h2.rooms[room].temp;
+  }
+  var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
+  function sleepSpot(state2) {
+    return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
+  }
+  function sleepTemp(state2) {
+    const spot = sleepSpot(state2);
+    return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  }
+  function homeDaily(state2) {
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
+  }
+  var homeSystem = {
+    id: "home",
+    label: "Home base",
+    order: 1005,
+    // right after the legacy rules, before the dog: the same order as before
+    version: 1,
+    legacy: true,
+    // state.home was in saves before the engine; newGame() makes it
+    owns: ["home"],
+    // The fire and the battery run out inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
+    daily: (state2) => homeDaily(state2)
+  };
+
   // src/engine/placesdb.js
   var LIST = [];
   var INDEX = {};
@@ -1727,101 +1840,6 @@
     }
   };
 
-  // src/engine/home.js
-  function homeStep(state2, dt, env) {
-    const h2 = state2.home;
-    const air = env.air;
-    let heat = 0;
-    if (h2.fireHours > 0) {
-      heat += fireHeat(state2);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
-    }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
-      heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
-        log(state2, "The home battery is empty. The electric heater stops.", "warn");
-      }
-    }
-    const passive = air + 6;
-    const lw = windowLoss(h2, "living");
-    const target = Math.min(75, passive + heat / lw);
-    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    roomsStep(h2, passive, dt);
-    const m = (state2.time % 1440 + 1440) % 1440;
-    const s = sunFor(state2.time);
-    if (m > s.rise && m < s.set) {
-      const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
-    }
-    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
-      const t = state2.weather.type;
-      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
-    }
-    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
-      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
-    }
-  }
-  var ROOMS = [
-    { id: "living", label: "Living room" },
-    { id: "kitchen", label: "Kitchen" },
-    { id: "bedroom", label: "Bedroom" },
-    { id: "bath", label: "Bathroom" }
-  ];
-  var OUT_RATE = 0.05;
-  var DOOR_OPEN = 0.15;
-  var DOOR_CLOSED = 0.02;
-  var BROKEN = 1.5;
-  var BOARDED = 0.3;
-  function ensureRooms(h2) {
-    if (!h2.rooms) {
-      h2.rooms = {};
-      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
-    }
-    if (!h2.windows) h2.windows = {};
-    if (!h2.doorsClosed) h2.doorsClosed = {};
-    return h2;
-  }
-  function windowLoss(h2, room) {
-    const w = h2.windows?.[room];
-    if (!w) return 1;
-    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
-  }
-  function roomsStep(h2, passive, dt) {
-    ensureRooms(h2);
-    for (const [id, r] of Object.entries(h2.rooms)) {
-      const kOut = OUT_RATE * windowLoss(h2, id);
-      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
-      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
-      const rate = Math.min(0.9, kOut + kDoor);
-      r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
-    }
-  }
-  function homeDaily(state2) {
-    const filtered = runAutoFilter(state2);
-    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
-  }
-  var homeSystem = {
-    id: "home",
-    label: "Home base",
-    order: 1005,
-    // right after the legacy rules, before the dog: the same order as before
-    version: 1,
-    legacy: true,
-    // state.home was in saves before the engine; newGame() makes it
-    owns: ["home"],
-    // The fire and the battery run out inside a day.
-    catchUp: "event",
-    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
-    daily: (state2) => homeDaily(state2)
-  };
-
   // src/engine/systems.js
   var weatherSystem = {
     id: "weather",
@@ -2006,10 +2024,11 @@
     return { outside: false, temp: air + 5, wind: 0, precip: false, dark, air };
   }
   function feltTemp(state2, mode, env = environment(state2, mode)) {
-    let felt = env.temp + clothingRating(state2);
+    const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state2);
     if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
     if (mode === "sleep") {
-      if (env.home) felt += 10;
+      if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
       const d = state2.dog;
       if (d.stage === "joined" && d.bond >= 80) felt += 5;

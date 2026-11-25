@@ -94,8 +94,18 @@ export function windowLoss(h, room) {
   return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
 }
 
+// The living room is bigger than one other room, so a cold room pulls it down
+// a third as fast as it warms that room.
+const LIVING_SHARE = 1 / 3;
+
 function roomsStep(h, passive, dt) {
   ensureRooms(h);
+  // Heat flows both ways: open doors to cold rooms cool the living room. That
+  // is the reason to close doors.
+  for (const [id, r] of Object.entries(h.rooms)) {
+    const kDoor = (h.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+    h.indoorTemp += (r.temp - h.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+  }
   for (const [id, r] of Object.entries(h.rooms)) {
     const kOut = OUT_RATE * windowLoss(h, id);
     const kDoor = h.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
@@ -124,6 +134,22 @@ export function boardWindow(state, room) {
   w.boarded = (w.boarded || 0) + 1;
   return true;
 }
+// Where the player sleeps at home: the bedroom (a bed, +10 °F) or by the fire
+// in the living room (a couch and blankets, +6 °F).
+export const SLEEP_SPOTS = { bedroom: { label: 'Bedroom', bed: 10 }, living: { label: 'By the fire', bed: 6 } };
+export function sleepSpot(state) {
+  return SLEEP_SPOTS[state.home.sleepSpot] ? state.home.sleepSpot : 'bedroom';
+}
+export function setSleepSpot(state, spot) {
+  if (!SLEEP_SPOTS[spot]) return false;
+  state.home.sleepSpot = spot;
+  return true;
+}
+export function sleepTemp(state) {
+  const spot = sleepSpot(state);
+  return { temp: roomTemp(state, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+}
+
 export function setDoor(state, room, closed) {
   const h = ensureRooms(state.home);
   if (!h.rooms[room]) return false;
@@ -139,6 +165,7 @@ export function homeHeat(state) {
     outside: Math.round(air),
     sources: { fire: h.fireHours > 0 ? fireHeat(state) : 0, fireHours: h.fireHours, heater: h.heaterOn ? 20 : 0, stove: built(state, 'wood_stove') },
     insulated: built(state, 'insulate_living'),
+    sleepSpot: sleepSpot(state),
     rooms: ROOMS.map((r) => {
       const w = h.windows?.[r.id] || { broken: 0, boarded: 0 };
       return {

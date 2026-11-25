@@ -5,6 +5,7 @@ import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
 import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
+import { sleepTemp } from './home.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
@@ -43,10 +44,12 @@ export function environment(state, mode, t = state.time) {
 }
 
 export function feltTemp(state, mode, env = environment(state, mode)) {
-  let felt = env.temp + clothingRating(state);
+  // Asleep at home: the room you sleep in (bedroom, or by the fire), not the living room.
+  const sleepHome = mode === 'sleep' && env.home ? sleepTemp(state) : null;
+  let felt = (sleepHome ? sleepHome.temp : env.temp) + clothingRating(state);
   if (env.outside) felt -= (env.wind / 10) * 7 * (1 - windBlock(state.player));
   if (mode === 'sleep') {
-    if (env.home) felt += 10; // bed and blankets
+    if (sleepHome) felt += sleepHome.bed; // a bed (+10) or the couch by the fire (+6)
     // The best sleeping gear you have (a sleeping bag, a wool blanket).
     felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state, id)).map((id) => ITEMS[id].sleepWarm));
     const d = state.dog;

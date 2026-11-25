@@ -54,3 +54,23 @@ test('rooms: the heat panel data', () => {
   assert.ok(h.rooms.find((r) => r.id === 'bath').loss > 1);
   assert.equal(h.rooms[0].doorClosed, null);
 });
+
+test('rooms: open doors to cold rooms pull the living room down', () => {
+  const a = cold(); const b = cold();
+  for (const r of ['kitchen', 'bedroom', 'bath']) setDoor(b, r, true);
+  run(a, 24); run(b, 24);
+  assert.ok(b.home.indoorTemp > a.home.indoorTemp + 1, `${b.home.indoorTemp} vs ${a.home.indoorTemp}`);
+});
+
+test('rooms: sleep feels the bedroom by default, or the fire if chosen', async () => {
+  const { feltTemp } = await import('../src/engine/tick.js');
+  const { setSleepSpot } = await import('../src/engine/home.js');
+  const s = cold();
+  s.location = { kind: 'home' };
+  s.home.indoorTemp = 65;
+  s.home.rooms.bedroom.temp = 40;
+  const bed = feltTemp(s, 'sleep');
+  setSleepSpot(s, 'living');
+  const fire = feltTemp(s, 'sleep');
+  assert.ok(fire - bed > 15, `bedroom ${bed} vs fire ${fire}`);
+});
