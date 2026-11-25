@@ -130,6 +130,8 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
 | `weather` | the weather system (`src/engine/systems.js`) |
 | Item pick-ups | PR #9 model: `zoneItems`, `taken[pid]`, `opened[cid]` |
 | Other place changes (doors, damage, discovered) | `world.changes` (`src/core/changes.js`) |
+| `pacer` | the event pacer (`src/engine/pacer.js`, stream `pacer`) |
+| `decay` | the slow breakdown (`src/engine/decay.js`) |
 | All other fields | the legacy system (old rules in `src/engine/tick.js`) |
 | `time` | the clock only |
 
@@ -157,6 +159,23 @@ the state paths that changed with a hash of each (`player.food`, `home.battery`,
 and game time, and the state paths that differ. Player text (`log`, `journal`) is not in
 the trace, so a new wording is not a rule change. The golden files change only in a pull
 request that says which rule change is meant and why.
+
+## Event pacer and slow breakdown (research spec step 7)
+
+- **Pacer** (`pacer`, after the rules in each step): tension rises 0.3 per quiet hour
+  (+0.3 outside). Each hour the chance of an event is `clamp((tension - 20) / 200, 0, 0.12)`.
+  An event lowers the tension (small 25, medium 50, big 100). No big event within 3 days
+  of the last one, no repeat of an event within 2 days, big events are half as likely when
+  the player has 2 or more need warnings or a fresh wound, and after 96 quiet hours the
+  next hour has a small event. A 120-day simulation gives about 2.4 events a week with no
+  gap of 5 days. Events are data in `src/data/events.js` (builder content).
+- **Slow breakdown** (`decay`, daily): rows in `src/data/decay.js` start at their month
+  (the game starts at month 3) and spread area by area with `chanceByDay`. The day each
+  area fails comes from a hash of the seed, the row and the area, so catch-up is exact
+  and nothing per area is saved. Rules ask `decayActive(state, id, area)` or
+  `decayShare(state, id)`. The journal gets one line when a row first shows.
+- For the F3 overlay: `pacerInfo(state)`, `decayInfo(state)`, and `sceneEnv(state)` for
+  the hour and weather (`src/engine/scene.js`).
 
 ## Moving old code into the engine
 
