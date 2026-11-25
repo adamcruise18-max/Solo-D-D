@@ -67,6 +67,13 @@
     matches: { name: "Matches", unit: "box", weight: 0.1, kind: "misc" },
     duct_tape: { name: "Duct tape", unit: "roll", weight: 0.6, kind: "part" },
     rope: { name: "Rope (50 ft)", unit: "coil", weight: 2, kind: "misc" },
+    fishing_rod: { name: "Fishing rod and reel", unit: "pc", weight: 1.5, kind: "tool" },
+    fishing_line: { name: "Fishing line and hooks", unit: "kit", weight: 0.2, kind: "tool" },
+    bow: { name: "Hunting bow", unit: "pc", weight: 4, kind: "tool" },
+    arrows: { name: "Arrows (set of 6)", unit: "set", weight: 0.6, kind: "tool" },
+    rifle: { name: "Hunting rifle", unit: "pc", weight: 8, kind: "tool" },
+    rifle_rounds: { name: "Rifle rounds (box of 20)", unit: "box", weight: 1, kind: "tool" },
+    snare_wire: { name: "Snare wire", unit: "coil", weight: 0.2, kind: "tool" },
     knife: { name: "Folding knife", unit: "pc", weight: 0.3, kind: "misc" },
     multitool: { name: "Multitool", unit: "pc", weight: 0.5, kind: "misc" },
     can_opener: { name: "Can opener", unit: "pc", weight: 0.2, kind: "misc" },
@@ -363,6 +370,12 @@
         { id: "matches", w: 4 },
         { id: "book_survival", w: 2 },
         { id: "book_cooking", w: 1 },
+        { id: "fishing_rod", w: 5 },
+        { id: "fishing_line", w: 6 },
+        { id: "bow", w: 1.5 },
+        { id: "arrows", w: 3 },
+        { id: "snare_wire", w: 4 },
+        { id: "rifle_rounds", w: 1 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -459,7 +472,11 @@
         { id: "wool_sweater", w: 3 },
         { id: "cotton_hoodie", w: 4 },
         { id: "fleece_jacket", w: 2 },
-        { id: "windbreaker", w: 1 }
+        { id: "windbreaker", w: 1 },
+        { id: "fishing_rod", w: 1.5 },
+        { id: "fishing_line", w: 1 },
+        { id: "rifle", w: 0.3 },
+        { id: "rifle_rounds", w: 0.4 }
       ]
     }
   };
@@ -574,6 +591,10 @@
     clearOldHazards(state2);
     const hz = (_a = state2.flags).hazards || (_a.hazards = {});
     hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
+  }
+  function hazardOn(state2, id, t = state2.time) {
+    const end = state2.flags?.hazards?.[id];
+    return end != null && t < end;
   }
   function activeHazards(state2, t = state2.time) {
     const hz = state2.flags?.hazards || {};
@@ -714,6 +735,18 @@
       how: "Keep a fire, collect and filter water.",
       perLevel: "Firewood burns 6% longer per level. Stomach bug risk from raw water is 10% lower per level.",
       notice: []
+    },
+    fishing: {
+      name: "Fishing",
+      how: "Fish from a river, creek or lake bank.",
+      perLevel: "+1 to fishing rolls per level.",
+      notice: ["", "", "You can read the water: where the fish hold.", "", "", ""]
+    },
+    hunting: {
+      name: "Hunting",
+      how: "Hunt with a bow or rifle, set and check snares.",
+      perLevel: "+1 to shots per level. Snares catch more.",
+      notice: ["", "You notice tracks and droppings on the trails.", "", "You can tell how fresh a track is.", "", ""]
     }
   };
   var LEVEL_XP = [0, 15, 40, 80, 140, 220];
@@ -1243,6 +1276,15 @@
       log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
   }
+  var LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
+  function overgrowthWalk(t) {
+    const og = overgrowth(t);
+    if (og <= 0.25) return 1;
+    return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
+  }
+  function animalCover(t) {
+    return Math.min(1, overgrowth(t) * LEAF[seasonOf(t)] * 1.2);
+  }
 
   // src/core/activity.js
   var source = { sys: null, hook: null };
@@ -1649,8 +1691,8 @@
   }
   function whereNow(state2, mode) {
     if (mode === "sleep") return "asleep";
-    if (mode === "walk") return "outside";
     const k = state2.location?.kind;
+    if (mode === "walk" || k === "wild") return "outside";
     if (k === "home") return "home";
     return "inside";
   }
@@ -1828,7 +1870,12 @@
     d.food = clamp(d.food - 4 * dt, 0, 100);
     d.water = 80;
     if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.sick) d.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d.health > 0) {
+      feralWarning(state2, d);
+      sniff(state2, d, dt);
+    }
     if (d.health <= 50 && d.warned < 1) {
       d.warned = 1;
       log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
@@ -1843,6 +1890,66 @@
       d.stage = "dead";
       log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
       state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  var SICK_PER_HOUR = 0.25;
+  var FIND_BOND = 40;
+  var FINDS = [
+    ["canned_food", 3],
+    ["jerky", 2],
+    ["snacks", 2],
+    ["dog_food", 1],
+    ["rope", 1],
+    ["gloves", 1],
+    ["wool_socks", 1],
+    ["batteries", 1],
+    ["raw_meat", 1]
+  ];
+  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
+  function dogWarns(state2) {
+    const d = state2.dog;
+    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+  }
+  function feralWarning(state2, d) {
+    if (!dogWarns(state2) || !hazardOn(state2, "feral_dogs")) return;
+    const end = state2.flags.hazards.feral_dogs;
+    if (d.feralWarned === end) return;
+    d.feralWarned = end;
+    log(state2, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+  }
+  function sniff(state2, d, dt) {
+    const loc = state2.location;
+    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    const key = `${loc.kind}:${loc.id}:${Math.floor(state2.time / 1440)}`;
+    if (d.foundAt === key) return;
+    const r = stream(state2, "dog");
+    if (r() >= 0.12 * (d.bond / 100) * dt) return;
+    d.foundAt = key;
+    const total = FINDS.reduce((a, [, w]) => a + w, 0);
+    let x = r() * total;
+    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
+    addItem(state2.carried, id, 1);
+    d.finds = (d.finds || 0) + 1;
+    log(state2, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+  }
+  function dogSickDaily(state2, day) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    const r = stream(state2, "dog");
+    if (d.sick) {
+      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
+        d.sick = null;
+        log(state2, `${d.name} eats with interest again. The sickness is over.`, "good");
+      }
+      return;
+    }
+    const w = state2.weather || {};
+    let p = 0.012;
+    if (d.food < 25) p += 0.03;
+    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (r() < p) {
+      d.sick = { since: day };
+      log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
   }
   function dogBondDaily(state2) {
@@ -1894,6 +2001,7 @@
     daily: (state2, day) => {
       dogBondDaily(state2);
       dogDaily(state2, day);
+      dogSickDaily(state2, day);
     }
   };
 
@@ -1928,10 +2036,10 @@
     const s = freshOf(state2)[id] || 0;
     return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
   }
-  function addFresh(state2, bags, id, qty, spoil = 0) {
+  function addFresh(state2, bags2, id, qty, spoil = 0) {
     if (!isPerishable(id)) return;
     const f = freshOf(state2);
-    const have = bags.reduce((n, b) => n + (b[id] || 0), 0);
+    const have = bags2.reduce((n, b) => n + (b[id] || 0), 0);
     f[id] = have + qty > 0 ? ((f[id] || 0) * have + spoil * qty) / (have + qty) : spoil;
   }
   function ageFood(state2, dt, tempAt) {
@@ -2236,7 +2344,7 @@
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
     const night = isNight(t);
-    if (mode === "walk") {
+    if (mode === "walk" || state2.location.kind === "wild") {
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
@@ -3115,7 +3223,13 @@
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
     if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
-    for (const h2 of activeHazards(state2, t)) if (h2.walk) apply(h2.walk, h2.label);
+    const og = overgrowthWalk(t);
+    if (og < 0.99) apply(og, "overgrown streets");
+    for (const h2 of activeHazards(state2, t)) {
+      if (!h2.walk) continue;
+      if (h2.id === "feral_dogs" && dogWarns(state2)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h2.walk, h2.label);
+    }
     return { mph, why };
   }
   function estimateTrip(state2, dest) {
@@ -3235,6 +3349,305 @@
   }
   var GEN_KWH_PER_GAL = 3;
 
+  // src/data/wild.js
+  var SPOTS = {
+    tualatin_rood: { name: "Tualatin River at Rood Bridge Park", lat: 45.4905, lon: -122.9505, kind: "fish", fish: ["largemouth bass", "catfish", "cutthroat trout"], quality: 1 },
+    tualatin_cook: { name: "Tualatin River at Cook Park", lat: 45.3975, lon: -122.77, kind: "fish", fish: ["largemouth bass", "crappie", "catfish"], quality: 1 },
+    fanno_creek: { name: "Fanno Creek", lat: 45.43, lon: -122.774, kind: "fish", fish: ["cutthroat trout"], quality: 0.6 },
+    commonwealth_lake: { name: "Commonwealth Lake", lat: 45.5076, lon: -122.799, kind: "fish", fish: ["rainbow trout", "bluegill", "largemouth bass"], quality: 0.8 },
+    willamette_park: { name: "Willamette River at Willamette Park", lat: 45.477, lon: -122.67, kind: "fish", fish: ["smallmouth bass", "walleye"], run: { months: [2, 3, 4, 8, 9], fish: "salmon" }, quality: 1.1 },
+    nature_park: { name: "Tualatin Hills Nature Park", lat: 45.502, lon: -122.837, kind: "hunt", game: ["rabbit", "deer", "duck"] },
+    cooper_mountain: { name: "Cooper Mountain Nature Park", lat: 45.451, lon: -122.874, kind: "hunt", game: ["rabbit", "deer"] },
+    jackson_bottom: { name: "Jackson Bottom Wetlands", lat: 45.501, lon: -122.989, kind: "hunt", game: ["duck", "goose", "deer", "rabbit"] },
+    fernhill: { name: "Fernhill Wetlands", lat: 45.5075, lon: -123.09, kind: "hunt", game: ["duck", "goose"] },
+    tualatin_refuge: { name: "Tualatin River Wildlife Refuge", lat: 45.388, lon: -122.829, kind: "hunt", game: ["duck", "goose", "deer", "rabbit"] },
+    forest_park: { name: "Forest Park", lat: 45.56, lon: -122.76, kind: "hunt", game: ["deer", "rabbit"] }
+  };
+  var GAME = {
+    rabbit: { name: "rabbit", dc: 13, meat: 2, clean: 20, w: 4, snare: true },
+    duck: { name: "duck", dc: 14, meat: 1.5, clean: 20, w: 3, months: [9, 10, 11, 0, 1, 2] },
+    goose: { name: "Canada goose", dc: 14, meat: 4, clean: 30, w: 2, months: [9, 10, 11, 0, 1, 2] },
+    deer: { name: "black-tailed deer", dc: 16, meat: 40, clean: 120, w: 1.5, dawnDusk: true }
+  };
+  var GEAR = {
+    fish: [["fishing_rod"], ["fishing_line"]],
+    bow: ["bow", "arrows"],
+    rifle: ["rifle", "rifle_rounds"],
+    snare: ["snare_wire"],
+    clean: ["knife", "multitool"]
+  };
+
+  // src/engine/wild.js
+  var FISH_MINUTES = 120;
+  var HUNT_MINUTES = 180;
+  var SNARE_SET_MINUTES = 30;
+  var SNARE_CHECK_MINUTES = 20;
+  var SCARED_HOURS = 24;
+  var FISH_DC = 12;
+  var FISH_CLEAN = 5;
+  function wildOf(state2) {
+    if (!state2.wild || typeof state2.wild !== "object") state2.wild = {};
+    const w = state2.wild;
+    w.scared || (w.scared = {});
+    w.snares || (w.snares = {});
+    return w;
+  }
+  var bags = (state2) => [state2.carried, state2.home.storage];
+  var hasAll = (state2, ids) => ids.every((id) => has(state2, id));
+  var hasKnife = (state2) => GEAR.clean.some((id) => has(state2, id));
+  function useOne(state2, id) {
+    const bag = (state2.carried[id] || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, id, -1);
+  }
+  function dawnOrDusk(t) {
+    const m = (t % 1440 + 1440) % 1440;
+    const s = sunFor(t);
+    return Math.abs(m - s.rise) <= 90 || Math.abs(m - s.set) <= 90;
+  }
+  function spotHere(state2) {
+    const loc = state2.location;
+    return loc && loc.kind === "wild" ? { id: loc.id, ...SPOTS[loc.id] } : null;
+  }
+  function goToSpot(state2, id) {
+    const s = SPOTS[id];
+    if (!s) {
+      log(state2, "No such place.");
+      return false;
+    }
+    if (!travel(state2, s, s.name)) return false;
+    state2.location = { kind: "wild", id };
+    log(state2, `You reach ${s.name}. ${s.kind === "fish" ? "The water is high and brown with rain." : "Brush, tall grass and the edge of the trees."}`, "travel");
+    return true;
+  }
+  function canFish(state2) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "fish") return "Go to a river, creek or lake first";
+    if (!GEAR.fish.some((ids) => hasAll(state2, ids))) return "You need a fishing rod, or line and hooks";
+    return null;
+  }
+  function fishSetup(state2) {
+    const s = spotHere(state2) || {};
+    const month = calendar(state2.time).month;
+    const mods = [];
+    const adv = [];
+    const dis = [];
+    const lvl = skillLevel(state2, "fishing");
+    if (lvl) mods.push(["fishing skill", lvl]);
+    if (dawnOrDusk(state2.time)) mods.push(["dawn or dusk", 2]);
+    const run2 = s.run && s.run.months.includes(month);
+    if (run2) mods.push([`${s.run.fish} run`, 3]);
+    if ([11, 0, 1].includes(month)) mods.push(["cold water", -2]);
+    if ((s.quality ?? 1) < 0.7) mods.push(["small creek", -2]);
+    if (!has(state2, "fishing_rod")) mods.push(["hand line", -1]);
+    if ((state2.weather?.low ?? 40) <= 30) mods.push(["frozen ground, no worms", -2]);
+    return { mods, adv, dis, run: run2, spot: s };
+  }
+  function fishOdds(state2) {
+    const f = fishSetup(state2);
+    return odds(state2, FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+  }
+  function fish(state2) {
+    const why = canFish(state2);
+    if (why) {
+      log(state2, why + ".");
+      return { ok: false, fish: 0 };
+    }
+    const f = fishSetup(state2);
+    log(state2, `You fish from the bank at ${f.spot.name} for two hours.`);
+    advanceTime(state2, FISH_MINUTES, "rest");
+    if (state2.dead) return { ok: false, fish: 0 };
+    const r = check(state2, "Fishing", FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+    let n = 0;
+    let what = "";
+    if (r.success) {
+      if (f.run && chance(state2, 0.4)) {
+        n = 4;
+        what = f.spot.run.fish;
+      } else {
+        n = Math.min(4, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 4)));
+        what = f.spot.fish[randInt(state2, 0, f.spot.fish.length - 1)];
+      }
+      const clean = (hasKnife(state2) ? FISH_CLEAN : 15) * n;
+      advanceTime(state2, clean, "rest");
+      addFresh(state2, bags(state2), "fresh_fish", n, 0);
+      addItem(state2.carried, "fresh_fish", n);
+      log(state2, n === 4 && what === f.spot.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state2) ? "" : ", slow with no knife"}).`, "good");
+    } else log(state2, "Nothing bites. You wind in the line.");
+    practice(state2, "fishing", r.success ? 4 : 2);
+    return { ok: r.success, fish: n, what };
+  }
+  function huntMethods(state2) {
+    const m = [];
+    if (hasAll(state2, GEAR.bow)) m.push("bow");
+    if (hasAll(state2, GEAR.rifle)) m.push("rifle");
+    return m;
+  }
+  function canHunt(state2, method) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "hunt") return "Go to a park, wetland or the edge of the woods first";
+    if (method === "bow" && !hasAll(state2, GEAR.bow)) return "You need a bow and arrows";
+    if (method === "rifle" && !hasAll(state2, GEAR.rifle)) return "You need a rifle and rounds";
+    if (method !== "bow" && method !== "rifle") return "Hunt with a bow or a rifle";
+    return null;
+  }
+  function gameHere(state2) {
+    const s = spotHere(state2);
+    if (!s || !s.game) return [];
+    const month = calendar(state2.time).month;
+    return s.game.filter((id) => !GAME[id].months || GAME[id].months.includes(month)).map((id) => ({ id, ...GAME[id], w: GAME[id].w * (GAME[id].dawnDusk && dawnOrDusk(state2.time) ? 2 : 1) }));
+  }
+  function isScared(state2, spotId = state2.location?.id) {
+    const until = state2.wild?.scared?.[spotId];
+    return until != null && state2.time < until;
+  }
+  function findChance(state2) {
+    let p = 0.5 + animalCover(state2.time) * 0.3;
+    if (dawnOrDusk(state2.time)) p += 0.15;
+    if (isNight(state2.time)) p *= 0.3;
+    if (isScared(state2)) p *= 0.4;
+    if (!gameHere(state2).length) p = 0;
+    return Math.min(0.95, p);
+  }
+  function shotSetup(state2, method, g) {
+    const mods = [];
+    const adv = [];
+    const dis = [];
+    const lvl = skillLevel(state2, "hunting");
+    if (lvl) mods.push(["hunting skill", lvl]);
+    if (method === "rifle") mods.push(["rifle", 3]);
+    if (animalCover(state2.time) > 0.6) mods.push(["thick brush", -1]);
+    if (g?.dawnDusk && dawnOrDusk(state2.time)) mods.push(["deer move at dawn", 1]);
+    if (isScared(state2)) dis.push("game is wary");
+    return { mods, adv, dis };
+  }
+  function huntOdds(state2, method) {
+    const list = gameHere(state2);
+    const g = list.length ? list.reduce((a, b) => b.w > a.w ? b : a) : GAME.rabbit;
+    const s = shotSetup(state2, method, g);
+    return { find: Math.round(findChance(state2) * 100), animal: g.name, shot: odds(state2, g.dc, s.mods, { outside: true, adv: s.adv, dis: s.dis }) };
+  }
+  function spendShot(state2, method) {
+    const w = wildOf(state2);
+    if (method === "rifle") {
+      if (!(w.rounds > 0)) {
+        useOne(state2, "rifle_rounds");
+        w.rounds = 20;
+      }
+      w.rounds--;
+      w.scared[state2.location.id] = state2.time + SCARED_HOURS * 60;
+    }
+  }
+  function loseArrow(state2) {
+    const w = wildOf(state2);
+    if (!(w.arrows > 0)) {
+      useOne(state2, "arrows");
+      w.arrows = 6;
+    }
+    w.arrows--;
+    if (w.arrows === 0) w.arrows = null;
+  }
+  function takeMeat(state2, g, spoil = 0) {
+    const knife = hasKnife(state2);
+    const lb = knife ? g.meat : Math.max(1, Math.round(g.meat * 0.4));
+    const min = g.clean * (knife ? 1 : 2);
+    advanceTime(state2, min, "work");
+    addFresh(state2, bags(state2), "raw_meat", lb, spoil);
+    addItem(state2.carried, "raw_meat", lb);
+    log(state2, `You clean the ${g.name} (${min} min${knife ? "" : ", hard work with no knife"}) and take ${lb} lb of meat.${lb >= 20 ? " It is a heavy load." : ""}`, "good");
+    return lb;
+  }
+  function hunt(state2, method) {
+    const why = canHunt(state2, method);
+    if (why) {
+      log(state2, why + ".");
+      return { ok: false };
+    }
+    const s = spotHere(state2);
+    log(state2, `You move slowly through ${s.name} with the ${method}, and wait.`);
+    const findP = findChance(state2);
+    advanceTime(state2, HUNT_MINUTES, "work");
+    if (state2.dead) return { ok: false };
+    const list = gameHere(state2);
+    if (!list.length || !chance(state2, findP)) {
+      log(state2, isScared(state2) ? "Nothing moves. The game here is still wary after the shot." : "You see tracks and droppings, but no animal comes in range.");
+      practice(state2, "hunting", 1);
+      return { ok: false, seen: null };
+    }
+    const total = list.reduce((a, b) => a + b.w, 0);
+    let x = randInt(state2, 0, 999) / 1e3 * total;
+    const g = list.find((e) => (x -= e.w) < 0) || list[0];
+    const sh = shotSetup(state2, method, g);
+    spendShot(state2, method);
+    const r = check(state2, `Shoot the ${g.name} (${method})`, g.dc, sh.mods, { outside: true, adv: sh.adv, dis: sh.dis });
+    if (method === "rifle") log(state2, "The shot cracks across the open ground. Every animal near here will be wary for a day.", "warn");
+    practice(state2, "hunting", r.success ? 5 : 3);
+    if (!r.success) {
+      if (method === "bow" && chance(state2, 0.4)) {
+        loseArrow(state2);
+        log(state2, `You miss. The ${g.name} is gone, and so is the arrow.`);
+      } else log(state2, `You miss. The ${g.name} is gone.`);
+      return { ok: false, seen: g.id };
+    }
+    const lb = takeMeat(state2, g);
+    return { ok: true, seen: g.id, meat: lb };
+  }
+  function canSetSnare(state2) {
+    const s = spotHere(state2);
+    if (!s || s.kind !== "hunt" || !s.game.includes("rabbit")) return "Snares need a place with rabbits";
+    if (!has(state2, "snare_wire")) return "You need snare wire";
+    if (wildOf(state2).snares[s.id] != null) return "Your snares are already set here";
+    return null;
+  }
+  function setSnare(state2) {
+    const why = canSetSnare(state2);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    advanceTime(state2, SNARE_SET_MINUTES, "work");
+    wildOf(state2).snares[state2.location.id] = state2.time;
+    log(state2, "You set a line of wire snares on the rabbit runs at the edge of the brush. Come back tomorrow.");
+    practice(state2, "hunting", 1);
+    return true;
+  }
+  function checkSnare(state2) {
+    const s = spotHere(state2);
+    const w = wildOf(state2);
+    const set = s ? w.snares[s.id] : null;
+    if (set == null) {
+      log(state2, "You have no snares here.");
+      return { ok: false };
+    }
+    const hours = (state2.time - set) / 60;
+    if (hours < 12) {
+      log(state2, "Too soon. Give the snares a night.");
+      return { ok: false };
+    }
+    advanceTime(state2, SNARE_CHECK_MINUTES, "work");
+    const days = Math.min(3, Math.max(1, Math.floor(hours / 24)));
+    const p = Math.min(0.8, 0.3 + 0.08 * skillLevel(state2, "hunting") + animalCover(state2.time) * 0.2);
+    let caught = 0;
+    for (let i = 0; i < days; i++) if (chance(state2, p)) caught++;
+    w.snares[s.id] = state2.time;
+    practice(state2, "hunting", caught ? 3 : 1);
+    if (!caught) {
+      log(state2, "The snares are empty. One is pulled loose; you set it again.");
+      return { ok: false, rabbits: 0 };
+    }
+    log(state2, `${caught} rabbit${caught > 1 ? "s" : ""} in the snares.`, "good");
+    let lb = 0;
+    for (let i = 0; i < caught; i++) lb += takeMeat(state2, GAME.rabbit, Math.min(0.6, hours / 24 * 0.15));
+    return { ok: true, rabbits: caught, meat: lb };
+  }
+  function takeUpSnare(state2) {
+    const s = spotHere(state2);
+    const w = wildOf(state2);
+    if (!s || w.snares[s.id] == null) return false;
+    delete w.snares[s.id];
+    log(state2, "You take up your snares.");
+    return true;
+  }
+
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "oatmeal", "canned_food"];
@@ -3268,6 +3681,7 @@
     if (loc.kind === "home") return "Home (Aloha)";
     if (loc.kind === "place") return getPlace(loc.id)?.name || "Unknown place";
     if (loc.kind === "house") return loc.label;
+    if (loc.kind === "wild") return spotHere(state2)?.name || "Outside";
     return "";
   }
   function canHeat(state2, kwh) {
@@ -4228,8 +4642,34 @@
       add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("leave_house", "Leave the house");
     }
+    if (loc.kind === "wild") {
+      const spot = spotHere(state2);
+      if (spot?.kind === "fish") {
+        const why = canFish(state2);
+        add("fish", `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? void 0 : oddsText(fishOdds(state2)) });
+      }
+      if (spot?.kind === "hunt") {
+        const methods = huntMethods(state2);
+        if (!methods.length) add("hunt_bow", `Hunt (${HUNT_MINUTES / 60} h)`, { disabled: "You need a bow and arrows, or a rifle and rounds" });
+        for (const m of methods) {
+          const o = huntOdds(state2, m);
+          const why = canHunt(state2, m);
+          add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game \xB7 ${o.shot.pct}% hit a ${o.animal}${m === "rifle" ? " \xB7 loud" : ""}${isScared(state2) ? " \xB7 game is wary" : ""}`, risk: m === "rifle" });
+        }
+        const w = state2.wild?.snares?.[spot.id];
+        if (w != null) {
+          const hours = (state2.time - w) / 60;
+          add("check_snare", "Check your snares", { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
+          add("take_snare", "Take up your snares");
+        } else if (spot.game?.includes("rabbit")) {
+          const why = canSetSnare(state2);
+          add("set_snare", "Set snares for rabbits (30 min)", { disabled: why, note: why ? void 0 : "check after a night" });
+        }
+      }
+      add("go_home", "Walk home");
+    }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
       if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
@@ -4313,6 +4753,20 @@
         return goHome(state2);
       case "go_place":
         return goToPlace(state2, arg);
+      case "go_spot":
+        return goToSpot(state2, arg);
+      case "fish":
+        return fish(state2);
+      case "hunt_bow":
+        return hunt(state2, "bow");
+      case "hunt_rifle":
+        return hunt(state2, "rifle");
+      case "set_snare":
+        return setSnare(state2);
+      case "check_snare":
+        return checkSnare(state2);
+      case "take_snare":
+        return takeUpSnare(state2);
       case "play_dog":
         return playWithDog(state2);
       case "dog_follow":
@@ -5717,6 +6171,17 @@
     youEl.title = "You";
     youEl.innerHTML = "<i></i>";
     const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    for (const [id, sp] of Object.entries(SPOTS)) {
+      const el = document.createElement("div");
+      el.className = `marker-wild ${sp.kind}`;
+      el.title = `${sp.name} (${sp.kind === "fish" ? "fishing" : "hunting"})`;
+      el.innerHTML = `<span>${sp.kind === "fish" ? "\u2248" : "\u22C0"}</span>`;
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        onPlaceClick(`wild:${id}`, null);
+      });
+      new maplibregl.Marker({ element: el }).setLngLat([sp.lon, sp.lat]).addTo(map);
+    }
     const signMarkers = /* @__PURE__ */ new Map();
     function applyMarks(state2, list) {
       const m = legacyMarks(state2);
@@ -5770,7 +6235,8 @@
       type: "FeatureCollection",
       features: list.map((p) => {
         const ps = placeStates[p.id];
-        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
         return {
           type: "Feature",
           geometry: { type: "Point", coordinates: [p.lon, p.lat] },
@@ -5996,7 +6462,7 @@
     state = loadGame();
     bindEvents();
     fx = createFx($("#mapwrap"));
-    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span><span><i class="edge"></i>15-mile edge</span>';
+    $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span><span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span><span><i class="edge"></i>15-mile edge</span>';
     try {
       mapApi = await createMap($("#map"), { places: allPlaces(), onPlaceClick: showPlacePopup });
       window.__llMap = mapApi.map;
@@ -6075,10 +6541,23 @@
     const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join("");
     return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}\xB0F.</div>${fx2 ? `<ul class="wx-fx">${fx2}</ul>` : ""}`;
   }
+  function tripRisks(t) {
+    const p = state.player;
+    if (!(t.miles > 2 || t.darkOnArrival)) return [];
+    const water = state.carried.water_bottle || 0;
+    return [
+      p.health < 50 && "your health is low",
+      p.injuries.some((i) => !i.bandaged) && "a wound is not bandaged",
+      p.illness?.infection && "an infection is not treated",
+      water < 0.5 && "you carry less than 2 qt of water",
+      t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && "it will be dark and you have no light"
+    ].filter(Boolean);
+  }
   function tripHtml(dest) {
     const t = tripPreview(state, dest);
+    const risks2 = tripRisks(t);
     const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
-    return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
+    return `${risks2.length ? `<p class="warn-line">\u26A0 Think first: ${esc(risks2.join("; "))}.</p>` : ""}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
   }
   function freshTag(id) {
     const l = stageLabel(state, id);
@@ -6190,6 +6669,7 @@
       const p = getPlace(loc.id);
       sub = CATEGORIES[p.cat].label;
     } else if (loc.kind === "home") sub = "Your house. One story, a fireplace, solar panels and a home battery.";
+    else if (loc.kind === "wild") sub = wildSub(SPOTS[loc.id]);
     else sub = "A house. Search it room by room.";
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
@@ -6366,12 +6846,21 @@
       pos = homeOf(state);
       const atHome = state.location.kind === "home";
       html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+    } else if (id.startsWith("wild:")) {
+      const sid = id.slice(5);
+      const sp = SPOTS[sid];
+      pos = sp;
+      const here = state.location.kind === "wild" && state.location.id === sid;
+      const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
+      html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === "fish" ? "Fishing" : "Hunting"} \xB7 ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
     } else {
       const p = getPlace(id);
       pos = p;
       const cat = CATEGORIES[p.cat];
       const ps = state.places[p.id];
-      const status = !ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched: nothing left" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
+      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+      const status = (!ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched all of it" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`) + (left > 0 ? ` \xB7 items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ": nothing left" : "");
       const here = state.location.kind === "place" && state.location.id === id;
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
       html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
@@ -6384,15 +6873,27 @@
       popup.remove();
       travelTo(e.currentTarget.dataset.goplace);
     });
+    el.querySelector("[data-gowild]")?.addEventListener("click", (e) => {
+      popup.remove();
+      travelTo(`wild:${e.currentTarget.dataset.gowild}`);
+    });
     el.querySelector("[data-gohome]")?.addEventListener("click", () => {
       popup.remove();
       travelTo("__home");
     });
   }
+  function wildSub(sp) {
+    if (!sp) return "";
+    if (sp.kind === "fish") return `Fish here: ${sp.fish.join(", ")}.${sp.run ? ` A ${sp.run.fish} run comes in some months.` : ""}`;
+    const here = state.location.kind === "wild" && SPOTS[state.location.id] === sp;
+    const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
+    return `Game here${here ? " now" : ""}: ${now.length ? now.join(", ") : "none this time of year"}.`;
+  }
   function travelTo(id) {
     if (state.dead) return;
     if (state.location.kind === "house") perform(state, "action", "leave_house");
     if (id === "__home") perform(state, "action", "go_home");
+    else if (id.startsWith("wild:")) perform(state, "action", "go_spot", id.slice(5));
     else perform(state, "action", "go_place", id);
     if (state.dead) recordRun(state);
     commit(true);
@@ -6426,12 +6927,30 @@
       });
     });
   }
+  function sleepPreview(h2) {
+    try {
+      const copy = structuredClone(state);
+      copy.log = [];
+      perform(copy, "action", "sleep", h2);
+      const p = copy.player;
+      return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
+    } catch {
+      return null;
+    }
+  }
   function showSleep() {
+    const p = state.player;
+    const prev = {};
     const opts = [1, 2, 4, 6, 8, 10].map((h2) => {
       const a = actionTiming(state, h2 * 60);
-      return `<button data-hours="${h2}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
+      const f = prev[h2] = sleepPreview(h2);
+      const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
+      const warn = !f ? "" : f.dead ? " \xB7 you may not wake" : low ? ` \xB7 wake ${[f.water < 15 && "very thirsty", f.food < 15 && "starving", f.warmth < 15 && "freezing"].filter(Boolean).join(", ")}` : "";
+      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc(warn)}</small></button>`;
     }).join("");
-    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+    const need = [p.water < 40 && "Drink first: you are thirsty.", p.food < 40 && "Eat first: you are hungry.", p.warmth < 40 && "Get warm first: you are cold."].filter(Boolean);
+    const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc(need.join(" "))}</p>` : ""}`;
+    modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
         closeModal();
         act("action", "sleep", Number(b.dataset.hours));

@@ -53,3 +53,30 @@ export function seasonDaily(state, day) {
     log(state, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], 'story');
   }
 }
+
+// ---------- overgrowth effects (research step 9) ----------
+// Grass and brush are tallest in summer and lowest in winter.
+const LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
+
+// Walk speed factor on the streets: 1 until the city is a quarter grown in,
+// then down to 0.85 (summer, fully grown). Routes are straight lines, so this is
+// the mean of big roads (clear) and small roads (brush, fallen limbs).
+export function overgrowthWalk(t) {
+  const og = overgrowth(t);
+  if (og <= 0.25) return 1;
+  return 1 - 0.15 * ((og - 0.25) / 0.75) * LEAF[seasonOf(t)];
+}
+
+// Cover for animals, 0..1: more brush, more deer, rabbits and birds, and they
+// are harder to see. For hunting (more animals near, harder shots) and for the
+// pacer (animal events).
+export function animalCover(t) {
+  return Math.min(1, overgrowth(t) * LEAF[seasonOf(t)] * 1.2);
+}
+
+// Food from foraging, as a factor of a summer base: blackberries, apples, greens.
+// Summer most, then fall; winter almost nothing. More overgrowth, more to find.
+const FORAGE = { winter: 0.1, spring: 0.5, summer: 1.2, fall: 1 };
+export function forageFactor(t) {
+  return FORAGE[seasonOf(t)] * (0.5 + overgrowth(t));
+}

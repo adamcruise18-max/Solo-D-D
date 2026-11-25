@@ -33,6 +33,8 @@ import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostic
 import { homeHeat } from '../engine/home.js';
 import { gardenInfo, canPlant } from '../engine/garden.js';
 import { CROPS } from '../data/crops.js';
+import { SPOTS, GAME } from '../data/wild.js';
+import { gameHere } from '../engine/wild.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
@@ -80,7 +82,8 @@ export async function start() {
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
-    + '<span><i class="part"></i>Visited, not all searched</span><span><i class="done"></i>All searched</span>'
+    + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span>'
+    + '<span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span>'
     + '<span><i class="edge"></i>15-mile edge</span>';
   try {
     mapApi = await createMap($('#map'), { places: allPlaces(), onPlaceClick: showPlacePopup });
@@ -171,10 +174,25 @@ function outlookHtml() {
 }
 
 // A walk: time, energy, finish time, the 5 AM change and the weather on the way.
+// Reasons not to go on a long trip now (over 2 miles, or arriving in the dark). Shown in the popup above Walk here.
+function tripRisks(t) {
+  const p = state.player;
+  if (!(t.miles > 2 || t.darkOnArrival)) return [];
+  const water = (state.carried.water_bottle || 0);
+  return [
+    p.health < 50 && 'your health is low',
+    p.injuries.some((i) => !i.bandaged) && 'a wound is not bandaged',
+    p.illness?.infection && 'an infection is not treated',
+    water < 0.5 && 'you carry less than 2 qt of water',
+    t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && 'it will be dark and you have no light',
+  ].filter(Boolean);
+}
+
 function tripHtml(dest) {
   const t = tripPreview(state, dest);
+  const risks = tripRisks(t);
   const fx = t.weather.effects.filter((e) => e.level !== 'ok').map((e) => esc(e.text)).join('<br>');
-  return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
+  return `${risks.length ? `<p class="warn-line">⚠ Think first: ${esc(risks.join('; '))}.</p>` : ''}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
     + `${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(', ')}</small></p>` : ''}${fx ? `<p class="wx-trip"><small>${fx}</small></p>` : ''}`;
 }
 
@@ -297,6 +315,7 @@ function renderLocation() {
     const p = getPlace(loc.id);
     sub = CATEGORIES[p.cat].label;
   } else if (loc.kind === 'home') sub = 'Your house. One story, a fireplace, solar panels and a home battery.';
+  else if (loc.kind === 'wild') sub = wildSub(SPOTS[loc.id]);
   else sub = 'A house. Search it room by room.';
   const acts = listActions(state).map((a) => {
     const dis = a.disabled ? 'disabled' : '';
@@ -478,12 +497,22 @@ function showPlacePopup(id, lngLat) {
     const atHome = state.location.kind === 'home';
     html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
       : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+  } else if (id.startsWith('wild:')) {
+    const sid = id.slice(5);
+    const sp = SPOTS[sid];
+    pos = sp;
+    const here = state.location.kind === 'wild' && state.location.id === sid;
+    const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
+    html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === 'fish' ? 'Fishing' : 'Hunting'} · ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      ${here ? '<p><i>You are here.</i></p>' : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
   } else {
     const p = getPlace(id);
     pos = p;
     const cat = CATEGORIES[p.cat];
     const ps = state.places[p.id];
-    const status = !ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched: nothing left' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
+    const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+    const status = (!ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched all of it' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`)
+      + (left > 0 ? ` · items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ': nothing left' : '');
     const here = state.location.kind === 'place' && state.location.id === id;
     const fromHome = straightMiles(homeOf(state), p).toFixed(1);
     html = `<h4>${esc(p.name)}</h4><p>${cat.label} · ${fromHome} mi from home</p><p><i>${status}</i></p>
@@ -497,16 +526,30 @@ function showPlacePopup(id, lngLat) {
     popup.remove();
     travelTo(e.currentTarget.dataset.goplace);
   });
+  el.querySelector('[data-gowild]')?.addEventListener('click', (e) => {
+    popup.remove();
+    travelTo(`wild:${e.currentTarget.dataset.gowild}`);
+  });
   el.querySelector('[data-gohome]')?.addEventListener('click', () => {
     popup.remove();
     travelTo('__home');
   });
 }
 
+// One line on what lives at a fishing or hunting spot (now, when you stand there).
+function wildSub(sp) {
+  if (!sp) return '';
+  if (sp.kind === 'fish') return `Fish here: ${sp.fish.join(', ')}.${sp.run ? ` A ${sp.run.fish} run comes in some months.` : ''}`;
+  const here = state.location.kind === 'wild' && SPOTS[state.location.id] === sp;
+  const now = here ? gameHere(state).map((g) => g.name) : sp.game.map((g) => GAME[g].name);
+  return `Game here${here ? ' now' : ''}: ${now.length ? now.join(', ') : 'none this time of year'}.`;
+}
+
 function travelTo(id) {
   if (state.dead) return;
   if (state.location.kind === 'house') perform(state, 'action', 'leave_house');
   if (id === '__home') perform(state, 'action', 'go_home');
+  else if (id.startsWith('wild:')) perform(state, 'action', 'go_spot', id.slice(5));
   else perform(state, 'action', 'go_place', id);
   if (state.dead) recordRun(state);
   commit(true);
@@ -541,12 +584,30 @@ function showIntro() {
   });
 }
 
+// Food, water and warmth after a sleep of h hours: try it on a copy of the game.
+function sleepPreview(h) {
+  try {
+    const copy = structuredClone(state);
+    copy.log = [];
+    perform(copy, 'action', 'sleep', h);
+    const p = copy.player;
+    return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
+  } catch { return null; }
+}
+
 function showSleep() {
+  const p = state.player;
+  const prev = {};
   const opts = [1, 2, 4, 6, 8, 10].map((h) => {
     const a = actionTiming(state, h * 60);
-    return `<button data-hours="${h}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}</small></button>`;
+    const f = (prev[h] = sleepPreview(h));
+    const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
+    const warn = !f ? '' : f.dead ? ' · you may not wake' : low ? ` · wake ${[f.water < 15 && 'very thirsty', f.food < 15 && 'starving', f.warmth < 15 && 'freezing'].filter(Boolean).join(', ')}` : '';
+    return `<button data-hours="${h}" class="${low ? 'risky' : ''}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}${esc(warn)}</small></button>`;
   }).join('');
-  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+  const need = [p.water < 40 && 'Drink first: you are thirsty.', p.food < 40 && 'Eat first: you are hungry.', p.warmth < 40 && 'Get warm first: you are cold.'].filter(Boolean);
+  const now = `<p class="hint">Now: Food ${Math.round(p.food)} · Water ${Math.round(p.water)} · Warmth ${Math.round(p.warmth)} · Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">⚠ ${esc(need.join(' '))}</p>` : ''}`;
+  modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
     m.querySelectorAll('[data-hours]').forEach((b) => b.addEventListener('click', () => {
       closeModal();
       act('action', 'sleep', Number(b.dataset.hours));

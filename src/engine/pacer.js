@@ -38,8 +38,8 @@ export function initPacer(state) {
 // written for sleep (where: 'asleep', a sound that wakes you) can happen.
 export function whereNow(state, mode) {
   if (mode === 'sleep') return 'asleep';
-  if (mode === 'walk') return 'outside';
   const k = state.location?.kind;
+  if (mode === 'walk' || k === 'wild') return 'outside';
   if (k === 'home') return 'home';
   return 'inside';
 }
