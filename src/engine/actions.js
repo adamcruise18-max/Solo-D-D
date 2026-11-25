@@ -5,7 +5,7 @@ import { chance, randInt } from '../rng.js';
 import {
   log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
-import { advanceTime, addInjury, startStomachBug, INJURY_NAMES, environment } from './tick.js';
+import { advanceTime, addInjury, startStomachBug, injuryName, injuryFactor, environment } from './tick.js';
 import { check, odds, oddsText } from './checks.js';
 import { RAW_WATER_SICK } from './status.js';
 import { isNight } from './world.js';
@@ -300,7 +300,7 @@ function useMed(state, id, bag) {
     inj.bandaged = true;
     inj.healH *= bandageHealFactor(state);
     practice(state, 'first_aid', 3);
-    log(state, `You clean and bandage the ${INJURY_NAMES[inj.type].toLowerCase()}.`, 'good');
+    log(state, `You clean and bandage the ${injuryName(inj).toLowerCase()}.`, 'good');
     advanceTime(state, 15);
     return;
   }
@@ -660,7 +660,7 @@ export function forceEntry(state) {
     practice(state, 'tinkering', 4);
   } else {
     practice(state, 'tinkering', 2);
-    if (chance(state, 0.3)) addInjury(state, 'sprain');
+    if (chance(state, 0.3)) addInjury(state, 'sprain', { part: 'ankle' });
   }
 }
 
@@ -690,7 +690,7 @@ export function searchMinutes(state, base, dark) {
   let m = base * searchTimeFactor(state) * searchJobFactor(state);
   if (dark && !hasLight(state)) m *= 2;
   if (p.water < 25) m *= 1.25;
-  if (p.injuries.some((i) => i.type === 'sprain')) m *= 1.3;
+  m /= injuryFactor(state, 'hand');
   const extra = Math.max(0, bagWeight(state.carried) - 10);
   m *= 1 + Math.floor(extra / 10) * 0.1;
   return m;
