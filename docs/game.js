@@ -1532,6 +1532,83 @@
     daily: (state2, day) => decayDaily(state2, day)
   };
 
+  // src/engine/dog.js
+  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function dogStep(state2, dt, sleeping) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    d.food = clamp(d.food - 4 * dt, 0, 100);
+    d.water = 80;
+    if (d.food <= 0) d.health -= 1 * dt;
+    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.health <= 50 && d.warned < 1) {
+      d.warned = 1;
+      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
+    }
+    if (d.health <= 25 && d.warned < 2) {
+      d.warned = 2;
+      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
+    }
+    if (d.health > 60) d.warned = 0;
+    if (d.health <= 0) {
+      d.health = 0;
+      d.stage = "dead";
+      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
+      state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  function dogBondDaily(state2) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    if (d.food >= 25) d.bond += 3;
+    else d.bond -= 10;
+    d.bond = clamp(d.bond, 0, 100);
+  }
+  function dogDaily(state2, day) {
+    const d = state2.dog;
+    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
+    if (d.stage === "none" && day >= d.arriveDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
+    } else if (d.stage === "visiting") {
+      const since = lastFed == null ? day - d.visitStart : day - lastFed;
+      if (since > 3) {
+        if (!d.revisitUsed) {
+          d.stage = "away";
+          d.revisitUsed = true;
+          d.revisitDay = day + randInt(state2, 5, 8);
+          log(state2, "The dog is not in the street today.");
+        } else {
+          d.stage = "gone";
+          log(state2, "The dog does not come back.");
+        }
+      }
+    } else if (d.stage === "away" && day >= d.revisitDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      d.feedDays = [];
+      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
+    }
+  }
+  var dogSystem = {
+    id: "dog",
+    label: "Dog",
+    order: 1010,
+    // right after the legacy rules: the same order as before
+    version: 1,
+    legacy: true,
+    // state.dog was in saves before the engine; newGame() makes it
+    owns: ["dog"],
+    // Thresholds (weak, sick, death) happen inside a day; the stray's visits are days.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => dogStep(state2, dtHours, ctx.mode === "sleep"),
+    daily: (state2, day) => {
+      dogBondDaily(state2);
+      dogDaily(state2, day);
+    }
+  };
+
   // src/engine/systems.js
   var weatherSystem = {
     id: "weather",
@@ -1564,7 +1641,7 @@
     step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
     daily: (state2, day) => dailyRollover(state2, day)
   };
-  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, pacerSystem];
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, dogSystem, pacerSystem];
   var devChecks = false;
   var cached = null;
   function gameSystems() {
@@ -1695,7 +1772,7 @@
   }
 
   // src/engine/tick.js
-  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
     return clothingWarmth(state2.player);
   }
@@ -1751,8 +1828,8 @@
     const wx = weatherInfo(state2);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
-    else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
+    if (env.outside && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
     if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
@@ -1762,7 +1839,7 @@
       if (wr < 0) wr *= 0.5;
       p.warmFedH = Math.max(0, p.warmFedH - dt);
     }
-    p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+    p.warmth = clamp2(p.warmth + wr * dt, 0, 100);
     ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
@@ -1770,21 +1847,21 @@
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
     if (state2.weather.type === "heat_wave" && env.outside && !env.dark) waterLoss *= 1.5;
-    p.food = clamp(p.food - foodLoss * dt, 0, 100);
-    p.water = clamp(p.water - waterLoss * dt, 0, 100);
+    p.food = clamp2(p.food - foodLoss * dt, 0, 100);
+    p.water = clamp2(p.water - waterLoss * dt, 0, 100);
     if (sleeping) {
       let gain = felt >= 55 ? 10 : 6;
       if (p.morale < 50) gain *= 0.75;
       if (p.health < 50) gain *= 0.75;
       if (p.food < 25) gain *= 0.75;
       gain *= sleepGainFactor(state2);
-      p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
+      p.energy = clamp2(p.energy + gain * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
       loss *= energyUseFactor(state2, mode);
       if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
-      p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
+      p.energy = clamp2(p.energy - loss * dt, 0, p.energyMax);
     }
     if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
     if (p.water <= 0) damage(state2, DEHYDRATED_DAMAGE * dt, "dehydration");
@@ -1831,7 +1908,6 @@
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
     homeStep(state2, dt, env);
-    dogStep(state2, dt, sleeping);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
@@ -1877,29 +1953,6 @@
       log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
   }
-  function dogStep(state2, dt, sleeping) {
-    const d = state2.dog;
-    if (d.stage !== "joined") return;
-    d.food = clamp(d.food - 4 * dt, 0, 100);
-    d.water = 80;
-    if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
-    if (d.health <= 50 && d.warned < 1) {
-      d.warned = 1;
-      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
-    }
-    if (d.health <= 25 && d.warned < 2) {
-      d.warned = 2;
-      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
-    }
-    if (d.health > 60) d.warned = 0;
-    if (d.health <= 0) {
-      d.health = 0;
-      d.stage = "dead";
-      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
-      state2.player.morale = Math.max(0, state2.player.morale - 25);
-    }
-  }
   function dailyRollover(state2, day) {
     const p = state2.player;
     seasonDaily(state2, day);
@@ -1916,13 +1969,8 @@
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
     if (built(state2, "led_lights")) p.morale += 3;
     if (built(state2, "sealed_store") && foodItemsStored(state2) >= 10) p.morale += 2;
-    if (state2.dog.stage === "joined") {
-      p.morale += 8;
-      if (state2.dog.food >= 25) state2.dog.bond += 3;
-      else state2.dog.bond -= 10;
-      state2.dog.bond = clamp(state2.dog.bond, 0, 100);
-    }
-    p.morale = clamp(p.morale, 0, 100);
+    if (state2.dog.stage === "joined") p.morale += 8;
+    p.morale = clamp2(p.morale, 0, 100);
     if (p.weak) {
       if (p.weakGoodHours >= 12) {
         p.energyMax = Math.min(100, p.energyMax + 2);
@@ -1936,34 +1984,6 @@
     }
     for (const inj of p.injuries) {
       if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
-    }
-    dogDaily(state2, day);
-  }
-  function dogDaily(state2, day) {
-    const d = state2.dog;
-    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-    if (d.stage === "none" && day >= d.arriveDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
-    } else if (d.stage === "visiting") {
-      const since = lastFed == null ? day - d.visitStart : day - lastFed;
-      if (since > 3) {
-        if (!d.revisitUsed) {
-          d.stage = "away";
-          d.revisitUsed = true;
-          d.revisitDay = day + randInt(state2, 5, 8);
-          log(state2, "The dog is not in the street today.");
-        } else {
-          d.stage = "gone";
-          log(state2, "The dog does not come back.");
-        }
-      }
-    } else if (d.stage === "away" && day >= d.revisitDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      d.feedDays = [];
-      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
     }
   }
   var INJURY_NAMES = {
@@ -2780,7 +2800,7 @@
 
   // src/engine/actions.js
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
-  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source2(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
   }
@@ -2813,16 +2833,16 @@
     log(state2, text, "story");
     if (p.bodySeenDay !== day) {
       p.bodySeenDay = day;
-      p.morale = clamp2(p.morale - (day >= 30 ? 1 : 3), 0, 100);
+      p.morale = clamp3(p.morale - (day >= 30 ? 1 : 3), 0, 100);
     }
   }
   function addFood(state2, points) {
     const p = state2.player;
     if (p.illness.stomachH > 0) points /= 2;
-    p.food = clamp2(p.food + points, 0, 100);
+    p.food = clamp3(p.food + points, 0, 100);
   }
   function addWater(state2, points) {
-    state2.player.water = clamp2(state2.player.water + points, 0, 100);
+    state2.player.water = clamp3(state2.player.water + points, 0, 100);
   }
   function freeWeight(state2) {
     return carryLimit(state2) * 1.5 - bagWeight(state2.carried);
@@ -2903,7 +2923,7 @@
           return;
         }
         p.lastComfortDay = day;
-        p.morale = clamp2(p.morale + 5, 0, 100);
+        p.morale = clamp3(p.morale + 5, 0, 100);
         if (it.portion) addItem(bag, id, -it.portion);
         log(state2, it.comfortText || "You rest your mind for a while.", "good");
         advanceTime(state2, 60);
@@ -2911,7 +2931,7 @@
       }
       case "warm": {
         addItem(bag, id, -1);
-        p.warmth = clamp2(p.warmth + it.warmth, 0, 100);
+        p.warmth = clamp3(p.warmth + it.warmth, 0, 100);
         log(state2, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
         advanceTime(state2, 1);
         return;
@@ -2944,7 +2964,7 @@
       practice(state2, it.skill, BOOK_XP, { book: true });
     } else {
       log(state2, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
-      state2.player.morale = clamp2(state2.player.morale + 2, 0, 100);
+      state2.player.morale = clamp3(state2.player.morale + 2, 0, 100);
     }
     return true;
   }
@@ -3157,8 +3177,8 @@
         const stage = stageLabel(state2, food);
         addItem(bag, food, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
-        p.warmth = clamp2(p.warmth + 10, 0, 100);
-        p.morale = clamp2(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        p.warmth = clamp3(p.warmth + 10, 0, 100);
+        p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
         p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
         log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
@@ -3203,7 +3223,7 @@
         return;
       case "fridge":
         h2.fridgeOpened = true;
-        p.morale = clamp2(p.morale - 2, 0, 100);
+        p.morale = clamp3(p.morale - 2, 0, 100);
         log(state2, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
         advanceTime(state2, 2);
         return;
@@ -3249,8 +3269,8 @@
     const it = ITEMS[id];
     addItem(bag, id, -it.portion);
     const points = it.kind === "dogfood" ? 100 : it.cal * it.portion / 10;
-    d.food = clamp2(d.food + points, 0, 100);
-    d.bond = clamp2(d.bond + 1, 0, 100);
+    d.food = clamp3(d.food + points, 0, 100);
+    d.bond = clamp3(d.bond + 1, 0, 100);
     log(state2, `You feed ${d.name}.`);
     advanceTime(state2, 5);
   }
@@ -3269,8 +3289,8 @@
       return;
     }
     p.lastDogPlayDay = day;
-    d.bond = clamp2(d.bond + 2, 0, 100);
-    p.morale = clamp2(p.morale + 3, 0, 100);
+    d.bond = clamp3(d.bond + 2, 0, 100);
+    p.morale = clamp3(p.morale + 3, 0, 100);
     log(state2, `You play with ${d.name} for a while. For a moment, things feel normal.`, "good");
     advanceTime(state2, 20);
   }
@@ -3287,7 +3307,7 @@
       state2.stats.placesSearched += 1;
       log(state2, cat.entryText, "story");
       if (ps.emptyHint) log(state2, "Most shelves here are already empty. People took a lot in the first weeks.");
-      if (cat.entryMorale) state2.player.morale = clamp2(state2.player.morale + cat.entryMorale, 0, 100);
+      if (cat.entryMorale) state2.player.morale = clamp3(state2.player.morale + cat.entryMorale, 0, 100);
     }
     if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
   }
@@ -3303,7 +3323,7 @@
       advanceTime(state2, 5, "work");
       return;
     }
-    state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+    state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
     advanceTime(state2, 5, "heavy");
     if (check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
       ps.unlocked = true;
@@ -3432,7 +3452,7 @@
     h2.touched.push(zone);
     zoneInjuryCheck(state2);
     if (ctx.catId === "supermarket" && h2.touched.length === 1) {
-      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
+      state2.player.morale = clamp3(state2.player.morale - 3, 0, 100);
       log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
   }
@@ -3607,7 +3627,7 @@
         log(state2, "The door is locked, but you find a spare key under a flower pot.");
         advanceTime(state2, 2);
       } else {
-        state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+        state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
         if (!check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
           log(state2, "The door holds. You break a window and climb in.");
           if (chance(state2, 0.25)) addInjury(state2, "small_cut");

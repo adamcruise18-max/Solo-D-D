@@ -1,12 +1,13 @@
 // The game's systems, run by the engine clock (src/core/clock.js).
-// Order in each step and at 5 AM: weather, slow breakdown, the legacy rules, then
-// the event pacer (it reads this step's vitals for its mercy rule).
+// Order in each step and at 5 AM: weather, slow breakdown, the legacy rules, the dog,
+// then the event pacer (it reads this step's vitals for its mercy rule).
 // This is the same order as the old advanceTime(), so the numbers do not change
 // (checked by the golden replay, npm run replay).
 //
 // Field ownership (external review, 1.3), until all rules are systems:
 //   weather                        weather system (only it writes state.weather)
 //   pacer, decay                   the pacer and decay systems (src/engine/pacer.js, decay.js)
+//   dog                            the dog system (src/engine/dog.js)
 //   item pickups                   zoneItems, taken[pid], opened[cid] (PR #9 model)
 //   other place changes            state.world.changes (src/core/changes.js)
 //   everything else                legacy rules (src/engine/tick.js)
@@ -17,6 +18,7 @@ import { rollSpell } from './rareweather.js';
 import { tickStep, dailyRollover } from './tick.js';
 import { pacerSystem } from './pacer.js';
 import { decaySystem } from './decay.js';
+import { dogSystem } from './dog.js';
 
 export const weatherSystem = {
   id: 'weather',
@@ -50,7 +52,7 @@ export const legacySystem = {
   daily: (state, day) => dailyRollover(state, day),
 };
 
-export const GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, pacerSystem];
+export const GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, dogSystem, pacerSystem];
 
 // dev: check that no system writes a field another system owns (tests, replay).
 let devChecks = false;

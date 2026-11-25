@@ -188,7 +188,7 @@ export function tickStep(state, dt, mode) {
   }
 
   homeStep(state, dt, env);
-  dogStep(state, dt, sleeping);
+  // The dog is its own system now (src/engine/dog.js), right after these rules.
 
   if (p.health <= 0) {
     p.health = 0;
@@ -245,30 +245,6 @@ function homeStep(state, dt, env) {
   }
 }
 
-function dogStep(state, dt, sleeping) {
-  const d = state.dog;
-  if (d.stage !== 'joined') return;
-  d.food = clamp(d.food - 4 * dt, 0, 100);
-  d.water = 80;
-  if (d.food <= 0) d.health -= 1 * dt;
-  else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
-  if (d.health <= 50 && d.warned < 1) {
-    d.warned = 1;
-    log(state, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, 'warn');
-  }
-  if (d.health <= 25 && d.warned < 2) {
-    d.warned = 2;
-    log(state, `${d.name} is very sick. ${d.name} needs food or medicine now.`, 'danger');
-  }
-  if (d.health > 60) d.warned = 0;
-  if (d.health <= 0) {
-    d.health = 0;
-    d.stage = 'dead';
-    log(state, `${d.name} lies down and does not get up again. ${d.name} is gone.`, 'danger');
-    state.player.morale = Math.max(0, state.player.morale - 25);
-  }
-}
-
 // Legacy system: the 5 AM rules that are not systems yet. The weather system
 // has rolled the new day's weather before this runs.
 export function dailyRollover(state, day) {
@@ -291,12 +267,7 @@ export function dailyRollover(state, day) {
   if (state.location.kind === 'home' && state.home.indoorTemp < 50) p.morale -= 5;
   if (built(state, 'led_lights')) p.morale += 3;
   if (built(state, 'sealed_store') && foodItemsStored(state) >= 10) p.morale += 2;
-  if (state.dog.stage === 'joined') {
-    p.morale += 8;
-    if (state.dog.food >= 25) state.dog.bond += 3;
-    else state.dog.bond -= 10;
-    state.dog.bond = clamp(state.dog.bond, 0, 100);
-  }
+  if (state.dog.stage === 'joined') p.morale += 8; // the dog's bond: dog system
   p.morale = clamp(p.morale, 0, 100);
 
   // Weak status
@@ -317,35 +288,6 @@ export function dailyRollover(state, day) {
     if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state);
   }
 
-  dogDaily(state, day);
-}
-
-function dogDaily(state, day) {
-  const d = state.dog;
-  const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-  if (d.stage === 'none' && day >= d.arriveDay) {
-    d.stage = 'visiting';
-    d.visitStart = day;
-    log(state, 'A thin dog watches the house from the street. It does not come near.', 'story');
-  } else if (d.stage === 'visiting') {
-    const since = lastFed == null ? day - d.visitStart : day - lastFed;
-    if (since > 3) {
-      if (!d.revisitUsed) {
-        d.stage = 'away';
-        d.revisitUsed = true;
-        d.revisitDay = day + randInt(state, 5, 8);
-        log(state, 'The dog is not in the street today.');
-      } else {
-        d.stage = 'gone';
-        log(state, 'The dog does not come back.');
-      }
-    }
-  } else if (d.stage === 'away' && day >= d.revisitDay) {
-    d.stage = 'visiting';
-    d.visitStart = day;
-    d.feedDays = [];
-    log(state, 'The thin dog is back in the street. It looks at your door.', 'story');
-  }
 }
 
 export const INJURY_NAMES = {

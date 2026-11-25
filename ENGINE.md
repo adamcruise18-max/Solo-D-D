@@ -132,6 +132,7 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
 | Other place changes (doors, damage, discovered) | `world.changes` (`src/core/changes.js`) |
 | `pacer` | the event pacer (`src/engine/pacer.js`, stream `pacer`) |
 | `decay` | the slow breakdown (`src/engine/decay.js`) |
+| `dog` | the dog system (`src/engine/dog.js`, after the legacy rules); player actions (feed, play, follow) also change it |
 | All other fields | the legacy system (old rules in `src/engine/tick.js`) |
 | `time` | the clock only |
 
