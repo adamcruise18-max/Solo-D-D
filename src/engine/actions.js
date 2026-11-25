@@ -20,6 +20,7 @@ import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 import { plant, waterGarden, harvest } from './garden.js';
 import { SALVAGE } from '../data/salvage.js';
+import { treatDog, canTreatDog } from './dog.js';
 import { carHere, goToCar, searchCar, siphonGas, takeCarBattery, stripCarWire, addCarBattery, SIPHON_TOOLS, WRENCH_TOOLS, CAR_SEARCH_MIN, SIPHON_MIN, BATTERY_MIN, WIRE_MIN, MAX_CAR_BATTERIES } from './cars.js';
 import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
 import { spotHere, goToSpot, canFish, fishOdds, fish, huntMethods, canHunt, huntOdds, hunt, canSetSnare, setSnare, checkSnare, takeUpSnare, isScared, FISH_MINUTES, HUNT_MINUTES } from './wild.js';
@@ -1155,6 +1156,7 @@ export function listActions(state) {
   add('sleep', state.location.kind === 'home' ? 'Sleep in your bed…' : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
+    if (state.dog.sick) { const why = canTreatDog(state); add('treat_dog', `Treat ${state.dog.name} (antibiotics)`, { disabled: why, note: why ? undefined : '1 course of antibiotics' }); }
     if (loc.kind === 'home') add('dog_follow', state.dog.withPlayer ? `${state.dog.name}: stay home` : `${state.dog.name}: come with me`);
   }
   return acts;
@@ -1213,6 +1215,7 @@ export function doAction(state, id, arg) {
     case 'go_home': return goHome(state);
     case 'go_place': return goToPlace(state, arg);
     case 'go_spot': return goToSpot(state, arg);
+    case 'treat_dog': { const ok = treatDog(state); if (ok) advanceTime(state, 10); return; }
     case 'go_car': { const [cid, la, lo] = String(arg).split('|'); return goToCar(state, cid, Number(la), Number(lo)); }
     case 'car_search': return searchCar(state);
     case 'car_siphon': return siphonGas(state);

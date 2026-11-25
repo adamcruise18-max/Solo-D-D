@@ -41,7 +41,7 @@ export const PROJECTS = [
   // ---- Garden ----
   {
     id: 'garden_beds', wing: 'food', name: 'Raised garden beds',
-    effect: 'Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).',
+    effect: 'Four beds in the back yard. Plant seeds, water them, and harvest fresh food.',
     needs: { scrap_wood: 4, hardware_parts: 1 }, tools: [], hours: 6,
   },
   // ---- Heat ----

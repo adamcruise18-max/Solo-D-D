@@ -186,6 +186,8 @@ function tripRisks(t) {
     p.illness?.infection && 'an infection is not treated',
     water < 0.5 && 'you carry less than 2 qt of water',
     t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && 'it will be dark and you have no light',
+    p.energy < 30 && 'you are very tired',
+    p.warmth < 40 && 'you are cold',
   ].filter(Boolean);
 }
 
@@ -481,6 +483,7 @@ function renderDog() {
   if (d.stage === 'joined') {
     const bar = (label, v) => `<div class="stat ${v < 25 ? 'bad' : v < 50 ? 'warn' : 'ok'}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
     html = `<h3>${esc(d.name)} <small>${d.withPlayer ? 'with you' : 'at home'}</small></h3>${bar('Food', d.food)}${bar('Health', d.health)}${bar('Bond', d.bond)}
+      ${d.sick ? `<p class="warn-line">⚠ ${esc(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ''}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
   } else if (d.stage === 'visiting') {
     html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
@@ -1230,12 +1233,13 @@ function diagText(state) {
 function homeProjectText(state, id, long) {
   if (id === 'home_battery') {
     const h = state.home;
-    return `Home battery <small>${h.battery.toFixed(1)} / ${h.batteryMax} kWh · charged by the solar panels</small>`;
+    const txt = `${h.battery.toFixed(1)} / ${h.batteryMax} kWh · charged by the solar panels`;
+    return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
   }
   const proj = PROJECTS.find((p) => p.id === id);
   if (!proj) return '';
   const st = projectStatus(state, proj);
-  if (st.built) return `${esc(proj.name)} <small>built · ${esc(proj.effect || '')}</small>`;
+  if (st.built) return long ? `${proj.name}: built. ${proj.effect || ''}` : `${esc(proj.name)} <small>built · ${esc(proj.effect || '')}</small>`;
   const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(', ');
   const tools = st.tools.length ? ` · tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? '' : ' (missing)')).join(', ')}` : '';
   const req = st.missingReq.length ? ` · build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(', ')}` : '';
@@ -1278,6 +1282,15 @@ function renderHeat(atHome) {
 }
 
 // Garden (engine garden.js): beds, what grows, and what you can sow this month.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+// [1,2,3,6,7,8] -> "Feb–Apr, Jul–Sep"
+function monthsText(list) {
+  const m = [...list].sort((a, b) => a - b);
+  const runs = [];
+  for (const x of m) { const r = runs[runs.length - 1]; if (r && x === r[1] + 1) r[1] = x; else runs.push([x, x]); }
+  return runs.map(([a, b]) => (a === b ? MONTHS[a] : `${MONTHS[a]}–${MONTHS[b]}`)).join(', ');
+}
+
 function renderGarden(atHome) {
   const g = gardenInfo(state);
   if (!g.beds) return '';
@@ -1287,7 +1300,7 @@ function renderGarden(atHome) {
     if (!b) { beds.push('<div class="bed empty"><span>Empty bed</span></div>'); continue; }
     const stage = { seedling: 'seedlings', growing: 'growing', nearly: 'nearly ready', ready: 'ready to harvest', dead: 'dead' }[b.stage] || b.stage;
     beds.push(`<div class="bed ${b.dead ? 'dead' : b.ready ? 'ready' : ''}"><b>${esc(b.name)}</b> <span>${stage}</span>
-      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? '' : `${b.growth}% grown · about ${Math.max(1, Math.round((CROPS[b.crop].days * (100 - b.growth)) / 100))} days left if warm · `}water ${b.water}%</small></div>`);
   }
   const sow = g.canSow.map((id) => {
     const why = canPlant(state, id);
@@ -1304,5 +1317,6 @@ function renderGarden(atHome) {
     </div>
     <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : 'Nothing to sow this month.'}</p>
     <div class="row">${sow}</div>
+    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(' · ')}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
   </div>`;
 }

@@ -916,7 +916,7 @@
       id: "garden_beds",
       wing: "food",
       name: "Raised garden beds",
-      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food (engine/garden.js).",
+      effect: "Four beds in the back yard. Plant seeds, water them, and harvest fresh food.",
       needs: { scrap_wood: 4, hardware_parts: 1 },
       tools: [],
       hours: 6
@@ -2002,6 +2002,27 @@
       d.sick = { since: day };
       log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
     }
+  }
+  function canTreatDog(state2) {
+    const d = state2.dog;
+    if (!d || d.stage !== "joined") return "No dog";
+    if (!d.sick) return `${d.name} is not sick`;
+    if (!has(state2, "antibiotics")) return "You need antibiotics";
+    return null;
+  }
+  function treatDog(state2) {
+    const why = canTreatDog(state2);
+    if (why) {
+      log(state2, why + ".");
+      return false;
+    }
+    const d = state2.dog;
+    const bag = (state2.carried.antibiotics || 0) > 0 ? state2.carried : state2.home.storage;
+    addItem(bag, "antibiotics", -1);
+    d.sick = null;
+    d.health = Math.min(100, d.health + 10);
+    log(state2, `You push the pills into a bit of food. ${d.name} swallows them. By evening ${d.name} looks better.`, "good");
+    return true;
   }
   function dogBondDaily(state2) {
     const d = state2.dog;
@@ -4974,6 +4995,10 @@
     add("sleep", state2.location.kind === "home" ? "Sleep in your bed\u2026" : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
+      if (state2.dog.sick) {
+        const why = canTreatDog(state2);
+        add("treat_dog", `Treat ${state2.dog.name} (antibiotics)`, { disabled: why, note: why ? void 0 : "1 course of antibiotics" });
+      }
       if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
     }
     return acts;
@@ -5057,6 +5082,11 @@
         return goToPlace(state2, arg);
       case "go_spot":
         return goToSpot(state2, arg);
+      case "treat_dog": {
+        const ok = treatDog(state2);
+        if (ok) advanceTime(state2, 10);
+        return;
+      }
       case "go_car": {
         const [cid, la, lo] = String(arg).split("|");
         return goToCar(state2, cid, Number(la), Number(lo));
@@ -5483,8 +5513,8 @@
     }
     for (const h2 of activeHazards(state2)) {
       const left = formatDuration(h2.endsAt - state2.time);
-      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} (about ${left} more).`, level: "warn" });
-      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder (about ${left} more).`, level: "danger" });
+      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} for about another ${left}.`, level: "warn" });
+      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder for about another ${left}.`, level: "danger" });
     }
     return out;
   }
@@ -6869,7 +6899,9 @@
       p.injuries.some((i) => !i.bandaged) && "a wound is not bandaged",
       p.illness?.infection && "an infection is not treated",
       water < 0.5 && "you carry less than 2 qt of water",
-      t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && "it will be dark and you have no light"
+      t.darkOnArrival && !((state.carried.flashlight || 0) > 0 && p.lightHours > 0) && "it will be dark and you have no light",
+      p.energy < 30 && "you are very tired",
+      p.warmth < 40 && "you are cold"
     ].filter(Boolean);
   }
   function tripHtml(dest) {
@@ -7150,6 +7182,7 @@
     if (d.stage === "joined") {
       const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
       html = `<h3>${esc(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
+      ${d.sick ? `<p class="warn-line">\u26A0 ${esc(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
     } else if (d.stage === "visiting") {
       html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
@@ -7880,12 +7913,13 @@
   function homeProjectText(state2, id, long) {
     if (id === "home_battery") {
       const h2 = state2.home;
-      return `Home battery <small>${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels</small>`;
+      const txt = `${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels`;
+      return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
     }
     const proj = PROJECTS.find((p) => p.id === id);
     if (!proj) return "";
     const st = projectStatus(state2, proj);
-    if (st.built) return `${esc(proj.name)} <small>built \xB7 ${esc(proj.effect || "")}</small>`;
+    if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc(proj.name)} <small>built \xB7 ${esc(proj.effect || "")}</small>`;
     const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
     const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
     const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
@@ -7921,6 +7955,17 @@
     ${rows}
   </div>`;
   }
+  var MONTHS2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function monthsText(list) {
+    const m = [...list].sort((a, b) => a - b);
+    const runs = [];
+    for (const x of m) {
+      const r = runs[runs.length - 1];
+      if (r && x === r[1] + 1) r[1] = x;
+      else runs.push([x, x]);
+    }
+    return runs.map(([a, b]) => a === b ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b]}`).join(", ");
+  }
   function renderGarden(atHome) {
     const g = gardenInfo(state);
     if (!g.beds) return "";
@@ -7933,7 +7978,7 @@
       }
       const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
       beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b> <span>${stage}</span>
-      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
+      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? "" : `${b.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b.crop].days * (100 - b.growth) / 100))} days left if warm \xB7 `}water ${b.water}%</small></div>`);
     }
     const sow = g.canSow.map((id) => {
       const why = canPlant(state, id);
@@ -7950,6 +7995,7 @@
     </div>
     <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : "Nothing to sow this month."}</p>
     <div class="row">${sow}</div>
+    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(" \xB7 ")}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
   </div>`;
   }
 
