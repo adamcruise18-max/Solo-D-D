@@ -1542,6 +1542,17 @@
     fire(state2, e, rng, mode);
     return e;
   }
+  function pacerInfo(state2) {
+    const p = state2.pacer || {};
+    return {
+      tension: Math.round(p.tension || 0),
+      chancePerHour: eventChance(p.tension || 0),
+      lastEventDay: p.lastEventDay ?? null,
+      lastBigDay: p.lastBigDay ?? null,
+      events: p.count || 0,
+      month: monthOf(state2.time)
+    };
+  }
   var pacerSystem = {
     id: "pacer",
     label: "Event pacer",
@@ -1608,6 +1619,19 @@
       st[row.id] = day;
       log(state2, row.text, row.kind || "story");
     }
+  }
+  function decayInfo(state2, t = state2.time) {
+    const day = gameDay(t);
+    const started = state2.decay?.started || {};
+    const next2 = DECAY.filter((r) => started[r.id] == null).map((r) => {
+      const k = r.chanceByDay >= 0.02 ? 1 : Math.ceil(Math.log(0.98) / Math.log(1 - r.chanceByDay));
+      return { id: r.id, day: Math.max(day, monthStartDay(r.month) + k - 1) };
+    }).sort((a, b) => a.day - b.day)[0] || null;
+    return {
+      shown: Object.keys(started),
+      next: next2,
+      shares: Object.fromEntries(DECAY.map((r) => [r.id, Math.round(decayShare(state2, r.id, t) * 100) / 100]))
+    };
   }
   var decaySystem = {
     id: "decay",
@@ -5142,6 +5166,48 @@
     };
   }
 
+  // src/engine/diagnostics.js
+  function diagnostics(state2, { records = 20 } = {}) {
+    const w = state2.weather || {};
+    let saveBytes = null;
+    try {
+      saveBytes = JSON.stringify(state2).length;
+    } catch {
+    }
+    return {
+      day: dayIndex(state2.time) + 1,
+      time: state2.time,
+      weather: {
+        type: w.type,
+        label: weatherInfo(state2)?.label || w.type,
+        high: Math.round(w.high),
+        low: Math.round(w.low),
+        wind: w.wind,
+        spell: w.spell ? { id: w.spell.id, daysLeft: w.spell.daysLeft } : null,
+        baseType: w.baseType || w.type
+      },
+      pacer: pacerInfo(state2),
+      decay: decayInfo(state2),
+      systems: gameSystems().list().map((s) => ({ id: s.id, order: s.order, version: s.version, saved: state2.systemVersions?.[s.id] ?? null, catchUp: s.catchUp || null })),
+      rng: { shared: state2.rngState, streams: { ...state2.rngStreams || {} } },
+      saveBytes,
+      deep: activity.isDeep(),
+      activity: activity.records(records)
+    };
+  }
+  function setDeepActivity(on) {
+    activity.setDeep(on);
+  }
+  function activityText(r) {
+    const head = `#${r.n} ${r.action} (${r.minutes} min)`;
+    const rng = r.rng ? [r.rng.shared ? "game rng" : null, ...r.rng.streams].filter(Boolean).join(", ") : "";
+    const out = [head];
+    for (const l of r.lines) out.push(`  [${l.sys ? `${l.sys}.${l.hook}` : "action"}] ${l.text}`);
+    if (rng) out.push(`  rng: ${rng}`);
+    if (r.changed) out.push(`  changed: ${r.changed.join(", ") || "(none)"}`);
+    return out.join("\n");
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
@@ -5914,6 +5980,9 @@
       isDone: (z) => zoneList().includes(z),
       isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
       isDead: () => !!state.dead,
+      // F3: engine diagnostics (systems, random streams, last actions with changed paths).
+      onDebug: (on) => setDeepActivity(on),
+      gameDiag: () => diagText(state),
       getStatus: () => {
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
@@ -6095,6 +6164,20 @@
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });
+  }
+  function diagText(state2) {
+    const d = diagnostics(state2, { records: 3 });
+    const w = d.weather;
+    const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join("  ");
+    const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(" ");
+    return [
+      `day ${d.day}  ${w.label} ${w.low}-${w.high}\xB0F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ""}`,
+      `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
+      `breakdown: ${shares || "none yet"}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ""}`,
+      `systems: ${d.systems.map((x) => x.id).join(" ")}`,
+      `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
+      ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
+    ];
   }
 
   // src/main.js
