@@ -397,3 +397,7 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 - **Injuries 90% rarer:** `addInjury` rolls `INJURY_RATE = 0.1` on rng stream `injury`; a miss logs a close call and returns null. `{ always: true }` skips the roll (tests).
 - **Severity:** each injury is minor (60%), moderate (30%) or serious (10%): health lost ×0.5 / ×1 / ×1.8, heal time ×0.5 / ×1 / ×1.6. Base: small cut 2, sprain 4, deep cut 12, bite 10. A sprain has a part: ankle (walking ×0.9 / ×0.75 / ×0.6) or wrist (`injuryFactor(state, 'hand')`). `injuryName(inj)` gives "Sprained wrist (serious)".
 - **Rest:** `advanceTime(..., 'rest', { restPerHour })`: the Rest action gives back 25% of max energy an hour (`REST_ENERGY_PER_HOUR`).
+
+## World grid
+
+`src/engine/worldgrid.js`: the one grid for the game. Origin HOME (map centre), 256 m cells, 15-mile area. `cellKeyAt({ lat, lon })` gives the "cx,cz" key; `WORLD_GRID` has `cellAt`, `center`, `inArea` and works with `classify` and the streamer. Street files (docs/data/streets/) are keyed by these cells, so the origin and size are fixed.
