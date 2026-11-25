@@ -2,7 +2,7 @@
 import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import {
-  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight,
+  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight, log,
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, INJURY_NAMES, environment } from '../engine/tick.js';
@@ -26,6 +26,8 @@ import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns, loadLega
 import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
 import { createFx } from './fx.js';
+import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
+import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
 import { PROJECTS } from '../data/projects.js';
 import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostics.js';
 import { seasonOf, SEASONS } from '../engine/season.js';
@@ -105,6 +107,7 @@ function commit(focus) {
 function act(kind, a, b, c) {
   const wasDead = !!state.dead;
   perform(state, kind, a, b, c);
+  afterAction();
   if (!wasDead && state.dead) recordRun(state);
   commit();
 }
@@ -197,10 +200,62 @@ function clothesHtml() {
 
 let skillsOpen = false;
 let clothesOpen = false;
+let goalsOpen = false;
+
+// ---------- legacy board ----------
+// After each action: mark goal steps that came true; announce the board once it opens.
+function afterAction() {
+  if (!state || state.dead) return;
+  if (boardOpen(state) && !state.player.goals?.announced) {
+    ensureGoals(state).announced = true;
+    log(state, 'A week alive. You start to think about more than the next meal: what could you keep, fix or leave behind? (Legacy, under your skills.)', 'hint');
+  }
+  checkGoals(state);
+}
+
+function goalsHtml() {
+  if (!boardOpen(state)) return '';
+  const g = ensureGoals(state);
+  const rows = g.picked.map((id) => {
+    const pr = goalProgress(state, id);
+    const steps = pr.steps.map((st) => `<li class="${st.done ? 'done' : ''}">${st.done ? '✓' : '○'} ${esc(st.text)}</li>`).join('');
+    return `<div class="goal"><div class="goal-h"><b>${esc(pr.goal.title)}</b><span class="goal-k">${esc(GOAL_KINDS[pr.goal.kind].label)}</span><span class="goal-n">${pr.done} / ${pr.total}</span>
+      <button class="link goal-drop" data-goaldrop="${id}" ${canChange(state) ? '' : 'disabled'} title="${canChange(state) ? 'Put this goal aside (steps done are kept)' : `You can change a goal once per ${CHANGE_GAP_DAYS} days`}">Put aside</button></div><ul class="goal-steps">${steps}</ul></div>`;
+  }).join('');
+  const free = MAX_GOALS - g.picked.length;
+  const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : '';
+  const empty = g.picked.length ? '' : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
+  return `<details class="goals"${goalsOpen ? ' open' : ''}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+}
+
+function showGoalBoard() {
+  const g = ensureGoals(state);
+  const groups = Object.entries(GOAL_KINDS).map(([kind, k]) => {
+    const items = GOALS.filter((x) => x.kind === kind).map((x) => {
+      const on = g.picked.includes(x.id);
+      const pr = goalProgress(state, x.id);
+      return `<div class="gb-goal"><div><b>${esc(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ''}</span><p class="hint">${esc(x.why)}</p></div>
+        <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? 'disabled' : ''}>${on ? 'Chosen' : 'Choose'}</button></div>`;
+    }).join('');
+    return `<h4>${esc(k.label)} <span class="hint">${esc(k.hint)}</span></h4>${items}`;
+  }).join('');
+  modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
+    <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
+    m.querySelector('#cancel').addEventListener('click', closeModal);
+    m.querySelectorAll('[data-goalpick]').forEach((b) => b.addEventListener('click', () => {
+      const why = pickGoal(state, b.dataset.goalpick);
+      if (why) { alert(why); return; }
+      goalsOpen = true;
+      closeModal();
+      commit();
+    }));
+  });
+}
 document.addEventListener('toggle', (e) => {
   if (!e.target.classList) return;
   if (e.target.classList.contains('skills')) skillsOpen = e.target.open;
   if (e.target.classList.contains('clothes')) clothesOpen = e.target.open;
+  if (e.target.classList.contains('goals')) goalsOpen = e.target.open;
 }, true);
 function skillsHtml(open) {
   const rows = allSkills(state).map((k) => {
@@ -229,7 +284,7 @@ function renderStats() {
   if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? '' : 'warn', `Flashlight ${p.lightHours.toFixed(1)} h`]);
   if (p.wetness >= 10) chips.push([p.wetness >= 50 ? 'bad' : 'warn', `Wet ${Math.round(p.wetness)}%`]);
   chips.push(['', `Wearing: ${wornText(p)}`]);
-  $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>` + `<details class="clothes"${clothesOpen ? ' open' : ''}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
+  $('#stats').innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>` + `<details class="clothes"${clothesOpen ? ' open' : ''}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false) + goalsHtml();
 }
 
 function renderLocation() {
@@ -505,6 +560,12 @@ function showNameDog() {
   });
 }
 
+function legacyEpilogueHtml() {
+  const ep = epilogue(state);
+  if (!ep.length) return '';
+  return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc(e.title)}</b> <span class="hint">${esc(e.kind)} · ${e.done} of ${e.total} steps</span><br>${esc(e.line)}</li>`).join('')}</ul>`;
+}
+
 function showDeath() {
   const d = state.dead;
   const runs = bestRuns().map((r) => `<li>${r.days} days · ${esc(r.cause)}${r.dog ? ` · with ${esc(r.dog)}` : ''}</li>`).join('');
@@ -512,6 +573,7 @@ function showDeath() {
     <p>You lived ${d.days} day${d.days === 1 ? '' : 's'} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc(d.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : 'none'}</b></div>
+    ${legacyEpilogueHtml()}
     <h3>Best runs</h3><ol>${runs}</ol>
     ${startChoicesHtml()}`, bindStartChoices);
 }
@@ -1018,7 +1080,11 @@ function bindEvents() {
     else if (b.dataset.takeall) act('takeall');
     else if (b.dataset.drop) act('drop', b.dataset.drop);
     else if (b.dataset.build) act('action', 'build', b.dataset.build);
-    else if (b.id === 'menuBtn') showMenu();
+    else if (b.dataset.goalboard) showGoalBoard();
+    else if (b.dataset.goaldrop) {
+      const why = dropGoal(state, b.dataset.goaldrop);
+      if (why) alert(why); else commit();
+    } else if (b.id === 'menuBtn') showMenu();
     else if (b.id === 'centerBtn' && mapApi) mapApi.flyTo(state.pos);
   });
   document.body.addEventListener('toggle', (e) => {

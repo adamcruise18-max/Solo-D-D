@@ -40,6 +40,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
       food: 40, water: 35, warmth: 60, energy: 40, health: 70, morale: 40,
       energyMax: 60, weak: true, weakGoodHours: 0,
       wet: false, wetMinutes: 0, dryMinutes: 0,
+      goals: { picked: [], done: {}, changedDay: null, since: {} }, // Legacy board (engine/goals.js); since[goalId] = { day, miles, places, houses, books } when chosen
       worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
       wetness: 0,
       injuries: [],

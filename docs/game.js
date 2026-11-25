@@ -1198,18 +1198,18 @@
     return Object.freeze({ order: 100, ...sys, version, migrations });
   }
   function createSystems(list = [], { dev = false } = {}) {
-    const byId2 = /* @__PURE__ */ new Map();
+    const byId3 = /* @__PURE__ */ new Map();
     const owner = /* @__PURE__ */ new Map();
     let ordered = [];
     function add(sys) {
       const s = defineSystem(sys);
-      if (byId2.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
+      if (byId3.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
       for (const f of s.owns || []) {
         if (owner.has(f)) throw new Error(`Field "${f}" is owned by both "${owner.get(f)}" and "${s.id}"`);
       }
       for (const f of s.owns || []) owner.set(f, s.id);
-      byId2.set(s.id, s);
-      ordered = [...byId2.values()].sort((a, b) => a.order - b.order);
+      byId3.set(s.id, s);
+      ordered = [...byId3.values()].sort((a, b) => a.order - b.order);
       return s;
     }
     for (const s of list) add(s);
@@ -1237,7 +1237,7 @@
     }
     return {
       add,
-      get: (id) => byId2.get(id),
+      get: (id) => byId3.get(id),
       ids: () => ordered.map((s) => s.id),
       ownerOf: (field) => owner.get(field) || null,
       // Systems that have not said how they catch up: reduced or abstract
@@ -1646,6 +1646,141 @@
     daily: (state2, day) => decayDaily(state2, day)
   };
 
+  // src/engine/dog.js
+  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function dogStep(state2, dt, sleeping) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    d.food = clamp(d.food - 4 * dt, 0, 100);
+    d.water = 80;
+    if (d.food <= 0) d.health -= 1 * dt;
+    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
+    if (d.health <= 50 && d.warned < 1) {
+      d.warned = 1;
+      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
+    }
+    if (d.health <= 25 && d.warned < 2) {
+      d.warned = 2;
+      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
+    }
+    if (d.health > 60) d.warned = 0;
+    if (d.health <= 0) {
+      d.health = 0;
+      d.stage = "dead";
+      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
+      state2.player.morale = Math.max(0, state2.player.morale - 25);
+    }
+  }
+  function dogBondDaily(state2) {
+    const d = state2.dog;
+    if (d.stage !== "joined") return;
+    if (d.food >= 25) d.bond += 3;
+    else d.bond -= 10;
+    d.bond = clamp(d.bond, 0, 100);
+  }
+  function dogDaily(state2, day) {
+    const d = state2.dog;
+    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
+    if (d.stage === "none" && day >= d.arriveDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
+    } else if (d.stage === "visiting") {
+      const since = lastFed == null ? day - d.visitStart : day - lastFed;
+      if (since > 3) {
+        if (!d.revisitUsed) {
+          d.stage = "away";
+          d.revisitUsed = true;
+          d.revisitDay = day + randInt(state2, 5, 8);
+          log(state2, "The dog is not in the street today.");
+        } else {
+          d.stage = "gone";
+          log(state2, "The dog does not come back.");
+        }
+      }
+    } else if (d.stage === "away" && day >= d.revisitDay) {
+      d.stage = "visiting";
+      d.visitStart = day;
+      d.feedDays = [];
+      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
+    }
+  }
+  var dogSystem = {
+    id: "dog",
+    label: "Dog",
+    order: 1010,
+    // right after the legacy rules: the same order as before
+    version: 1,
+    legacy: true,
+    // state.dog was in saves before the engine; newGame() makes it
+    owns: ["dog"],
+    // Thresholds (weak, sick, death) happen inside a day; the stray's visits are days.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => dogStep(state2, dtHours, ctx.mode === "sleep"),
+    daily: (state2, day) => {
+      dogBondDaily(state2);
+      dogDaily(state2, day);
+    }
+  };
+
+  // src/engine/home.js
+  function homeStep(state2, dt, env) {
+    const h2 = state2.home;
+    const air = env.air;
+    let heat = 0;
+    if (h2.fireHours > 0) {
+      heat += fireHeat(state2);
+      h2.fireHours = Math.max(0, h2.fireHours - dt);
+      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    }
+    if (h2.heaterOn) {
+      h2.battery -= 1.5 * dt;
+      heat += 20;
+      if (h2.battery <= 0) {
+        h2.battery = 0;
+        h2.heaterOn = false;
+        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      }
+    }
+    const passive = air + 6;
+    const target = Math.min(75, passive + heat);
+    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
+    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    const m = (state2.time % 1440 + 1440) % 1440;
+    const s = sunFor(state2.time);
+    if (m > s.rise && m < s.set) {
+      const hours = (s.set - s.rise) / 60;
+      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
+    }
+    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
+      const t = state2.weather.type;
+      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
+      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+    }
+    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
+      h2.tapWorks = false;
+      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    }
+  }
+  function homeDaily(state2) {
+    const filtered = runAutoFilter(state2);
+    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
+  }
+  var homeSystem = {
+    id: "home",
+    label: "Home base",
+    order: 1005,
+    // right after the legacy rules, before the dog: the same order as before
+    version: 1,
+    legacy: true,
+    // state.home was in saves before the engine; newGame() makes it
+    owns: ["home"],
+    // The fire and the battery run out inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
+    daily: (state2) => homeDaily(state2)
+  };
+
   // src/engine/systems.js
   var weatherSystem = {
     id: "weather",
@@ -1678,7 +1813,7 @@
     step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
     daily: (state2, day) => dailyRollover(state2, day)
   };
-  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, pacerSystem];
+  var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, dogSystem, pacerSystem];
   var devChecks = false;
   var cached = null;
   function gameSystems() {
@@ -1809,7 +1944,7 @@
   }
 
   // src/engine/tick.js
-  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function clothingRating(state2) {
     return clothingWarmth(state2.player);
   }
@@ -1865,8 +2000,8 @@
     const wx = weatherInfo(state2);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if (env.outside && wx.wetAfter) p.wetness = clamp(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
-    else if (!env.outside) p.wetness = clamp(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
+    if (env.outside && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt, 0, 100);
+    else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
     if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
     if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
@@ -1876,7 +2011,7 @@
       if (wr < 0) wr *= 0.5;
       p.warmFedH = Math.max(0, p.warmFedH - dt);
     }
-    p.warmth = clamp(p.warmth + wr * dt, 0, 100);
+    p.warmth = clamp2(p.warmth + wr * dt, 0, 100);
     ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
@@ -1884,21 +2019,21 @@
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
     if (state2.weather.type === "heat_wave" && env.outside && !env.dark) waterLoss *= 1.5;
-    p.food = clamp(p.food - foodLoss * dt, 0, 100);
-    p.water = clamp(p.water - waterLoss * dt, 0, 100);
+    p.food = clamp2(p.food - foodLoss * dt, 0, 100);
+    p.water = clamp2(p.water - waterLoss * dt, 0, 100);
     if (sleeping) {
       let gain = felt >= 55 ? 10 : 6;
       if (p.morale < 50) gain *= 0.75;
       if (p.health < 50) gain *= 0.75;
       if (p.food < 25) gain *= 0.75;
       gain *= sleepGainFactor(state2);
-      p.energy = clamp(p.energy + gain * dt, 0, p.energyMax);
+      p.energy = clamp2(p.energy + gain * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
       loss *= energyUseFactor(state2, mode);
       if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
-      p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
+      p.energy = clamp2(p.energy - loss * dt, 0, p.energyMax);
     }
     if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
     if (p.water <= 0) damage(state2, DEHYDRATED_DAMAGE * dt, "dehydration");
@@ -1944,75 +2079,12 @@
       p.lightHours = Math.max(0, p.lightHours - dt);
       if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
     }
-    homeStep(state2, dt, env);
-    dogStep(state2, dt, sleeping);
     if (p.health <= 0) {
       p.health = 0;
       const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
       die(state2, causes.length ? causes[0][0] : "unknown");
     }
     state2._damage = {};
-  }
-  function homeStep(state2, dt, env) {
-    const h2 = state2.home;
-    const air = env.air;
-    let heat = 0;
-    if (h2.fireHours > 0) {
-      heat += fireHeat(state2);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
-    }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
-      heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
-        log(state2, "The home battery is empty. The electric heater stops.", "warn");
-      }
-    }
-    const passive = air + 6;
-    const target = Math.min(75, passive + heat);
-    const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state2);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    const m = (state2.time % 1440 + 1440) % 1440;
-    const s = sunFor(state2.time);
-    if (m > s.rise && m < s.set) {
-      const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
-    }
-    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
-      const t = state2.weather.type;
-      const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
-    }
-    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
-      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
-    }
-  }
-  function dogStep(state2, dt, sleeping) {
-    const d = state2.dog;
-    if (d.stage !== "joined") return;
-    d.food = clamp(d.food - 4 * dt, 0, 100);
-    d.water = 80;
-    if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
-    if (d.health <= 50 && d.warned < 1) {
-      d.warned = 1;
-      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
-    }
-    if (d.health <= 25 && d.warned < 2) {
-      d.warned = 2;
-      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
-    }
-    if (d.health > 60) d.warned = 0;
-    if (d.health <= 0) {
-      d.health = 0;
-      d.stage = "dead";
-      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
-      state2.player.morale = Math.max(0, state2.player.morale - 25);
-    }
   }
   function dailyRollover(state2, day) {
     const p = state2.player;
@@ -2023,20 +2095,13 @@
     const spell = state2.weather.spell;
     if (spell?.first) log(state2, spellStartText(spell.id), "warn");
     else if (spell) log(state2, `${weatherInfo(state2).label} again today.`, "warn");
-    const filtered = runAutoFilter(state2);
-    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
     if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
     if (built(state2, "led_lights")) p.morale += 3;
     if (built(state2, "sealed_store") && foodItemsStored(state2) >= 10) p.morale += 2;
-    if (state2.dog.stage === "joined") {
-      p.morale += 8;
-      if (state2.dog.food >= 25) state2.dog.bond += 3;
-      else state2.dog.bond -= 10;
-      state2.dog.bond = clamp(state2.dog.bond, 0, 100);
-    }
-    p.morale = clamp(p.morale, 0, 100);
+    if (state2.dog.stage === "joined") p.morale += 8;
+    p.morale = clamp2(p.morale, 0, 100);
     if (p.weak) {
       if (p.weakGoodHours >= 12) {
         p.energyMax = Math.min(100, p.energyMax + 2);
@@ -2050,34 +2115,6 @@
     }
     for (const inj of p.injuries) {
       if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
-    }
-    dogDaily(state2, day);
-  }
-  function dogDaily(state2, day) {
-    const d = state2.dog;
-    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-    if (d.stage === "none" && day >= d.arriveDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
-    } else if (d.stage === "visiting") {
-      const since = lastFed == null ? day - d.visitStart : day - lastFed;
-      if (since > 3) {
-        if (!d.revisitUsed) {
-          d.stage = "away";
-          d.revisitUsed = true;
-          d.revisitDay = day + randInt(state2, 5, 8);
-          log(state2, "The dog is not in the street today.");
-        } else {
-          d.stage = "gone";
-          log(state2, "The dog does not come back.");
-        }
-      }
-    } else if (d.stage === "away" && day >= d.revisitDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      d.feedDays = [];
-      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
     }
   }
   var INJURY_NAMES = {
@@ -2494,6 +2531,8 @@
         wet: false,
         wetMinutes: 0,
         dryMinutes: 0,
+        goals: { picked: [], done: {}, changedDay: null, since: {} },
+        // Legacy board (engine/goals.js); since[goalId] = { day, miles, places, houses, books } when chosen
         worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
         wetness: 0,
         injuries: [],
@@ -2910,7 +2949,7 @@
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
-  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   function source2(state2, from) {
     return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
   }
@@ -2943,16 +2982,16 @@
     log(state2, text, "story");
     if (p.bodySeenDay !== day) {
       p.bodySeenDay = day;
-      p.morale = clamp2(p.morale - (day >= 30 ? 1 : 3), 0, 100);
+      p.morale = clamp3(p.morale - (day >= 30 ? 1 : 3), 0, 100);
     }
   }
   function addFood(state2, points) {
     const p = state2.player;
     if (p.illness.stomachH > 0) points /= 2;
-    p.food = clamp2(p.food + points, 0, 100);
+    p.food = clamp3(p.food + points, 0, 100);
   }
   function addWater(state2, points) {
-    state2.player.water = clamp2(state2.player.water + points, 0, 100);
+    state2.player.water = clamp3(state2.player.water + points, 0, 100);
   }
   function freeWeight(state2) {
     return carryLimit(state2) * 1.5 - bagWeight(state2.carried);
@@ -3033,7 +3072,7 @@
           return;
         }
         p.lastComfortDay = day;
-        p.morale = clamp2(p.morale + 5, 0, 100);
+        p.morale = clamp3(p.morale + 5, 0, 100);
         if (it.portion) addItem(bag, id, -it.portion);
         log(state2, it.comfortText || "You rest your mind for a while.", "good");
         advanceTime(state2, 60);
@@ -3041,7 +3080,7 @@
       }
       case "warm": {
         addItem(bag, id, -1);
-        p.warmth = clamp2(p.warmth + it.warmth, 0, 100);
+        p.warmth = clamp3(p.warmth + it.warmth, 0, 100);
         log(state2, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
         advanceTime(state2, 1);
         return;
@@ -3074,7 +3113,7 @@
       practice(state2, it.skill, BOOK_XP, { book: true });
     } else {
       log(state2, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
-      state2.player.morale = clamp2(state2.player.morale + 2, 0, 100);
+      state2.player.morale = clamp3(state2.player.morale + 2, 0, 100);
     }
     return true;
   }
@@ -3292,8 +3331,8 @@
         const stage = stageLabel(state2, food);
         addItem(bag, food, -it.portion);
         addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
-        p.warmth = clamp2(p.warmth + 10, 0, 100);
-        p.morale = clamp2(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        p.warmth = clamp3(p.warmth + 10, 0, 100);
+        p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
         p.warmFedH = WARM_FED_HOURS;
         practice(state2, "cooking", 3);
         log(state2, `You cook a hot meal (${it.name.toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
@@ -3323,7 +3362,7 @@
         if (state2.dead) return;
         if (!chance(state2, gasStartChance(state2))) {
           log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
-          p.morale = clamp2(p.morale - 2, 0, 100);
+          p.morale = clamp3(p.morale - 2, 0, 100);
           return;
         }
         const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
@@ -3354,7 +3393,7 @@
         return;
       case "fridge":
         h2.fridgeOpened = true;
-        p.morale = clamp2(p.morale - 2, 0, 100);
+        p.morale = clamp3(p.morale - 2, 0, 100);
         log(state2, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
         advanceTime(state2, 2);
         return;
@@ -3400,8 +3439,8 @@
     const it = ITEMS[id];
     addItem(bag, id, -it.portion);
     const points = it.kind === "dogfood" ? 100 : it.cal * it.portion / 10;
-    d.food = clamp2(d.food + points, 0, 100);
-    d.bond = clamp2(d.bond + 1, 0, 100);
+    d.food = clamp3(d.food + points, 0, 100);
+    d.bond = clamp3(d.bond + 1, 0, 100);
     log(state2, `You feed ${d.name}.`);
     advanceTime(state2, 5);
   }
@@ -3420,8 +3459,8 @@
       return;
     }
     p.lastDogPlayDay = day;
-    d.bond = clamp2(d.bond + 2, 0, 100);
-    p.morale = clamp2(p.morale + 3, 0, 100);
+    d.bond = clamp3(d.bond + 2, 0, 100);
+    p.morale = clamp3(p.morale + 3, 0, 100);
     log(state2, `You play with ${d.name} for a while. For a moment, things feel normal.`, "good");
     advanceTime(state2, 20);
   }
@@ -3438,7 +3477,7 @@
       state2.stats.placesSearched += 1;
       log(state2, cat.entryText, "story");
       if (ps.emptyHint) log(state2, "Most shelves here are already empty. People took a lot in the first weeks.");
-      if (cat.entryMorale) state2.player.morale = clamp2(state2.player.morale + cat.entryMorale, 0, 100);
+      if (cat.entryMorale) state2.player.morale = clamp3(state2.player.morale + cat.entryMorale, 0, 100);
     }
     if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
   }
@@ -3454,7 +3493,7 @@
       advanceTime(state2, 5, "work");
       return;
     }
-    state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+    state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
     advanceTime(state2, 5, "heavy");
     if (check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
       ps.unlocked = true;
@@ -3583,7 +3622,7 @@
     h2.touched.push(zone);
     zoneInjuryCheck(state2);
     if (ctx.catId === "supermarket" && h2.touched.length === 1) {
-      state2.player.morale = clamp2(state2.player.morale - 3, 0, 100);
+      state2.player.morale = clamp3(state2.player.morale - 3, 0, 100);
       log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
   }
@@ -3758,7 +3797,7 @@
         log(state2, "The door is locked, but you find a spare key under a flower pot.");
         advanceTime(state2, 2);
       } else {
-        state2.player.energy = clamp2(state2.player.energy - 5, 0, 100);
+        state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
         if (!check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
           log(state2, "The door holds. You break a window and climb in.");
           if (chance(state2, 0.25)) addInjury(state2, "small_cut");
@@ -5166,6 +5205,292 @@
     };
   }
 
+  // src/data/legacy-goals.js
+  var stored = (s, id) => s.home?.storage?.[id] || 0;
+  var storedAny = (s, ids) => ids.reduce((a, id) => a + stored(s, id), 0);
+  var BOOKS = ["book_first_aid", "book_repair", "book_cooking", "book_survival"];
+  var booksAt = (s) => storedAny(s, BOOKS);
+  function goalCounters(s) {
+    return { miles: s.stats?.miles || 0, places: s.stats?.placesSearched || 0, houses: s.stats?.housesSearched || 0, books: booksAt(s) };
+  }
+  var GOAL_KINDS = {
+    preserve: { label: "Preserve", hint: "Keep something alive or safe for later." },
+    repair: { label: "Repair", hint: "Make something work again." },
+    document: { label: "Document", hint: "Keep a record of the city as it changes." },
+    leave: { label: "Leave behind", hint: "Make something for whoever comes after." }
+  };
+  var GOALS = [
+    {
+      id: "seed_bank",
+      kind: "preserve",
+      title: "Seed bank",
+      why: "Seeds stay alive for years if they are dry and cool.",
+      steps: [
+        { id: "seeds_1", text: "Store a packet of seeds at home", check: (s) => stored(s, "seeds") >= 1 },
+        { id: "seeds_5", text: "Store 5 packets of seeds", check: (s) => stored(s, "seeds") >= 5 },
+        { id: "dry_store", text: "Build the sealed food store (dry, safe from mice)", check: (s) => built(s, "sealed_store") },
+        { id: "seeds_12", text: "Store 12 packets of seeds", check: (s) => stored(s, "seeds") >= 12 },
+        { id: "water_for_bed", text: "Have a rain barrel system to water a test bed", check: (s) => built(s, "rain_barrels") },
+        { id: "seed_keep", text: "Keep the seeds dry in the sealed store for 30 days after you choose this", check: (s, c) => c.days >= 30 && built(s, "sealed_store") && stored(s, "seeds") >= 5 }
+      ],
+      epilogue: {
+        none: "The seed packets stayed in the stores, and the mice found them.",
+        some: "A few jars of seeds sit dry on a shelf in a house in Aloha.",
+        all: "A dry store in Aloha holds seeds for a whole garden, labeled and sealed."
+      }
+    },
+    {
+      id: "library_shelf",
+      kind: "preserve",
+      title: "A shelf of books",
+      why: "Paper rots in a wet city. A dry shelf keeps what people knew.",
+      steps: [
+        { id: "books_1", text: "Bring a book home", check: (s) => storedAny(s, BOOKS) >= 1 },
+        { id: "books_4", text: "Have 4 books on the shelf at home", check: (s) => storedAny(s, BOOKS) >= 4 },
+        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b) => stored(s, b) >= 1) },
+        { id: "dry_room", text: "Insulate the living room to keep the shelf dry", check: (s) => built(s, "insulate_living") },
+        { id: "books_more", text: "Bring home 6 more books after you choose this", check: (s, c) => booksAt(s) - c.since.books >= 6 }
+      ],
+      epilogue: {
+        none: "The libraries stood open to the rain, and the books swelled and fell apart.",
+        some: "A short row of books stays dry in one living room.",
+        all: "A dry shelf in Aloha keeps how to heal, fix, cook and live, for whoever reads next."
+      }
+    },
+    {
+      id: "animal_care",
+      kind: "preserve",
+      title: "Animal care",
+      why: "The animals did not choose this either.",
+      steps: [
+        { id: "dog_joined", text: "Take in the stray dog", check: (s) => s.dog?.stage === "joined" },
+        { id: "dog_food_5", text: "Store 5 bags of dog food at home", check: (s) => stored(s, "dog_food") >= 5 },
+        { id: "flea_spray", text: "Keep flea spray at home", check: (s) => stored(s, "flea_spray") >= 1 },
+        { id: "bond_80", text: "Earn the dog\u2019s full trust (bond 80)", check: (s) => s.dog?.stage === "joined" && s.dog.bond >= 80 },
+        { id: "dog_60_days", text: "Keep the dog fed and with you for 60 days after you choose this", check: (s, c) => s.dog?.stage === "joined" && c.days >= 60 }
+      ],
+      epilogue: {
+        none: "The dogs of the city went wild, and then went quiet.",
+        some: "One dog was fed and named, for a while.",
+        all: "A dog grew old and safe in a warm house, and never went hungry."
+      }
+    },
+    {
+      id: "light_on_hill",
+      kind: "repair",
+      title: "Light in the window",
+      why: "One lit window, every night, in a dark city.",
+      steps: [
+        { id: "battery_module", text: "Bring home a battery module", check: (s) => stored(s, "battery_module") >= 1 },
+        { id: "led", text: "Build LED lights on the battery", check: (s) => built(s, "led_lights") },
+        { id: "second_battery", text: "Build a second battery", check: (s) => built(s, "second_battery") },
+        { id: "candles_10", text: "Store 10 candles for the nights the battery is empty", check: (s) => stored(s, "candles") >= 10 },
+        { id: "lit_30", text: "Keep the window lit for 30 nights after you choose this", check: (s, c) => c.days >= 30 && built(s, "led_lights") }
+      ],
+      epilogue: {
+        none: "At night the whole city was dark, to the last house.",
+        some: "For a while, one window in Aloha was lit at night.",
+        all: "Every night a window in Aloha lights up on its own, as long as the sun charges the battery."
+      }
+    },
+    {
+      id: "water_for_anyone",
+      kind: "repair",
+      title: "Water for anyone",
+      why: "Clean water is the first thing anyone needs.",
+      steps: [
+        { id: "barrels", text: "Build the rain barrel system", check: (s) => built(s, "rain_barrels") },
+        { id: "filter", text: "Build the water filter station", check: (s) => built(s, "filter_station") },
+        { id: "safe_20", text: "Have 20 gal of safe water in store", check: (s) => (s.home?.safeGal || 0) >= 20 },
+        { id: "tablets", text: "Store 3 packs of water tablets for later", check: (s) => stored(s, "water_tablets") >= 3 },
+        { id: "water_30", text: "Keep 20 gal of safe water ready for 30 days after you choose this", check: (s, c) => c.days >= 30 && (s.home?.safeGal || 0) >= 20 }
+      ],
+      epilogue: {
+        none: "The taps went dry, and the rain ran into the drains.",
+        some: "A barrel by a house in Aloha still fills with rain.",
+        all: "Rain still turns into clean water at a house in Aloha, with nobody to turn a tap."
+      }
+    },
+    {
+      id: "radio",
+      kind: "repair",
+      title: "The radio",
+      why: "Nobody answers. You keep the radio working anyway.",
+      steps: [
+        { id: "radio_home", text: "Bring a radio home", check: (s) => stored(s, "radio") >= 1 },
+        { id: "radio_parts", text: "Store wiring and hardware parts for repairs", check: (s) => stored(s, "wiring") >= 1 && stored(s, "hardware_parts") >= 1 },
+        { id: "radio_power", text: "Build LED lights on the battery (the radio runs on it too)", check: (s) => built(s, "led_lights") },
+        { id: "radio_batteries", text: "Store 4 sets of batteries for the radio", check: (s) => stored(s, "batteries") >= 4 },
+        { id: "radio_30", text: "Listen each evening for 30 days after you choose this", check: (s, c) => c.days >= 30 && stored(s, "radio") >= 1 }
+      ],
+      epilogue: {
+        none: "The air was only static, on every band.",
+        some: "A radio in Aloha was switched on each evening for a while.",
+        all: "A radio in Aloha was kept working to the end, listening to the static."
+      }
+    },
+    {
+      id: "city_atlas",
+      kind: "document",
+      title: "City atlas",
+      why: "Walk it and mark it: what is left, and where.",
+      steps: [
+        { id: "miles_10", text: "Walk 10 miles", check: (s) => (s.stats?.miles || 0) >= 10 },
+        { id: "places_10", text: "Search 10 places", check: (s) => (s.stats?.placesSearched || 0) >= 10 },
+        { id: "map_carried", text: "Keep a paper map with you to mark", check: (s) => (s.carried?.paper_map || 0) >= 1 || stored(s, "paper_map") >= 1 },
+        { id: "miles_50", text: "Walk 50 miles", check: (s) => (s.stats?.miles || 0) >= 50 },
+        { id: "places_more", text: "Search 15 more places after you choose this", check: (s, c) => (s.stats?.placesSearched || 0) - c.since.places >= 15 },
+        { id: "houses_more", text: "Search 10 more houses after you choose this", check: (s, c) => (s.stats?.housesSearched || 0) - c.since.houses >= 10 }
+      ],
+      epilogue: {
+        none: "Nobody knew any more which stores still had food.",
+        some: "A paper map in Aloha has marks on it: searched, empty, water here.",
+        all: "A worn paper map in Aloha shows every store, every road, and what was left in each."
+      }
+    },
+    {
+      id: "weather_record",
+      kind: "document",
+      title: "Weather record",
+      why: "Write down every day. Someone may need to know the seasons here.",
+      steps: [
+        { id: "days_14", text: "Keep the record for 14 days", check: (s, c) => c.days >= 14 },
+        { id: "days_30", text: "Keep the record for 30 days", check: (s, c) => c.days >= 30 },
+        { id: "first_snow", text: "Record a day of snow", check: (s, c) => c.days >= 0 && s.weather?.type === "snow" },
+        { id: "days_90", text: "Keep the record for 90 days", check: (s, c) => c.days >= 90 },
+        { id: "days_365", text: "Keep the record for a full year", check: (s, c) => c.days >= 365 }
+      ],
+      epilogue: {
+        none: "Nobody wrote down the weather any more.",
+        some: "A notebook in Aloha lists the weather, day by day, for a season.",
+        all: "A shelf of notebooks in Aloha holds a full year of weather, one line a day."
+      }
+    },
+    {
+      id: "time_capsule",
+      kind: "leave",
+      title: "Time capsule",
+      why: "A box of small things that say how people lived.",
+      steps: [
+        { id: "tc_bin", text: "Bring home a metal bin to seal it in", check: (s) => stored(s, "metal_bin") >= 1 },
+        { id: "tc_comfort", text: "Keep a comfort item for it", check: (s) => stored(s, "comfort") >= 1 },
+        { id: "tc_book", text: "Keep a book for it", check: (s) => storedAny(s, BOOKS) >= 1 },
+        { id: "tc_radio", text: "Keep a radio for it", check: (s) => stored(s, "radio") >= 1 },
+        { id: "tc_map", text: "Keep a paper map for it", check: (s) => stored(s, "paper_map") >= 1 },
+        { id: "tc_seal", text: "Store plastic sheet and duct tape to seal it", check: (s) => stored(s, "plastic_sheet") >= 1 && stored(s, "duct_tape") >= 1 },
+        { id: "tc_bury", text: "Seal and bury it, at least 7 days after you choose this", check: (s, c) => c.days >= 7 && ["metal_bin", "comfort", "radio", "paper_map", "plastic_sheet", "duct_tape"].every((id) => stored(s, id) >= 1) && booksAt(s) >= 1 }
+      ],
+      epilogue: {
+        none: "The small things of daily life were lost with everything else.",
+        some: "A metal bin in Aloha holds a few small things from before.",
+        all: "A sealed bin in Aloha holds a toy, a map, a book and a radio, for someone to open one day."
+      }
+    },
+    {
+      id: "message_wall",
+      kind: "leave",
+      title: "Signs for later",
+      why: "Practical advice, painted large, for anyone who comes later.",
+      steps: [
+        { id: "mw_tools", text: "Keep a toolkit and scrap wood for sign boards", check: (s) => stored(s, "toolkit") >= 1 && stored(s, "scrap_wood") >= 2 },
+        { id: "mw_water", text: "Know where water is: build the filter station", check: (s) => built(s, "filter_station") },
+        { id: "mw_places", text: "Search 20 places, so the signs say what is left", check: (s) => (s.stats?.placesSearched || 0) >= 20 },
+        { id: "mw_miles", text: "Walk 20 miles after you choose this, putting the signs up", check: (s, c) => (s.stats?.miles || 0) - c.since.miles >= 20 }
+      ],
+      epilogue: {
+        none: "The streets gave no advice to anyone.",
+        some: "A few hand-painted signs say where to find water.",
+        all: "Painted signs across the west side say where water is, which roads are open and which stores still have food."
+      }
+    }
+  ];
+
+  // src/engine/goals.js
+  var MAX_GOALS = 3;
+  var BOARD_OPENS_DAY = 7;
+  var CHANGE_GAP_DAYS = 30;
+  var STEP_MORALE = 3;
+  var byId2 = new Map(GOALS.map((g) => [g.id, g]));
+  function ensureGoals(state2) {
+    var _a;
+    const p = state2.player;
+    if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null, since: {} };
+    (_a = p.goals).since || (_a.since = {});
+    return p.goals;
+  }
+  var boardOpen = (state2) => gameDay(state2.time) >= BOARD_OPENS_DAY;
+  function canChange(state2) {
+    const g = ensureGoals(state2);
+    return g.changedDay == null || gameDay(state2.time) - g.changedDay >= CHANGE_GAP_DAYS;
+  }
+  function pickGoal(state2, id) {
+    var _a;
+    const g = ensureGoals(state2);
+    if (!boardOpen(state2)) return `The board opens on day ${BOARD_OPENS_DAY + 1}. First, stay alive.`;
+    if (!byId2.has(id)) return "Unknown goal.";
+    if (g.picked.includes(id)) return "You already work on this.";
+    if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
+    g.picked.push(id);
+    (_a = g.done)[id] || (_a[id] = []);
+    g.since[id] = { day: gameDay(state2.time), ...goalCounters(state2) };
+    log(state2, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
+    checkGoals(state2);
+    return null;
+  }
+  function dropGoal(state2, id) {
+    const g = ensureGoals(state2);
+    if (!g.picked.includes(id)) return "You do not work on this.";
+    if (!canChange(state2)) return `You can change a goal again in ${CHANGE_GAP_DAYS - (gameDay(state2.time) - g.changedDay)} days.`;
+    g.picked = g.picked.filter((x) => x !== id);
+    g.changedDay = gameDay(state2.time);
+    log(state2, `You put the goal aside: ${byId2.get(id).title}.`);
+    return null;
+  }
+  function checkGoals(state2) {
+    var _a;
+    const g = state2.player.goals;
+    if (!g || !g.picked.length || state2.dead) return [];
+    const now = [];
+    for (const id of g.picked) {
+      const goal = byId2.get(id);
+      if (!goal) continue;
+      const done = (_a = g.done)[id] || (_a[id] = []);
+      const since = g.since?.[id] || { day: gameDay(state2.time), ...goalCounters(state2) };
+      const c = { days: gameDay(state2.time) - since.day, since };
+      for (const st of goal.steps) {
+        if (done.includes(st.id)) continue;
+        let ok = false;
+        try {
+          ok = !!st.check(state2, c);
+        } catch {
+          ok = false;
+        }
+        if (!ok) continue;
+        done.push(st.id);
+        state2.player.morale = Math.min(100, state2.player.morale + STEP_MORALE);
+        const all = done.length === goal.steps.length;
+        log(state2, all ? `${goal.title}: done. ${goal.epilogue.all}` : `${goal.title}: ${st.text} (step ${done.length} of ${goal.steps.length}).`, "good");
+        now.push({ goal: id, step: st.id });
+      }
+    }
+    return now;
+  }
+  function goalProgress(state2, id) {
+    const goal = byId2.get(id);
+    const done = state2.player.goals?.done?.[id] || [];
+    return { goal, done: done.length, total: goal.steps.length, steps: goal.steps.map((s) => ({ ...s, done: done.includes(s.id) })) };
+  }
+  function epilogue(state2) {
+    const g = state2.player.goals;
+    if (!g) return [];
+    const ids = [.../* @__PURE__ */ new Set([...g.picked, ...Object.keys(g.done).filter((k) => g.done[k].length)])];
+    return ids.filter((id) => byId2.has(id)).map((id) => {
+      const { goal, done, total } = goalProgress(state2, id);
+      const line = done === 0 ? goal.epilogue.none : done === total ? goal.epilogue.all : goal.epilogue.some;
+      return { id, title: goal.title, kind: GOAL_KINDS[goal.kind].label, done, total, line };
+    });
+  }
+
   // src/engine/diagnostics.js
   function diagnostics(state2, { records = 20 } = {}) {
     const w = state2.weather || {};
@@ -5268,6 +5593,7 @@
   function act(kind, a, b, c) {
     const wasDead = !!state.dead;
     perform(state, kind, a, b, c);
+    afterAction2();
     if (!wasDead && state.dead) recordRun(state);
     commit();
   }
@@ -5344,10 +5670,60 @@
   }
   var skillsOpen = false;
   var clothesOpen = false;
+  var goalsOpen = false;
+  function afterAction2() {
+    if (!state || state.dead) return;
+    if (boardOpen(state) && !state.player.goals?.announced) {
+      ensureGoals(state).announced = true;
+      log(state, "A week alive. You start to think about more than the next meal: what could you keep, fix or leave behind? (Legacy, under your skills.)", "hint");
+    }
+    checkGoals(state);
+  }
+  function goalsHtml() {
+    if (!boardOpen(state)) return "";
+    const g = ensureGoals(state);
+    const rows = g.picked.map((id) => {
+      const pr = goalProgress(state, id);
+      const steps = pr.steps.map((st) => `<li class="${st.done ? "done" : ""}">${st.done ? "\u2713" : "\u25CB"} ${esc(st.text)}</li>`).join("");
+      return `<div class="goal"><div class="goal-h"><b>${esc(pr.goal.title)}</b><span class="goal-k">${esc(GOAL_KINDS[pr.goal.kind].label)}</span><span class="goal-n">${pr.done} / ${pr.total}</span>
+      <button class="link goal-drop" data-goaldrop="${id}" ${canChange(state) ? "" : "disabled"} title="${canChange(state) ? "Put this goal aside (steps done are kept)" : `You can change a goal once per ${CHANGE_GAP_DAYS} days`}">Put aside</button></div><ul class="goal-steps">${steps}</ul></div>`;
+    }).join("");
+    const free = MAX_GOALS - g.picked.length;
+    const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : "";
+    const empty = g.picked.length ? "" : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
+    return `<details class="goals"${goalsOpen ? " open" : ""}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+  }
+  function showGoalBoard() {
+    const g = ensureGoals(state);
+    const groups = Object.entries(GOAL_KINDS).map(([kind, k]) => {
+      const items = GOALS.filter((x) => x.kind === kind).map((x) => {
+        const on = g.picked.includes(x.id);
+        const pr = goalProgress(state, x.id);
+        return `<div class="gb-goal"><div><b>${esc(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc(x.why)}</p></div>
+        <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
+      }).join("");
+      return `<h4>${esc(k.label)} <span class="hint">${esc(k.hint)}</span></h4>${items}`;
+    }).join("");
+    modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
+    <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
+      m.querySelector("#cancel").addEventListener("click", closeModal);
+      m.querySelectorAll("[data-goalpick]").forEach((b) => b.addEventListener("click", () => {
+        const why = pickGoal(state, b.dataset.goalpick);
+        if (why) {
+          alert(why);
+          return;
+        }
+        goalsOpen = true;
+        closeModal();
+        commit();
+      }));
+    });
+  }
   document.addEventListener("toggle", (e) => {
     if (!e.target.classList) return;
     if (e.target.classList.contains("skills")) skillsOpen = e.target.open;
     if (e.target.classList.contains("clothes")) clothesOpen = e.target.open;
+    if (e.target.classList.contains("goals")) goalsOpen = e.target.open;
   }, true);
   function skillsHtml(open) {
     const rows = allSkills(state).map((k) => {
@@ -5375,7 +5751,7 @@
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
     if (p.wetness >= 10) chips.push([p.wetness >= 50 ? "bad" : "warn", `Wet ${Math.round(p.wetness)}%`]);
     chips.push(["", `Wearing: ${wornText(p)}`]);
-    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false);
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false) + goalsHtml();
   }
   function renderLocation() {
     const loc = state.location;
@@ -5645,6 +6021,11 @@
       });
     });
   }
+  function legacyEpilogueHtml() {
+    const ep = epilogue(state);
+    if (!ep.length) return "";
+    return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc(e.title)}</b> <span class="hint">${esc(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc(e.line)}</li>`).join("")}</ul>`;
+  }
   function showDeath() {
     const d = state.dead;
     const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc(r.cause)}${r.dog ? ` \xB7 with ${esc(r.dog)}` : ""}</li>`).join("");
@@ -5652,6 +6033,7 @@
     <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc(d.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : "none"}</b></div>
+    ${legacyEpilogueHtml()}
     <h3>Best runs</h3><ol>${runs}</ol>
     ${startChoicesHtml()}`, bindStartChoices);
   }
@@ -6152,7 +6534,12 @@
       else if (b.dataset.takeall) act("takeall");
       else if (b.dataset.drop) act("drop", b.dataset.drop);
       else if (b.dataset.build) act("action", "build", b.dataset.build);
-      else if (b.id === "menuBtn") showMenu();
+      else if (b.dataset.goalboard) showGoalBoard();
+      else if (b.dataset.goaldrop) {
+        const why = dropGoal(state, b.dataset.goaldrop);
+        if (why) alert(why);
+        else commit();
+      } else if (b.id === "menuBtn") showMenu();
       else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
     document.body.addEventListener("toggle", (e) => {

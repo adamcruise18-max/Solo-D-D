@@ -3,14 +3,14 @@
 // 'walk' (travel outside), 'sleep'.
 import { rand, randInt, chance } from '../rng.js';
 import * as V from './vitals.js';
-import { airTemp, isNight, sunFor, solarToday, weatherInfo } from './world.js';
+import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
 import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
-import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
+import { built, foodItemsStored } from './base.js';
 import { infectRiskFactor } from './skills.js';
 import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
@@ -187,8 +187,8 @@ export function tickStep(state, dt, mode) {
     if (p.lightHours === 0) log(state, 'The flashlight goes dark. The batteries are empty.', 'warn');
   }
 
-  homeStep(state, dt, env);
-  dogStep(state, dt, sleeping);
+  // The home and the dog are their own systems now (src/engine/home.js, dog.js),
+  // right after these rules.
 
   if (p.health <= 0) {
     p.health = 0;
@@ -196,77 +196,6 @@ export function tickStep(state, dt, mode) {
     die(state, causes.length ? causes[0][0] : 'unknown');
   }
   state._damage = {};
-}
-
-function homeStep(state, dt, env) {
-  const h = state.home;
-  const air = env.air;
-  let heat = 0;
-  if (h.fireHours > 0) {
-    heat += fireHeat(state);
-    h.fireHours = Math.max(0, h.fireHours - dt);
-    if (h.fireHours === 0 && state.location.kind === 'home') log(state, 'The fire in the fireplace burns out.');
-  }
-  if (h.heaterOn) {
-    h.battery -= 1.5 * dt;
-    heat += 20;
-    if (h.battery <= 0) {
-      h.battery = 0;
-      h.heaterOn = false;
-      log(state, 'The home battery is empty. The electric heater stops.', 'warn');
-    }
-  }
-  const passive = air + 6;
-  const target = Math.min(75, passive + heat);
-  const rate = heat > 0 ? 0.25 : 0.05 * heatLossFactor(state);
-  h.indoorTemp += (target - h.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-
-  // Solar charge in daylight
-  const m = ((state.time % 1440) + 1440) % 1440;
-  const s = sunFor(state.time);
-  if (m > s.rise && m < s.set) {
-    const hours = (s.set - s.rise) / 60;
-    h.battery = Math.min(h.batteryMax, h.battery + (solarToday(state) / hours) * dt);
-  }
-
-  // Rain barrels fill from the gutter (rain water is unsafe until boiled or filtered)
-  if (built(state, 'rain_barrels') && h.rawGal < 110) {
-    const t = state.weather.type;
-    const perH = t === 'heavy_rain' ? 5 : t === 'rain' || t === 'windstorm' ? 2 : 0;
-    if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
-  }
-
-  // City water stops on a hard freeze or on a random day
-  if (h.tapWorks && (air < 25 || dayIndex(state.time) >= h.tapStopDay)) {
-    h.tapWorks = false;
-    log(state, air < 25
-      ? 'Hard freeze. The water pipes are frozen. The kitchen tap stops.'
-      : 'The kitchen tap coughs and stops. The city water is gone now.', 'warn');
-  }
-}
-
-function dogStep(state, dt, sleeping) {
-  const d = state.dog;
-  if (d.stage !== 'joined') return;
-  d.food = clamp(d.food - 4 * dt, 0, 100);
-  d.water = 80;
-  if (d.food <= 0) d.health -= 1 * dt;
-  else if (sleeping) d.health = Math.min(100, d.health + 1 * dt);
-  if (d.health <= 50 && d.warned < 1) {
-    d.warned = 1;
-    log(state, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, 'warn');
-  }
-  if (d.health <= 25 && d.warned < 2) {
-    d.warned = 2;
-    log(state, `${d.name} is very sick. ${d.name} needs food or medicine now.`, 'danger');
-  }
-  if (d.health > 60) d.warned = 0;
-  if (d.health <= 0) {
-    d.health = 0;
-    d.stage = 'dead';
-    log(state, `${d.name} lies down and does not get up again. ${d.name} is gone.`, 'danger');
-    state.player.morale = Math.max(0, state.player.morale - 25);
-  }
 }
 
 // Legacy system: the 5 AM rules that are not systems yet. The weather system
@@ -281,9 +210,7 @@ export function dailyRollover(state, day) {
   if (spell?.first) log(state, spellStartText(spell.id), 'warn');
   else if (spell) log(state, `${weatherInfo(state).label} again today.`, 'warn');
 
-  // The water chain: the filter station cleans rain water by itself.
-  const filtered = runAutoFilter(state);
-  if (filtered >= 0.25) log(state, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, 'good');
+  // The water chain (filter station) is in the home system (src/engine/home.js).
 
   // Morale
   p.morale -= 2;
@@ -291,12 +218,7 @@ export function dailyRollover(state, day) {
   if (state.location.kind === 'home' && state.home.indoorTemp < 50) p.morale -= 5;
   if (built(state, 'led_lights')) p.morale += 3;
   if (built(state, 'sealed_store') && foodItemsStored(state) >= 10) p.morale += 2;
-  if (state.dog.stage === 'joined') {
-    p.morale += 8;
-    if (state.dog.food >= 25) state.dog.bond += 3;
-    else state.dog.bond -= 10;
-    state.dog.bond = clamp(state.dog.bond, 0, 100);
-  }
+  if (state.dog.stage === 'joined') p.morale += 8; // the dog's bond: dog system
   p.morale = clamp(p.morale, 0, 100);
 
   // Weak status
@@ -317,35 +239,6 @@ export function dailyRollover(state, day) {
     if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state);
   }
 
-  dogDaily(state, day);
-}
-
-function dogDaily(state, day) {
-  const d = state.dog;
-  const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-  if (d.stage === 'none' && day >= d.arriveDay) {
-    d.stage = 'visiting';
-    d.visitStart = day;
-    log(state, 'A thin dog watches the house from the street. It does not come near.', 'story');
-  } else if (d.stage === 'visiting') {
-    const since = lastFed == null ? day - d.visitStart : day - lastFed;
-    if (since > 3) {
-      if (!d.revisitUsed) {
-        d.stage = 'away';
-        d.revisitUsed = true;
-        d.revisitDay = day + randInt(state, 5, 8);
-        log(state, 'The dog is not in the street today.');
-      } else {
-        d.stage = 'gone';
-        log(state, 'The dog does not come back.');
-      }
-    }
-  } else if (d.stage === 'away' && day >= d.revisitDay) {
-    d.stage = 'visiting';
-    d.visitStart = day;
-    d.feedDays = [];
-    log(state, 'The thin dog is back in the street. It looks at your door.', 'story');
-  }
 }
 
 export const INJURY_NAMES = {
