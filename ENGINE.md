@@ -88,6 +88,19 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
   and says so in `store.lastLoad`. A failed write never destroys the last good save.
 - `migrate()` upgrades the whole game (`state.version`) and each system
   (`state.systemVersions`). A save from before the engine keeps all its values.
+- Errors have a code (`SaveError`): `quota` (no space; the last good save is kept) and
+  `broken` (the slot has saves, but every copy is bad). A broken slot is never shown as
+  an empty slot, so the game cannot start a new run over it by mistake. An upgrade
+  error (for example a save from a newer game) is passed up, not hidden by `~prev`.
+- The live game (`src/engine/save.js`, localStorage) does not drop a save it cannot load
+  (for example one from a newer game): `loadGame()` moves it to
+  `lastlight.save.v1.unreadable` before a new run can write over it, and
+  `loadProblem()` says why. `unreadableSave()` gives its text for a backup download.
+- Save timing (`npm run bench:save`, and IndexedDB numbers in `npm run check:browser`),
+  2026-11-24: a real 47-day bot save is about 48 KB. In Chromium IndexedDB, a save of
+  both copies takes about 27 ms at 1 MB, 158 ms at 5 MB, 292 ms at 10 MB, 708 ms at
+  25 MB. The checksum is about 11 ms per MB in Node. Saves are far below 1 MB now, so
+  no worker is needed yet; check again when the map state grows.
 - `askPersistentStorage()` asks the browser not to clear the saves (Safari can clear
   site storage after 7 days without a visit). The backup file is the safe copy.
 
@@ -101,6 +114,24 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
    fields were already in old saves gets `legacy: true` (old saves then skip its `init`).
 4. Content is data. `npm test` checks the links.
 5. Time costs and risks are declared on the action, not written by hand in the panel.
+6. Only the clock moves time. A system that calls `advance()` inside a step is an error
+   ("time charged twice").
+7. A system lists the top-level state fields it owns (`owns`). With dev checks on
+   (tests and the replay), a system that changes a field another system owns stops the
+   run ("Dual write"). Rules 1 and 2 are checked by `test/architecture.test.js`.
+8. A system says how it catches up (`catchUp`: `exact`, `approx` or `event`). Reduced or
+   abstract simulation must not skip time for a system that has not said it
+   (`systems.missingCatchUp()`). Test the claim: 10 one-day steps against 1 ten-day step.
+
+## Field ownership (until all rules are systems)
+
+| State | Who writes it |
+| --- | --- |
+| `weather` | the weather system (`src/engine/systems.js`) |
+| Item pick-ups | PR #9 model: `zoneItems`, `taken[pid]`, `opened[cid]` |
+| Other place changes (doors, damage, discovered) | `world.changes` (`src/core/changes.js`) |
+| All other fields | the legacy system (old rules in `src/engine/tick.js`) |
+| `time` | the clock only |
 
 ## Tools
 
@@ -109,12 +140,29 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
 | `npm test` | All node tests, with the content check and the replay test |
 | `npm run sim -- --runs 50 --days 90` | The bot plays many runs fast; shows days survived and causes of death |
 | `npm run replay` | Bot plays seeds 42, 1234, 777 for 30 days; compares with `test/golden/replay.json` |
-| `npm run replay -- --record` | Writes a new golden file. Only when a rule change is meant, and say so in the PR |
-| `npm run check:browser` | Chromium: the game page loads with no errors; saves and the fallback work in IndexedDB |
+| `npm run replay -- --record` | Writes new golden files. Only when a rule change is meant, and say so in the PR |
+| `npm run check:browser` | Chromium: the game page loads; a new run plays through the clock and the weather system; saves and the fallback work in IndexedDB; save timing |
+| `npm run bench:save` | Save timing in Node at 1, 5, 10 and 25 MB |
+
+CI (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, `npm run replay`, the build and
+the browser check on every pull request and every push to main. On a failure it keeps
+the browser screenshot and page errors as an artifact.
+
+### Replay
+
+`test/golden/replay.json` has one snapshot per game day. `test/golden/trace.json` has one
+line per bot turn: turn, action, start and end time, minutes, rng before and after, and
+the state paths that changed with a hash of each (`player.food`, `home.battery`,
+`places.<id>`...). When the replay changes, the report names the first turn, its action
+and game time, and the state paths that differ. Player text (`log`, `journal`) is not in
+the trace, so a new wording is not a rule change. The golden files change only in a pull
+request that says which rule change is meant and why.
 
 ## Moving old code into the engine
 
-Steps 2 to 4 start after PR 9 (pick-up items) merges, because it edits the same files.
+Done: time moves through the engine clock (`advanceTime()` calls `gameClock().advance()`).
+The weather is the first system (`weather`, before `legacy`). The rest of the old rules
+run as one `legacy` system until they move out. The golden replay did not change.
 
 1. Before a move, `npm run replay` must pass.
 2. Move one part (for example the dog in `tick.js`) into a system file. Do not change numbers.
@@ -154,6 +202,8 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 | 2026-11-24 | 3D streets: decide later (Adam). Build the shared parts first; ask before 3D street work |
 | 2026-11-24 | Cells 256 m; rings 3x3 / 5x5 / 7x7 kept / 9x9 known (from the research thread) |
 | 2026-11-24 | Change records instead of copies of locations; base made again from seed + content |
+| 2026-11-24 | External review adopted as the build order: CI, weather, observability, dog, home base, balance |
+| 2026-11-24 | Weather keeps the shared game rng for now, so its numbers stay the same. Its own `weather` stream is a separate change that re-records the golden files |
 
 ## Open points from the research review (PR #10)
 
@@ -163,9 +213,9 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
    `world.changes` is for other kinds (doors, containers emptied, places discovered,
    moved or damaged objects). New record ids must be content-based (zone + item + n),
    never a position in a list made again from content.
-2. Measure the save checksum on a late-game save with the profiler; move it to a worker
-   if it costs more than about 5 ms.
-3. When rules move onto `simDue()` tiers, test that 1 step of 10 days gives the same
-   result as 10 steps of 1 day (spoilage, growth, decay).
+2. Save checksum: measured (see Saves). About 11 ms per MB; real saves are about 48 KB,
+   so about 0.5 ms. No worker needed now.
+3. Catch-up: `test/systems.test.js` checks that 10 one-day advances give the same game
+   as one ten-day advance. Each system now declares `catchUp`.
 4. A small diagnostics overlay (frame ms, sections, memory) behind a key, with the
    pick-up items thread, which owns the 3D view.

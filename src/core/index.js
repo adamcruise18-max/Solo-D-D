@@ -7,7 +7,7 @@ import { createClock } from './clock.js';
 import { createActions } from './actions.js';
 
 export { createEvents } from './events.js';
-export { createSystems, defineSystem } from './systems.js';
+export { createSystems, defineSystem, CATCH_UP } from './systems.js';
 export { createClock, sendDeath, STEP_MINUTES, DAY_START_MINUTE, dayIndex, minuteOfDay, gameDay } from './clock.js';
 export { createActions, defineAction, legacyActions } from './actions.js';
 export { stream, streamInt, streamChance } from './rng.js';

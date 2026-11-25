@@ -10,8 +10,7 @@ import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored } from './base.js';
-import { infectRiskFactor } from './skills.js';
-import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
+import { gameClock } from './systems.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -66,22 +65,17 @@ function damage(state, amount, cause) {
   state._damage[cause] = (state._damage[cause] || 0) + amount;
 }
 
+// Time moves through the engine clock (src/core/clock.js) and its systems
+// (src/engine/systems.js): steps of at most 10 minutes; at 5 AM each system's
+// daily hook runs before the step. Weather is a system of its own; the rules
+// below still run as one "legacy" system until they move out too.
 export function advanceTime(state, minutes, mode = 'rest') {
-  let left = minutes;
-  while (left > 0.0001 && !state.dead) {
-    const step = Math.min(10, left);
-    const before = state.time;
-    state.time += step;
-    left -= step;
-    // 5 AM rollover
-    const dBefore = dayIndex(before - 300);
-    const dAfter = dayIndex(state.time - 300);
-    for (let d = dBefore + 1; d <= dAfter; d++) dailyRollover(state, d);
-    tickStep(state, step / 60, mode);
-  }
+  if (!(minutes > 0)) return; // as before: no time, nothing happens
+  gameClock().advance(state, minutes, mode);
 }
 
-function tickStep(state, dt, mode) {
+// Legacy system: one clock step of the rules that are not systems yet.
+export function tickStep(state, dt, mode) {
   const p = state.player;
   const env = environment(state, mode);
   const sleeping = mode === 'sleep';
@@ -259,9 +253,10 @@ function dogStep(state, dt, sleeping) {
   }
 }
 
-function dailyRollover(state, day) {
+// Legacy system: the 5 AM rules that are not systems yet. The weather system
+// has rolled the new day's weather before this runs.
+export function dailyRollover(state, day) {
   const p = state.player;
-  rollWeather(state, day);
   seasonDaily(state, day);
   log(state, `A new day. Weather: ${weatherInfo(state).label}, high ${Math.round(state.weather.high)}°F, low ${Math.round(state.weather.low)}°F.`, 'day');
   if (state.weather.type === 'snow') log(state, `Snow: ${state.weather.snowInches} inches. Walking is slow today.`, 'warn');

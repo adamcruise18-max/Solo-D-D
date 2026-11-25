@@ -3,6 +3,7 @@ import { hashString, mulberry32 } from '../rng.js';
 import { ITEMS } from '../data/items.js';
 import { HOME_LAT, HOME_LON } from '../sun.js';
 import { initWeather } from './world.js';
+import { systemVersions } from './systems.js';
 
 export const SAVE_VERSION = 1;
 export const START_MINUTE = 9 * 60 + 5; // Day 1, 9:05 AM
@@ -93,7 +94,8 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     dead: null,
     pendingPrompt: null,
   };
-  initWeather(state);
+  initWeather(state); // the weather system's init (same rng order as before)
+  state.systemVersions = systemVersions();
   if (opts.homeLabel) log(state, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, 'story');
   log(state, 'You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.', 'story');
   log(state, 'The house is cold and silent. Nobody comes when you call out.', 'story');

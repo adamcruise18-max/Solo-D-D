@@ -13,11 +13,21 @@
 //   cancelled -> (gone)            (load done: its data is freed with unload)
 //   loading   -> failed            (load error: retried after a wait that doubles)
 //   loaded    -> (gone)            (unloaded: out of range or over budget)
+//   loading   -> failed            (no answer in loadTimeoutMs: the load is abandoned;
+//                                  its late result is freed with unload and ignored)
+//
+// maxInFlight counts live loads only: an abandoned load may still run in the
+// background until it answers.
+//
+// Each load has a generation token. A result whose token is not the key's current
+// token is late and obsolete: it is freed and never shown. unload(key, data) must
+// free that data only (another load of the same key can be live).
 import { TIER_INFO, TIER_ORDER, tierOf } from './cells.js';
 
 export function createStreamer({
   load, unload = () => {}, maxLoaded = 40, maxInFlight = 4, now = () => Date.now(),
   cost = () => 1, budget = Infinity, retryMs = 1000, maxRetryMs = 30000,
+  loadTimeoutMs = 30000,
 } = {}) {
   if (typeof load !== 'function') throw new Error('The streamer needs a load(key) function');
   const cells = new Map(); // key -> { status, data, lastUsed, cost, token, tries, retryAt }
@@ -25,7 +35,8 @@ export function createStreamer({
   let dropped = new Set(); // keys dropped for the budget: not loaded again until the next update()
   let inFlight = 0;
   let token = 0;
-  const stats = { requests: 0, loaded: 0, unloaded: 0, failed: 0, cancelled: 0, hits: 0, listenerErrors: 0, latencyMs: [] };
+  const abandoned = new Set(); // tokens of loads that timed out (already out of inFlight)
+  const stats = { requests: 0, loaded: 0, unloaded: 0, failed: 0, cancelled: 0, timedOut: 0, late: 0, hits: 0, listenerErrors: 0, latencyMs: [] };
   let lastTiers = new Map();
   const listeners = new Set();
 
@@ -42,6 +53,12 @@ export function createStreamer({
     }
   }
 
+  // Run pump() again after ms of real time (load timeouts, retry waits).
+  function wake(ms) {
+    const timer = setTimeout(() => pump(), ms);
+    timer?.unref?.(); // do not keep Node tests running
+  }
+
   function start(key) {
     const t0 = now();
     const my = ++token;
@@ -49,13 +66,26 @@ export function createStreamer({
     cells.set(key, { status: 'loading', data: null, lastUsed: t0, cost: 0, token: my, tries: prev?.tries || 0, t0 });
     inFlight++;
     stats.requests++;
+    // Wake up when this load is due to time out, even if nothing else happens
+    // (the player may stand still). unref: do not keep Node tests running.
+    if (Number.isFinite(loadTimeoutMs)) wake(loadTimeoutMs + 1);
     Promise.resolve().then(() => load(key)).then(
       (data) => done(key, my, data),
       (err) => fail(key, my, err),
     );
   }
 
+  // A late result of an abandoned load: free it, change nothing else.
+  function late(my, key, data, ok) {
+    if (!abandoned.delete(my)) return false;
+    stats.late++;
+    if (ok) unload(key, data);
+    pump();
+    return true;
+  }
+
   function done(key, my, data) {
+    if (late(my, key, data, true)) return;
     inFlight--;
     const cur = cells.get(key);
     if (!cur || cur.token !== my) { unload(key, data); return pump(); } // should not happen: free it anyway
@@ -79,6 +109,7 @@ export function createStreamer({
   }
 
   function fail(key, my, err) {
+    if (late(my, key, null, false)) return;
     inFlight--;
     const cur = cells.get(key);
     stats.failed++;
@@ -87,7 +118,9 @@ export function createStreamer({
       else {
         cur.status = 'failed';
         cur.tries += 1;
-        cur.retryAt = now() + Math.min(maxRetryMs, retryMs * 2 ** (cur.tries - 1));
+        const wait = Math.min(maxRetryMs, retryMs * 2 ** (cur.tries - 1));
+        cur.retryAt = now() + wait;
+        wake(wait + 1);
       }
     }
     tell({ type: 'failed', key, error: err });
@@ -114,7 +147,29 @@ export function createStreamer({
     return !full || rank(key) < worst;
   }
 
+  // Loads with no answer in loadTimeoutMs free their slot and count as failed.
+  function expire() {
+    const t = now();
+    for (const [key, c] of [...cells.entries()]) {
+      if ((c.status !== 'loading' && c.status !== 'cancelled') || t - c.t0 < loadTimeoutMs) continue;
+      abandoned.add(c.token);
+      if (abandoned.size > 1000) abandoned.delete(abandoned.values().next().value); // loads that never answer
+      inFlight--;
+      stats.timedOut++;
+      stats.failed++;
+      if (c.status === 'cancelled') { cells.delete(key); continue; }
+      c.status = 'failed';
+      c.token = ++token;
+      c.tries += 1;
+      const wait = Math.min(maxRetryMs, retryMs * 2 ** (c.tries - 1));
+      c.retryAt = t + wait;
+      wake(wait + 1);
+      tell({ type: 'failed', key, error: new Error(`load timed out after ${loadTimeoutMs} ms`) });
+    }
+  }
+
   function pump() {
+    expire();
     const t = now();
     for (const [key] of wanted()) {
       if (inFlight >= maxInFlight) break;
@@ -188,14 +243,23 @@ export function createStreamer({
     return {
       loaded, loading: inFlight, cost: usedCost(),
       requests: stats.requests, unloaded: stats.unloaded, failed: stats.failed, cancelled: stats.cancelled,
+      timedOut: stats.timedOut, late: stats.late,
       hits: stats.hits, listenerErrors: stats.listenerErrors,
       avgLatencyMs: lat.length ? lat.reduce((a, b) => a + b, 0) / lat.length : null,
     };
   }
 
-  // Resolves when nothing is loading (tests, loading screens).
-  async function idle() {
-    for (let i = 0; i < 10000 && inFlight > 0; i++) await new Promise((r) => setTimeout(r, 0));
+  // Resolves true when nothing is loading, or false after timeoutMs of real time
+  // (tests, loading screens). Real time, not loop turns: a slow disk is not a hang.
+  async function idle({ timeoutMs = 10000, clock = () => Date.now() } = {}) {
+    const end = clock() + timeoutMs;
+    while (inFlight > 0) {
+      pump(); // expire loads past loadTimeoutMs, start due retries
+      if (inFlight === 0) break;
+      if (clock() >= end) return false;
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    return true;
   }
 
   return {

@@ -626,202 +626,176 @@
     return CLIMATE[month].solar * WEATHER_TYPES[state2.weather.type].solar;
   }
 
-  // src/engine/state.js
-  var SAVE_VERSION = 1;
-  var START_MINUTE = 9 * 60 + 5;
-  var HOME = { lat: HOME_LAT, lon: HOME_LON };
-  var MAP_RADIUS_MILES = 15;
-  var homeOf = (state2) => state2.homePos || HOME;
-  function randomStartPoint(rng = Math.random) {
-    const r = 12 * Math.sqrt(rng());
-    const a = rng() * 2 * Math.PI;
+  // src/core/systems.js
+  var HOOKS = ["init", "step", "daily"];
+  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
+  var CATCH_UP = ["exact", "approx", "event"];
+  function defineSystem(sys) {
+    if (!sys || typeof sys.id !== "string" || !sys.id) throw new Error("A system needs an id");
+    for (const k of Object.keys(sys)) {
+      if (!KNOWN.has(k)) throw new Error(`System "${sys.id}": unknown field "${k}"`);
+    }
+    for (const h of HOOKS) {
+      if (sys[h] != null && typeof sys[h] !== "function") throw new Error(`System "${sys.id}": ${h} must be a function`);
+    }
+    const version = sys.version ?? 1;
+    if (!Number.isInteger(version) || version < 1) throw new Error(`System "${sys.id}": version must be a whole number from 1`);
+    if (sys.owns != null && (!Array.isArray(sys.owns) || sys.owns.some((f) => typeof f !== "string" || !f))) {
+      throw new Error(`System "${sys.id}": owns must be a list of state field names`);
+    }
+    if (sys.catchUp != null && !CATCH_UP.includes(sys.catchUp)) {
+      throw new Error(`System "${sys.id}": catchUp must be one of ${CATCH_UP.join(", ")}`);
+    }
+    const migrations = sys.migrations || {};
+    for (let v = 2; v <= version; v++) {
+      if (typeof migrations[v] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v}`);
+    }
+    return Object.freeze({ order: 100, ...sys, version, migrations });
+  }
+  function createSystems(list = [], { dev = false } = {}) {
+    const byId = /* @__PURE__ */ new Map();
+    const owner = /* @__PURE__ */ new Map();
+    let ordered = [];
+    function add(sys) {
+      const s = defineSystem(sys);
+      if (byId.has(s.id)) throw new Error(`System "${s.id}" is already in the list`);
+      for (const f of s.owns || []) {
+        if (owner.has(f)) throw new Error(`Field "${f}" is owned by both "${owner.get(f)}" and "${s.id}"`);
+      }
+      for (const f of s.owns || []) owner.set(f, s.id);
+      byId.set(s.id, s);
+      ordered = [...byId.values()].sort((a, b) => a.order - b.order);
+      return s;
+    }
+    for (const s of list) add(s);
+    const snapOthers = (state2, id) => {
+      const out = {};
+      for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
+      return out;
+    };
+    function run(hook, state2, arg, ctx) {
+      for (const s of ordered) {
+        if (!s[hook]) continue;
+        if (!dev || !owner.size) {
+          s[hook](state2, arg, ctx);
+          continue;
+        }
+        const before = snapOthers(state2, s.id);
+        s[hook](state2, arg, ctx);
+        for (const [f, v] of Object.entries(before)) {
+          if (JSON.stringify(state2[f] ?? null) !== v) {
+            throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);
+          }
+        }
+      }
+    }
     return {
-      lat: HOME.lat + r * Math.sin(a) / 69.09,
-      lon: HOME.lon + r * Math.cos(a) / (69.09 * Math.cos(HOME.lat * Math.PI / 180))
+      add,
+      get: (id) => byId.get(id),
+      ids: () => ordered.map((s) => s.id),
+      ownerOf: (field) => owner.get(field) || null,
+      // Systems that have not said how they catch up: reduced or abstract
+      // simulation must not skip time for these.
+      missingCatchUp: () => ordered.filter((s) => !s.catchUp).map((s) => s.id),
+      list: () => ordered.slice(),
+      init: (state2, ctx) => {
+        run("init", state2, void 0, ctx);
+        state2.systemVersions = Object.fromEntries(ordered.map((s) => [s.id, s.version]));
+      },
+      step: (state2, dtHours, ctx) => run("step", state2, dtHours, ctx),
+      daily: (state2, day, ctx) => run("daily", state2, day, ctx)
     };
   }
-  function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
-    const homePos = opts.home ? { lat: +opts.home.lat, lon: +opts.home.lon } : { ...HOME };
-    const r = mulberry32(hashString("setup" + seed));
-    const state2 = {
-      version: SAVE_VERSION,
-      seed,
-      rngState: seed,
-      time: START_MINUTE,
-      player: {
-        food: 40,
-        water: 35,
-        warmth: 60,
-        energy: 40,
-        health: 70,
-        morale: 40,
-        energyMax: 60,
-        weak: true,
-        weakGoodHours: 0,
-        wet: false,
-        wetMinutes: 0,
-        dryMinutes: 0,
-        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
-        wetness: 0,
-        injuries: [],
-        illness: { stomachH: 0, infection: null },
-        painH: 0,
-        lightHours: 10,
-        lastComfortDay: -1,
-        bodySeenDay: -1,
-        lastDogPlayDay: -1
-      },
-      homePos,
-      homeLabel: opts.homeLabel || null,
-      pos: { ...homePos },
-      location: { kind: "home" },
-      carried: { backpack: 1 },
-      home: {
-        storage: {
-          formula: 4,
-          saline: 2,
-          first_aid: 1,
-          antibiotics: 1,
-          pain_pills: 1,
-          canned_food: 6,
-          snacks: 1,
-          dry_food: 1,
-          flashlight: 1,
-          winter_coat: 1,
-          firewood: 3
-        },
-        indoorTemp: 47,
-        fireHours: 0,
-        heaterOn: false,
-        battery: 5.4,
-        batteryMax: 13.5,
-        tapWorks: true,
-        tapStopDay: 9 + Math.floor(r() * 21),
-        // day 10 to 30
-        tankGal: 40,
-        toiletGal: 3,
-        rawGal: 0,
-        safeGal: 0,
-        furniture: 12,
-        fridgeOpened: false,
-        projects: {},
-        // built home base projects (see data/projects.js)
-        work: {}
-        // hours of work done on started projects
-      },
-      places: {},
-      houses: {},
-      houseAreas: {},
-      dog: {
-        stage: "none",
-        arriveDay: 1 + Math.floor(r() * 4),
-        // day 2 to 5
-        revisitUsed: false,
-        revisitDay: null,
-        feedDays: [],
-        name: null,
-        food: 60,
-        water: 80,
-        health: 80,
-        bond: 30,
-        withPlayer: true,
-        warned: 0
-      },
-      weather: null,
-      stats: { miles: 0, placesSearched: 0, zonesSearched: 0, housesSearched: 0 },
-      flags: {},
-      log: [],
-      dead: null,
-      pendingPrompt: null
-    };
-    initWeather(state2);
-    if (opts.homeLabel) log(state2, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
-    log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
-    log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
-    log(state2, "Hint: drink, eat, and get the house warm before the first night.", "hint");
-    return state2;
-  }
+
+  // src/core/clock.js
+  var STEP_MINUTES = 10;
+  var DAY_START_MINUTE = 5 * 60;
   var dayIndex = (t) => Math.floor(t / 1440);
-  var minuteOfDay = (t) => (t % 1440 + 1440) % 1440;
-  function formatClock(t) {
-    const m = Math.floor(minuteOfDay(t));
-    let h = Math.floor(m / 60);
-    const mm = String(m % 60).padStart(2, "0");
-    const ampm = h >= 12 ? "PM" : "AM";
-    h = h % 12 || 12;
-    return `${h}:${mm} ${ampm}`;
+  var gameDay = (t) => dayIndex(t - DAY_START_MINUTE);
+  function sendDeath(state2, events) {
+    if (!state2.dead || !events || state2.deathSent) return;
+    state2.deathSent = true;
+    events.emit("player.died", { cause: state2.dead.cause, days: state2.dead.days, time: state2.time });
   }
-  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  function calendar(t) {
-    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
-  }
-  function formatDate(t) {
-    const c = calendar(t);
-    return `${DAYS[c.weekday]} ${c.date} ${MONTHS[c.month]} ${c.year}`;
-  }
-  function formatDuration(min) {
-    min = Math.round(min);
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    if (h && m) return `${h} h ${m} min`;
-    if (h) return `${h} h`;
-    return `${m} min`;
-  }
-  function addItem(bag, id, qty = 1) {
-    bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
-    if (bag[id] <= 1e-4) delete bag[id];
-  }
-  function bagWeight(bag) {
-    let w = 0;
-    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
-    return Math.round(w * 10) / 10;
-  }
-  function carryLimit(state2) {
-    let lim = state2.carried.backpack ? 30 : 10;
-    if (state2.player.weak) lim *= 0.5;
-    if (state2.player.food < 25) lim *= 0.9;
-    return Math.round(lim);
-  }
-  function has(state2, id) {
-    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
-  }
-  function hasLight(state2) {
-    return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0 && !state2.player.lightOff;
-  }
-  function log(state2, text, kind = "info") {
-    state2.log.push({ t: state2.time, text, kind });
-    if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
-    journalNote(state2, text, kind);
-  }
-  function journalNote(state2, text, kind) {
-    if (!state2.journal) state2.journal = [];
-    const day = dayIndex(state2.time);
-    let d = state2.journal[state2.journal.length - 1];
-    if (!d || d.day !== day) {
-      d = { day, places: [], taken: 0, searched: 0, events: [] };
-      state2.journal.push(d);
+  function createClock({ systems, events = null, stepMinutes = STEP_MINUTES } = {}) {
+    if (!systems) throw new Error("The clock needs a systems list");
+    let running = false;
+    function advance(state2, minutes, mode = "rest") {
+      if (!(minutes >= 0)) throw new Error(`Bad number of minutes: ${minutes}`);
+      if (running) throw new Error("Time was moved inside a clock step (time charged twice)");
+      running = true;
+      try {
+        return run(state2, minutes, mode);
+      } finally {
+        running = false;
+      }
     }
-    const arrive = /^You arrive at (.+)\.$/.exec(text);
-    if (arrive) {
-      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
-      return;
+    function run(state2, minutes, mode) {
+      let left = minutes;
+      const ctx = { mode, events, clock: api };
+      while (left > 1e-4 && !state2.dead) {
+        const step = Math.min(stepMinutes, left);
+        const before = state2.time;
+        state2.time += step;
+        left -= step;
+        const dBefore = gameDay(before);
+        const dAfter = gameDay(state2.time);
+        for (let d = dBefore + 1; d <= dAfter; d++) {
+          systems.daily(state2, d, ctx);
+          events?.emit("day.start", { day: d, time: state2.time });
+        }
+        systems.step(state2, step / 60, ctx);
+      }
+      sendDeath(state2, events);
+      return state2;
     }
-    if (/^You walk to a house/.test(text)) {
-      if (!d.places.includes("a house")) d.places.push("a house");
-      return;
-    }
-    if (/^You take: /.test(text)) {
-      d.taken += 1;
-      return;
-    }
-    if (/^You search the /.test(text)) {
-      d.searched = (d.searched || 0) + 1;
-      return;
-    }
-    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
+    const api = { advance, stepMinutes };
+    return api;
   }
+
+  // src/core/save.js
+  function migrate(state2, { version, gameMigrations = {}, systems = null } = {}) {
+    let s = structuredCloneSafe(state2);
+    if (s.version == null) s.version = 1;
+    s.version = Number(s.version);
+    if (!Number.isInteger(s.version) || s.version < 1) throw new Error(`Bad save version: ${state2.version}`);
+    if (version != null) {
+      if (s.version > version) throw new Error(`This save is from a newer game (v${s.version}). Update the game first.`);
+      while (s.version < version) {
+        const to = s.version + 1;
+        const fn = gameMigrations[to];
+        if (typeof fn !== "function") throw new Error(`No upgrade from save v${s.version} to v${to}`);
+        s = fn(s) || s;
+        s.version = to;
+      }
+    }
+    if (systems) {
+      if (!s.systemVersions) {
+        s.systemVersions = Object.fromEntries(systems.list().filter((sys) => sys.legacy).map((sys) => [sys.id, 1]));
+      }
+      for (const sys of systems.list()) {
+        let v = s.systemVersions[sys.id];
+        if (v == null) {
+          if (sys.init) sys.init(s, {});
+          s.systemVersions[sys.id] = sys.version;
+          continue;
+        }
+        if (v > sys.version) throw new Error(`Save has ${sys.id} v${v}, game has v${sys.version}`);
+        while (v < sys.version) {
+          v += 1;
+          s = sys.migrations[v](s) || s;
+        }
+        s.systemVersions[sys.id] = v;
+      }
+    }
+    return s;
+  }
+  function structuredCloneSafe(o) {
+    return typeof structuredClone === "function" ? structuredClone(o) : JSON.parse(JSON.stringify(o));
+  }
+
+  // src/core/profiler.js
+  var FRAME_BUDGET_MS = 1e3 / 30;
 
   // src/engine/vitals.js
   var CAL_PER_FOOD_POINT = 70;
@@ -858,7 +832,7 @@
     return Object.keys(SEASONS).find((k) => SEASONS[k].months.includes(m));
   }
   function overgrowth(t) {
-    const days = Math.max(0, dayIndex(t));
+    const days = Math.max(0, dayIndex2(t));
     return Math.min(1, 0.08 + days / 730);
   }
   var SEASON_START_TEXT = {
@@ -1339,17 +1313,8 @@
     state2._damage[cause] = (state2._damage[cause] || 0) + amount;
   }
   function advanceTime(state2, minutes, mode = "rest") {
-    let left = minutes;
-    while (left > 1e-4 && !state2.dead) {
-      const step = Math.min(10, left);
-      const before = state2.time;
-      state2.time += step;
-      left -= step;
-      const dBefore = dayIndex(before - 300);
-      const dAfter = dayIndex(state2.time - 300);
-      for (let d = dBefore + 1; d <= dAfter; d++) dailyRollover(state2, d);
-      tickStep(state2, step / 60, mode);
-    }
+    if (!(minutes > 0)) return;
+    gameClock().advance(state2, minutes, mode);
   }
   function tickStep(state2, dt, mode) {
     const p = state2.player;
@@ -1470,7 +1435,7 @@
       const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
       if (perH) h.rawGal = Math.min(110, h.rawGal + perH * dt);
     }
-    if (h.tapWorks && (air < 25 || dayIndex(state2.time) >= h.tapStopDay)) {
+    if (h.tapWorks && (air < 25 || dayIndex2(state2.time) >= h.tapStopDay)) {
       h.tapWorks = false;
       log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
@@ -1500,7 +1465,6 @@
   }
   function dailyRollover(state2, day) {
     const p = state2.player;
-    rollWeather(state2, day);
     seasonDaily(state2, day);
     log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
     if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
@@ -1612,9 +1576,250 @@
     state2.dead = {
       cause: CAUSE_TEXT[cause] || cause,
       time: state2.time,
-      days: dayIndex(state2.time) + 1
+      days: dayIndex2(state2.time) + 1
     };
     log(state2, `You died of ${state2.dead.cause}.`, "danger");
+  }
+
+  // src/engine/systems.js
+  var weatherSystem = {
+    id: "weather",
+    label: "Weather",
+    order: 10,
+    version: 1,
+    legacy: true,
+    // state.weather was in saves before the engine
+    owns: ["weather"],
+    // One roll per game day from the shared game rng; nothing changes inside a day.
+    // Skipping days must still roll each day in order, so the result is exact.
+    catchUp: "exact",
+    init: (state2) => initWeather(state2),
+    daily: (state2, day) => rollWeather(state2, day)
+  };
+  var legacySystem = {
+    id: "legacy",
+    label: "Rules not yet moved into systems",
+    order: 1e3,
+    version: 1,
+    legacy: true,
+    // Death checks, wounds and illness thresholds happen inside a day.
+    catchUp: "event",
+    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
+    daily: (state2, day) => dailyRollover(state2, day)
+  };
+  var GAME_SYSTEMS = [weatherSystem, legacySystem];
+  var devChecks = false;
+  var cached = null;
+  function gameSystems() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).systems;
+  }
+  function gameClock() {
+    return (cached || (cached = createGameSystems({ dev: devChecks }))).clock;
+  }
+  function createGameSystems({ dev = false, events = null } = {}) {
+    const systems = createSystems(GAME_SYSTEMS, { dev });
+    const clock = createClock({ systems, events });
+    return { systems, clock };
+  }
+  function systemVersions() {
+    return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
+  }
+
+  // src/engine/state.js
+  var SAVE_VERSION = 1;
+  var START_MINUTE = 9 * 60 + 5;
+  var HOME = { lat: HOME_LAT, lon: HOME_LON };
+  var MAP_RADIUS_MILES = 15;
+  var homeOf = (state2) => state2.homePos || HOME;
+  function randomStartPoint(rng = Math.random) {
+    const r = 12 * Math.sqrt(rng());
+    const a = rng() * 2 * Math.PI;
+    return {
+      lat: HOME.lat + r * Math.sin(a) / 69.09,
+      lon: HOME.lon + r * Math.cos(a) / (69.09 * Math.cos(HOME.lat * Math.PI / 180))
+    };
+  }
+  function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
+    const homePos = opts.home ? { lat: +opts.home.lat, lon: +opts.home.lon } : { ...HOME };
+    const r = mulberry32(hashString("setup" + seed));
+    const state2 = {
+      version: SAVE_VERSION,
+      seed,
+      rngState: seed,
+      time: START_MINUTE,
+      player: {
+        food: 40,
+        water: 35,
+        warmth: 60,
+        energy: 40,
+        health: 70,
+        morale: 40,
+        energyMax: 60,
+        weak: true,
+        weakGoodHours: 0,
+        wet: false,
+        wetMinutes: 0,
+        dryMinutes: 0,
+        worn: { coat: false, hat: false, gloves: false, boots: false, rain: false },
+        injuries: [],
+        illness: { stomachH: 0, infection: null },
+        painH: 0,
+        lightHours: 10,
+        lastComfortDay: -1,
+        bodySeenDay: -1,
+        lastDogPlayDay: -1
+      },
+      homePos,
+      homeLabel: opts.homeLabel || null,
+      pos: { ...homePos },
+      location: { kind: "home" },
+      carried: { backpack: 1 },
+      home: {
+        storage: {
+          formula: 4,
+          saline: 2,
+          first_aid: 1,
+          antibiotics: 1,
+          pain_pills: 1,
+          canned_food: 6,
+          snacks: 1,
+          dry_food: 1,
+          flashlight: 1,
+          winter_coat: 1,
+          firewood: 3
+        },
+        indoorTemp: 47,
+        fireHours: 0,
+        heaterOn: false,
+        battery: 5.4,
+        batteryMax: 13.5,
+        tapWorks: true,
+        tapStopDay: 9 + Math.floor(r() * 21),
+        // day 10 to 30
+        tankGal: 40,
+        toiletGal: 3,
+        rawGal: 0,
+        safeGal: 0,
+        furniture: 12,
+        fridgeOpened: false,
+        projects: {},
+        // built home base projects (see data/projects.js)
+        work: {}
+        // hours of work done on started projects
+      },
+      places: {},
+      houses: {},
+      houseAreas: {},
+      dog: {
+        stage: "none",
+        arriveDay: 1 + Math.floor(r() * 4),
+        // day 2 to 5
+        revisitUsed: false,
+        revisitDay: null,
+        feedDays: [],
+        name: null,
+        food: 60,
+        water: 80,
+        health: 80,
+        bond: 30,
+        withPlayer: true,
+        warned: 0
+      },
+      weather: null,
+      stats: { miles: 0, placesSearched: 0, zonesSearched: 0, housesSearched: 0 },
+      flags: {},
+      log: [],
+      dead: null,
+      pendingPrompt: null
+    };
+    initWeather(state2);
+    state2.systemVersions = systemVersions();
+    if (opts.homeLabel) log(state2, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
+    log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
+    log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
+    log(state2, "Hint: drink, eat, and get the house warm before the first night.", "hint");
+    return state2;
+  }
+  var dayIndex2 = (t) => Math.floor(t / 1440);
+  var minuteOfDay2 = (t) => (t % 1440 + 1440) % 1440;
+  function formatClock(t) {
+    const m = Math.floor(minuteOfDay2(t));
+    let h = Math.floor(m / 60);
+    const mm = String(m % 60).padStart(2, "0");
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${h}:${mm} ${ampm}`;
+  }
+  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function calendar(t) {
+    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex2(t) * 864e5);
+    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
+  }
+  function formatDate(t) {
+    const c = calendar(t);
+    return `${DAYS[c.weekday]} ${c.date} ${MONTHS[c.month]} ${c.year}`;
+  }
+  function formatDuration(min) {
+    min = Math.round(min);
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
+  }
+  function addItem(bag, id, qty = 1) {
+    bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
+    if (bag[id] <= 1e-4) delete bag[id];
+  }
+  function bagWeight(bag) {
+    let w = 0;
+    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
+    return Math.round(w * 10) / 10;
+  }
+  function carryLimit(state2) {
+    let lim = state2.carried.backpack ? 30 : 10;
+    if (state2.player.weak) lim *= 0.5;
+    if (state2.player.food < 25) lim *= 0.9;
+    return Math.round(lim);
+  }
+  function has(state2, id) {
+    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  }
+  function hasLight(state2) {
+    return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0 && !state2.player.lightOff;
+  }
+  function log(state2, text, kind = "info") {
+    state2.log.push({ t: state2.time, text, kind });
+    if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
+    journalNote(state2, text, kind);
+  }
+  function journalNote(state2, text, kind) {
+    if (!state2.journal) state2.journal = [];
+    const day = dayIndex2(state2.time);
+    let d = state2.journal[state2.journal.length - 1];
+    if (!d || d.day !== day) {
+      d = { day, places: [], taken: 0, searched: 0, events: [] };
+      state2.journal.push(d);
+    }
+    const arrive = /^You arrive at (.+)\.$/.exec(text);
+    if (arrive) {
+      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      return;
+    }
+    if (/^You walk to a house/.test(text)) {
+      if (!d.places.includes("a house")) d.places.push("a house");
+      return;
+    }
+    if (/^You take: /.test(text)) {
+      d.taken += 1;
+      return;
+    }
+    if (/^You search the /.test(text)) {
+      d.searched = (d.searched || 0) + 1;
+      return;
+    }
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
   }
 
   // src/engine/checks.js
@@ -1945,7 +2150,7 @@
   }
   function seeBody(state2, text) {
     const p = state2.player;
-    const day = dayIndex(state2.time);
+    const day = dayIndex2(state2.time);
     log(state2, text, "story");
     if (p.bodySeenDay !== day) {
       p.bodySeenDay = day;
@@ -2028,7 +2233,7 @@
         return;
       }
       case "comfort": {
-        const day = dayIndex(state2.time);
+        const day = dayIndex2(state2.time);
         if (p.lastComfortDay === day) {
           log(state2, "You already did that today. It does not help again.");
           return;
@@ -2344,7 +2549,7 @@
   }
   function feedStray(state2) {
     const d = state2.dog;
-    const day = dayIndex(state2.time);
+    const day = dayIndex2(state2.time);
     const food = anyFood(state2);
     if (!food) {
       log(state2, "You have no food to give the dog.");
@@ -2386,7 +2591,7 @@
   function playWithDog(state2) {
     const d = state2.dog;
     const p = state2.player;
-    const day = dayIndex(state2.time);
+    const day = dayIndex2(state2.time);
     if (p.lastDogPlayDay === day) {
       log(state2, `${d.name} is resting. You already played today.`);
       return;
@@ -2820,7 +3025,7 @@
       if (!h.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
       if (state2.dog.stage === "visiting") {
-        const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
+        const fedToday = state2.dog.feedDays.includes(dayIndex2(state2.time));
         const night = isNight(state2.time);
         add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" || !anyFood(state2) && "You have no food to give" });
       }
@@ -3182,21 +3387,37 @@
       return false;
     }
   }
+  var UNREADABLE_KEY = "lastlight.save.v1.unreadable";
+  var problem = null;
   function loadGame() {
+    problem = null;
     const s = store();
     if (!s) return null;
+    let raw;
     try {
-      const raw = s.getItem(KEY);
-      if (!raw) return null;
+      raw = s.getItem(KEY);
+    } catch (err) {
+      problem = String(err);
+      return null;
+    }
+    if (!raw) return null;
+    try {
       return parseSave(raw);
-    } catch {
+    } catch (err) {
+      problem = err?.message || String(err);
+      try {
+        s.setItem(UNREADABLE_KEY, raw);
+        s.removeItem(KEY);
+      } catch {
+      }
+      if (typeof console !== "undefined") console.warn(`Save not loaded (kept as ${UNREADABLE_KEY}): ${problem}`);
       return null;
     }
   }
   function parseSave(raw) {
     const st = JSON.parse(raw);
     if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
-    return st;
+    return migrate(st, { systems: gameSystems() });
   }
   function clearGame() {
     const s = store();
@@ -3990,7 +4211,7 @@
     const low = needWarnings(state).map((n) => n.word);
     const rk = risks(state).length;
     $("#hud").innerHTML = `
-    <span class="h-day">DAY ${dayIndex(t) + 1}</span>
+    <span class="h-day">DAY ${dayIndex2(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
     <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
@@ -4005,10 +4226,10 @@
     const night = isNight(t);
     const air = Math.round(airTemp(state, t));
     const w = state.weather;
-    const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
+    const sunText = night ? `Sunrise ${formatClock(dayIndex2(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex2(t) * 1440 + sun.set)}`;
     $("#clock").innerHTML = `
     <div class="eyebrow">Status</div>
-    <div class="day">Day ${dayIndex(t) + 1}</div>
+    <div class="day">Day ${dayIndex2(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
     <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
   }
@@ -4226,7 +4447,7 @@
     $("#dog").hidden = !html;
   }
   function renderLog() {
-    const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+    const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex2(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
     $("#log").innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
   }
   function showPlacePopup(id, lngLat) {
@@ -4436,7 +4657,7 @@
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `last-light-day${dayIndex(state.time) + 1}.json`;
+        a.download = `last-light-day${dayIndex2(state.time) + 1}.json`;
         a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 1e3);
       });
@@ -4563,7 +4784,7 @@
       },
       quickSave: () => {
         const ok = saveGame(state);
-        return ok ? `Game saved (Day ${dayIndex(state.time) + 1}, ${formatClock(state.time)}).` : "The game could not save in this browser.";
+        return ok ? `Game saved (Day ${dayIndex2(state.time) + 1}, ${formatClock(state.time)}).` : "The game could not save in this browser.";
       },
       canQuickLoad: () => !!loadGame(),
       isDone: (z) => zoneList().includes(z),
@@ -4573,7 +4794,7 @@
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
-        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
+        return `<b>Day ${dayIndex2(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
       },
       describe: (n) => {
         if (n.type === "exit") return "<kbd>E</kbd> Leave the building <small>back to the map</small>";
@@ -4716,7 +4937,7 @@
       ${skillsHtml(true)}`;
     }
     if (name === "journal") {
-      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex2(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
       return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
     }
     if (name === "objectives") {
