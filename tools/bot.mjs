@@ -243,6 +243,23 @@ function atWild(state) {
   perform(state, 'action', 'go_home'); return 'go home';
 }
 
+// Low on food: a food store not yet visited, close by, first; then the houses here
+// (every house had a pantry); then the nearest place that still has houses around it.
+function foodRun(state, pl) {
+  const fresh = pl && FOOD_CATS.has(pl.cat) && pl.cat !== 'house' && !state.places[pl.id] && straightMiles(state.pos, pl) <= 4;
+  if (fresh && pl.id !== state.location.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
+  if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+  if (isNight(state.time + 2 * 60) || state.player.energy < 40) return null;
+  let best = null;
+  for (const p of allPlaces()) {
+    if (!CATEGORIES[p.cat] || (state.houseAreas?.[p.id] || 0) >= 12 || p.id === state.location.id) continue;
+    const d = straightMiles(state.pos, p);
+    if (d <= 9 && (!best || d < best.d)) best = { p, d };
+  }
+  if (best) { perform(state, 'action', 'go_place', best.p.id); return `go ${best.p.id} (houses)`; }
+  return null;
+}
+
 export function smartTurn(state) {
   const p = state.player;
   if (treat(state)) return 'treat';
@@ -265,8 +282,7 @@ export function smartTurn(state) {
     if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
     if (can(state, 'store_all')) perform(state, 'action', 'store_all');
     const pl = smartNextPlace(state, lowFood);
-    // Stores give about 4x more food per hour than houses: a house only when no food store is in reach.
-    if (lowFood && can(state, 'house') && !(pl && FOOD_CATS.has(pl.cat) && pl.cat !== 'house')) { perform(state, 'action', 'house'); return 'house'; }
+    if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
     if (pl) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
     if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
     perform(state, 'action', 'rest'); return 'rest';
@@ -292,7 +308,7 @@ export function smartTurn(state) {
     return 'search';
   }
   const pl = smartNextPlace(state, lowFood);
-  if (lowFood && can(state, 'house') && !(pl && pl.id !== loc.id && FOOD_CATS.has(pl.cat) && pl.cat !== 'house')) { perform(state, 'action', 'house'); return 'house'; }
+  if (lowFood) { const f = foodRun(state, pl); if (f) return f; }
   if (pl && pl.id !== loc.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
   perform(state, 'action', 'go_home'); return 'go home';
 }

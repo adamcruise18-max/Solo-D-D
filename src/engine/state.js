@@ -60,6 +60,7 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
       storage: {
         formula: 4, saline: 2, first_aid: 1, antibiotics: 1, pain_pills: 1,
         canned_food: 6, snacks: 1, dry_food: 1, flashlight: 1, winter_coat: 1, firewood: 3,
+        snare_wire: 1, // a coil in the garage (research: common in a suburban garage)
       },
       indoorTemp: 47,
       fireHours: 0,

@@ -2004,11 +2004,13 @@
 
   // src/data/crops.js
   var CROPS = {
-    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8], days: 55, frostF: null, minF: 40, yield: ["kale", 8] },
+    // Kale overwinters in Portland: sown Feb-Apr or Jul-Oct; after a harvest the plant
+    // grows new leaves (regrow: growth it keeps; up to `cuts` harvests).
+    kale: { name: "Kale", plant: [1, 2, 3, 6, 7, 8, 9], days: 55, frostF: null, minF: 40, yield: ["kale", 8], regrow: 0.5, cuts: 4 },
     potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
     beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
     squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
-    garlic: { name: "Garlic", plant: [9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
+    garlic: { name: "Garlic", plant: [8, 9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
 
   // src/engine/food.js
@@ -2896,7 +2898,9 @@
           dry_food: 1,
           flashlight: 1,
           winter_coat: 1,
-          firewood: 3
+          firewood: 3,
+          snare_wire: 1
+          // a coil in the garage (research: common in a suburban garage)
         },
         indoorTemp: 47,
         fireHours: 0,

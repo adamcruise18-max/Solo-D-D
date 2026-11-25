@@ -109,8 +109,8 @@ function fishSetup(state) {
   const lvl = skillLevel(state, 'fishing');
   if (lvl) mods.push(['fishing skill', lvl]);
   if (dawnOrDusk(state.time)) mods.push(['dawn or dusk', 2]);
-  const run = s.run && s.run.months.includes(month);
-  if (run) mods.push([`${s.run.fish} run`, 3]);
+  const run = (s.runs || []).find((x) => x.months.includes(month)) || null;
+  if (run) mods.push([`${run.fish} run`, 3]);
   if ([11, 0, 1].includes(month)) mods.push(['cold water', -2]);
   if ((s.quality ?? 1) < 0.7) mods.push(['small creek', -2]);
   if (!has(state, 'fishing_rod')) mods.push(['hand line', -1]);
@@ -138,7 +138,7 @@ export function fish(state) {
   let what = '';
   if (r.success) {
     const k = catchFactor(state, f.spot.id);
-    if (f.run && chance(state, 0.5)) { n = 4; what = f.spot.run.fish; }
+    if (f.run && chance(state, 0.5)) { n = f.run.n; what = f.run.fish; }
     else {
       // 1 to 3 fish by the roll, times the catch factor (at least 1 on a success).
       const base = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
@@ -149,7 +149,7 @@ export function fish(state) {
     advanceTime(state, clean, 'rest');
     addFresh(state, bags(state), 'fresh_fish', n, 0);
     addItem(state.carried, 'fresh_fish', n);
-    log(state, n === 4 && what === f.spot.run?.fish
+    log(state, what === f.run?.fish
       ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).`
       : `You catch ${n} ${what}. You clean ${n > 1 ? 'them' : 'it'} on the bank (${clean} min${hasKnife(state) ? '' : ', slow with no knife'}).`, 'good');
   } else log(state, 'Nothing bites. You wind in the line.');

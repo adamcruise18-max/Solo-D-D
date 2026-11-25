@@ -74,14 +74,15 @@ test('fishing: spot pressure lowers the odds and recovers in 2 to 3 weeks; winte
   assert.equal(catchFactor(w, 'commonwealth_lake'), 0.5);
 });
 
-test('fishing: a salmon run month on the Willamette gives better odds', () => {
-  const winter = at('willamette_park');
-  winter.carried.fishing_rod = 1;
-  const spring = at('willamette_park');
-  spring.carried.fishing_rod = 1;
-  spring.time = 140 * 1440 + 8 * 60; // April
-  assert.ok(fishOdds(spring).pct > fishOdds(winter).pct);
-  assert.ok(fishOdds(spring).mods.some(([n]) => /run/.test(n)));
+test('fishing: Willamette runs (spring and fall salmon, winter steelhead) give better odds', () => {
+  const mk = (day) => { const s = at('willamette_park'); s.carried.fishing_rod = 1; s.time = day * 1440 + 8 * 60; return s; };
+  const winter = mk(10); // early December
+  const spring = mk(140); // April
+  const summer = mk(220); // early July: no run
+  assert.ok(fishOdds(spring).mods.some(([n]) => /salmon run/.test(n)));
+  assert.ok(fishOdds(winter).mods.some(([n]) => /steelhead run/.test(n)));
+  assert.ok(!fishOdds(summer).mods.some(([n]) => /run/.test(n)));
+  assert.ok(fishOdds(spring).pct > fishOdds(summer).pct);
 });
 
 test('hunting: needs a hunt spot and a bow or rifle; ducks only in their months', () => {
