@@ -24,6 +24,11 @@ export const SNARE_SET_MINUTES = 30;
 export const SNARE_CHECK_MINUTES = 20;
 export const SCARED_HOURS = 24; // a rifle shot scares the game at that spot for a day
 export const FISH_DC = 12;
+// Spot pressure (research): each trip fishes a spot down; it recovers in 2 to 3 weeks.
+export const PRESSURE_PER_TRIP = 1;
+export const PRESSURE_RECOVER_PER_DAY = 0.25; // 4 trips in a week take about 16 days to recover
+export const PRESSURE_CATCH = 0.15; // catch drops 15% per pressure point
+export const WINTER_CATCH = 0.5; // December to February: fish are slow and deep
 const FISH_CLEAN = 5; // minutes a fish with a knife
 
 function wildOf(state) {
@@ -31,6 +36,7 @@ function wildOf(state) {
   const w = state.wild;
   w.scared ||= {};
   w.snares ||= {};
+  w.pressure ||= {};
   return w;
 }
 
@@ -73,6 +79,20 @@ export function goToSpot(state, id) {
 }
 
 // ---------- fishing ----------
+// Pressure now at a spot: { [spotId]: { p, t } } recovers with time since the last trip.
+export function spotPressure(state, id, t = state.time) {
+  const e = state.wild?.pressure?.[id];
+  if (!e) return 0;
+  return Math.max(0, e.p - ((t - e.t) / 1440) * PRESSURE_RECOVER_PER_DAY);
+}
+
+// Share of a normal catch: pressure and winter.
+export function catchFactor(state, id) {
+  const month = calendar(state.time).month;
+  const season = [11, 0, 1].includes(month) ? WINTER_CATCH : 1;
+  return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state, id)) * season;
+}
+
 export function canFish(state) {
   const s = spotHere(state);
   if (!s || s.kind !== 'fish') return 'Go to a river, creek or lake first';
@@ -94,6 +114,8 @@ function fishSetup(state) {
   if ([11, 0, 1].includes(month)) mods.push(['cold water', -2]);
   if ((s.quality ?? 1) < 0.7) mods.push(['small creek', -2]);
   if (!has(state, 'fishing_rod')) mods.push(['hand line', -1]);
+  const pr = Math.round(spotPressure(state, s.id));
+  if (pr >= 2) mods.push(['fished out', -Math.min(4, pr - 1)]);
   if ((state.weather?.low ?? 40) <= 30) mods.push(['frozen ground, no worms', -2]);
   return { mods, adv, dis, run, spot: s };
 }
@@ -115,9 +137,12 @@ export function fish(state) {
   let n = 0;
   let what = '';
   if (r.success) {
-    if (f.run && chance(state, 0.4)) { n = 4; what = f.spot.run.fish; }
+    const k = catchFactor(state, f.spot.id);
+    if (f.run && chance(state, 0.5)) { n = 4; what = f.spot.run.fish; }
     else {
-      n = Math.min(4, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 4)));
+      // 1 to 3 fish by the roll, times the catch factor (at least 1 on a success).
+      const base = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
+      n = Math.max(1, Math.floor(base * k + randInt(state, 0, 99) / 100));
       what = f.spot.fish[randInt(state, 0, f.spot.fish.length - 1)];
     }
     const clean = (hasKnife(state) ? FISH_CLEAN : 15) * n;
@@ -128,6 +153,8 @@ export function fish(state) {
       ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).`
       : `You catch ${n} ${what}. You clean ${n > 1 ? 'them' : 'it'} on the bank (${clean} min${hasKnife(state) ? '' : ', slow with no knife'}).`, 'good');
   } else log(state, 'Nothing bites. You wind in the line.');
+  const w = wildOf(state);
+  w.pressure[f.spot.id] = { p: spotPressure(state, f.spot.id) + PRESSURE_PER_TRIP, t: state.time };
   practice(state, 'fishing', r.success ? 4 : 2);
   return { ok: r.success, fish: n, what };
 }

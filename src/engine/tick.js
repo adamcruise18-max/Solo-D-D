@@ -167,9 +167,10 @@ export function tickStep(state, dt, mode) {
     let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
     if (sleeping && state.location.kind === 'home' && built(state, 'sick_room')) slow *= 1.5;
     inj.healH -= dt * slow;
-    if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+    if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
       inj.infectRolled = true;
-      if (chance(state, inj.infectRisk)) startInfection(state, inj.type);
+      const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state) : inj.infectRisk;
+      if (risk > 0 && chance(state, risk)) startInfection(state, inj.type);
     }
   }
   const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -273,7 +274,8 @@ const INJURY_DATA = {
   small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
   deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
   sprain: { hp: 5, healH: 120, infectRisk: 0 },
-  bite: { hp: 10, healH: 168, infectRisk: 0.4 },
+  // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+  bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 },
 };
 
 export function addInjury(state, type) {

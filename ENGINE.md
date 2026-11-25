@@ -268,6 +268,17 @@ request that says which rule change is meant and why.
 - Odds for buttons: `fishOdds`, `huntOdds` (find % and shot odds).
 - Replay recorded again: new gear in outdoor store and house loot.
 
+## Year sim tuning (research, 2026-11-25)
+
+- Fishing spot pressure: each trip adds 1 (`state.wild.pressure[spot]`), recovering
+  0.25 a day; catch × (1 − 0.15 × pressure), and −1 to −4 on the roll ("fished out").
+  Winter (Dec to Feb) halves the catch; a salmon run is a salmon half the time.
+  Catch is 1 to 3 fish by the roll. A skilled angler who rotates spots gets about
+  500 kcal an hour at the bank, about 300 with the walk.
+- Hunting gear: more bows and arrows in outdoor stores, a few in houses; snare wire in
+  hardware stores.
+- Bites: 25% infection if open for 6 h, 10% even if bandaged in time.
+
 ## Playtest list 1 fixes (research, 700 bot runs)
 
 - Antibiotics: once a course starts (`infection.abxH`), the infection does no more

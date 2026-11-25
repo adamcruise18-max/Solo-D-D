@@ -323,6 +323,7 @@
         { id: "rain_barrel", w: 5 },
         { id: "stove_kit", w: 2 },
         { id: "water_filter", w: 3 },
+        { id: "snare_wire", w: 4 },
         { id: "duct_tape", w: 10 },
         { id: "rope", w: 6 },
         { id: "multitool", w: 3 },
@@ -373,10 +374,11 @@
         { id: "book_cooking", w: 1 },
         { id: "fishing_rod", w: 5 },
         { id: "fishing_line", w: 6 },
-        { id: "bow", w: 1.5 },
-        { id: "arrows", w: 3 },
+        { id: "bow", w: 4 },
+        { id: "arrows", w: 6 },
         { id: "snare_wire", w: 4 },
-        { id: "rifle_rounds", w: 1 },
+        { id: "rifle_rounds", w: 1.5 },
+        { id: "rifle", w: 0.5 },
         { id: "thermal_underwear", w: 6 },
         { id: "fleece_jacket", w: 6 },
         { id: "wool_sweater", w: 3 },
@@ -478,7 +480,9 @@
         { id: "fishing_line", w: 1 },
         { id: "rifle", w: 0.3 },
         { id: "rifle_rounds", w: 0.4 },
-        { id: "phone", w: 1.5 }
+        { id: "phone", w: 1.5 },
+        { id: "bow", w: 0.3 },
+        { id: "arrows", w: 0.4 }
       ]
     }
   };
@@ -2337,9 +2341,10 @@
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
       if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
-      if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
+      if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        if (chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
+        const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state2) : inj.infectRisk;
+        if (risk > 0 && chance(state2, risk)) startInfection(state2, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -2420,7 +2425,8 @@
     small_cut: { hp: 5, healH: 48, infectRisk: 0.2 },
     deep_cut: { hp: 15, healH: 168, infectRisk: 0.2 },
     sprain: { hp: 5, healH: 120, infectRisk: 0 },
-    bite: { hp: 10, healH: 168, infectRisk: 0.4 }
+    // Research (year sim): bites 25% if left open 6 h, 10% even when bandaged in time.
+    bite: { hp: 10, healH: 168, infectRisk: 0.25, bandagedRisk: 0.1 }
   };
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];

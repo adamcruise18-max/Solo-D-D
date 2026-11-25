@@ -17,7 +17,7 @@ import { bedCount, canPlant, plant, waterGarden, gardenInfo, harvest } from '../
 import { projectStatus } from '../src/engine/base.js';
 import { PROJECT_BY_ID } from '../src/data/projects.js';
 import { advanceTime } from '../src/engine/tick.js';
-import { spotsNear, goToSpot, spotHere, canFish, fish, huntMethods, hunt, canSetSnare, setSnare, checkSnare } from '../src/engine/wild.js';
+import { spotPressure, spotsNear, goToSpot, spotHere, canFish, fish, huntMethods, hunt, canSetSnare, setSnare, checkSnare } from '../src/engine/wild.js';
 
 // Load the real place list (docs/data/places.js sets window.LL_PLACES).
 export function loadPlaces() {
@@ -204,6 +204,7 @@ const WILD_MILES = 5;
 function wildTrip(state) {
   // Only a short walk, rested, with most of the day left.
   if (isNight(state.time) || isNight(state.time + 5 * 60) || state.player.energy < 60) return null;
+  if (state.player.health < 60 || state.player.injuries.some((i) => !i.bandaged && i.infectRisk)) return null;
   const near = (kind) => spotsNear(state, kind).find((x) => x.miles <= WILD_MILES);
   if (!near('fish') && !near('hunt')) return null;
   for (const id of ['fishing_rod', 'fishing_line', 'bow', 'arrows', 'rifle', 'rifle_rounds', 'snare_wire', 'knife']) {
@@ -214,7 +215,8 @@ function wildTrip(state) {
   if (hasFishGear(state)) kinds.push('fish');
   if (methods.length || state.carried.snare_wire > 0) kinds.push('hunt');
   for (const kind of kinds) {
-    const spot = near(kind);
+    // Rotate: the least fished spot near, not always the nearest.
+    const spot = spotsNear(state, kind).filter((x) => x.miles <= WILD_MILES).sort((a, b) => spotPressure(state, a.id) - spotPressure(state, b.id) || a.miles - b.miles)[0];
     if (spot) { wild.set(state, 0); goToSpot(state, spot.id); return `go ${spot.id}`; }
   }
   return null;
