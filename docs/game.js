@@ -4860,351 +4860,6 @@
     }
   }
 
-  // src/ui/map.js
-  var STYLE_URLS = [
-    "https://tiles.openfreemap.org/styles/liberty",
-    "https://tiles.openfreemap.org/styles/bright",
-    "https://tiles.openfreemap.org/styles/positron"
-  ];
-  var OFFLINE_STYLE = {
-    version: 8,
-    sources: {},
-    layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
-  };
-  async function pickStyle() {
-    for (const url of STYLE_URLS) {
-      try {
-        const ctl = new AbortController();
-        const timer = setTimeout(() => ctl.abort(), 5e3);
-        const res = await fetch(url, { signal: ctl.signal });
-        clearTimeout(timer);
-        if (res.ok) return { style: winterizeStyle(await res.json()), online: true };
-      } catch {
-      }
-    }
-    return { style: OFFLINE_STYLE, online: false };
-  }
-  function circlePolygon(center, miles, n = 128) {
-    const coords = [];
-    const latR = miles / 69;
-    const lonR = miles / (69 * Math.cos(center.lat * Math.PI / 180));
-    for (let i = 0; i <= n; i++) {
-      const a = i / n * 2 * Math.PI;
-      coords.push([center.lon + lonR * Math.cos(a), center.lat + latR * Math.sin(a)]);
-    }
-    return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
-  }
-  async function createMap(container, { places, onPlaceClick }) {
-    const maplibregl = window.maplibregl;
-    const { style, online } = await pickStyle();
-    const map = new maplibregl.Map({
-      container,
-      style,
-      center: [HOME.lon, HOME.lat],
-      zoom: 12.5,
-      minZoom: 9,
-      maxZoom: 18,
-      maxBounds: [[HOME.lon - 0.75, HOME.lat - 0.5], [HOME.lon + 0.75, HOME.lat + 0.5]],
-      attributionControl: false
-    });
-    map.addControl(new maplibregl.AttributionControl({
-      compact: false,
-      customAttribution: online ? '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' : 'Places \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (map tiles offline)'
-    }));
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    const colorExpr = ["match", ["get", "cat"]];
-    for (const [id, c] of Object.entries(CATEGORIES)) if (id !== "house") colorExpr.push(id, c.color);
-    colorExpr.push("#999");
-    const ready = new Promise((resolve) => map.on("load", resolve));
-    await ready;
-    addDetailIcons(map);
-    map.addSource("details", { type: "geojson", data: detailFeatures(places, HOME) });
-    map.addLayer({
-      id: "details",
-      type: "symbol",
-      source: "details",
-      minzoom: 14,
-      filter: ["<=", ["get", "g"], 0.08],
-      layout: {
-        "icon-image": ["get", "icon"],
-        "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.75, 16, 1.1, 18, 1.8],
-        "icon-rotate": ["match", ["get", "type"], ["car", "debris", "trash", "barricade", "bush"], ["get", "rot"], 0],
-        "icon-rotation-alignment": "map",
-        "icon-allow-overlap": true,
-        "icon-ignore-placement": true
-      }
-    });
-    let detailPopup = null;
-    map.on("click", "details", (e) => {
-      const f = e.features && e.features[0];
-      if (!f || map.queryRenderedFeatures(e.point, { layers: ["places"] }).length) return;
-      const info = DETAIL_INFO[f.properties.type];
-      if (detailPopup) detailPopup.remove();
-      detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px" }).setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
-    });
-    map.on("mouseenter", "details", () => {
-      map.getCanvas().style.cursor = "help";
-    });
-    map.on("mouseleave", "details", () => {
-      map.getCanvas().style.cursor = "";
-    });
-    map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
-    map.addLayer({
-      id: "edge-glow",
-      type: "line",
-      source: "edge",
-      paint: { "line-color": "#a3263b", "line-width": 8, "line-blur": 6, "line-opacity": 0.18 }
-    });
-    map.addLayer({
-      id: "edge",
-      type: "line",
-      source: "edge",
-      paint: { "line-color": "#a3263b", "line-width": 2, "line-dasharray": [4, 3], "line-opacity": 0.8 }
-    });
-    map.addSource("places", { type: "geojson", data: placesGeo(places, {}) });
-    map.addLayer({
-      id: "places-ring",
-      type: "circle",
-      source: "places",
-      filter: ["==", ["get", "status"], 0],
-      paint: {
-        "circle-color": "rgba(0,0,0,0)",
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 13, 9, 16, 15],
-        "circle-stroke-color": colorExpr,
-        "circle-stroke-width": 1.2,
-        "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12.5, 0.55]
-      }
-    });
-    map.addLayer({
-      id: "places",
-      type: "circle",
-      source: "places",
-      paint: {
-        "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
-        // Your marks: amber ring = partly searched, grey = searched.
-        "circle-stroke-color": ["match", ["get", "status"], 2, "#6b7682", 1, "#e3b04b", "#16202a"],
-        "circle-stroke-width": [
-          "interpolate",
-          ["linear"],
-          ["zoom"],
-          9,
-          ["case", ["==", ["get", "status"], 1], 1.6, 0.8],
-          14,
-          ["case", ["==", ["get", "status"], 1], 3, 1.6]
-        ],
-        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, 1]
-      }
-    });
-    map.on("click", "places", (e) => {
-      const f = e.features && e.features[0];
-      if (f) onPlaceClick(f.properties.id, e.lngLat);
-    });
-    map.on("mouseenter", "places", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "places", () => {
-      map.getCanvas().style.cursor = "";
-    });
-    const homeEl = document.createElement("div");
-    homeEl.className = "marker-home";
-    homeEl.title = "Home";
-    homeEl.innerHTML = "<span>\u2302</span>";
-    homeEl.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      onPlaceClick("__home", null);
-    });
-    const homeMarker = new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
-    const youEl = document.createElement("div");
-    youEl.className = "marker-you";
-    youEl.title = "You";
-    youEl.innerHTML = "<i></i>";
-    const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
-    let seasonKey = "";
-    function applySeason(t) {
-      const season = seasonOf(t);
-      const growth = Math.round(overgrowth(t) * 20) / 20;
-      const key = `${season}:${growth}`;
-      if (key === seasonKey) return;
-      seasonKey = key;
-      for (const [id, prop, color] of seasonPaint(season, growth)) {
-        if (map.getLayer(id)) map.setPaintProperty(id, prop, color);
-      }
-      map.setFilter("details", ["<=", ["get", "g"], growth]);
-    }
-    return {
-      map,
-      online,
-      update(state2, list) {
-        applySeason(state2.time);
-        map.getSource("places").setData(placesGeo(list, state2.places));
-        you.setLngLat([state2.pos.lon, state2.pos.lat]);
-        const h2 = state2.homePos || HOME;
-        homeMarker.setLngLat([h2.lon, h2.lat]);
-        youEl.classList.toggle("at-home", state2.location.kind === "home");
-        homeEl.classList.toggle("here", state2.location.kind === "home");
-      },
-      flyTo(pos) {
-        map.easeTo({ center: [pos.lon, pos.lat], duration: 800 });
-      }
-    };
-  }
-  function placesGeo(list, placeStates) {
-    return {
-      type: "FeatureCollection",
-      features: list.map((p) => {
-        const ps = placeStates[p.id];
-        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
-        return {
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [p.lon, p.lat] },
-          properties: { id: p.id, cat: p.cat, status }
-        };
-      })
-    };
-  }
-
-  // src/ui/fx.js
-  var FX_KEY = "lastlight.fx";
-  function fxEnabled() {
-    try {
-      const v = localStorage.getItem(FX_KEY);
-      if (v !== null) return v === "1";
-    } catch {
-    }
-    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-  }
-  function setFxEnabled(on) {
-    try {
-      localStorage.setItem(FX_KEY, on ? "1" : "0");
-    } catch {
-    }
-  }
-  function createFx(wrap) {
-    const layer = document.createElement("div");
-    layer.className = "fx";
-    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><div class="fx-haze"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
-    wrap.appendChild(layer);
-    const canvas2 = layer.querySelector("canvas");
-    const ctx = canvas2.getContext("2d");
-    let kind = "none";
-    let strength = 0;
-    let wind = 0;
-    let parts = [];
-    let raf = 0;
-    let enabled = fxEnabled();
-    function resize() {
-      const r = wrap.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas2.width = Math.max(1, r.width * dpr);
-      canvas2.height = Math.max(1, r.height * dpr);
-      canvas2.style.width = `${r.width}px`;
-      canvas2.style.height = `${r.height}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    function spawn(w, h2, anywhere) {
-      const snow = kind === "snow" || kind === "leaves";
-      return {
-        x: Math.random() * (w + 200) - 100,
-        y: anywhere ? Math.random() * h2 : -10,
-        r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
-        c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
-        v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
-        p: Math.random() * Math.PI * 2
-      };
-    }
-    function frame() {
-      raf = 0;
-      const w = canvas2.clientWidth;
-      const h2 = canvas2.clientHeight;
-      ctx.clearRect(0, 0, w, h2);
-      if (!enabled || kind === "none" || document.hidden) return;
-      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h2 / 6e5 + 0.3));
-      while (parts.length < want) parts.push(spawn(w, h2, true));
-      if (parts.length > want) parts.length = want;
-      const drift = wind / 12;
-      if (kind === "snow") {
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.shadowColor = "rgba(80,110,140,0.55)";
-        ctx.shadowBlur = 2;
-        for (const s of parts) {
-          s.p += 0.02;
-          s.y += s.v;
-          s.x += Math.sin(s.p) * 0.4 + drift;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
-          ctx.beginPath();
-          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.shadowBlur = 0;
-      } else if (kind === "leaves") {
-        for (const s of parts) {
-          s.p += 0.05;
-          s.y += s.v * 0.9;
-          s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
-          ctx.save();
-          ctx.translate(s.x, s.y);
-          ctx.rotate(s.p);
-          ctx.fillStyle = s.c;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, s.r, s.r * 0.5, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-      } else {
-        ctx.strokeStyle = "rgba(60,90,120,0.38)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (const s of parts) {
-          s.y += s.v;
-          s.x += drift * 3;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
-          ctx.moveTo(s.x, s.y);
-          ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
-        }
-        ctx.stroke();
-      }
-      raf = requestAnimationFrame(frame);
-    }
-    function run2() {
-      if (!raf) raf = requestAnimationFrame(frame);
-    }
-    new ResizeObserver(resize).observe(wrap);
-    resize();
-    document.addEventListener("visibilitychange", run2);
-    return {
-      // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
-      update({ weather, night, windMph, season }) {
-        const windy = weather === "windstorm" || (windMph || 0) >= 12;
-        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" || weather === "ice_storm" ? "rain" : season === "fall" && windy ? "leaves" : "none";
-        if (nextKind !== kind) parts = [];
-        kind = nextKind;
-        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "ice_storm" ? 0.6 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
-        for (const s of ["winter", "spring", "summer", "fall"]) layer.classList.toggle(`is-${s}`, season === s);
-        wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
-        layer.classList.toggle("is-night", !!night);
-        layer.classList.toggle("is-fog", weather === "fog");
-        layer.classList.toggle("is-smoke", weather === "smoke");
-        layer.classList.toggle("is-heat", weather === "heat_wave");
-        layer.classList.toggle("is-ice", weather === "ice_storm");
-        layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
-        layer.classList.toggle("off", !enabled);
-        run2();
-      },
-      setEnabled(on) {
-        enabled = on;
-        setFxEnabled(on);
-        layer.classList.toggle("off", !on);
-        if (!on) ctx.clearRect(0, 0, canvas2.width, canvas2.height);
-        run2();
-      },
-      get enabled() {
-        return enabled;
-      }
-    };
-  }
-
   // src/data/legacy-goals.js
   var stored = (s, id) => s.home?.storage?.[id] || 0;
   var storedAny = (s, ids) => ids.reduce((a, id) => a + stored(s, id), 0);
@@ -5450,6 +5105,7 @@
     var _a;
     const g = state2.player.goals;
     if (!g || !g.picked.length || state2.dead) return [];
+    paintSign(state2);
     const now = [];
     for (const id of g.picked) {
       const goal = byId2.get(id);
@@ -5475,6 +5131,26 @@
     }
     return now;
   }
+  var MAX_SIGNS = 40;
+  function legacyMarks(state2) {
+    const g = state2.player.goals;
+    const done = (id, step) => !!g?.done?.[id]?.includes(step);
+    return {
+      litWindow: done("light_on_hill", "led") && isNight(state2.time) && (state2.home?.battery || 0) > 0.2,
+      signs: g?.signs || [],
+      capsule: done("time_capsule", "tc_bury")
+    };
+  }
+  function paintSign(state2) {
+    const g = state2.player.goals;
+    if (!g.picked.includes("message_wall") || !g.done.message_wall?.includes("mw_tools")) return;
+    const loc = state2.location;
+    if (!loc || loc.kind !== "place") return;
+    g.signs || (g.signs = []);
+    if (g.signs.includes(loc.id) || g.signs.length >= MAX_SIGNS) return;
+    g.signs.push(loc.id);
+    log(state2, "You paint a sign by the door: where to find water, and what is left here.", "story");
+  }
   function goalProgress(state2, id) {
     const goal = byId2.get(id);
     const done = state2.player.goals?.done?.[id] || [];
@@ -5489,6 +5165,370 @@
       const line = done === 0 ? goal.epilogue.none : done === total ? goal.epilogue.all : goal.epilogue.some;
       return { id, title: goal.title, kind: GOAL_KINDS[goal.kind].label, done, total, line };
     });
+  }
+
+  // src/ui/map.js
+  var STYLE_URLS = [
+    "https://tiles.openfreemap.org/styles/liberty",
+    "https://tiles.openfreemap.org/styles/bright",
+    "https://tiles.openfreemap.org/styles/positron"
+  ];
+  var OFFLINE_STYLE = {
+    version: 8,
+    sources: {},
+    layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
+  };
+  async function pickStyle() {
+    for (const url of STYLE_URLS) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 5e3);
+        const res = await fetch(url, { signal: ctl.signal });
+        clearTimeout(timer);
+        if (res.ok) return { style: winterizeStyle(await res.json()), online: true };
+      } catch {
+      }
+    }
+    return { style: OFFLINE_STYLE, online: false };
+  }
+  function circlePolygon(center, miles, n = 128) {
+    const coords = [];
+    const latR = miles / 69;
+    const lonR = miles / (69 * Math.cos(center.lat * Math.PI / 180));
+    for (let i = 0; i <= n; i++) {
+      const a = i / n * 2 * Math.PI;
+      coords.push([center.lon + lonR * Math.cos(a), center.lat + latR * Math.sin(a)]);
+    }
+    return { type: "Feature", geometry: { type: "LineString", coordinates: coords }, properties: {} };
+  }
+  async function createMap(container, { places, onPlaceClick }) {
+    const maplibregl = window.maplibregl;
+    const { style, online } = await pickStyle();
+    const map = new maplibregl.Map({
+      container,
+      style,
+      center: [HOME.lon, HOME.lat],
+      zoom: 12.5,
+      minZoom: 9,
+      maxZoom: 18,
+      maxBounds: [[HOME.lon - 0.75, HOME.lat - 0.5], [HOME.lon + 0.75, HOME.lat + 0.5]],
+      attributionControl: false
+    });
+    map.addControl(new maplibregl.AttributionControl({
+      compact: false,
+      customAttribution: online ? '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>' : 'Places \xA9 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (map tiles offline)'
+    }));
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    const colorExpr = ["match", ["get", "cat"]];
+    for (const [id, c] of Object.entries(CATEGORIES)) if (id !== "house") colorExpr.push(id, c.color);
+    colorExpr.push("#999");
+    const ready = new Promise((resolve) => map.on("load", resolve));
+    await ready;
+    addDetailIcons(map);
+    map.addSource("details", { type: "geojson", data: detailFeatures(places, HOME) });
+    map.addLayer({
+      id: "details",
+      type: "symbol",
+      source: "details",
+      minzoom: 14,
+      filter: ["<=", ["get", "g"], 0.08],
+      layout: {
+        "icon-image": ["get", "icon"],
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 14, 0.75, 16, 1.1, 18, 1.8],
+        "icon-rotate": ["match", ["get", "type"], ["car", "debris", "trash", "barricade", "bush"], ["get", "rot"], 0],
+        "icon-rotation-alignment": "map",
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true
+      }
+    });
+    let detailPopup = null;
+    map.on("click", "details", (e) => {
+      const f = e.features && e.features[0];
+      if (!f || map.queryRenderedFeatures(e.point, { layers: ["places"] }).length) return;
+      const info = DETAIL_INFO[f.properties.type];
+      if (detailPopup) detailPopup.remove();
+      detailPopup = new maplibregl.Popup({ closeButton: true, maxWidth: "240px" }).setLngLat(e.lngLat).setHTML(`<h4>${info.label}</h4><p>${info.text}</p>`).addTo(map);
+    });
+    map.on("mouseenter", "details", () => {
+      map.getCanvas().style.cursor = "help";
+    });
+    map.on("mouseleave", "details", () => {
+      map.getCanvas().style.cursor = "";
+    });
+    map.addSource("edge", { type: "geojson", data: circlePolygon(HOME, MAP_RADIUS_MILES) });
+    map.addLayer({
+      id: "edge-glow",
+      type: "line",
+      source: "edge",
+      paint: { "line-color": "#a3263b", "line-width": 8, "line-blur": 6, "line-opacity": 0.18 }
+    });
+    map.addLayer({
+      id: "edge",
+      type: "line",
+      source: "edge",
+      paint: { "line-color": "#a3263b", "line-width": 2, "line-dasharray": [4, 3], "line-opacity": 0.8 }
+    });
+    map.addSource("places", { type: "geojson", data: placesGeo(places, {}) });
+    map.addLayer({
+      id: "places-ring",
+      type: "circle",
+      source: "places",
+      filter: ["==", ["get", "status"], 0],
+      paint: {
+        "circle-color": "rgba(0,0,0,0)",
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 4, 13, 9, 16, 15],
+        "circle-stroke-color": colorExpr,
+        "circle-stroke-width": 1.2,
+        "circle-stroke-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12.5, 0.55]
+      }
+    });
+    map.addLayer({
+      id: "places",
+      type: "circle",
+      source: "places",
+      paint: {
+        "circle-color": ["case", ["==", ["get", "status"], 2], "#9aa5b1", colorExpr],
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.5, 13, 5, 16, 9],
+        // Your marks: amber ring = partly searched, grey = searched.
+        "circle-stroke-color": ["match", ["get", "status"], 2, "#6b7682", 1, "#e3b04b", "#16202a"],
+        "circle-stroke-width": [
+          "interpolate",
+          ["linear"],
+          ["zoom"],
+          9,
+          ["case", ["==", ["get", "status"], 1], 1.6, 0.8],
+          14,
+          ["case", ["==", ["get", "status"], 1], 3, 1.6]
+        ],
+        "circle-opacity": ["case", ["==", ["get", "status"], 2], 0.55, 1]
+      }
+    });
+    map.on("click", "places", (e) => {
+      const f = e.features && e.features[0];
+      if (f) onPlaceClick(f.properties.id, e.lngLat);
+    });
+    map.on("mouseenter", "places", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "places", () => {
+      map.getCanvas().style.cursor = "";
+    });
+    const homeEl = document.createElement("div");
+    homeEl.className = "marker-home";
+    homeEl.title = "Home";
+    homeEl.innerHTML = "<span>\u2302</span>";
+    homeEl.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      onPlaceClick("__home", null);
+    });
+    const homeMarker = new maplibregl.Marker({ element: homeEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    const youEl = document.createElement("div");
+    youEl.className = "marker-you";
+    youEl.title = "You";
+    youEl.innerHTML = "<i></i>";
+    const you = new maplibregl.Marker({ element: youEl }).setLngLat([HOME.lon, HOME.lat]).addTo(map);
+    const signMarkers = /* @__PURE__ */ new Map();
+    function applyMarks(state2, list) {
+      const m = legacyMarks(state2);
+      homeEl.classList.toggle("lit", m.litWindow);
+      homeEl.classList.toggle("capsule", m.capsule);
+      homeEl.title = ["Home", m.litWindow && "the window is lit", m.capsule && "a time capsule is buried here"].filter(Boolean).join(" \xB7 ");
+      if (signMarkers.size === m.signs.length) return;
+      const byId3 = new Map(list.map((p) => [p.id, p]));
+      for (const id of m.signs) {
+        if (signMarkers.has(id)) continue;
+        const p = byId3.get(id);
+        if (!p) continue;
+        const el = document.createElement("div");
+        el.className = "marker-sign";
+        el.title = "Your painted sign";
+        signMarkers.set(id, new maplibregl.Marker({ element: el, offset: [12, -12] }).setLngLat([p.lon, p.lat]).addTo(map));
+      }
+    }
+    let seasonKey = "";
+    function applySeason(t) {
+      const season = seasonOf(t);
+      const growth = Math.round(overgrowth(t) * 20) / 20;
+      const key = `${season}:${growth}`;
+      if (key === seasonKey) return;
+      seasonKey = key;
+      for (const [id, prop, color] of seasonPaint(season, growth)) {
+        if (map.getLayer(id)) map.setPaintProperty(id, prop, color);
+      }
+      map.setFilter("details", ["<=", ["get", "g"], growth]);
+    }
+    return {
+      map,
+      online,
+      update(state2, list) {
+        applySeason(state2.time);
+        map.getSource("places").setData(placesGeo(list, state2.places));
+        you.setLngLat([state2.pos.lon, state2.pos.lat]);
+        const h2 = state2.homePos || HOME;
+        homeMarker.setLngLat([h2.lon, h2.lat]);
+        youEl.classList.toggle("at-home", state2.location.kind === "home");
+        homeEl.classList.toggle("here", state2.location.kind === "home");
+        applyMarks(state2, list);
+      },
+      flyTo(pos) {
+        map.easeTo({ center: [pos.lon, pos.lat], duration: 800 });
+      }
+    };
+  }
+  function placesGeo(list, placeStates) {
+    return {
+      type: "FeatureCollection",
+      features: list.map((p) => {
+        const ps = placeStates[p.id];
+        const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones ? 2 : 1;
+        return {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [p.lon, p.lat] },
+          properties: { id: p.id, cat: p.cat, status }
+        };
+      })
+    };
+  }
+
+  // src/ui/fx.js
+  var FX_KEY = "lastlight.fx";
+  function fxEnabled() {
+    try {
+      const v = localStorage.getItem(FX_KEY);
+      if (v !== null) return v === "1";
+    } catch {
+    }
+    return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  }
+  function setFxEnabled(on) {
+    try {
+      localStorage.setItem(FX_KEY, on ? "1" : "0");
+    } catch {
+    }
+  }
+  function createFx(wrap) {
+    const layer = document.createElement("div");
+    layer.className = "fx";
+    layer.innerHTML = '<div class="fx-season"></div><div class="fx-night"></div><div class="fx-fog"></div><div class="fx-haze"></div><canvas class="fx-fall"></canvas><div class="fx-grid"></div><div class="fx-vignette"></div>';
+    wrap.appendChild(layer);
+    const canvas2 = layer.querySelector("canvas");
+    const ctx = canvas2.getContext("2d");
+    let kind = "none";
+    let strength = 0;
+    let wind = 0;
+    let parts = [];
+    let raf = 0;
+    let enabled = fxEnabled();
+    function resize() {
+      const r = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas2.width = Math.max(1, r.width * dpr);
+      canvas2.height = Math.max(1, r.height * dpr);
+      canvas2.style.width = `${r.width}px`;
+      canvas2.style.height = `${r.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function spawn(w, h2, anywhere) {
+      const snow = kind === "snow" || kind === "leaves";
+      return {
+        x: Math.random() * (w + 200) - 100,
+        y: anywhere ? Math.random() * h2 : -10,
+        r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
+        c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
+        v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
+        p: Math.random() * Math.PI * 2
+      };
+    }
+    function frame() {
+      raf = 0;
+      const w = canvas2.clientWidth;
+      const h2 = canvas2.clientHeight;
+      ctx.clearRect(0, 0, w, h2);
+      if (!enabled || kind === "none" || document.hidden) return;
+      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h2 / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w, h2, true));
+      if (parts.length > want) parts.length = want;
+      const drift = wind / 12;
+      if (kind === "snow") {
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.shadowColor = "rgba(80,110,140,0.55)";
+        ctx.shadowBlur = 2;
+        for (const s of parts) {
+          s.p += 0.02;
+          s.y += s.v;
+          s.x += Math.sin(s.p) * 0.4 + drift;
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      } else if (kind === "leaves") {
+        for (const s of parts) {
+          s.p += 0.05;
+          s.y += s.v * 0.9;
+          s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.rotate(s.p);
+          ctx.fillStyle = s.c;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, s.r, s.r * 0.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      } else {
+        ctx.strokeStyle = "rgba(60,90,120,0.38)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const s of parts) {
+          s.y += s.v;
+          s.x += drift * 3;
+          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          ctx.moveTo(s.x, s.y);
+          ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
+        }
+        ctx.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    function run2() {
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+    new ResizeObserver(resize).observe(wrap);
+    resize();
+    document.addEventListener("visibilitychange", run2);
+    return {
+      // weather: a weather type id from data/climate.js; night: true or false; windMph: number.
+      update({ weather, night, windMph, season }) {
+        const windy = weather === "windstorm" || (windMph || 0) >= 12;
+        const nextKind = weather === "snow" ? "snow" : weather === "rain" || weather === "heavy_rain" || weather === "ice_storm" ? "rain" : season === "fall" && windy ? "leaves" : "none";
+        if (nextKind !== kind) parts = [];
+        kind = nextKind;
+        strength = weather === "heavy_rain" ? 1 : weather === "rain" ? 0.5 : weather === "ice_storm" ? 0.6 : weather === "snow" ? 0.8 : nextKind === "leaves" ? 1 : 0;
+        for (const s of ["winter", "spring", "summer", "fall"]) layer.classList.toggle(`is-${s}`, season === s);
+        wind = (windMph || 0) * (weather === "windstorm" ? 1.5 : 1);
+        layer.classList.toggle("is-night", !!night);
+        layer.classList.toggle("is-fog", weather === "fog");
+        layer.classList.toggle("is-smoke", weather === "smoke");
+        layer.classList.toggle("is-heat", weather === "heat_wave");
+        layer.classList.toggle("is-ice", weather === "ice_storm");
+        layer.classList.toggle("is-storm", weather === "windstorm" || weather === "heavy_rain");
+        layer.classList.toggle("off", !enabled);
+        run2();
+      },
+      setEnabled(on) {
+        enabled = on;
+        setFxEnabled(on);
+        layer.classList.toggle("off", !on);
+        if (!on) ctx.clearRect(0, 0, canvas2.width, canvas2.height);
+        run2();
+      },
+      get enabled() {
+        return enabled;
+      }
+    };
   }
 
   // src/engine/diagnostics.js
