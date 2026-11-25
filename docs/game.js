@@ -1237,9 +1237,13 @@
   var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
   var dogWithYou = (s) => s.dog?.stage === "joined";
   var inHouse = (s) => s.location?.kind === "house";
+  var calMonth = (s) => new Date(Date.UTC(2026, 10, 24) + Math.floor(s.time / 1440) * 864e5).getUTCMonth();
+  var isWinter = (s) => [11, 0, 1].includes(calMonth(s));
+  var isColdSeason = (s) => [10, 11, 0, 1, 2].includes(calMonth(s));
+  var isRainySeason = (s) => [9, 10, 11, 0, 1, 2, 3].includes(calMonth(s));
   var EVENTS = [
     { id: "geese", size: "small", where: "outside", months: [3, 99], text: "A long line of geese flies over, very low and loud. Then it is quiet again." },
-    { id: "frost_windows", size: "small", where: "home", months: [3, 6], text: "Frost makes ferns on the inside of the windows." },
+    { id: "frost_windows", size: "small", where: "home", months: [3, 99], when: isColdSeason, text: "Frost makes ferns on the inside of the windows." },
     { id: "car_alarm_dies", size: "small", where: "any", months: [3, 5], text: "Far away, a car alarm that has cried for days goes weak, then stops." },
     { id: "shelf_falls", size: "small", where: "inside", months: [3, 99], text: "Somewhere in the building, a shelf gives way with a crash. You hold still until the dust settles." },
     { id: "wind_chimes", size: "small", where: "home", months: [3, 99], text: "A neighbor\u2019s wind chimes ring in the wind. For a moment it sounds like a normal street." },
@@ -1255,7 +1259,7 @@
     { id: "dog_bone", size: "small", where: "home", months: [3, 99], when: dogWithYou, apply: (s) => {
       s.dog.bond = Math.min(100, s.dog.bond + 3);
     }, text: "The dog comes in proud, with an old bone from a yard. It lies at your feet to chew it. (Bond +3)" },
-    { id: "pipe_burst", size: "small", where: "inside", months: [3, 6], text: "A pipe has burst somewhere above. Water runs down a wall and across the floor. You step around it." },
+    { id: "pipe_burst", size: "small", where: "inside", months: [3, 99], when: isColdSeason, text: "A pipe has burst somewhere above. Water runs down a wall and across the floor. You step around it." },
     { id: "crows_porch", size: "small", where: "outside", months: [3, 99], text: "Crows gather on a porch down the street. You know what they found there, and you do not look." },
     { id: "cat_watches", size: "small", where: "outside", months: [3, 99], text: "A thin cat watches you from under a car. When you stop, it is gone." },
     { id: "rain_gutter", size: "small", where: "home", months: [3, 99], when: raining, text: "Rain pours over a blocked gutter in a sheet. It is loud, and somehow it helps." },
@@ -1268,11 +1272,11 @@
       s.home.indoorTemp -= 3;
     }, text: "Water drips through the ceiling in the hall. You put a pot under it: 2 gal of rain water to filter, but the house is colder." },
     { id: "gas_smell", size: "medium", where: "inside", months: [3, 8], when: inHouse, text: "A strong smell of gas in this house. You open a window, and you do not light anything in here." },
-    { id: "black_ice", size: "medium", where: "outside", months: [3, 5], when: (s) => (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, "black_ice", 18), text: "Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts." },
-    { id: "house_fire_far", size: "medium", where: "any", months: [3, 99], when: (s) => !raining(s), text: "At dusk the sky to the south is orange. A house burns there, and the next one catches. The smoke smell reaches you an hour later." },
+    { id: "black_ice", size: "medium", where: "outside", months: [3, 99], when: (s) => isColdSeason(s) && (s.weather?.low ?? 40) < 33, apply: (s) => startHazard(s, "black_ice", 18), text: "Your boot slides on clear ice. Black ice on every road this morning. You walk slowly until it melts." },
+    { id: "house_fire_far", size: "medium", where: "any", months: [3, 99], when: (s) => !raining(s), text: "To the south, the sky glows orange under a column of smoke. A house burns there, and the next one catches. The smell reaches you an hour later." },
     // ---- big ----
-    { id: "cold_snap", size: "big", where: "any", months: [3, 5], apply: (s) => startHazard(s, "cold_snap", 72), text: "The air turns hard and dry. A cold snap from the north: the next three days are about 12 \xB0F colder. Keep the fire going." },
-    { id: "flood_low_streets", size: "big", where: "any", months: [3, 7], when: (s) => s.weather?.type === "heavy_rain", apply: (s) => startHazard(s, "flood", 24), text: "The creeks are over their banks. Low streets are under brown water, and you must go around them for a day." },
+    { id: "cold_snap", size: "big", where: "any", months: [3, 99], when: isWinter, apply: (s) => startHazard(s, "cold_snap", 72), text: "The air turns hard and dry. A cold snap from the north: the next three days are about 12 \xB0F colder. Keep the fire going." },
+    { id: "flood_low_streets", size: "big", where: "any", months: [3, 99], when: (s) => isRainySeason(s) && s.weather?.type === "heavy_rain", apply: (s) => startHazard(s, "flood", 24), text: "The creeks are over their banks. Low streets are under brown water, and you must go around them for a day." },
     { id: "bridge_debris", size: "big", where: "outside", months: [4, 99], apply: (s) => startHazard(s, "road_blocked", 48), text: "A pile-up of cars and a fallen sign block an overpass. You must find other ways for a while." }
   ];
 
@@ -1473,6 +1477,12 @@
     const row = byId.get(id);
     if (!row) throw new Error(`Unknown decay row "${id}"`);
     return gameDay(t) >= failDay(state2, row, area);
+  }
+  function decayShare(state2, id, t = state2.time) {
+    const row = byId.get(id);
+    if (!row) throw new Error(`Unknown decay row "${id}"`);
+    const days = gameDay(t) - monthStartDay(row.month) + 1;
+    return days <= 0 ? 0 : 1 - (1 - row.chanceByDay) ** days;
   }
   function initDecay(state2) {
     state2.decay = { started: {} };
@@ -2744,6 +2754,14 @@
     return `${est.miles.toFixed(1)} mi \xB7 about ${formatDuration(est.minutes)} \xB7 Energy \u2212${Math.round(est.energy)}`;
   }
 
+  // src/engine/breakdown.js
+  function batteryHours(state2) {
+    return Math.max(3, Math.round(10 * (1 - 0.7 * decayShare(state2, "battery_drain"))));
+  }
+  function medicineFactor(state2) {
+    return 1 - 0.3 * decayShare(state2, "old_medicine");
+  }
+
   // src/engine/actions.js
   var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "canned_food"];
@@ -2858,8 +2876,8 @@
           return;
         }
         addItem(bag, id, -1);
-        p.lightHours = 10;
-        log(state2, "You put new batteries in the flashlight (10 h of light).");
+        p.lightHours = batteryHours(state2);
+        log(state2, p.lightHours >= 10 ? "You put new batteries in the flashlight (10 h of light)." : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
         advanceTime(state2, 2);
         return;
       }
@@ -2953,8 +2971,8 @@
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = painPillHours(state2);
-      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.`);
+      p.painH = Math.max(1, Math.round(painPillHours(state2) * medicineFactor(state2)));
+      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state2) < 0.95 ? " They are past their date and work less well." : ""}`);
       advanceTime(state2, 2);
       return;
     }

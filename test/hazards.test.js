@@ -56,3 +56,25 @@ test('decay: the home tap stops when water pressure fails at home', () => {
   assert.ok(decayActive(s, 'water_pressure', 'home'));
   assert.ok(!listActions(s).some((a) => a.id === 'collect_tap'));
 });
+
+test('events: season events follow the calendar, not the months since the collapse', () => {
+  const cold = EVENTS.find((e) => e.id === 'cold_snap');
+  const s = newGame(9);
+  s.time = 40 * 1440; // early January of the first winter
+  assert.ok(cold.when(s));
+  s.time = 200 * 1440; // June
+  assert.ok(!cold.when(s));
+  s.time = 405 * 1440; // the next January
+  assert.ok(cold.when(s));
+  assert.deepEqual(cold.months, [3, 99]);
+});
+
+test('breakdown: batteries and medicine weaken slowly, months after the start', async () => {
+  const { batteryHours, medicineFactor } = await import('../src/engine/breakdown.js');
+  const s = newGame(10);
+  assert.equal(batteryHours(s), 10);
+  assert.equal(medicineFactor(s), 1);
+  s.time = 2000 * 1440; // years later: spread everywhere
+  assert.equal(batteryHours(s), 3);
+  assert.ok(Math.abs(medicineFactor(s) - 0.7) < 0.01);
+});

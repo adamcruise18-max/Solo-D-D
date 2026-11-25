@@ -17,6 +17,7 @@ import { built, workOnProject, fireHoursPerBundle, painPillHours } from './base.
 import { putOn, takeOff, normalizeWorn } from './clothes.js';
 import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
+import { batteryHours, medicineFactor } from './breakdown.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -143,8 +144,8 @@ export function useItem(state, id, verb, from = 'carried') {
     case 'batteries': {
       if (!has(state, 'flashlight')) { log(state, 'You need a flashlight first.'); return; }
       addItem(bag, id, -1);
-      p.lightHours = 10;
-      log(state, 'You put new batteries in the flashlight (10 h of light).');
+      p.lightHours = batteryHours(state);
+      log(state, p.lightHours >= 10 ? 'You put new batteries in the flashlight (10 h of light).' : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
       advanceTime(state, 2);
       return;
     }
@@ -228,8 +229,8 @@ function useMed(state, id, bag) {
   }
   if (it.med === 'pain') {
     addItem(bag, id, -it.portion);
-    p.painH = painPillHours(state);
-    log(state, `You take pain pills. The pain is less for ${p.painH} hours.`);
+    p.painH = Math.max(1, Math.round(painPillHours(state) * medicineFactor(state)));
+    log(state, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state) < 0.95 ? ' They are past their date and work less well.' : ''}`);
     advanceTime(state, 2);
     return;
   }
