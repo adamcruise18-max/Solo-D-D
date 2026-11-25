@@ -246,7 +246,9 @@ function goalsHtml() {
   const free = MAX_GOALS - g.picked.length;
   const choose = free > 0 ? `<button data-goalboard="1">Choose a goal (${free} free)</button>` : '';
   const empty = g.picked.length ? '' : '<p class="hint">Choose what the last person keeps, fixes, records or leaves behind. Each step done lifts your morale a little.</p>';
-  return `<details class="goals"${goalsOpen ? ' open' : ''}><summary>Legacy</summary>${empty}${rows}${choose}</details>`;
+  // Until you pick your first goal, the section is open and has a badge, so the new board is not missed.
+  const fresh = !g.picked.length;
+  return `<details class="goals"${goalsOpen || fresh ? ' open' : ''}><summary>Legacy${fresh ? ' <span class="badge-new">New</span>' : ''}</summary>${empty}${rows}${choose}</details>`;
 }
 
 function showGoalBoard() {
@@ -434,7 +436,14 @@ function renderBase() {
     for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
     for (const t of st.tools) if (!t.have) need[t.id] = 1;
   }
-  const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} ×${q}</span>`).join('');
+  // Where you left needed parts behind (pack was full): up to two places by name.
+  const leftAt = (id) => {
+    const at = [];
+    for (const [pid, ps] of Object.entries(state.places || {})) if ((ps.leftovers?.[id] || 0) > 0) at.push(getPlace(pid)?.name || 'a store');
+    for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || 'a house');
+    return at.length ? ` · left at ${at.slice(0, 2).join(', ')}${at.length > 2 ? ` +${at.length - 2}` : ''}` : '';
+  };
+  const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} ×${q}${esc(leftAt(id))}</span>`).join('');
   return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${(done / PROJECTS.length) * 100}%"></i></div>

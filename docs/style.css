@@ -246,7 +246,8 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
   .legend, .coords { display: none; }
   .hud { top: 50px; left: 10px; transform: none; font-size: 12px; max-width: calc(100% - 20px); }
   .hud span { padding: 6px 8px; }
-  .hud .h-alert, .hud .h-season { display: none; }
+  .hud .h-season, .hud .h-wx { display: none; }
+  .hud { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .marker-you i, .marker-home.here span, .hud .h-alert { animation: none; }
@@ -472,3 +473,4 @@ b.ok, b.warn, b.bad { background: none; }
 .warn-line { color: #e3b04b; margin: 6px 0; font-size: 13px; }
 #modal .row button.risky { border-color: #c96a3a; }
 #modal .row button.risky small { color: #e3a06b; }
+.badge-new { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #2a2205; background: #e3b04b; border-radius: 2px; vertical-align: middle; }
