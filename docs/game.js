@@ -1122,6 +1122,13 @@
     if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
     return h2.rooms[room].temp;
   }
+  function boardWindow(state2, room) {
+    const h2 = ensureRooms(state2.home);
+    const w = h2.windows[room];
+    if (!w || (w.boarded || 0) >= (w.broken || 0)) return false;
+    w.boarded = (w.boarded || 0) + 1;
+    return true;
+  }
   var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
   function sleepSpot(state2) {
     return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
@@ -2067,6 +2074,13 @@
     log(state2, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
     return got;
   }
+  function stageOf2(b) {
+    if (b.dead) return "dead";
+    if (b.growth >= 1) return "ready";
+    if (b.growth >= 0.6) return "nearly";
+    if (b.growth >= 0.2) return "growing";
+    return "seedling";
+  }
   function gardenInfo(state2) {
     const g = garden(state2);
     const month = monthOfDay3(dayIndex(state2.time));
@@ -2078,7 +2092,8 @@
         growth: Math.round(b.growth * 100),
         water: Math.round(b.water * 100),
         ready: b.growth >= 1 && !b.dead,
-        dead: b.dead
+        dead: b.dead,
+        stage: stageOf2(b)
       })),
       canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id)
     };
@@ -4249,6 +4264,19 @@
       case "sleep_spot":
         if (setSleepSpot(state2, String(arg))) log(state2, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
         return;
+      case "board_window": {
+        if (state2.location.kind !== "home") return;
+        const bag = (state2.home.storage.scrap_wood || 0) > 0 ? state2.home.storage : (state2.carried.scrap_wood || 0) > 0 ? state2.carried : null;
+        if (!bag) {
+          log(state2, "You need scrap wood to board up a window.");
+          return;
+        }
+        if (!boardWindow(state2, String(arg))) return;
+        addItem(bag, "scrap_wood", -1);
+        log(state2, "You nail scrap wood over the broken window. Less cold gets in.", "good");
+        advanceTime(state2, 30, "work");
+        return;
+      }
       case "door": {
         const [room, closed] = String(arg).split(":");
         if (state2.location.kind === "home" && setDoor(state2, room, closed === "1")) {
@@ -6943,6 +6971,7 @@
         const [what, crop] = b.dataset.garden.split(":");
         act("action", `garden_${what}`, crop);
       } else if (b.dataset.sleepspot) act("action", "sleep_spot", b.dataset.sleepspot);
+      else if (b.dataset.board) act("action", "board_window", b.dataset.board);
       else if (b.dataset.door) act("action", "door", b.dataset.door);
       else if (b.dataset.goaldrop) {
         const why = dropGoal(state, b.dataset.goaldrop);
@@ -7001,6 +7030,7 @@
       if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? "s" : ""}`);
       if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
       if (r.id === "living" && hh.insulated) leaks.push("insulated");
+      const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? "" : "disabled"} title="1 scrap wood, 30 min">Board up a window</button>` : "";
       const door = r.doorClosed == null ? "" : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? "" : "disabled"}>${r.doorClosed ? "Open door" : "Close door"}</button>`;
       const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
       const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
@@ -7008,8 +7038,8 @@
       <span class="hn">${esc(r.label)}</span>
       <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
       <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
-      <small>${esc(leaks.join(" \xB7 ") || (r.loss > 1.2 ? "drafty" : "closed up"))}</small>
-      <span class="hb">${door}${bed}</span>
+      <small>${esc(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
+      <span class="hb">${board}${door}${bed}</span>
     </div>`;
     }).join("");
     return `<div class="heat">
@@ -7028,8 +7058,8 @@
         beds.push('<div class="bed empty"><span>Empty bed</span></div>');
         continue;
       }
-      const stage = b.dead ? "dead" : b.ready ? "ready" : b.growth < 30 ? "sprouts" : b.growth < 70 ? "growing" : "almost ready";
-      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b><span>${stage}</span>
+      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
+      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b> <span>${stage}</span>
       <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
     }
     const sow = g.canSow.map((id) => {

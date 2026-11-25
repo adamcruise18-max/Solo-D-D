@@ -1102,6 +1102,7 @@ function bindEvents() {
       const [what, crop] = b.dataset.garden.split(':');
       act('action', `garden_${what}`, crop);
     } else if (b.dataset.sleepspot) act('action', 'sleep_spot', b.dataset.sleepspot);
+    else if (b.dataset.board) act('action', 'board_window', b.dataset.board);
     else if (b.dataset.door) act('action', 'door', b.dataset.door);
     else if (b.dataset.goaldrop) {
       const why = dropGoal(state, b.dataset.goaldrop);
@@ -1165,6 +1166,7 @@ function renderHeat(atHome) {
     if (r.brokenWindows > 0) leaks.push(`${r.brokenWindows} broken window${r.brokenWindows > 1 ? 's' : ''}`);
     if (r.boardedWindows > 0) leaks.push(`${r.boardedWindows} boarded`);
     if (r.id === 'living' && hh.insulated) leaks.push('insulated');
+    const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? '' : 'disabled'} title="1 scrap wood, 30 min">Board up a window</button>` : '';
     const door = r.doorClosed == null ? '' : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? '' : 'disabled'}>${r.doorClosed ? 'Open door' : 'Close door'}</button>`;
     const bed = r.id === 'bedroom' || r.id === 'living'
       ? (hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? '' : 'disabled'}>Sleep here</button>`)
@@ -1174,8 +1176,8 @@ function renderHeat(atHome) {
       <span class="hn">${esc(r.label)}</span>
       <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
       <b class="${tcls(r.temp)}">${Math.round(r.temp)}°F</b>
-      <small>${esc(leaks.join(' · ') || (r.loss > 1.2 ? 'drafty' : 'closed up'))}</small>
-      <span class="hb">${door}${bed}</span>
+      <small>${esc(leaks.join(' · ') || 'closed up')}${r.loss > 1.05 ? ` · draft ×${r.loss.toFixed(1)}` : ''}</small>
+      <span class="hb">${board}${door}${bed}</span>
     </div>`;
   }).join('');
   return `<div class="heat">
@@ -1193,8 +1195,8 @@ function renderGarden(atHome) {
   for (let i = 0; i < g.beds; i++) {
     const b = g.planted[i];
     if (!b) { beds.push('<div class="bed empty"><span>Empty bed</span></div>'); continue; }
-    const stage = b.dead ? 'dead' : b.ready ? 'ready' : b.growth < 30 ? 'sprouts' : b.growth < 70 ? 'growing' : 'almost ready';
-    beds.push(`<div class="bed ${b.dead ? 'dead' : b.ready ? 'ready' : ''}"><b>${esc(b.name)}</b><span>${stage}</span>
+    const stage = { seedling: 'seedlings', growing: 'growing', nearly: 'nearly ready', ready: 'ready to harvest', dead: 'dead' }[b.stage] || b.stage;
+    beds.push(`<div class="bed ${b.dead ? 'dead' : b.ready ? 'ready' : ''}"><b>${esc(b.name)}</b> <span>${stage}</span>
       <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>water ${b.water}%</small></div>`);
   }
   const sow = g.canSow.map((id) => {

@@ -19,7 +19,7 @@ import { dogBondBonus, searchJobFactor } from './background.js';
 import { decayActive } from './decay.js';
 import { batteryHours, medicineFactor, gasStartChance, GEN_KWH_PER_GAL } from './breakdown.js';
 import { plant, waterGarden, harvest } from './garden.js';
-import { setSleepSpot, setDoor, SLEEP_SPOTS } from './home.js';
+import { setSleepSpot, setDoor, boardWindow, SLEEP_SPOTS } from './home.js';
 // The home tap also stops when the city's water pressure fails in the home's area (slow breakdown).
 const tapRuns = (state) => state.home.tapWorks && !decayActive(state, 'water_pressure', 'home');
 import { eatRisk, stageLabel, isPerishable, WARM_FED_HOURS } from './food.js';
@@ -1090,6 +1090,17 @@ export function doAction(state, id, arg) {
     case 'sleep_spot':
       if (setSleepSpot(state, String(arg))) log(state, `You will sleep in the ${SLEEP_SPOTS[arg].label.toLowerCase()}.`);
       return;
+    case 'board_window': {
+      // One board-up: 1 scrap wood and 30 min (the rule is engine home.js boardWindow).
+      if (state.location.kind !== 'home') return;
+      const bag = (state.home.storage.scrap_wood || 0) > 0 ? state.home.storage : (state.carried.scrap_wood || 0) > 0 ? state.carried : null;
+      if (!bag) { log(state, 'You need scrap wood to board up a window.'); return; }
+      if (!boardWindow(state, String(arg))) return;
+      addItem(bag, 'scrap_wood', -1);
+      log(state, 'You nail scrap wood over the broken window. Less cold gets in.', 'good');
+      advanceTime(state, 30, 'work');
+      return;
+    }
     case 'door': {
       const [room, closed] = String(arg).split(':');
       if (state.location.kind === 'home' && setDoor(state, room, closed === '1')) { log(state, closed === '1' ? 'You close the door.' : 'You open the door.'); advanceTime(state, 1); }
