@@ -1173,7 +1173,7 @@
 
   // src/core/systems.js
   var HOOKS = ["init", "step", "daily"];
-  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "catchUp", ...HOOKS]);
+  var KNOWN = /* @__PURE__ */ new Set(["id", "order", "version", "migrations", "label", "legacy", "owns", "effects", "catchUp", ...HOOKS]);
   var CATCH_UP = ["exact", "approx", "event"];
   function defineSystem(sys) {
     if (!sys || typeof sys.id !== "string" || !sys.id) throw new Error("A system needs an id");
@@ -1214,8 +1214,9 @@
     }
     for (const s of list) add(s);
     const snapOthers = (state2, id) => {
+      const allowed = new Set(byId3.get(id)?.effects || []);
       const out = {};
-      for (const [f, who] of owner) if (who !== id) out[f] = JSON.stringify(state2[f] ?? null);
+      for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state2[f] ?? null);
       return out;
     };
     function run2(hook, state2, arg, ctx) {
@@ -1560,6 +1561,9 @@
     // after the rules: the mercy rule reads this step's vitals
     version: 1,
     owns: ["pacer"],
+    // Event effects (src/data/events.js apply) may change these on purpose:
+    // a roof leak (home), the dog finds a bone (dog).
+    effects: ["home", "dog"],
     // Hour by hour with thresholds: time must be played, not skipped.
     catchUp: "event",
     init: (state2) => initPacer(state2),
@@ -2040,14 +2044,14 @@
     if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
     if (state2.weather.type === "smoke" && env.outside && !has(state2, "n95")) damage(state2, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
     for (const inj of p.injuries) {
-      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, 2 * dt, "bleeding");
+      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), "bleeding");
       inj.ageH += dt;
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
       if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
       if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        if (chance(state2, inj.infectRisk)) startInfection(state2);
+        if (chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -2056,7 +2060,7 @@
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state2, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
@@ -2114,7 +2118,7 @@
       }
     }
     for (const inj of p.injuries) {
-      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2);
+      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
     }
   }
   var INJURY_NAMES = {
@@ -2132,13 +2136,16 @@
   function addInjury(state2, type) {
     const d = INJURY_DATA[type];
     state2.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false });
-    damage(state2, d.hp, type === "bite" ? "an animal attack" : "an injury");
+    const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state2.player.health - 1)) : d.hp;
+    damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
     log(state2, `Injury: ${INJURY_NAMES[type]} (Health \u2212${d.hp}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
     if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
   }
-  function startInfection(state2) {
+  var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);
+  var BLEED_FLOOR = 10;
+  function startInfection(state2, from = null) {
     if (state2.player.illness.infection) return;
-    state2.player.illness.infection = { ageH: 0, abxH: null };
+    state2.player.illness.infection = { ageH: 0, abxH: null, from };
     log(state2, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
   }
   function startStomachBug(state2) {

@@ -140,14 +140,14 @@ export function tickStep(state, dt, mode) {
   // Wildfire smoke (rare weather): outside air hurts without an N95 mask.
   if (state.weather.type === 'smoke' && env.outside && !has(state, 'n95')) damage(state, SMOKE_DAMAGE_PER_HOUR * dt, 'smoke');
   for (const inj of p.injuries) {
-    if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, 2 * dt, 'bleeding');
+    if (inj.type === 'deep_cut' && !inj.bandaged) damage(state, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), 'bleeding');
     inj.ageH += dt;
     let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
     if (sleeping && state.location.kind === 'home' && built(state, 'sick_room')) slow *= 1.5;
     inj.healH -= dt * slow;
     if (!inj.bandaged && !inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
       inj.infectRolled = true;
-      if (chance(state, inj.infectRisk)) startInfection(state);
+      if (chance(state, inj.infectRisk)) startInfection(state, inj.type);
     }
   }
   const healed = p.injuries.filter((i) => i.healH <= 0);
@@ -157,7 +157,7 @@ export function tickStep(state, dt, mode) {
   const inf = p.illness.infection;
   if (inf) {
     inf.ageH += dt;
-    if (inf.ageH >= 48) damage(state, 1 * dt, 'infection');
+    if (inf.ageH >= 48 && !CUTS.has(inf.from)) damage(state, 1 * dt, 'infection'); // an infected cut never kills
     if (inf.abxH != null) {
       inf.abxH += dt;
       if (inf.abxH >= 72) {
@@ -236,7 +236,7 @@ export function dailyRollover(state, day) {
 
   // Open wounds can get infected
   for (const inj of p.injuries) {
-    if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state);
+    if (!inj.bandaged && inj.infectRisk && chance(state, inj.infectRisk)) startInfection(state, inj.type);
   }
 
 }
@@ -255,14 +255,21 @@ const INJURY_DATA = {
 export function addInjury(state, type) {
   const d = INJURY_DATA[type];
   state.player.injuries.push({ type, bandaged: false, ageH: 0, healH: d.healH, infectRisk: d.infectRisk * infectRiskFactor(state), infectRolled: false });
-  damage(state, d.hp, type === 'bite' ? 'an animal attack' : 'an injury');
+  const hp = CUTS.has(type) ? Math.min(d.hp, Math.max(0, state.player.health - 1)) : d.hp; // a cut never kills
+  damage(state, hp, type === 'bite' ? 'an animal attack' : 'an injury');
   log(state, `Injury: ${INJURY_NAMES[type]} (Health −${d.hp}).` + (type === 'deep_cut' ? ' It bleeds. Bandage it fast.' : ''), 'danger');
   if (state.player.health <= 0) die(state, type === 'bite' ? 'an animal attack' : 'an injury');
 }
 
-export function startInfection(state) {
+// Adam (2026-11-25): cuts never kill. A cut can bleed and get infected, but its
+// damage stops above 0: bleeding stops at 10 health, the cut itself at 1, and an
+// infected cut gives fever (no health refill) but no health loss. Bites still can.
+export const CUTS = new Set(['small_cut', 'deep_cut']);
+export const BLEED_FLOOR = 10;
+
+export function startInfection(state, from = null) {
   if (state.player.illness.infection) return;
-  state.player.illness.infection = { ageH: 0, abxH: null };
+  state.player.illness.infection = { ageH: 0, abxH: null, from };
   log(state, 'A wound is red, hot and swollen. It is infected. You need antibiotics.', 'danger');
 }
 
