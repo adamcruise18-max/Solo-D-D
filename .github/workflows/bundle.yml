@@ -1,0 +1,57 @@
+# Keep the built game on main fresh.
+# GitHub merges docs/game.js and docs/inside3d.js line by line like source code,
+# so two pull requests that were each fresh can merge into a bundle that matches
+# neither. After every push to main, this job builds again and, when the built
+# files differ, commits the fresh build to main. GitHub Pages then serves it.
+# (A push made with GITHUB_TOKEN does not start workflows again, so no loop.)
+name: Fresh bundle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bundle-main
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit the fresh build if main had a stale one
+        run: |
+          if git diff --quiet -- docs/game.js docs/inside3d.js; then
+            echo "The bundle on main is fresh."
+            exit 0
+          fi
+          git diff --stat -- docs/game.js docs/inside3d.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/game.js docs/inside3d.js
+          git commit -m "Rebuild docs bundle after merge (automatic)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((i * 5))
+          done
+          echo "::error::Could not push the fresh bundle to main."
+          exit 1

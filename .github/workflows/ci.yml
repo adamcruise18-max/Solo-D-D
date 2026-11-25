@@ -36,9 +36,15 @@ jobs:
       - name: Golden replay
         run: npm run replay
 
+      # In a pull request, the built files must match a fresh build. On main,
+      # the "Fresh bundle" workflow (bundle.yml) commits a fresh build after a
+      # merge instead, so this check runs on pull requests only.
       - name: Production build
+        run: npm run build
+
+      - name: Bundle is fresh (pull requests)
+        if: github.event_name == 'pull_request'
         run: |
-          npm run build
           git diff --stat -- docs/game.js docs/inside3d.js
           if ! git diff --quiet -- docs/game.js docs/inside3d.js; then
             echo "::error::docs/game.js or docs/inside3d.js differ from a fresh build. Run npm run build and commit the result."

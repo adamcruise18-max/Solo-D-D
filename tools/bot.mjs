@@ -130,13 +130,91 @@ function turn(state) {
   perform(state, 'action', 'go_home'); return 'go home';
 }
 
+// Food you could eat now (kcal), carried and at home, raw or to cook.
+export function foodKcal(state) {
+  const sum = (bag) => Object.entries(bag || {}).reduce((n, [id, q]) => n + (ITEMS[id]?.kind === 'food' ? (ITEMS[id].cal || 0) * (ITEMS[id].portion || 1) * q : 0), 0);
+  return Math.round(sum(state.carried) + sum(state.home.storage));
+}
+
+// The "careful player" policy, for balance runs only (npm run sim -- --smart).
+// The replay bot above stays the same, so the golden files do not move.
+// Differences: it searches the houses on its street (houses have kitchens), it
+// keeps searching when hungry and hurt instead of going home with nothing, it
+// goes to food places first when food runs low, and it cooks.
+const FOOD_CATS = new Set(['supermarket', 'convenience', 'gas', 'house']);
+const LOW_FOOD_KCAL = 6000;
+
+function smartNextPlace(state, wantFood) {
+  let best = null;
+  for (const pl of allPlaces()) {
+    const ps = state.places[pl.id];
+    if (ps && (ps.zonesDone >= ps.zones || !ps.unlocked)) continue;
+    if (!CATEGORIES[pl.cat]) continue;
+    const d = straightMiles(state.pos, pl);
+    if (d > 4) continue;
+    const score = d * (wantFood && !FOOD_CATS.has(pl.cat) ? 3 : 1);
+    if (!best || score < best.score) best = { pl, score };
+  }
+  return best?.pl || null;
+}
+
+export function smartTurn(state) {
+  const p = state.player;
+  if (treat(state)) return 'treat';
+  const loc = state.location;
+  if (state.pendingPrompt === 'name_dog') { perform(state, 'namedog', 'Scout'); return 'name dog'; }
+  const lowFood = foodKcal(state) < LOW_FOOD_KCAL;
+  const starving = p.food < 25 && foodKcal(state) === 0;
+  if (loc.kind === 'home') {
+    dressUp(state);
+    eatDrink(state);
+    if (state.home.indoorTemp < 55 && can(state, 'add_wood')) { perform(state, 'action', 'add_wood'); return 'fire'; }
+    if (state.home.indoorTemp < 50 && state.home.fireHours <= 0 && can(state, 'break_furniture')) { perform(state, 'action', 'break_furniture'); return 'furniture'; }
+    if (p.food < 50 && can(state, 'cook')) { perform(state, 'action', 'cook'); return 'cook'; }
+    const spare = Object.keys(state.home.storage).filter((id) => ITEMS[id]?.kind === 'food' && id !== 'formula');
+    if (!lowFood && spare.length >= 2 && can(state, 'feed_stray')) { perform(state, 'action', 'feed_stray'); return 'feed stray'; }
+    if (isNight(state.time) || (p.energy < 30 && !starving)) { perform(state, 'action', 'sleep', 8); return 'sleep'; }
+    if (can(state, 'store_all')) perform(state, 'action', 'store_all');
+    if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+    const pl = smartNextPlace(state, lowFood);
+    if (pl) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
+    if (can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+    perform(state, 'action', 'rest'); return 'rest';
+  }
+  eatDrink(state);
+  const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
+  const mustGo = isNight(state.time) || heavy || (!starving && (p.energy < 25 || p.health < 40));
+  if (loc.kind === 'house') {
+    if (!mustGo && can(state, 'room')) {
+      perform(state, 'action', 'room');
+      perform(state, 'takeall'); // found items wait in the house until taken
+      return 'room';
+    }
+    perform(state, 'action', 'leave_house'); return 'leave house';
+  }
+  if (mustGo) { perform(state, 'action', 'go_home'); return 'go home'; }
+  if (can(state, 'force')) { perform(state, 'action', 'force'); return 'force'; }
+  if (can(state, 'search')) {
+    perform(state, 'action', 'search');
+    if (can(state, 'takeall') || Object.keys(placeState(state, { ...allPlaces().find((x) => x.id === loc.id) }).leftovers).length) perform(state, 'takeall');
+    return 'search';
+  }
+  if (lowFood && can(state, 'house')) { perform(state, 'action', 'house'); return 'house'; }
+  const pl = smartNextPlace(state, lowFood);
+  if (pl && pl.id !== loc.id) { perform(state, 'action', 'go_place', pl.id); return `go ${pl.id}`; }
+  perform(state, 'action', 'go_home'); return 'go home';
+}
+
 // Play one run until death or maxDays. Returns a short report.
-export function playRun(seed, { maxDays = 60, maxTurns = 20000 } = {}) {
+export function playRun(seed, { maxDays = 60, maxTurns = 20000, smart = false, onDay = null } = {}) {
   const state = newGame(seed);
   let turns = 0;
+  let day = -1;
+  const t = smart ? smartTurn : botTurn;
   while (!state.dead && dayIndex(state.time) < maxDays && turns < maxTurns) {
-    botTurn(state);
+    t(state);
     turns++;
+    if (onDay && dayIndex(state.time) !== day) { day = dayIndex(state.time); onDay(state, day); }
   }
   return {
     seed,
@@ -144,6 +222,8 @@ export function playRun(seed, { maxDays = 60, maxTurns = 20000 } = {}) {
     cause: state.dead ? state.dead.cause : null,
     miles: Math.round(state.stats.miles * 10) / 10,
     places: state.stats.placesSearched,
+    houses: Object.keys(state.houses || {}).length,
+    foodKcal: foodKcal(state),
     dog: state.dog.stage,
     turns,
     state,
