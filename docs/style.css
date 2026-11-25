@@ -304,7 +304,7 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 #inside .hint { color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
 #inside button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 #inside .in-toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); max-width: min(520px, calc(100% - 32px)); padding: 8px 14px; background: var(--glass); border: 1px solid var(--line-2); text-align: center; pointer-events: none; }
-#inside .in-help { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12px; color: var(--dim); white-space: nowrap; pointer-events: none; }
+#inside .in-help { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12px; color: #d6dde4; background: rgba(8,12,16,.62); padding: 4px 10px; border-radius: 3px; text-shadow: 0 1px 2px #000; white-space: nowrap; pointer-events: none; }
 #inside .in-pause { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 9, 13, .6); }
 #inside .in-pause[hidden], #inside [hidden] { display: none; }
 #inside .in-pause .box { padding: 18px 20px; display: grid; gap: 8px; min-width: 260px; max-width: calc(100% - 32px); }

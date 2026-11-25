@@ -804,7 +804,37 @@ export function openInside(opts) {
     return k ? `something inside: ${k} item${k > 1 ? 's' : ''}` : 'it sounds empty';
   }
   // An open box: the lid flaps fold back (shown as a lower, tilted box).
-  function openLook(c) { c.obj.scale.y = 0.85; c.obj.rotation.z = 0.06; }
+  // An opened box: flaps folded out and a dark inside, so you can see at a glance it is done.
+  const flapMat = new MeshStandardMaterial({ color: 0xb08a5a, roughness: 0.9, side: DoubleSide });
+  const holeMat = new MeshBasicMaterial({ color: 0x17110b });
+  function openLook(c) {
+    if (c.obj.userData.openDone) return;
+    c.obj.userData.openDone = true;
+    // Size in the box's own frame (no rotation), then build the open top as its child.
+    const rot = c.obj.rotation.y;
+    c.obj.rotation.y = 0;
+    c.obj.updateMatrixWorld(true);
+    const bb = new Box3().setFromObject(c.obj);
+    c.obj.rotation.y = rot;
+    const P = c.obj.position;
+    const hx = (bb.max.x - bb.min.x) / 2, hz = (bb.max.z - bb.min.z) / 2, top = bb.max.y - P.y + 0.003;
+    const cx = (bb.min.x + bb.max.x) / 2 - P.x, cz = (bb.min.z + bb.max.z) / 2 - P.z;
+    const g = new Group();
+    const hole = new Mesh(new PlaneGeometry(hx * 1.84, hz * 1.84), holeMat);
+    hole.rotation.x = -Math.PI / 2; hole.position.set(cx, top, cz); g.add(hole);
+    const len = Math.min(hx, hz) * 0.9;
+    for (const [sx, sz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const pivot = new Group();
+      pivot.position.set(cx + sx * hx, top, cz + sz * hz);
+      const f = new Mesh(new PlaneGeometry(sx ? hz * 1.9 : hx * 1.9, len), flapMat);
+      f.position.y = len / 2;
+      if (sx) f.rotation.y = Math.PI / 2;
+      pivot.add(f);
+      if (sx) pivot.rotation.z = -sx * 0.7; else pivot.rotation.x = sz * 0.7;
+      g.add(pivot);
+    }
+    c.obj.add(g);
+  }
 
   function addItems() {
     for (const it of opts.items()) {
@@ -815,7 +845,9 @@ export function openInside(opts) {
         if (c && !c.opened) continue; // still in the closed box
         if (c) {
           // Out of the box, on the floor next to it.
-          const k = hashString(it.pid) % 360;
+          // Next to the box on the side you stand (so they are in reach), spread a little.
+          const toYou = Math.atan2(camera.position.z - c.z, camera.position.x - c.x);
+          const k = toYou + (((hashString(it.pid) % 100) / 100) - 0.5) * 1.6;
           p = { x: c.x + Math.cos(k) * (c.r + 0.15), y: 0, z: c.z + Math.sin(k) * (c.r + 0.15) };
         }
       }
@@ -1150,7 +1182,7 @@ export function openInside(opts) {
     if (busy || paused || closed || hold) return false;
     if (target && target.container) return false;
     const near = itemsInReach(camera.position);
-    if (!near.length) return false;
+    if (!near.length) { if (!target) toast('Nothing in reach. Walk up to an item.', 1400); return false; }
     const bar = $('.in-bar');
     const fill = bar.querySelector('i');
     bar.hidden = false;
