@@ -22,6 +22,8 @@
     potatoes: { name: "Potatoes (lb)", unit: "lb", weight: 1, kind: "food", cal: 350, portion: 1, needsCooking: true, perish: 60 },
     green_beans: { name: "Green beans (lb)", unit: "lb", weight: 1, kind: "food", cal: 140, portion: 1, perish: 6 },
     squash: { name: "Winter squash", unit: "squash", weight: 3, kind: "food", cal: 450, portion: 0.5, needsCooking: true, perish: 90 },
+    salad_greens: { name: "Salad greens (bag)", unit: "bag", weight: 0.3, kind: "food", cal: 30, portion: 1, perish: 5 },
+    fava_beans: { name: "Fava beans (lb)", unit: "lb", weight: 1, kind: "food", cal: 340, portion: 1, needsCooking: true, perish: 7 },
     garlic: { name: "Garlic (head)", unit: "head", weight: 0.1, kind: "food", cal: 60, portion: 1, perish: 120 },
     oatmeal: { name: "Oatmeal (canister)", unit: "can", weight: 2.6, kind: "food", cal: 4500, portion: 0.1, needsCooking: true },
     water_bottle: { name: "Bottled water (1 gal)", unit: "gal", weight: 8.3, kind: "drink", water: 25, portion: 0.25 },
@@ -2111,6 +2113,11 @@
     potatoes: { name: "Potatoes", plant: [2, 3, 4, 5], days: 100, frostF: 26, minF: 40, yield: ["potatoes", 15] },
     beans: { name: "Green beans", plant: [4, 5, 6], days: 60, frostF: 32, minF: 55, yield: ["green_beans", 6] },
     squash: { name: "Winter squash", plant: [4, 5], days: 80, frostF: 32, minF: 50, yield: ["squash", 4] },
+    // Winter greens (lettuce, mache, arugula): hardy to about 20°F, slow but steady in a
+    // Portland winter; cut-and-come-again. Small calories, but fresh food in the dark months.
+    greens: { name: "Winter greens", plant: [0, 1, 9, 10, 11], days: 45, frostF: 20, minF: 32, yield: ["salad_greens", 5], regrow: 0.55, cuts: 3 },
+    // Fava beans: sow Oct-Nov (ready about May) or Feb-Mar (ready in about 100 days).
+    fava: { name: "Fava beans", plant: [1, 2, 9, 10], days: 90, frostF: 15, minF: 36, yield: ["fava_beans", 8] },
     garlic: { name: "Garlic", plant: [8, 9, 10, 11], days: 220, frostF: null, minF: 35, yield: ["garlic", 20] }
   };
 
