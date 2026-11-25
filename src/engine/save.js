@@ -1,6 +1,8 @@
 // Save in the browser. One life per run: the game saves after each action,
 // so there is no older save to go back to. Export/import gives a backup file.
 import { SAVE_VERSION } from './state.js';
+import { migrate } from '../core/save.js';
+import { gameSystems } from './systems.js';
 import { addRun, normalizeRecord } from './legacy.js';
 
 const KEY = 'lastlight.save.v1';

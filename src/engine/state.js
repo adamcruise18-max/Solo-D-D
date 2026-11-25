@@ -5,6 +5,7 @@ import { HOME_LAT, HOME_LON } from '../sun.js';
 import { initWeather } from './world.js';
 import { applyBackground, carryMinus } from './background.js';
 import { applyLegacy } from './legacy.js';
+import { systemVersions } from './systems.js';
 
 export const SAVE_VERSION = 1;
 export const START_MINUTE = 9 * 60 + 5; // Day 1, 9:05 AM
@@ -95,7 +96,8 @@ export function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     dead: null,
     pendingPrompt: null,
   };
-  initWeather(state);
+  initWeather(state); // the weather system's init (same rng order as before)
+  state.systemVersions = systemVersions();
   applyBackground(state, opts.job, opts.traits);
   applyLegacy(state, opts.legacy);
   if (opts.homeLabel) log(state, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, 'story');

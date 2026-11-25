@@ -11,6 +11,7 @@ import { getPlace } from './placesdb.js';
 import { seasonDaily } from './season.js';
 import { built, fireHeat, heatLossFactor, foodItemsStored, runAutoFilter } from './base.js';
 import { infectRiskFactor } from './skills.js';
+import { gameClock } from './systems.js';
 import { ageFood } from './food.js';
 import { foodLossFactor, sleepGainFactor, energyUseFactor } from './background.js';
 import { clothingWarmth, windBlock, normalizeWorn, wetGainPerHour, dryPerHour, WET_LIMIT } from './clothes.js';
