@@ -2417,6 +2417,8 @@
         wet: false,
         wetMinutes: 0,
         dryMinutes: 0,
+        goals: { picked: [], done: {}, changedDay: null, since: {} },
+        // Legacy board (engine/goals.js); since[goalId] = { day, miles, places, houses, books } when chosen
         worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
         wetness: 0,
         injuries: [],
