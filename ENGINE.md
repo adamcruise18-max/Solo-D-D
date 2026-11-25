@@ -139,10 +139,13 @@ so every subsystem counts its own bytes with `profiler.memory(name, bytes)`.
 
 ## Tools
 
+Built files: `docs/game.js` and `docs/inside3d.js` are generated. A pull request must carry a fresh build (CI fails otherwise). After a merge, the "Fresh bundle" workflow (`.github/workflows/bundle.yml`) builds main again and commits the result when the merge left a stale bundle.
+
 | Command | What it does |
 | --- | --- |
 | `npm test` | All node tests, with the content check and the replay test |
 | `npm run sim -- --runs 50 --days 90` | The bot plays many runs fast; shows days survived and causes of death |
+| `npm run sim -- --smart` | The same with the careful-player policy (balance runs; `test/balance.test.js` guards day 21) |
 | `npm run replay` | Bot plays seeds 42, 1234, 777 for 30 days; compares with `test/golden/replay.json` |
 | `npm run replay -- --record` | Writes new golden files. Only when a rule change is meant, and say so in the PR |
 | `npm run check:browser` | Chromium: the game page loads; a new run plays through the clock and the weather system; saves and the fallback work in IndexedDB; save timing |
