@@ -14,6 +14,7 @@ import { SLOTS, SLOT_NAMES, normalizeWorn, wornText } from '../engine/clothes.js
 import { statStage, needWarnings, risks } from '../engine/status.js';
 import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
+import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
 import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
@@ -146,7 +147,23 @@ function renderHeader() {
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} · <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} · ${esc(weatherInfo(state).label)} · ${air}°F outside · wind ${w.wind} mph · ${sunText}</div>
+    ${outlookHtml()}`;
+}
+
+// Weather effects now and the next change (src/engine/preview.js: same rules as the game).
+function outlookHtml() {
+  const o = weatherOutlook(state);
+  const fx = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join('');
+  return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}°F.</div>${fx ? `<ul class="wx-fx">${fx}</ul>` : ''}`;
+}
+
+// A walk: time, energy, finish time, the 5 AM change and the weather on the way.
+function tripHtml(dest) {
+  const t = tripPreview(state, dest);
+  const fx = t.weather.effects.filter((e) => e.level !== 'ok').map((e) => esc(e.text)).join('<br>');
+  return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? ' (dark)' : ''}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ''}</p>`
+    + `${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(', ')}</small></p>` : ''}${fx ? `<p class="wx-trip"><small>${fx}</small></p>` : ''}`;
 }
 
 // Skills: level 0..5, a bar to the next level, and what the skill does.
@@ -384,9 +401,8 @@ function showPlacePopup(id, lngLat) {
   if (id === '__home') {
     pos = homeOf(state);
     const atHome = state.location.kind === 'home';
-    const est = estimateTrip(state, pos);
     html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || 'in Aloha')}.</p>${atHome ? '<p><i>You are here.</i></p>'
-      : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
+      : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
   } else {
     const p = getPlace(id);
     pos = p;
@@ -394,10 +410,9 @@ function showPlacePopup(id, lngLat) {
     const ps = state.places[p.id];
     const status = !ps || !ps.visited ? 'Not searched' : ps.zonesDone >= ps.zones ? 'Searched: nothing left' : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
     const here = state.location.kind === 'place' && state.location.id === id;
-    const est = estimateTrip(state, p);
     const fromHome = straightMiles(homeOf(state), p).toFixed(1);
     html = `<h4>${esc(p.name)}</h4><p>${cat.label} · ${fromHome} mi from home</p><p><i>${status}</i></p>
-      ${here ? '<p><i>You are here.</i></p>' : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(', ')}</small>` : ''}</p>
+      ${here ? '<p><i>You are here.</i></p>' : `${tripHtml(p)}
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
   }
   popup = new maplibregl.Popup({ closeButton: true, maxWidth: '260px' })
@@ -454,8 +469,11 @@ function showIntro() {
 }
 
 function showSleep() {
-  const opts = [1, 2, 4, 6, 8, 10].map((h) => `<button data-hours="${h}">${h} h</button>`).join('');
-  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+  const opts = [1, 2, 4, 6, 8, 10].map((h) => {
+    const a = actionTiming(state, h * 60);
+    return `<button data-hours="${h}" title="${esc(a.dayStartText || '')}">${h} h<small>until ${a.endText}${a.crossesDayStart ? ' ☀' : ''}</small></button>`;
+  }).join('');
+  modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. ☀ = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
     m.querySelectorAll('[data-hours]').forEach((b) => b.addEventListener('click', () => {
       closeModal();
       act('action', 'sleep', Number(b.dataset.hours));

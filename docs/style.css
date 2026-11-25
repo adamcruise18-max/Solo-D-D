@@ -146,6 +146,14 @@ a { color: var(--accent); }
 #clock .when { margin-top: 4px; }
 #clock .when b { font-family: var(--cond); font-size: 17px; letter-spacing: .06em; color: #fff; font-variant-numeric: tabular-nums; }
 #clock .wx { color: var(--muted); font-size: 13px; }
+/* Weather outlook (src/engine/preview.js). Color only for real problems, always with a sign. */
+#clock .wx-next { color: var(--muted); font-size: 12px; margin-top: 2px; }
+#clock .wx-fx { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; }
+#clock .wx-fx li { color: var(--muted); }
+#clock .wx-fx li.wx-warn { color: var(--warn); }
+#clock .wx-fx li.wx-danger { color: var(--bad); }
+#clock .wx-fx li.wx-warn::before, #clock .wx-fx li.wx-danger::before { content: '⚠ '; }
+#modal [data-hours] small { display: block; font-size: 11px; opacity: .75; }
 .badge { font: 600 11px/1 var(--cond); letter-spacing: .14em; text-transform: uppercase; padding: 3px 7px; border-radius: 0; margin-left: 4px; vertical-align: 2px; }
 .badge.night { background: #1c2b46; color: #a9c1ff; }
 .badge.day { background: #3a3220; color: var(--signal); }

@@ -3128,6 +3128,81 @@
     };
   }
 
+  // src/core/clock.js
+  var DAY_START_MINUTE = 5 * 60;
+  var dayIndex2 = (t) => Math.floor(t / 1440);
+  var gameDay = (t) => dayIndex2(t - DAY_START_MINUTE);
+
+  // src/engine/preview.js
+  var DAY_START = 300;
+  function weatherEffects(state2) {
+    const w = state2.weather;
+    const info = weatherInfo(state2);
+    const p = state2.player;
+    const out = [];
+    if (w.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
+    if (info.wetAfter) {
+      const perHour = wetGainPerHour(p, w.type, info.wetAfter);
+      const toWet = perHour > 0 ? Math.max(0, (WET_LIMIT - (p.wetness || 0)) / perHour) * 60 : Infinity;
+      if (perHour <= 0) out.push({ id: "wet", text: "You stay dry outside.", level: "ok" });
+      else if (toWet === 0) out.push({ id: "wet", text: "You are wet already. Outside you get wetter.", level: "danger" });
+      else out.push({ id: "wet", text: `Outside you are wet through after about ${formatDuration(toWet)}.`, level: toWet < 60 ? "warn" : "ok" });
+    }
+    const env = environment(state2, "walk");
+    const chill = Math.round(feltTemp(state2, "walk", { ...env, wind: 0 }) - feltTemp(state2, "walk", env));
+    if (chill >= 3) {
+      out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
+    }
+    return out;
+  }
+  function nextDayStart(t) {
+    return (gameDay(t) + 1) * 1440 + DAY_START;
+  }
+  function weatherOutlook(state2, t = state2.time) {
+    const w = state2.weather;
+    const next = nextDayStart(t);
+    return {
+      type: w.type,
+      label: WEATHER_TYPES[w.type].label,
+      airF: Math.round(airTemp(state2, t)),
+      windMph: w.wind,
+      highF: Math.round(w.high),
+      lowF: Math.round(w.low),
+      night: isNight(t),
+      effects: weatherEffects(state2),
+      // The next weather change: the weather rolls once a day at 5 AM.
+      // Tomorrow's low is known now (it is the end of today's temperature curve).
+      next: { at: next, atText: formatClock(next), inMinutes: Math.round(next - t), lowF: Math.round(w.nextLow) }
+    };
+  }
+  function actionTiming(state2, minutes) {
+    const end = state2.time + minutes;
+    const next = nextDayStart(state2.time);
+    const crosses = end >= next;
+    return {
+      minutes,
+      durationText: formatDuration(minutes),
+      end,
+      endText: formatClock(end),
+      crossesDayStart: crosses,
+      dayStartText: crosses ? `The new day starts at ${formatClock(next)}: the weather can change.` : null
+    };
+  }
+  function tripPreview(state2, dest) {
+    const trip = estimateTrip(state2, dest);
+    const timing = actionTiming(state2, trip.minutes);
+    return {
+      miles: trip.miles,
+      minutes: trip.minutes,
+      energy: trip.energy,
+      mph: trip.mph,
+      slowBecause: trip.why,
+      weather: weatherOutlook(state2),
+      darkOnArrival: isNight(timing.end),
+      ...timing
+    };
+  }
+
   // src/engine/game.js
   function perform(state2, kind, a, b, c) {
     if (state2.dead) return;
@@ -4010,7 +4085,18 @@
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>`;
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
+    ${outlookHtml()}`;
+  }
+  function outlookHtml() {
+    const o = weatherOutlook(state);
+    const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join("");
+    return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}\xB0F.</div>${fx2 ? `<ul class="wx-fx">${fx2}</ul>` : ""}`;
+  }
+  function tripHtml(dest) {
+    const t = tripPreview(state, dest);
+    const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
+    return `<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
   }
   function clothesHtml() {
     const p = state.player;
@@ -4238,8 +4324,7 @@
     if (id === "__home") {
       pos = homeOf(state);
       const atHome = state.location.kind === "home";
-      const est = estimateTrip(state, pos);
-      html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}</p><button class="go" data-gohome="1">Walk home</button>`}`;
+      html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
     } else {
       const p = getPlace(id);
       pos = p;
@@ -4247,10 +4332,9 @@
       const ps = state.places[p.id];
       const status = !ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched: nothing left" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`;
       const here = state.location.kind === "place" && state.location.id === id;
-      const est = estimateTrip(state, p);
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
       html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
-      ${here ? "<p><i>You are here.</i></p>" : `<p>${describeTrip(state, est)}${est.why.length ? `<br><small>Slow: ${est.why.join(", ")}</small>` : ""}</p>
+      ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(p)}
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
     }
     popup = new maplibregl.Popup({ closeButton: true, maxWidth: "260px" }).setLngLat(lngLat || [pos.lon, pos.lat]).setHTML(html).addTo(mapApi.map);
@@ -4304,8 +4388,11 @@
     });
   }
   function showSleep() {
-    const opts = [1, 2, 4, 6, 8, 10].map((h) => `<button data-hours="${h}">${h} h</button>`).join("");
-    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
+    const opts = [1, 2, 4, 6, 8, 10].map((h) => {
+      const a = actionTiming(state, h * 60);
+      return `<button data-hours="${h}" title="${esc(a.dayStartText || "")}">${h} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}</small></button>`;
+    }).join("");
+    modal(`<h3>How long do you want to sleep?</h3><p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
         closeModal();
         act("action", "sleep", Number(b.dataset.hours));
