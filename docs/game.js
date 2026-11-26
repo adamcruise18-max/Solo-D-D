@@ -8764,7 +8764,12 @@
         if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc2(getPlace(door.placeId).name)}`;
         if (door.kind === 0 && atHomeDoor(ll)) return "<kbd>E</kbd> Go inside your home";
         if (door.name) return `${esc2(door.name)} <small>closed. Nothing to find here</small>`;
-        if (door.kind === 0) return 'A house <small>Going into real houses from the street comes next. Use "Search a house" on the map for now.</small>';
+        if (door.kind === 0 || door.kind === 3) {
+          const hs = state.houses[`b:${door.id}`];
+          if (!hs) return "<kbd>E</kbd> Go into the house <small>most doors are locked</small>";
+          const done = (hs.doneList || []).length >= 6;
+          return `<kbd>E</kbd> Go back into the house <small>${done ? "searched" : "you were here"}</small>`;
+        }
         return "The door is locked <small>nothing to find here</small>";
       },
       onDoor: (door, ll) => {
@@ -8780,14 +8785,33 @@
           afterAction2();
           return { close: true };
         }
+        if (door.kind === 0 || door.kind === 3) {
+          const n0 = state.log.length;
+          const wasDead = !!state.dead;
+          const street = streetLabel(door);
+          enterHouse(state, `b:${door.id}`, street ? `House on ${street}` : "House", { lat: ll.lat, lon: ll.lon }, { walkMinutes: 1 });
+          afterAction2();
+          if (!wasDead && state.dead) recordRun(state);
+          openAfterStreets = state.location.kind === "house" && !state.dead;
+          if (!openAfterStreets) return { text: lastLines(n0).map(esc2).join(" ") };
+          return { close: true };
+        }
         return null;
       },
       onClose: () => {
         document.body.classList.remove("inside-open");
         if (state.player.lightOff) state.player.lightOff = false;
         commit(true);
+        if (openAfterStreets) {
+          openAfterStreets = false;
+          walkInside2();
+        }
       }
     });
+  }
+  var openAfterStreets = false;
+  function streetLabel(door) {
+    return door.street || null;
   }
   function projectNeeds() {
     const out = {};

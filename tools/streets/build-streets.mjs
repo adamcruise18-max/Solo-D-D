@@ -310,7 +310,7 @@ for (const f of readGeo('buildings')) {
     }
     const wallC = Math.floor(rnd() * PALETTE_SIZE.wall);
     const roofC = Math.floor(rnd() * PALETTE_SIZE.roof);
-    buildingsM.push({ r, ctr, kind, roof, h, rise, box, wallC, roofC, place, name: place?.name || null });
+    buildingsM.push({ r, ctr, kind, roof, h, rise, box, wallC, roofC, place, name: place?.name || null, sid: String(pr.id || '').replace(/-/g, '').slice(0, 12) });
   }
 }
 for (const b of buildingsM) {
@@ -318,7 +318,7 @@ for (const b of buildingsM) {
   const ang = Math.round(((b.box.ang % Math.PI) + Math.PI) % Math.PI * 1000);
   c.b.push([b.kind, b.roof, dm(b.h), dm(b.rise), b.wallC, b.roofC, local(c, b.r),
     [dm(b.box.cx - c.x0), dm(b.box.cz - c.z0), dm(b.box.hu), dm(b.box.hv), ang],
-    b.place ? b.place.id : 0, nameIdx(c, b.name)]);
+    b.place ? b.place.id : 0, nameIdx(c, b.name), b.sid]);
 }
 function nearBuilding(pt, margin) {
   const k = cellOfM(pt[0], pt[1]);
