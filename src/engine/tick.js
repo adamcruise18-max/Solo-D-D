@@ -7,7 +7,7 @@ import * as V from './vitals.js';
 import { airTemp, isNight, weatherInfo } from './world.js';
 import { spellStartText } from './rareweather.js';
 import { sleepTemp } from './home.js';
-import { dayIndex, log, hasLight, bagWeight, carryLimit, has } from './state.js';
+import { dayIndex, log, hasLight, has } from './state.js';
 import { ITEMS } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import { getPlace } from './placesdb.js';
@@ -206,7 +206,6 @@ export function tickStep(state, dt, mode) {
     let loss = V.ENERGY_LOSS[mode] || V.ENERGY_LOSS.rest;
     if (cold) loss *= 1.5;
     loss *= energyUseFactor(state, mode);
-    if (mode === 'walk' && bagWeight(state.carried) > carryLimit(state)) loss *= 1.5;
     p.energy = clamp(p.energy - loss * dt, 0, p.energyMax);
   }
 

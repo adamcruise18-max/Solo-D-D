@@ -39,7 +39,7 @@
     flashlight: { name: "Flashlight", unit: "pc", weight: 0.5, kind: "tool" },
     batteries: { name: "Batteries (1 set)", unit: "set", weight: 0.2, kind: "batteries", portion: 1 },
     pry_bar: { name: "Pry bar", unit: "pc", weight: 3, kind: "tool" },
-    backpack: { name: "Backpack", unit: "pc", weight: 1, kind: "tool" },
+    backpack: { name: "Backpack", unit: "pc", weight: 1, kind: "wear", slot: "back", warmth: 0, short: "backpack" },
     winter_coat: { name: "Winter coat (down)", unit: "pc", weight: 3, kind: "wear", slot: "mid", warmth: 18, wind: 0.5, wetWarm: false, short: "winter coat" },
     winter_hat: { name: "Winter hat (wool)", unit: "pc", weight: 0.3, kind: "wear", slot: "hat", warmth: 4, wetWarm: true, short: "hat" },
     gloves: { name: "Winter gloves", unit: "pair", weight: 0.3, kind: "wear", slot: "gloves", warmth: 3, wetWarm: false, short: "gloves" },
@@ -2454,8 +2454,8 @@
   }
 
   // src/engine/clothes.js
-  var SLOTS = ["base", "mid", "shell", "hat", "gloves", "boots", "socks"];
-  var SLOT_NAMES = { base: "Base layer", mid: "Warm layer", shell: "Shell", hat: "Hat", gloves: "Gloves", boots: "Boots", socks: "Socks" };
+  var SLOTS = ["base", "mid", "shell", "hat", "gloves", "boots", "socks", "back"];
+  var SLOT_NAMES = { base: "Base layer", mid: "Warm layer", shell: "Shell", hat: "Hat", gloves: "Gloves", boots: "Boots", socks: "Socks", back: "Backpack" };
   var NORMAL_CLOTHES = { warmth: 10, wind: 0.1, wetWarm: false };
   var OLD = { coat: ["mid", "winter_coat"], rain: ["shell", "rain_jacket"], hat: ["hat", "winter_hat"], gloves: ["gloves", "gloves"], boots: ["boots", "boots"], socks: ["socks", "wool_socks"] };
   var WET_LIMIT = 50;
@@ -2668,7 +2668,6 @@
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
       loss *= energyUseFactor(state2, mode);
-      if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
       p.energy = clamp2(p.energy - loss * dt, 0, p.energyMax);
     }
     if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
@@ -3070,7 +3069,7 @@
       text: "Twelve years on a hospital ward.",
       skills: { first_aid: 2 },
       item: ["bandages", 2],
-      weakness: "Bad back from lifting patients: you carry 4 lb less."
+      weakness: "Bad back from lifting patients: hard work uses 15% more energy."
     },
     tow_driver: {
       name: "Tow-truck driver",
@@ -3143,9 +3142,6 @@
   function xpFactor(state2) {
     return hasTrait(state2, "fast_learner") ? 1.3 : hasTrait(state2, "slow_learner") ? 0.7 : 1;
   }
-  function carryMinus(state2) {
-    return jobOf(state2) === "nurse" ? 4 : 0;
-  }
   function walkSpeedFactor(state2) {
     return jobOf(state2) === "roofer" ? 0.9 : 1;
   }
@@ -3161,6 +3157,7 @@
   function energyUseFactor(state2, mode) {
     let f = 1;
     if (mode === "walk" && jobOf(state2) === "tow_driver") f *= 1.15;
+    if (mode === "heavy" && jobOf(state2) === "nurse") f *= 1.15;
     if (mode === "walk" && hasLegacy(state2, "road_legs")) f *= 0.95;
     if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state2, "asthmatic")) f *= 1.2;
     return f;
@@ -3215,7 +3212,7 @@
         dryMinutes: 0,
         goals: { picked: [], done: {}, changedDay: null, since: {} },
         // Legacy board (engine/goals.js); since[goalId] = { day, miles, places, houses, books } when chosen
-        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false },
+        worn: { _v: 2, base: false, mid: false, shell: false, hat: false, gloves: false, boots: false, socks: false, back: false },
         wetness: 0,
         injuries: [],
         illness: { stomachH: 0, infection: null },
@@ -3338,20 +3335,6 @@
   function addItem(bag, id, qty = 1) {
     bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
     if (bag[id] <= 1e-4) delete bag[id];
-  }
-  function bagWeight(bag) {
-    let w = 0;
-    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
-    return Math.round(w * 10) / 10;
-  }
-  var BASE_CARRY = 15;
-  var BACKPACK_CARRY = 15;
-  function carryLimit(state2) {
-    let lim = BASE_CARRY + (state2.carried.backpack ? BACKPACK_CARRY : 0);
-    if (state2.player.weak) lim *= 0.5;
-    if (state2.player.food < 25) lim *= 0.9;
-    lim -= carryMinus(state2) * (state2.player.weak ? 0.5 : 1);
-    return Math.round(lim);
   }
   function has(state2, id) {
     return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
@@ -3596,16 +3579,23 @@
     if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
     return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
   }
-  var WORN = ["backpack"];
-  function packTiles(bag, order = Object.keys(bag)) {
-    return tilesFor(bag, order.filter((id) => !WORN.includes(id)));
+  var legacyPack = (state2) => state2.player?.worn?.back === void 0 && (state2.carried.backpack || 0) > 0;
+  function wearsPack(state2) {
+    return state2.player?.worn?.back === "backpack" || legacyPack(state2);
   }
-  function packSize(state2) {
-    return { cols: GRID_COLS, rows: packRows(!!state2.carried.backpack) };
+  function gridBag(state2, bag = state2.carried) {
+    if (!legacyPack(state2)) return bag;
+    const b = { ...bag };
+    b.backpack = (b.backpack || 0) - 1;
+    if (b.backpack <= 0) delete b.backpack;
+    return b;
   }
-  function bagFits(state2, bag) {
-    const { cols, rows } = packSize(state2);
-    return layoutGrid(packTiles(bag), cols, rows).overflow === 0;
+  function packSize(state2, pack = wearsPack(state2)) {
+    return { cols: GRID_COLS, rows: packRows(pack) };
+  }
+  function bagFits(state2, bag, pack) {
+    const { cols, rows } = packSize(state2, pack);
+    return layoutGrid(tilesFor(gridBag(state2, bag)), cols, rows).overflow === 0;
   }
   function roomFor(state2, id, want) {
     if (!(want > 0)) return 0;
@@ -3625,16 +3615,21 @@
     }
     return lo;
   }
-  function packUse(state2) {
+  function packLayout(state2) {
     const { cols, rows } = packSize(state2);
-    const L = layoutGrid(packTiles(state2.carried), cols, rows);
-    const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
-    return { used, total: cols * rows, over: L.overflow > 0 };
+    return layoutGrid(tilesFor(gridBag(state2)), cols, rows);
   }
-  function packFitsWithout(state2, id) {
-    const bag = { ...state2.carried };
-    delete bag[id];
-    return bagFits({ ...state2, carried: bag }, bag);
+  function packUse(state2) {
+    const L = packLayout(state2);
+    const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
+    return { used, total: L.cols * L.rows, over: L.overflow > 0 };
+  }
+  function canTakeOffPack(state2) {
+    const bag = { ...gridBag(state2), backpack: (gridBag(state2).backpack || 0) + 1 };
+    return layoutGrid(tilesFor(bag), GRID_COLS, packRows(false)).overflow === 0;
+  }
+  function pocketsFit(state2) {
+    return layoutGrid(tilesFor(gridBag(state2)), GRID_COLS, packRows(false)).overflow === 0;
   }
 
   // src/engine/checks.js
@@ -3892,8 +3887,8 @@
         names.push(`${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
       }
       log(state2, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
-      if (!state2.carried.backpack) {
-        addItem(state2.carried, "backpack", 1);
+      if (!wearsPack(state2)) {
+        putOn(state2.player, "backpack");
         log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
       }
     }
@@ -4699,6 +4694,10 @@
     const bag = hereBag(state2);
     const have = bag[id] || 0;
     if (!have) return;
+    if (wearPackFrom(state2, bag, id)) {
+      advanceTime(state2, 2);
+      return;
+    }
     let want = Math.min(qty ?? have, have);
     if (["part", "tool", "wear"].includes(ITEMS[id].kind)) want = Math.floor(want + 1e-9);
     const n = roomFor(state2, id, want);
@@ -4710,8 +4709,16 @@
     addItem(state2.carried, id, n);
     advanceTime(state2, 1);
   }
+  function wearPackFrom(state2, bag, id) {
+    if (id !== "backpack" || wearsPack(state2) || !(bag[id] >= 1)) return false;
+    addItem(bag, id, -1);
+    putOn(state2.player, "backpack");
+    log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
+    return true;
+  }
   function takeAll(state2) {
     const bag = hereBag(state2);
+    wearPackFrom(state2, bag, "backpack");
     const cells = (id) => {
       const z = sizeOf(id);
       return z.w * z.h / z.stack;
@@ -4736,7 +4743,7 @@
   function dropItem(state2, id, qty) {
     const have = state2.carried[id] || 0;
     if (!have) return;
-    if (id === "backpack" && !packFitsWithout(state2, "backpack")) {
+    if (id === "backpack" && state2.player.worn?.back !== "backpack" && !pocketsFit(state2)) {
       log(state2, "Your things do not fit in your pockets. Take some out of the backpack first.", "warn");
       return;
     }
@@ -5163,7 +5170,8 @@
     }
     const it = zoneItemList(state2, ctx, zone).find((x) => x.pid === pid);
     if (!it || ctx.holder.taken.includes(pid)) return false;
-    if (roomFor(state2, it.item, 1) < 1) {
+    const wearIt = it.item === "backpack" && !wearsPack(state2);
+    if (!wearIt && roomFor(state2, it.item, 1) < 1) {
       log(state2, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, "warn");
       return false;
     }
@@ -5172,8 +5180,13 @@
     if (state2.dead) return true;
     touchZone(state2, ctx, zone);
     ctx.holder.taken.push(pid);
-    addItem(state2.carried, it.item, 1);
-    log(state2, `You take: ${itemName(it.item)}.`);
+    if (wearIt) {
+      putOn(state2.player, "backpack");
+      log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
+    } else {
+      addItem(state2.carried, it.item, 1);
+      log(state2, `You take: ${itemName(it.item)}.`);
+    }
     practice(state2, "scavenging", SCAV_XP);
     if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
       markZoneDone(ctx, zone);
@@ -5536,6 +5549,10 @@
     return acts;
   }
   function takeOffSlot(state2, slot) {
+    if (slot === "back" && state2.player.worn?.back && !canTakeOffPack(state2)) {
+      log(state2, "Your things will not fit in your pockets. Put some down before you take off the backpack.", "warn");
+      return false;
+    }
     const old = takeOff(state2.player, slot);
     if (!old) return false;
     addItem(state2.carried, old, 1);
@@ -7833,9 +7850,10 @@
   }
   function buildGrid(which) {
     const bag = which === "pack" ? state.carried : hereBag(state);
-    const tiles = which === "pack" ? packTiles(bag, sortedIds(bag)) : tilesFor(bag, sortedIds(bag));
+    const gb = which === "pack" ? gridBag(state) : bag;
+    const tiles = tilesFor(gb, sortedIds(gb));
     const cols = which === "pack" ? GRID_COLS : hereGridCols();
-    const rows = which === "pack" ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
+    const rows = which === "pack" ? packSize(state).rows : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
     let L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
     if (L.overflow) {
       const auto = layoutGrid(tiles, cols, rows);
@@ -7951,7 +7969,7 @@
         <span class="${over ? "bad" : ""}">${use.used} / ${use.total} cells${over ? " (over full: slow)" : ""}</span></h3>
       <div class="bag-load${over ? " over" : ""}"><i style="width:${fill}%"></i></div>
       ${gridHtml("pack", packO)}
-      <p class="hint">${state.carried.backpack ? `Backpack on: big grid. <button class="small" data-drop="backpack">Take it off</button>` : "No backpack: pockets and hands only. Find a backpack for a bigger grid."} Drag to move \xB7 R turns a tile while you drag \xB7 tap for buttons.</p>
+      <p class="hint">${wearsPack(state) ? `Backpack on (worn, like clothes): big grid.${state.player.worn?.back ? ' <button class="small" data-use="back" data-verb="take_off">Take it off</button>' : ""}` : "No backpack: pockets and hands only. Find a backpack for a bigger grid."} Drag to move \xB7 R turns a tile while you drag \xB7 tap for buttons.</p>
     </section>
     <section class="bag bag-here${home ? " bag-home" : ""}">
       <h3><span class="bag-ico" aria-hidden="true">${home ? "\u2302" : "\u2315"}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll2}</h3>

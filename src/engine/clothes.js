@@ -1,5 +1,6 @@
 // Clothes in layers, wetness and the "feels like" number.
-// Slots: base (next to the skin), mid (the warm layer), shell (wind and rain), hat, gloves, boots, socks.
+// Slots: base (next to the skin), mid (the warm layer), shell (wind and rain), hat, gloves, boots, socks,
+// back (a backpack: no warmth; it makes the pack grid bigger, see packgrid.js).
 // Each worn item has warmth (°F felt), wind (0..1: how much wind it blocks), and
 // wetWarm (wool, fleece and synthetics keep heat when wet; cotton and down do not).
 // In a Portland winter, wet is the main danger, not deep cold.
@@ -9,8 +10,8 @@
 // state.player.wetness = 0..100. player.wet stays as "wetness >= 50" for older code and saves.
 import { ITEMS } from '../data/items.js';
 
-export const SLOTS = ['base', 'mid', 'shell', 'hat', 'gloves', 'boots', 'socks'];
-export const SLOT_NAMES = { base: 'Base layer', mid: 'Warm layer', shell: 'Shell', hat: 'Hat', gloves: 'Gloves', boots: 'Boots', socks: 'Socks' };
+export const SLOTS = ['base', 'mid', 'shell', 'hat', 'gloves', 'boots', 'socks', 'back'];
+export const SLOT_NAMES = { base: 'Base layer', mid: 'Warm layer', shell: 'Shell', hat: 'Hat', gloves: 'Gloves', boots: 'Boots', socks: 'Socks', back: 'Backpack' };
 // Your own everyday clothes (cotton): always there, under everything.
 export const NORMAL_CLOTHES = { warmth: 10, wind: 0.1, wetWarm: false };
 const OLD = { coat: ['mid', 'winter_coat'], rain: ['shell', 'rain_jacket'], hat: ['hat', 'winter_hat'], gloves: ['gloves', 'gloves'], boots: ['boots', 'boots'], socks: ['socks', 'wool_socks'] };

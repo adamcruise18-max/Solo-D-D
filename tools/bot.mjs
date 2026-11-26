@@ -4,7 +4,8 @@
 // It is not a good player; it is a steady one, so changes in the numbers show.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { newGame, carryLimit, bagWeight, dayIndex } from '../src/engine/state.js';
+import { newGame, dayIndex } from '../src/engine/state.js';
+import { packFull } from '../src/engine/packgrid.js';
 import { perform } from '../src/engine/game.js';
 import { listActions } from '../src/engine/actions.js';
 import { setPlaces, allPlaces } from '../src/engine/placesdb.js';
@@ -123,7 +124,7 @@ function turn(state) {
   // At a place.
   eatDrink(state);
   if (loc.kind === 'wild') return atWild(state);
-  const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
+  const heavy = packFull(state);
   if (isNight(state.time) || p.energy < 25 || heavy || p.health < 40) { perform(state, 'action', 'go_home'); return 'go home'; }
   if (can(state, 'force')) { perform(state, 'action', 'force'); return 'force'; }
   if (can(state, 'search')) {
@@ -289,7 +290,7 @@ export function smartTurn(state) {
   }
   eatDrink(state);
   if (loc.kind === 'wild') return atWild(state);
-  const heavy = bagWeight(state.carried) >= carryLimit(state) - 2;
+  const heavy = packFull(state);
   const needAbx = p.illness.infection && p.illness.infection.abxH == null && !(state.carried.antibiotics > 0) && (state.home.storage.antibiotics || 0) > 0;
   const mustGo = isNight(state.time) || heavy || needAbx || (!starving && (p.energy < 25 || p.health < 40));
   if (loc.kind === 'house') {

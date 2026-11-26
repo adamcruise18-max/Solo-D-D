@@ -77,20 +77,31 @@ export function fitsAt(layout, key, x, y, w, h) {
 }
 
 // ---------- the player's pack ----------
-// The backpack is worn: it makes the grid bigger and takes no cells itself.
-export const WORN = ['backpack'];
-export function packTiles(bag, order = Object.keys(bag)) {
-  return tilesFor(bag, order.filter((id) => !WORN.includes(id)));
+// The backpack is gear you wear, like a hoodie or gloves (Adam, 2026-11-26): it sits in the
+// 'back' clothes slot, never in the grid, and makes the grid bigger. A save from before this
+// change (its clothes have no 'back' slot yet) can still have a backpack in the bag: it
+// counts as worn (one of them). Once the slot exists, a backpack in the bag is a plain tile.
+const legacyPack = (state) => state.player?.worn?.back === undefined && (state.carried.backpack || 0) > 0;
+export function wearsPack(state) {
+  return state.player?.worn?.back === 'backpack' || legacyPack(state);
+}
+// The bag as the grid sees it (an old-save backpack is taken out: it is "worn").
+export function gridBag(state, bag = state.carried) {
+  if (!legacyPack(state)) return bag;
+  const b = { ...bag };
+  b.backpack = (b.backpack || 0) - 1;
+  if (b.backpack <= 0) delete b.backpack;
+  return b;
 }
 
-export function packSize(state) {
-  return { cols: GRID_COLS, rows: packRows(!!state.carried.backpack) };
+export function packSize(state, pack = wearsPack(state)) {
+  return { cols: GRID_COLS, rows: packRows(pack) };
 }
 
 // Does this bag fit in the pack (auto layout, no tile over the edge)?
-function bagFits(state, bag) {
-  const { cols, rows } = packSize(state);
-  return layoutGrid(packTiles(bag), cols, rows).overflow === 0;
+function bagFits(state, bag, pack) {
+  const { cols, rows } = packSize(state, pack);
+  return layoutGrid(tilesFor(gridBag(state, bag)), cols, rows).overflow === 0;
 }
 
 // How many units of id (up to want) fit in the pack now. Whole units for things that
@@ -109,25 +120,33 @@ export function roomFor(state, id, want) {
   return lo;
 }
 
+function packLayout(state) {
+  const { cols, rows } = packSize(state);
+  return layoutGrid(tilesFor(gridBag(state)), cols, rows);
+}
+
 // Cells used and cells in the pack (auto layout).
 export function packUse(state) {
-  const { cols, rows } = packSize(state);
-  const L = layoutGrid(packTiles(state.carried), cols, rows);
+  const L = packLayout(state);
   const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
-  return { used, total: cols * rows, over: L.overflow > 0 };
+  return { used, total: L.cols * L.rows, over: L.overflow > 0 };
 }
 
 // No room left even for a 1x1 thing.
 export function packFull(state) {
-  const { cols, rows } = packSize(state);
-  const L = layoutGrid(packTiles(state.carried), cols, rows);
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (fitsAt(L, null, x, y, 1, 1)) return false;
+  const L = packLayout(state);
+  for (let y = 0; y < L.rows; y++) for (let x = 0; x < L.cols; x++) if (fitsAt(L, null, x, y, 1, 1)) return false;
   return true;
 }
 
-// Would the rest still fit if this item left the pack (for example, the backpack)?
-export function packFitsWithout(state, id) {
-  const bag = { ...state.carried };
-  delete bag[id];
-  return bagFits({ ...state, carried: bag }, bag);
+// Can you take the backpack off? Everything, the backpack too (3 x 3), must then fit in
+// your pockets (the small grid).
+export function canTakeOffPack(state) {
+  const bag = { ...gridBag(state), backpack: (gridBag(state).backpack || 0) + 1 };
+  return layoutGrid(tilesFor(bag), GRID_COLS, packRows(false)).overflow === 0;
+}
+
+// Would what you carry fit in your pockets alone (the small grid, no backpack)?
+export function pocketsFit(state) {
+  return layoutGrid(tilesFor(gridBag(state)), GRID_COLS, packRows(false)).overflow === 0;
 }

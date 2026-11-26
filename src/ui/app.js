@@ -27,7 +27,7 @@ import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
 import { tilesFor, layoutGrid, gridHtml, setGridHandlers, savedPos, setPos, fitsAt } from './grid.js';
 import { GRID_COLS, packRows, sizeOf } from '../data/gridsize.js';
-import { roomFor, packUse, packTiles } from '../engine/packgrid.js';
+import { roomFor, packUse, gridBag, packSize, wearsPack } from '../engine/packgrid.js';
 import { createFx } from './fx.js';
 import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
@@ -373,9 +373,10 @@ const gridLayouts = {};
 function hereGridCols() { return GRID_COLS + 2; }
 function buildGrid(which) {
   const bag = which === 'pack' ? state.carried : hereBag(state);
-  const tiles = which === 'pack' ? packTiles(bag, sortedIds(bag)) : tilesFor(bag, sortedIds(bag));
+  const gb = which === 'pack' ? gridBag(state) : bag;
+  const tiles = tilesFor(gb, sortedIds(gb));
   const cols = which === 'pack' ? GRID_COLS : hereGridCols();
-  const rows = which === 'pack' ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
+  const rows = which === 'pack' ? packSize(state).rows : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
   let L = layoutGrid(tiles, cols, rows, savedPos(which === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`));
   // Your own tile places must never make the pack look fuller than it is: the rules use the
   // packed layout, so show that when your places leave tiles over the edge.
@@ -487,7 +488,7 @@ function renderItems() {
         <span class="${over ? 'bad' : ''}">${use.used} / ${use.total} cells${over ? ' (over full: slow)' : ''}</span></h3>
       <div class="bag-load${over ? ' over' : ''}"><i style="width:${fill}%"></i></div>
       ${gridHtml('pack', packO)}
-      <p class="hint">${state.carried.backpack ? `Backpack on: big grid. <button class="small" data-drop="backpack">Take it off</button>` : 'No backpack: pockets and hands only. Find a backpack for a bigger grid.'} Drag to move · R turns a tile while you drag · tap for buttons.</p>
+      <p class="hint">${wearsPack(state) ? `Backpack on (worn, like clothes): big grid.${state.player.worn?.back ? ' <button class="small" data-use="back" data-verb="take_off">Take it off</button>' : ''}` : 'No backpack: pockets and hands only. Find a backpack for a bigger grid.'} Drag to move · R turns a tile while you drag · tap for buttons.</p>
     </section>
     <section class="bag bag-here${home ? ' bag-home' : ''}">
       <h3><span class="bag-ico" aria-hidden="true">${home ? '⌂' : '⌕'}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll}</h3>
