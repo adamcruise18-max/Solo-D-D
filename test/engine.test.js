@@ -1,7 +1,7 @@
 import { packUse } from '../src/engine/packgrid.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, formatClock, formatDate, bagWeight, carryLimit } from '../src/engine/state.js';
+import { newGame, formatClock, formatDate, bagWeight } from '../src/engine/state.js';
 import { advanceTime } from '../src/engine/tick.js';
 import { perform } from '../src/engine/game.js';
 import { listActions, hereBag } from '../src/engine/actions.js';

@@ -2668,7 +2668,6 @@
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
       loss *= energyUseFactor(state2, mode);
-      if (mode === "walk" && bagWeight(state2.carried) > carryLimit(state2)) loss *= 1.5;
       p.energy = clamp2(p.energy - loss * dt, 0, p.energyMax);
     }
     if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
@@ -3070,7 +3069,7 @@
       text: "Twelve years on a hospital ward.",
       skills: { first_aid: 2 },
       item: ["bandages", 2],
-      weakness: "Bad back from lifting patients: you carry 4 lb less."
+      weakness: "Bad back from lifting patients: hard work uses 15% more energy."
     },
     tow_driver: {
       name: "Tow-truck driver",
@@ -3143,9 +3142,6 @@
   function xpFactor(state2) {
     return hasTrait(state2, "fast_learner") ? 1.3 : hasTrait(state2, "slow_learner") ? 0.7 : 1;
   }
-  function carryMinus(state2) {
-    return jobOf(state2) === "nurse" ? 4 : 0;
-  }
   function walkSpeedFactor(state2) {
     return jobOf(state2) === "roofer" ? 0.9 : 1;
   }
@@ -3161,6 +3157,7 @@
   function energyUseFactor(state2, mode) {
     let f = 1;
     if (mode === "walk" && jobOf(state2) === "tow_driver") f *= 1.15;
+    if (mode === "heavy" && jobOf(state2) === "nurse") f *= 1.15;
     if (mode === "walk" && hasLegacy(state2, "road_legs")) f *= 0.95;
     if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state2, "asthmatic")) f *= 1.2;
     return f;
@@ -3338,20 +3335,6 @@
   function addItem(bag, id, qty = 1) {
     bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
     if (bag[id] <= 1e-4) delete bag[id];
-  }
-  function bagWeight(bag) {
-    let w = 0;
-    for (const [id, q] of Object.entries(bag)) w += (ITEMS[id]?.weight || 0) * q;
-    return Math.round(w * 10) / 10;
-  }
-  var BASE_CARRY = 15;
-  var BACKPACK_CARRY = 15;
-  function carryLimit(state2) {
-    let lim = BASE_CARRY + (state2.carried.backpack ? BACKPACK_CARRY : 0);
-    if (state2.player.weak) lim *= 0.5;
-    if (state2.player.food < 25) lim *= 0.9;
-    lim -= carryMinus(state2) * (state2.player.weak ? 0.5 : 1);
-    return Math.round(lim);
   }
   function has(state2, id) {
     return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
