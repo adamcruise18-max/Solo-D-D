@@ -921,24 +921,91 @@ const FRUIT_LABELS = [
   { t: 'PEAR HALVES', s: 'BARTLETT', n: 'NET WT 15 OZ (425g)', b: '#e7efc8', f: '#4f6a1a', a: '#9ab83a', p: 'apple' },
 ];
 
+// ---- fine detail parts for items (part A). Only called when FINE (Medium/High 3D quality). ----
+// can: double seams, beads at the label edges, side seam, lid countersink and bottom stacking ring
+function dA_can(g, r, h) {
+  add(g, gTorus(r * 0.9, r * 0.022, 3, 16), M.tin, 0, h - r * 0.05, 0, Math.PI / 2); // lid countersink
+  add(g, gTorus(r * 0.55, r * 0.018, 3, 14), M.tin, 0, h - r * 0.045, 0, Math.PI / 2); // lid emboss ring
+  add(g, gCyl(r * 0.2, r * 0.2, r * 0.02, 10), M.tin, 0, h - r * 0.055, 0); // centre dimple
+  add(g, gTorus(r * 0.88, r * 0.03, 3, 16), M.tin, 0, r * 0.06, 0, Math.PI / 2); // stacking ring
+  add(g, gTorus(r * 0.993, r * 0.014, 3, 16), M.tin, 0, h * 0.08, 0, Math.PI / 2); // bead under label edge
+  add(g, gTorus(r * 0.993, r * 0.014, 3, 16), M.tin, 0, h * 0.92, 0, Math.PI / 2);
+  add(g, gTorus(r * 0.985, r * 0.02, 3, 16), M.tin, 0, h * 0.045, 0, Math.PI / 2); // necked shoulder bottom
+  add(g, gTorus(r * 0.985, r * 0.02, 3, 16), M.tin, 0, h * 0.955, 0, Math.PI / 2); // necked shoulder top
+  add(g, gBox(r * 0.06, h * 0.84, r * 0.02), M.tin, 0, h * 0.08, -r * 1.0); // label overlap / side seam
+}
+// soft pouch: heat seals top and bottom, a seal rib, tear notches, a hang hole ring. Pouch stands on y = 0, front +z.
+function dA_pouch(g, w, h, d, hex, rough, metal, crimp) {
+  const m = col(new THREE.Color(hex).getHex(), rough, metal);
+  const dk = col(new THREE.Color(shade(hex, -0.18)).getHex(), rough, metal);
+  const ch = h * crimp * 1.6, t = Math.max(0.004, d * 0.12);
+  add(g, gBox(w * 0.995, ch, t), m, 0, h - ch, 0); // top seal
+  add(g, gBox(w * 0.97, ch * 0.8, t), m, 0, 0, 0); // bottom seal
+  add(g, gBox(w * 0.96, ch * 0.12, t * 1.25), dk, 0, h - ch * 0.62, 0); // seal rib
+  add(g, gBox(w * 0.94, ch * 0.1, t * 1.25), dk, 0, ch * 0.4, 0);
+  for (const s of [-1, 1]) add(g, gBox(w * 0.035, ch * 0.32, t * 1.3), dk, s * w * 0.48, h - ch * 1.25, 0); // tear notches
+  add(g, gTorus(Math.min(w * 0.05, 0.012), Math.min(w * 0.01, 0.0025), 3, 10), dk, 0, h - ch * 0.5, t * 0.62); // hang hole
+}
+// printed carton: tuck flap and dust flap lines on top, glue flap on one side, bottom seam, a tear strip
+function dA_box(g, w, h, d, hex) {
+  const dk = col(new THREE.Color(shade(hex, -0.25)).getHex(), 0.65);
+  const e = 0.0012;
+  add(g, gBox(w * 0.8, e, 0.003), dk, 0, h, d * 0.18); // tuck flap fold
+  for (const s of [-1, 1]) add(g, gBox(0.003, e, d * 0.6), dk, s * w * 0.32, h, 0); // dust flap edges
+  add(g, gBox(e, h * 0.82, Math.min(0.006, d * 0.12)), dk, w / 2, h * 0.09, -d * 0.36); // glue flap
+  add(g, gBox(w * 0.8, e, 0.003), dk, 0, -e, -d * 0.18); // bottom seam
+  add(g, gBox(w * 0.6, Math.min(0.006, h * 0.05), e), dk, 0, h * 0.86, d / 2); // tear strip
+}
+// screw-cap bottle: tamper band, cap skirt and crown, neck and shoulder rings, label beads, base ring
+function dA_bottle(g, prof, bodyMat, capM, y0, y1, rLab, capH, capR) {
+  const top = prof[prof.length - 1];
+  const cr = Math.max(top[0] * 1.12, capR || 0);
+  const rMax = Math.max(...prof.map((p) => p[0]));
+  add(g, gTorus(cr * 0.97, capH * 0.12, 3, 12), capM, 0, top[1] + capH * 0.08, 0, Math.PI / 2); // tamper band
+  add(g, gTorus(cr * 0.98, capH * 0.1, 3, 12), capM, 0, top[1] + capH * 0.95, 0, Math.PI / 2); // crown edge
+  add(g, gCyl(cr * 0.55, cr * 0.55, capH * 0.08, 12), capM, 0, top[1] + capH, 0); // crown disc
+  add(g, gTorus(top[0] * 1.02, capH * 0.08, 3, 12), bodyMat, 0, top[1] - capH * 0.15, 0, Math.PI / 2); // neck ring
+  add(g, gTorus(rLab * 1.003, 0.0012, 3, 12), capM, 0, y0, 0, Math.PI / 2); // label edges
+  add(g, gTorus(rLab * 1.003, 0.0012, 3, 12), capM, 0, y1, 0, Math.PI / 2);
+  add(g, gTorus(rMax * 0.82, 0.0025, 3, 12), bodyMat, 0, 0.002, 0, Math.PI / 2); // base ring
+}
+
 const ITEM_BUILDERS = {
   canned_food(g, r) {
     canBody(g, 0.038, 0.112, pick(r, CAN_LABELS));
+    if (FINE) dA_can(g, 0.038, 0.112);
   },
   canned_fruit(g, r) {
     canBody(g, 0.038, 0.11, pick(r, FRUIT_LABELS), { tab: true });
+    if (FINE) {
+      const R = 0.038, H = 0.11;
+      dA_can(g, R, H);
+      add(g, gTorus(R * 0.7, R * 0.016, 3, 16), M.tin, 0, H - R * 0.045, 0, Math.PI / 2); // score line of the pull lid
+      add(g, gTorus(R * 0.1, R * 0.02, 3, 8), M.alu, 0, H - R * 0.03, 0, Math.PI / 2); // rivet ring
+      add(g, gBox(R * 0.22, R * 0.015, R * 0.08), M.alu, R * 0.14, H - R * 0.03, 0); // tab nose
+    }
   },
   dry_food(g, r) {
     if (r() < 0.5) {
       pouch(g, 0.17, 0.25, 0.08, { t: 'LONG GRAIN', t2: 'WHITE RICE', s: 'ENRICHED', n: 'NET WT 2 LB (907g)', b: '#f6f3ea', f: '#1d4f8a', a: '#1d4f8a', p: 'grain', top: 'PANTRY' }, 0.5, 0.05);
+      if (FINE) dA_pouch(g, 0.17, 0.25, 0.08, '#f6f3ea', 0.5, 0.05, 0.06);
     } else {
       const L = { t: 'PENNE', t2: 'RIGATE', s: 'ENRICHED MACARONI', n: 'NET WT 16 OZ (1 LB) 454g', b: '#1d4f9a', f: '#fff', a: '#f2c21b', tf: '#1d4f9a', p: 'grain', top: 'NO. 41' };
       printedBox(g, 0.15, 0.24, 0.06, L);
+      if (FINE) {
+        dA_box(g, 0.15, 0.24, 0.06, L.a);
+        add(g, gBox(0.06, 0.05, 0.002), M.clearPl, 0, 0.1, 0.0305); // window onto the pasta
+      }
     }
   },
   peanut_butter(g, r) {
     const prof = [[0, 0], [0.042, 0], [0.046, 0.006], [0.046, 0.1], [0.042, 0.112], [0.036, 0.116], [0.036, 0.122]];
-    bottle(g, prof, { t: 'PEANUT BUTTER', s: 'CREAMY', n: 'NET WT 16 OZ (454g)', b: '#f5e6c0', f: '#8a3a12', a: '#c8321e', p: 'peanut' }, col(0x9a6a2c, 0.35), capMat(pick(r, ['#c8321e', '#1d4f9a', '#2f7a32'])), 0.012, 0.095, 0.0465, 0.025, { capR: 0.043 });
+    const pbCap = capMat(pick(r, ['#c8321e', '#1d4f9a', '#2f7a32']));
+    bottle(g, prof, { t: 'PEANUT BUTTER', s: 'CREAMY', n: 'NET WT 16 OZ (454g)', b: '#f5e6c0', f: '#8a3a12', a: '#c8321e', p: 'peanut' }, col(0x9a6a2c, 0.35), pbCap, 0.012, 0.095, 0.0465, 0.025, { capR: 0.043 });
+    if (FINE) {
+      dA_bottle(g, prof, col(0x9a6a2c, 0.35), pbCap, 0.012, 0.095, 0.0465, 0.025, 0.043);
+      for (const y of [0.1, 0.106]) add(g, gTorus(0.044, 0.0016, 3, 18), col(0x9a6a2c, 0.35), 0, y, 0, Math.PI / 2); // jar shoulder threads
+    }
   },
   snacks(g, r) {
     const L = pick(r, [
@@ -946,22 +1013,41 @@ const ITEM_BUILDERS = {
       { t: 'GRAHAM', t2: 'CRACKERS', s: 'HONEY', n: 'NET WT 14.4 OZ (408g)', b: '#e3c07a', f: '#5a2a0a', a: '#2b4f9a', p: 'grain', top: 'FAMILY SIZE' },
     ]);
     printedBox(g, 0.2, 0.22, 0.07, L);
+    if (FINE) dA_box(g, 0.2, 0.22, 0.07, L.a);
   },
   formula(g) {
     // stand-up liquid nutrition pouch with spout
     pouch(g, 0.13, 0.19, 0.05, { t: 'LIQUID', t2: 'NUTRITION', s: 'COMPLETE  1.0 KCAL/ML', n: '1000 mL  TUBE FEEDING OR ORAL', b: '#fbfbf7', f: '#1d5fa8', a: '#3aa7a0', p: 'drop', top: 'MEDICAL' }, 0.35, 0.05, 0.05);
     add(g, gCyl(0.009, 0.009, 0.02, 12), M.whitePl, 0.03, 0.185, 0);
     add(g, gCyl(0.013, 0.013, 0.014, 12), capMat('#3aa7a0'), 0.03, 0.2, 0);
+    if (FINE) {
+      dA_pouch(g, 0.13, 0.19, 0.05, '#fbfbf7', 0.35, 0.05, 0.05);
+      add(g, gCyl(0.016, 0.016, 0.003, 12), M.whitePl, 0.03, 0.184, 0); // spout flange
+      add(g, gTorus(0.0135, 0.0015, 3, 12), capMat('#3aa7a0'), 0.03, 0.2, 0, Math.PI / 2); // tamper ring
+      add(g, gCyl(0.008, 0.008, 0.003, 10), capMat('#3aa7a0'), 0.03, 0.214, 0); // cap crown
+    }
   },
   dog_food(g) {
     pouch(g, 0.42, 0.62, 0.16, { t: 'DOG FOOD', s: 'CHICKEN & RICE  ADULT', n: 'NET WT 15 LB (6.8 kg)', b: '#2f7a32', f: '#fff', a: '#f2c21b', tf: '#2f7a32', p: 'paw', top: 'COMPLETE NUTRITION', tag: 'NEW', st: '#14401a' }, 0.7, 0.02, 0.04);
+    if (FINE) {
+      dA_pouch(g, 0.42, 0.62, 0.16, '#2f7a32', 0.7, 0.02, 0.04);
+      const dk = col(new THREE.Color(shade('#2f7a32', -0.18)).getHex(), 0.7, 0.02);
+      add(g, gBox(0.12, 0.022, 0.006), dk, 0, 0.565, 0.0); // carry handle cut-out
+      add(g, gBox(0.3, 0.006, 0.0215), dk, 0, 0.54, 0); // reseal strip
+    }
   },
   energy_bar(g, r) {
     const L = { t: 'ENERGY BARS', s: 'OATS & HONEY  6 BARS', n: '6 x 1.4 OZ (40g)', b: '#f08a1c', f: '#fff', a: '#5a2a0a', p: 'oats', st: '#7a3a0a' };
     printedBox(g, 0.16, 0.05, 0.09, L, { tw: 256, th: 96 });
+    if (FINE) dA_box(g, 0.16, 0.05, 0.09, L.a);
     // one loose bar on top
     const bar = new THREE.Group();
     pouch(bar, 0.04, 0.13, 0.016, { t: 'OAT BAR', b: '#f08a1c', f: '#fff', a: '#5a2a0a' }, 0.4, 0.2, 0.08);
+    if (FINE) {
+      const sm = col(0xf08a1c, 0.4, 0.2);
+      for (const y of [0, 0.118]) add(bar, gBox(0.041, 0.012, 0.003), sm, 0, y, 0); // crimped ends
+      add(bar, gBox(0.004, 0.11, 0.003), sm, 0, 0.01, -0.006); // fin seal on the back
+    }
     bar.rotation.set(-Math.PI / 2, 0, 0.3 + r() * 0.4);
     bar.position.set(-0.01, 0.058, 0.06);
     g.add(bar);
@@ -972,8 +1058,21 @@ const ITEM_BUILDERS = {
       add(g, gLathe('noodlecup', prof, 18), col(0xf4f1ea, 0.7));
       add(g, gCyl(0.05, 0.0385, 0.094, 18, true), tmat(wrapTex({ t: 'INSTANT NOODLES', s: 'CHICKEN FLAVOR', n: 'NET WT 2.25 OZ (64g)', b: '#f4f1ea', f: '#c41e1e', a: '#f2c21b', p: 'noodle' }, 512, 160), 0.6), 0, 0.004, 0);
       add(g, gCircle(0.051, 18), tmat(ctex('foillid', 128, 128, (c, w, h, rr) => { c.fillStyle = '#d8d8d0'; c.fillRect(0, 0, w, h); c.fillStyle = '#c41e1e'; c.beginPath(); c.arc(64, 64, 40, 0, TAU); c.fill(); txt(c, 'PEEL', 64, 64, 18, { color: '#fff' }); grime(c, w, h, rr, 0.5); }), 0.35, 0.4), 0, 0.103, 0);
+      if (FINE) {
+        const cup = col(0xf4f1ea, 0.7);
+        add(g, gTorus(0.051, 0.003, 3, 16), cup, 0, 0.1, 0, Math.PI / 2); // rolled rim
+        add(g, gBox(0.022, 0.0015, 0.016), tmat(ctex('foillid', 128, 128, () => {}), 0.35, 0.4), 0.056, 0.1025, 0); // peel tab
+        add(g, gTorus(0.0385, 0.002, 3, 14), cup, 0, 0.005, 0, Math.PI / 2); // foot ring
+        add(g, gTorus(0.0505, 0.0016, 3, 14), cup, 0, 0.097, 0, Math.PI / 2); // label edges
+        add(g, gTorus(0.0389, 0.0016, 3, 14), cup, 0, 0.006, 0, Math.PI / 2);
+        add(g, gCircle(0.036, 16), cup, 0, 0.0008, 0, Math.PI); // base
+      }
     } else {
-      pouch(g, 0.12, 0.16, 0.035, { t: 'RAMEN', t2: 'NOODLES', s: 'BEEF FLAVOR', n: 'NET WT 3 OZ (85g)', b: '#c41e1e', f: '#fff', a: '#f2c21b', tf: '#c41e1e', p: 'noodle', top: 'QUICK 3 MIN' }, 0.4, 0.15).rotation.x = -Math.PI / 2;
+      const p = new THREE.Group();
+      pouch(p, 0.12, 0.16, 0.035, { t: 'RAMEN', t2: 'NOODLES', s: 'BEEF FLAVOR', n: 'NET WT 3 OZ (85g)', b: '#c41e1e', f: '#fff', a: '#f2c21b', tf: '#c41e1e', p: 'noodle', top: 'QUICK 3 MIN' }, 0.4, 0.15);
+      if (FINE) dA_pouch(p, 0.12, 0.16, 0.035, '#c41e1e', 0.4, 0.15, 0.08);
+      p.rotation.x = -Math.PI / 2;
+      g.add(p);
     }
   },
   chips(g, r) {
@@ -982,14 +1081,30 @@ const ITEM_BUILDERS = {
       { t: 'TORTILLA', t2: 'CHIPS', s: 'RESTAURANT STYLE', n: 'NET WT 11 OZ (311g)', b: '#2b4f9a', f: '#fff', a: '#f2c21b', tf: '#2b4f9a', p: 'chip', top: 'FAMILY SIZE' },
     ]);
     pouch(g, 0.21, 0.3, 0.08, L, 0.3, 0.35, 0.05);
+    if (FINE) dA_pouch(g, 0.21, 0.3, 0.08, L.b, 0.3, 0.35, 0.05);
   },
   jerky(g) {
-    pouch(g, 0.14, 0.2, 0.035, { t: 'BEEF JERKY', s: 'ORIGINAL  HIGH PROTEIN', n: 'NET WT 3.25 OZ (92g)', b: '#2a2420', f: '#f2c21b', a: '#8a2a12', p: 'meat', top: 'RESEALABLE' }, 0.4, 0.2, 0.06).rotation.x = -Math.PI / 2;
+    const p = new THREE.Group();
+    pouch(p, 0.14, 0.2, 0.035, { t: 'BEEF JERKY', s: 'ORIGINAL  HIGH PROTEIN', n: 'NET WT 3.25 OZ (92g)', b: '#2a2420', f: '#f2c21b', a: '#8a2a12', p: 'meat', top: 'RESEALABLE' }, 0.4, 0.2, 0.06);
+    if (FINE) {
+      dA_pouch(p, 0.14, 0.2, 0.035, '#2a2420', 0.4, 0.2, 0.06);
+      add(p, gBox(0.125, 0.003, 0.0065), col(new THREE.Color(shade('#2a2420', -0.18)).getHex(), 0.4, 0.2), 0, 0.165, 0); // zip-lock track
+    }
+    p.rotation.x = -Math.PI / 2;
+    g.add(p);
   },
   oatmeal(g) {
     add(g, gCyl(0.064, 0.064, 0.18, 20, true), tmat(wrapTex({ t: 'OLD FASHIONED OATS', s: '100% WHOLE GRAIN', n: 'NET WT 42 OZ (2 LB 10 OZ) 1.19kg', b: '#f4f1ea', f: '#2a4f8a', a: '#2a4f8a', p: 'oats' }, 512, 220), 0.75));
     add(g, gCyl(0.066, 0.066, 0.025, 20), col(0x2a4f8a, 0.4), 0, 0.17, 0);
     add(g, gCircle(0.063, 20), col(0x7a6a50, 0.9), 0, 0.001, 0, Math.PI);
+    if (FINE) {
+      const blue = col(0x2a4f8a, 0.4);
+      add(g, gTorus(0.066, 0.003, 3, 16), blue, 0, 0.17, 0, Math.PI / 2); // lid lip
+      add(g, gTorus(0.066, 0.0025, 3, 16), blue, 0, 0.195, 0, Math.PI / 2); // lid top edge
+      add(g, gTorus(0.04, 0.002, 3, 12), blue, 0, 0.1952, 0, Math.PI / 2); // lid ring
+      add(g, gTorus(0.0645, 0.003, 3, 16), col(0x7a6a50, 0.9), 0, 0.003, 0, Math.PI / 2); // card base rim
+      add(g, gBox(0.004, 0.15, 0.002), col(0x7a6a50, 0.9), 0, 0.01, -0.0645); // tube seam
+    }
   },
   soda(g, r) {
     const L = pick(r, [
@@ -1002,6 +1117,14 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.0332, 0.0332, 0.092, 18, true), tmat(wrapTex(L, 512, 150), 0.3, 0.3), 0, 0.011, 0);
     add(g, gCircle(0.026, 16), M.alu, 0, 0.12, 0);
     add(g, gTorus(0.0065, 0.0015, 3, 8), M.alu, 0.008, 0.121, 0, Math.PI / 2, 0, 0, 1, 1.5, 1);
+    if (FINE) {
+      add(g, gTorus(0.0265, 0.0022, 4, 18), M.alu, 0, 0.1215, 0, Math.PI / 2); // top rim
+      add(g, gTorus(0.023, 0.0012, 3, 16), M.alu, 0, 0.1205, 0, Math.PI / 2); // lid countersink
+      add(g, gCyl(0.002, 0.002, 0.002, 8), M.alu, 0, 0.1208, 0); // tab rivet
+      add(g, gBox(0.011, 0.0008, 0.009), M.blackPl, -0.009, 0.1204, 0); // opening score
+      add(g, gTorus(0.023, 0.002, 3, 16), M.alu, 0, 0.004, 0, Math.PI / 2); // base dome ring
+      add(g, gTorus(0.0333, 0.0012, 3, 18), M.alu, 0, 0.103, 0, Math.PI / 2); // label top edge
+    }
   },
   sports_drink(g, r) {
     const c = pick(r, [[0x2a7fd6, 'GLACIER BLUE', '#2a7fd6'], [0xf08a1c, 'ORANGE', '#f08a1c'], [0xd6283a, 'FRUIT PUNCH', '#d6283a']]);
@@ -1009,6 +1132,15 @@ const ITEM_BUILDERS = {
     add(g, gLathe('sportsbottle', prof, 18), mat('sport' + c[0], { color: c[0], roughness: 0.15, transparent: true, opacity: 0.82 }));
     add(g, gCyl(0.0365, 0.0365, 0.055, 18, true), tmat(wrapTex({ t: 'SPORTS DRINK', s: c[1], n: '28 FL OZ (828 mL)', b: '#111', f: '#fff', a: c[2], p: 'bolt' }, 512, 120), 0.4), 0, 0.112, 0);
     add(g, gCyl(0.018, 0.018, 0.022, 16), capMat(c[2]), 0, 0.212, 0);
+    if (FINE) {
+      const cm = capMat(c[2]);
+      const body = mat('sport' + c[0], { color: c[0], roughness: 0.15, transparent: true, opacity: 0.82 });
+      add(g, gTorus(0.018, 0.0022, 3, 14), cm, 0, 0.214, 0, Math.PI / 2); // tamper band
+      add(g, gCyl(0.009, 0.011, 0.012, 12), cm, 0, 0.234, 0); // sport spout
+      add(g, gTorus(0.0175, 0.0022, 3, 14), body, 0, 0.207, 0, Math.PI / 2); // neck ring
+      for (const y of [0.084, 0.091]) add(g, gTorus(0.0335, 0.0018, 3, 18), body, 0, y, 0, Math.PI / 2); // grip waist ribs
+      add(g, gTorus(0.03, 0.0025, 3, 16), body, 0, 0.004, 0, Math.PI / 2); // base ring
+    }
   },
   water_bottle(g) {
     // one gallon jug: rounded square body, handle, neck, cap
@@ -1020,6 +1152,16 @@ const ITEM_BUILDERS = {
     add(g, gTube('jughandle', [[0.04, 0.2, -0.06], [0.06, 0.25, -0.06], [0.065, 0.27, -0.02], [0.05, 0.25, 0.02], [0.04, 0.2, 0.04]], 0.012, 12, 6), jug, 0, 0, 0);
     const band = tmat(sleeveTex({ t: 'DRINKING WATER', s: '1 GALLON (3.78 L)  PURIFIED', b: '#ffffff', f: '#1d5fa8', a: '#3d8fd6' }), 0.5);
     add(g, gBox(0.152, 0.07, 0.152), [band, band, M.clearPl, M.clearPl, band, band], 0, 0.08, 0);
+    if (FINE) {
+      const cm = capMat('#2a6fd6');
+      add(g, gTorus(0.021, 0.0025, 3, 14), cm, 0, 0.272, 0, Math.PI / 2); // tamper band
+      add(g, gCyl(0.017, 0.017, 0.003, 12), cm, 0, 0.286, 0); // cap crown
+      add(g, gTorus(0.019, 0.0025, 3, 14), jug, 0, 0.266, 0, Math.PI / 2); // neck ring
+      for (const y of [0.04, 0.17]) add(g, gRBox(0.156, 0.006, 0.156, 0.003), jug, 0, y, 0); // ribs above and below the band
+      for (const s of [-1, 1]) add(g, gBox(0.004, 0.03, 0.156), jug, s * 0.04, 0.18, 0); // grip panel ridges
+      add(g, gRBox(0.12, 0.004, 0.12, 0.002), jug, 0, 0.0, 0); // base step
+      add(g, gBox(0.01, 0.004, 0.012), jug, 0.045, 0.254, 0.01, 0, 0, -0.5); // handle web
+    }
   },
   saline(g) {
     // IV bag lying flat: front print on +y
@@ -1040,13 +1182,26 @@ const ITEM_BUILDERS = {
     m.rotation.x = -Math.PI / 2; m.position.y = 0.015; m.position.z = 0.125;
     add(g, gCyl(0.005, 0.005, 0.04, 8), M.whitePl, -0.02, 0.012, 0.135, Math.PI / 2);
     add(g, gCyl(0.006, 0.006, 0.03, 8), col(0x2a6fd6, 0.5), 0.025, 0.012, 0.13, Math.PI / 2);
+    if (FINE) {
+      add(g, gCyl(0.0065, 0.0065, 0.006, 8), M.whitePl, -0.02, 0.012, 0.157, Math.PI / 2); // port cap
+      add(g, gCyl(0.0075, 0.0075, 0.005, 8), col(0x2a6fd6, 0.5), 0.025, 0.012, 0.147, Math.PI / 2); // injection port bulb
+      add(g, gBox(0.148, 0.006, 0.012), M.clearPl, 0, 0.012, 0.118); // bottom weld
+      add(g, gBox(0.148, 0.006, 0.014), M.clearPl, 0, 0.012, -0.118); // top weld
+      add(g, gTorus(0.008, 0.002, 3, 10), M.clearPl, 0, 0.016, -0.112, Math.PI / 2); // hanger hole
+      add(g, gBox(0.012, 0.006, 0.022), M.whitePl, 0, 0.012, 0.115); // port block
+    }
   },
   ors(g) {
     const L = { t: 'ORAL', t2: 'REHYDRATION SALTS', s: 'WHO FORMULA  10 SACHETS', n: 'DISSOLVE 1 SACHET IN 1 L WATER', b: '#f4f8fb', f: '#1d5fa8', a: '#3aa7a0', p: 'drop', top: 'ELECTROLYTES' };
     printedBox(g, 0.1, 0.13, 0.04, L);
+    if (FINE) dA_box(g, 0.1, 0.13, 0.04, L.a);
     for (let i = 0; i < 2; i++) {
       const s = new THREE.Group();
       pouch(s, 0.07, 0.1, 0.008, { t: 'ORS', s: '1 L SACHET', b: '#fbfbf7', f: '#1d5fa8', a: '#3aa7a0' }, 0.35, 0.25, 0.08);
+      if (FINE) {
+        for (const y of [0, 0.088]) add(s, gBox(0.07, 0.012, 0.0025), col(0xfbfbf7, 0.35, 0.25), 0, y, 0); // sealed ends
+        add(s, gBox(0.004, 0.008, 0.003), col(0xfbfbf7, 0.35, 0.25), 0.033, 0.08, 0); // tear notch
+      }
       s.rotation.set(-Math.PI / 2, 0, 0.4 + i * 0.5);
       s.position.set(0.08 + i * 0.03, 0.005 + i * 0.006, 0.07);
       g.add(s);
@@ -1069,6 +1224,17 @@ const ITEM_BUILDERS = {
     add(g, gBox(0.24, 0.002, 0.17), [red, red, lid, red, red, red], 0, 0.091, 0);
     add(g, gTube('fahandle', [[-0.06, 0.05, 0.1], [-0.05, 0.05, 0.125], [0.05, 0.05, 0.125], [0.06, 0.05, 0.1]], 0.008, 10, 6), M.whitePl);
     for (const x of [-0.09, 0.09]) add(g, gBox(0.025, 0.03, 0.008), M.whitePl, x, 0.04, 0.102);
+    if (FINE) {
+      for (const x of [-0.09, 0.09]) {
+        add(g, gCyl(0.004, 0.004, 0.022, 8), M.whitePl, x, 0.056, 0.106, 0, 0, Math.PI / 2); // latch pivot
+        add(g, gBox(0.016, 0.004, 0.006), M.whitePl, x, 0.07, 0.105); // latch lip
+        add(g, gCyl(0.005, 0.005, 0.03, 8), red, x, 0.056, -0.1, 0, 0, Math.PI / 2); // hinge knuckle
+      }
+      for (const x of [-0.05, 0.05]) add(g, gBox(0.016, 0.014, 0.006), M.whitePl, x, 0.044, 0.104); // handle mounts
+      for (const x of [-0.11, 0.11]) for (const z of [-0.075, 0.075]) add(g, gCyl(0.008, 0.008, 0.004, 8), M.rubber, x, 0, z); // feet
+      add(g, gBox(0.002, 0.004, 0.17), col(0xeeeeee, 0.5), -0.121, 0.0915, 0); // lid plate trim
+      add(g, gBox(0.002, 0.004, 0.17), col(0xeeeeee, 0.5), 0.121, 0.0915, 0);
+    }
   },
   antibiotics(g, r) {
     const amber = mat('amber', { color: 0xb5651d, roughness: 0.2, transparent: true, opacity: 0.85 });
@@ -1078,31 +1244,63 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.0212, 0.0212, 0.045, 16, true), tmat(rxLabelTex(name, 'TAKE 1 CAPSULE 3 TIMES DAILY', 1), 0.6), 0, 0.012, 0);
     add(g, gCyl(0.023, 0.023, 0.018, 16), capMat('#f4f4f0'), 0, 0.075, 0);
     add(g, gCircle(0.022, 16), col(0xf4f4f0, 0.5), 0, 0.0935, 0);
+    if (FINE) {
+      const cm = capMat('#f4f4f0');
+      add(g, gTorus(0.0232, 0.0018, 3, 14), cm, 0, 0.0765, 0, Math.PI / 2); // child-proof skirt
+      add(g, gTorus(0.0225, 0.0015, 3, 14), cm, 0, 0.092, 0, Math.PI / 2); // crown edge
+      add(g, gTorus(0.012, 0.001, 3, 12), col(0xf4f4f0, 0.5), 0, 0.0937, 0, Math.PI / 2); // PUSH DOWN ring
+      add(g, gTorus(0.0214, 0.0012, 3, 16), cm, 0, 0.012, 0, Math.PI / 2); // label edges
+      add(g, gTorus(0.0214, 0.0012, 3, 16), cm, 0, 0.057, 0, Math.PI / 2);
+      add(g, gTorus(0.017, 0.002, 3, 14), amber, 0, 0.002, 0, Math.PI / 2); // base ring
+      add(g, gTorus(0.0185, 0.0015, 3, 14), amber, 0, 0.073, 0, Math.PI / 2); // neck bead
+    }
   },
   pain_pills(g) {
     const prof = [[0, 0], [0.026, 0], [0.029, 0.006], [0.029, 0.085], [0.02, 0.098], [0.016, 0.1]];
     bottle(g, prof, { t: 'PAIN RELIEVER', s: 'ACETAMINOPHEN 500 MG', n: '100 CAPLETS', b: '#f4f4f0', f: '#c41e1e', a: '#c41e1e', p: 'pill' }, col(0xf4f4f0, 0.4), capMat('#f4f4f0'), 0.01, 0.08, 0.0293, 0.02, { capR: 0.02 });
+    if (FINE) dA_bottle(g, prof, col(0xf4f4f0, 0.4), capMat('#f4f4f0'), 0.01, 0.08, 0.0293, 0.02, 0.02);
   },
   ibuprofen(g) {
     printedBox(g, 0.075, 0.115, 0.04, { t: 'IBUPROFEN', s: '200 MG  PAIN RELIEVER', n: '50 COATED TABLETS', b: '#f08a1c', f: '#fff', a: '#7a2a0a', p: 'pill', top: 'NSAID', st: '#a0400a' });
+    if (FINE) dA_box(g, 0.075, 0.115, 0.04, '#7a2a0a');
     const prof = [[0, 0], [0.018, 0], [0.02, 0.004], [0.02, 0.06], [0.014, 0.068], [0.012, 0.07]];
     const b = new THREE.Group();
     bottle(b, prof, { t: 'IBUPROFEN', s: '200 MG', n: '50 TABLETS', b: '#fff', f: '#f08a1c', a: '#f08a1c', p: 'pill' }, col(0xf4f4f0, 0.4), capMat('#f08a1c'), 0.008, 0.055, 0.0203, 0.016, { capR: 0.015 });
+    if (FINE) dA_bottle(b, prof, col(0xf4f4f0, 0.4), capMat('#f08a1c'), 0.008, 0.055, 0.0203, 0.016, 0.015);
     b.position.set(0.065, 0, 0.01);
     g.add(b);
   },
   vitamins(g) {
     const prof = [[0, 0], [0.034, 0], [0.037, 0.006], [0.037, 0.105], [0.03, 0.115], [0.028, 0.118]];
     bottle(g, prof, { t: 'MULTIVITAMIN', s: 'DAILY  ADULT 50+', n: '120 TABLETS', b: '#2a2a6a', f: '#f2c21b', a: '#f2c21b', p: 'sun' }, col(0x23234f, 0.35), capMat('#23234f'), 0.012, 0.1, 0.0373, 0.022, { capR: 0.031 });
+    if (FINE) dA_bottle(g, prof, col(0x23234f, 0.35), capMat('#23234f'), 0.012, 0.1, 0.0373, 0.022, 0.031);
   },
   bandages(g) {
+    const gz = tmat(ctex('gauze', 64, 64, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#f3f0e8', 0.08, 600, 1); c.strokeStyle = 'rgba(0,0,0,0.08)'; for (let i = 0; i < w; i += 3) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } }), 0.95);
     printedBox(g, 0.1, 0.13, 0.045, { t: 'ADHESIVE', t2: 'BANDAGES', s: 'FLEXIBLE FABRIC  ASSORTED', n: '60 BANDAGES', b: '#f4f1ea', f: '#c41e1e', a: '#e0b38a', tf: '#5a2a0a', p: 'cross', top: 'STERILE' });
+    if (FINE) {
+      dA_box(g, 0.1, 0.13, 0.045, '#e0b38a');
+      // two loose bandages in front of the box
+      for (let i = 0; i < 2; i++) {
+        add(g, gBox(0.07, 0.002, 0.02), col(0xe0b38a, 0.65), -0.01 + i * 0.012, i * 0.0022, 0.05 + i * 0.012, 0, 0.3 - i * 0.5, 0);
+        add(g, gBox(0.022, 0.0025, 0.014), gz, -0.01 + i * 0.012, 0.0002 + i * 0.0022, 0.05 + i * 0.012, 0, 0.3 - i * 0.5, 0);
+      }
+    }
     // gauze roll beside
-    add(g, gCyl(0.025, 0.025, 0.05, 16), tmat(ctex('gauze', 64, 64, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#f3f0e8', 0.08, 600, 1); c.strokeStyle = 'rgba(0,0,0,0.08)'; for (let i = 0; i < w; i += 3) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } }), 0.95), 0.085, 0.025, 0.02, Math.PI / 2, 0, 0.3);
+    add(g, gCyl(0.025, 0.025, 0.05, 16), gz, 0.085, 0.025, 0.02, Math.PI / 2, 0, 0.3);
+    if (FINE) {
+      // paper core visible in the gauze roll ends, and a loose tail on the table
+      const roll = new THREE.Group();
+      add(roll, gCyl(0.009, 0.009, 0.0515, 10, true), col(new THREE.Color(shade('#e0b38a', -0.25)).getHex(), 0.65), 0, -0.00075, 0);
+      roll.position.set(0.085, 0.025, 0.02); roll.rotation.set(Math.PI / 2, 0, 0.3);
+      g.add(roll);
+      add(g, gBox(0.045, 0.0015, 0.04), gz, 0.1, 0, -0.03, 0, 0.3, 0);
+    }
   },
   water_tablets(g) {
     const prof = [[0, 0], [0.018, 0], [0.02, 0.004], [0.02, 0.055], [0.013, 0.062], [0.012, 0.065]];
     bottle(g, prof, { t: 'WATER PURIFICATION', s: 'TABLETS  KILLS GERMS', n: '50 TABLETS  TREATS 25 L', b: '#4a5a2a', f: '#fff', a: '#f2c21b', p: 'drop' }, mat('brownglass', { color: 0x5a3a1a, roughness: 0.15, transparent: true, opacity: 0.88 }), capMat('#3a3a3a'), 0.008, 0.05, 0.0203, 0.016, { capR: 0.015 });
+    if (FINE) dA_bottle(g, prof, mat('brownglass', { color: 0x5a3a1a, roughness: 0.15, transparent: true, opacity: 0.88 }), capMat('#3a3a3a'), 0.008, 0.05, 0.0203, 0.016, 0.015);
   },
   first_aid_kit: null,
   flashlight(g) {
@@ -1114,6 +1312,18 @@ const ITEM_BUILDERS = {
     add(f, gCircle(0.024, 16), mat('lens', { color: 0xeef6ff, roughness: 0.05, emissive: 0x222222 }), 0, 0.2015, 0);
     add(f, gCyl(0.006, 0.006, 0.006, 8), col(0x111111, 0.8), 0, 0.15, 0.019, Math.PI / 2);
     add(f, gTorus(0.026, 0.0025, 4, 16), M.alu, 0, 0.2, 0, Math.PI / 2);
+    if (FINE) {
+      const body = col(0x2b2d30, 0.4, 0.45);
+      add(f, gLathe('fl_reflector', [[0.006, 0.172], [0.023, 0.199]], 14), M.alu); // reflector cone behind the lens
+      add(f, gCyl(0.0035, 0.0035, 0.004, 8), mat('lens', { color: 0xeef6ff, roughness: 0.05, emissive: 0x222222 }), 0, 0.174, 0); // bulb
+      add(f, gTorus(0.0175, 0.002, 3, 14), body, 0, 0.0055, 0, Math.PI / 2); // tail cap ring
+      add(f, gTorus(0.0175, 0.0018, 3, 14), body, 0, 0.115, 0, Math.PI / 2); // knurl end rings
+      add(f, gTorus(0.0175, 0.0018, 3, 14), body, 0, 0.02, 0, Math.PI / 2);
+      for (const y of [0.172, 0.18, 0.188]) add(f, gTorus(0.0265, 0.0016, 3, 14), body, 0, y, 0, Math.PI / 2); // head grip fins
+      add(f, gTorus(0.0075, 0.0015, 3, 10), col(0x111111, 0.8), 0, 0.15, 0.019); // switch boot rim
+      add(f, gBox(0.006, 0.07, 0.0025), M.alu, 0, 0.05, -0.0195); // pocket clip
+      add(f, gTorus(0.006, 0.0012, 3, 8), M.alu, 0, -0.004, 0, 0, Math.PI / 2, 0); // lanyard loop
+    }
     f.rotation.z = Math.PI / 2;
     f.position.y = 0.027;
     g.add(f);
@@ -1126,6 +1336,16 @@ const ITEM_BUILDERS = {
       add(g, gCyl(0.007, 0.007, 0.05, 10), bt, x, 0.01, z - 0.025, Math.PI / 2);
     }
     add(g, gRBox(0.112, 0.016, 0.13, 0.006), M.clearPl, 0, 0.003, -0.002);
+    if (FINE) {
+      for (let i = 0; i < 8; i++) { // positive terminal nubs and flat negative ends
+        const x = -0.042 + (i % 4) * 0.028, z = (i < 4 ? -0.035 : 0.035) - 0.025;
+        add(g, gCyl(0.0025, 0.0025, 0.002, 8), M.steel, x, 0.01, z + 0.025, Math.PI / 2);
+        add(g, gCyl(0.0062, 0.0062, 0.0008, 10), M.steel, x, 0.01, z - 0.0008, Math.PI / 2);
+      }
+      add(g, gTorus(0.006, 0.0015, 3, 10), col(0xdddddd, 0.7), 0, 0.0035, -0.07, Math.PI / 2); // hang hole
+      add(g, gBox(0.116, 0.002, 0.006), M.clearPl, 0, 0.003, 0.064); // blister flange
+      add(g, gBox(0.116, 0.002, 0.006), M.clearPl, 0, 0.003, -0.068);
+    }
   },
   pry_bar(g) {
     const paint = tmat(texPainted('#c4221c', 'pry'), 0.5, 0.2);
@@ -1133,6 +1353,12 @@ const ITEM_BUILDERS = {
     add(g, gTube('prybar', [[-0.33, 0.012, 0], [-0.1, 0.012, 0], [0.18, 0.012, 0], [0.26, 0.016, 0], [0.31, 0.04, 0], [0.31, 0.075, 0], [0.28, 0.09, 0], [0.25, 0.085, 0]], 0.011, 40, 6), paint);
     add(g, gBox(0.05, 0.006, 0.026), M.steel, -0.355, 0.006, 0, 0, 0, 0.12);
     add(g, gBox(0.02, 0.008, 0.026), M.darkMetal, 0.24, 0.083, 0, 0, 0, 0.5);
+    if (FINE) {
+      for (const s of [-1, 1]) add(g, gBox(0.03, 0.007, 0.011), paint, 0.25, 0.085, s * 0.008, 0, 0, 0.5); // split claw tines
+      add(g, gBox(0.012, 0.009, 0.006), M.darkMetal, 0.252, 0.088, 0, 0, 0, 0.5); // nail slot
+      for (const x of [-0.27, -0.24, -0.21, -0.18]) add(g, gTorus(0.0115, 0.0025, 3, 8), M.darkMetal, x, 0.012, 0, 0, Math.PI / 2, 0); // grip wraps
+      add(g, gBox(0.012, 0.004, 0.024), M.steel, -0.33, 0.009, 0, 0, 0, -0.3); // chisel bevel
+    }
   },
   backpack(g, r) {
     const color = pick(r, ['#2f3f2a', '#22304a', '#3a3a3c', '#5a2a22']);
@@ -1152,21 +1378,65 @@ const ITEM_BUILDERS = {
     for (const s of [-1, 1]) add(g, gBox(0.03, 0.14, 0.1), tmat(texNylon('#111111', 'mesh'), 0.9), s * 0.155, 0.02, 0);
     // compression strap buckles
     for (const s of [-1, 1]) add(g, gBox(0.025, 0.03, 0.008), M.blackPl, s * 0.07, 0.15, 0.137);
+    if (FINE) {
+      for (const s of [-1, 1]) {
+        add(g, gBox(0.018, 0.12, 0.004), dk, s * 0.07, 0.03, 0.136); // webbing under the buckles
+        add(g, gBox(0.018, 0.1, 0.004), dk, s * 0.07, 0.168, 0.132);
+        add(g, gBox(0.004, 0.12, 0.05), dk, s * 0.152, 0.25, 0.0); // side compression strap
+        add(g, gBox(0.008, 0.025, 0.02), M.blackPl, s * 0.154, 0.3, 0.0); // its buckle
+        add(g, gBox(0.03, 0.02, 0.012), M.blackPl, s * 0.08, 0.06, -0.125); // strap adjuster at the bottom
+        add(g, gBox(0.02, 0.014, 0.014), M.blackPl, s * 0.08, 0.418, -0.088); // strap top anchor
+      }
+      for (let i = 0; i < 4; i++) add(g, gBox(0.03, 0.008, 0.006), dk, 0, 0.29 + i * 0.022, 0.117); // daisy chain loops
+      add(g, gBox(0.2, 0.004, 0.004), M.blackPl, 0, 0.435, 0.092); // lid zipper
+      add(g, gBox(0.008, 0.02, 0.003), M.steel, -0.08, 0.425, 0.093); // lid zipper pull
+      add(g, gBox(0.008, 0.02, 0.003), M.steel, -0.09, 0.225, 0.136); // second main pull
+      add(g, gBox(0.06, 0.035, 0.003), tmat(texNylon(shade(color, 0.35), 'patch'), 0.8), 0, 0.12, 0.137); // name patch
+      add(g, gRBox(0.29, 0.03, 0.16, 0.012), dk, 0, -0.002, 0); // reinforced bottom panel
+      add(g, gTube('bphaul', [[-0.03, 0, 0], [-0.02, 0.02, 0], [0.02, 0.02, 0], [0.03, 0, 0]], 0.006, 8, 4), dk, 0, 0.47, -0.06); // haul loop
+    }
   },
   winter_coat(g, r) {
     const color = pick(r, ['#22304a', '#2f3a2a', '#5a1d1a', '#2a2a2c', '#6a5a3a']);
     const q = tmat(texQuilt(color), 0.75);
     const fur = tmat(ctex('fur', 128, 128, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#9a8a72', 0.35, 4000, 2); for (let i = 0; i < 600; i++) { c.strokeStyle = rr() < 0.5 ? 'rgba(60,50,40,0.5)' : 'rgba(220,210,190,0.5)'; c.beginPath(); const x = rr() * w, y = rr() * h; c.moveTo(x, y); c.lineTo(x + (rr() - 0.5) * 8, y + 6); c.stroke(); } }), 0.95);
     jacketLaid(g, q, tmat(texKnit(shade(color, -0.2), 'coatcuff'), 0.95), { th: 0.075, sleeveR: 0.065, color, fur });
+    if (FINE) {
+      const th = 0.075;
+      const flap = col(new THREE.Color(shade(color, -0.15)).getHex(), 0.75);
+      add(g, gBox(0.05, 0.006, 0.5), flap, 0.03, th - 0.001, 0.04); // storm flap over the zipper
+      for (let i = 0; i < 6; i++) add(g, gCyl(0.008, 0.008, 0.004, 10), M.steel, 0.045, th + 0.004, -0.15 + i * 0.07); // snaps
+      for (const s of [-1, 1]) {
+        add(g, gBox(0.13, 0.008, 0.05), flap, s * 0.12, th - 0.002, 0.1); // pocket flaps
+        add(g, gCyl(0.006, 0.006, 0.004, 10), M.steel, s * 0.12, th + 0.003, 0.115); // pocket snaps
+        add(g, gBox(0.02, 0.006, 0.17), flap, s * 0.2, th - 0.004, -0.13, 0, s * 0.3, 0); // shoulder seams
+      }
+      add(g, gRBox(0.45, th * 0.5, 0.05, 0.01), flap, 0, th * 0.25, 0.28); // hem band
+      add(g, gBox(0.09, 0.004, 0.004), M.darkMetal, -0.11, th, -0.08); // chest pocket zipper
+      add(g, gBox(0.006, 0.006, 0.02), M.steel, -0.07, th + 0.001, -0.08); // its pull
+      for (const s of [-1, 1]) {
+        add(g, gTube('coatcord' + s, [[s * 0.05, 0, 0], [s * 0.08, 0, 0.04], [s * 0.07, 0, 0.09]], 0.003, 6, 3), col(0x111111, 0.6), 0, th + 0.004, -0.27); // hood cords
+        add(g, gCyl(0.008, 0.008, 0.016, 8), col(0x111111, 0.6), s * 0.07, th + 0.006, -0.18, Math.PI / 2); // cord stoppers
+      }
+      add(g, gBox(0.05, 0.003, 0.03), flap, 0.36, th * 0.9, 0.05, 0, -0.3, 0); // sleeve patch
+    }
   },
   winter_hat(g, r) {
     const color = pick(r, ['#8a1d1a', '#22304a', '#3a5a2a', '#7a6a50', '#d8d2c4']);
     const k = tmat(texKnit(color), 0.95);
-    add(g, gLathe('beanie', [[0.0, 0.17], [0.04, 0.168], [0.07, 0.155], [0.088, 0.13], [0.095, 0.09], [0.095, 0.04]], 18), k, 0, 0, 0);
+    add(g, gLathe('beanie_out', [[0.095, 0.04], [0.095, 0.09], [0.088, 0.13], [0.07, 0.155], [0.04, 0.168], [0.0, 0.17]], 18), k, 0, 0, 0); // points run bottom to top so the faces point outward
     add(g, gCyl(0.1, 0.1, 0.06, 18, true), tmat(texKnit(shade(color, -0.1), 'cuff'), 0.95), 0, 0.01, 0);
         add(g, gTorus(0.097, 0.008, 4, 18), k, 0, 0.012, 0, Math.PI / 2);
     add(g, gCircle(0.097, 18), col(0x1a1a1a, 0.95), 0, 0.012, 0);
     add(g, gSphere(0.035, 8, 6), tmat(ctex('pom' + color, 64, 64, (c, w, h, rr) => { noiseFill(c, w, h, rr, color, 0.4, 900, 2); }), 1), 0, 0.19, 0);
+    if (FINE) {
+      const cuffM = tmat(texKnit(shade(color, -0.1), 'cuff'), 0.95);
+      for (const y of [0.025, 0.045, 0.065]) add(g, gTorus(0.1, 0.004, 3, 18), cuffM, 0, y, 0, Math.PI / 2); // cuff rib rows
+      add(g, gTorus(0.1, 0.006, 4, 18), cuffM, 0, 0.07, 0, Math.PI / 2); // cuff fold
+      for (const y of [0.1, 0.125]) add(g, gTorus(y < 0.11 ? 0.094 : 0.087, 0.004, 3, 18), k, 0, y, 0, Math.PI / 2); // knit rows on the crown
+      for (const a of [0, Math.PI / 2]) add(g, gBox(0.006, 0.006, 0.11), k, 0, 0.162, 0, 0, a, 0); // crown seams
+      add(g, gBox(0.035, 0.02, 0.003), col(0xd8d2c4, 0.6), 0, 0.03, 0.1005); // woven tag
+    }
   },
   gloves(g, r) {
     const color = pick(r, ['#1d1d1f', '#3a2a1f', '#2a3a4a']);
@@ -1178,6 +1448,20 @@ const ITEM_BUILDERS = {
       for (let i = 0; i < 4; i++) add(h, gCyl(0.0095, 0.0105, 0.08 - Math.abs(i - 1.5) * 0.012, 6), m, -0.032 + i * 0.021, 0.012, 0.035, Math.PI / 2 - 0.04, 0, (i - 1.5) * 0.05);
       add(h, gCyl(0.011, 0.012, 0.06, 6), m, flip * 0.04, 0.012, 0.0, Math.PI / 2, 0, flip * 0.9);
       add(h, gCyl(0.047, 0.05, 0.065, 10), cuff, 0, 0.014, -0.045, -Math.PI / 2, 0, 0, 1, 1, 0.45);
+      if (FINE) {
+        const pad = col(new THREE.Color(shade(color, 0.25)).getHex(), 0.85);
+        for (let i = 0; i < 4; i++) { // rounded finger tips
+          const L = 0.08 - Math.abs(i - 1.5) * 0.012, a = (i - 1.5) * 0.05;
+          add(h, gSphere(0.0102, 6, 4), m, -0.032 + i * 0.021 - Math.sin(a) * L, 0.012 + Math.sin(0.04) * L * 0, 0.035 + Math.cos(a) * L);
+        }
+        add(h, gSphere(0.0112, 6, 4), m, flip * (0.04 + Math.sin(0.9) * 0.06), 0.012, Math.cos(0.9) * 0.06); // thumb tip
+        add(h, gRBox(0.086, 0.004, 0.02, 0.002), pad, 0, 0.026, 0.035); // knuckle pad
+        add(h, gRBox(0.06, 0.004, 0.05, 0.002), pad, 0, -0.0005, 0.0); // palm grip patch
+        add(h, gBox(0.075, 0.006, 0.018), m, 0, 0.026, -0.03); // wrist strap
+        add(h, gBox(0.02, 0.008, 0.016), pad, flip * 0.03, 0.028, -0.03); // strap tab
+        add(h, gTorus(0.046, 0.004, 3, 12), cuff, 0, 0.014, -0.078, 0, 0, 0, 1, 0.45, 1); // cuff edge
+        add(h, gTorus(0.008, 0.0018, 3, 8), m, 0, 0.012, -0.082, 0, Math.PI / 2, 0); // pull loop
+      }
       h.position.set(x, 0.005, z); h.rotation.y = ry;
       g.add(h);
     };
@@ -1198,6 +1482,14 @@ const ITEM_BUILDERS = {
       add(b, gTorus(0.055, 0.015, 4, 10), fur, 0, 0.22, -0.065, Math.PI / 2, 0, 0, 0.95, 1.25, 1);
       // laces
       for (let i = 0; i < 4; i++) add(b, gBox(0.06, 0.004, 0.006), col(0xc8b48a, 0.9), 0, 0.1 + i * 0.025, 0.0 + (i < 2 ? 0.05 - i * 0.03 : 0.002), -0.3 + (i < 2 ? -0.7 : 0), 0, 0);
+      if (FINE) {
+        add(b, gRBox(0.104, 0.05, 0.07, 0.022), sole, 0, 0.02, 0.105); // rubber toe cap
+        add(b, gRBox(0.1, 0.07, 0.05, 0.02), leather, 0, 0.03, -0.12); // heel counter
+        for (let i = 0; i < 4; i++) add(b, gBox(0.1, 0.008, 0.02), sole, 0, -0.006, -0.11 + i * 0.07); // tread lugs
+        for (let i = 0; i < 4; i++) for (const s of [-1, 1]) add(b, gCyl(0.0045, 0.0045, 0.002, 6), M.brass, s * 0.03, 0.105 + i * 0.025, (i < 2 ? 0.045 - i * 0.03 : -0.005) + 0.004, -0.3 + (i < 2 ? -0.7 : 0), 0, 0); // eyelets
+        add(b, gBox(0.025, 0.04, 0.006), leather, 0, 0.21, -0.13); // pull tab
+        add(b, gRBox(0.045, 0.12, 0.012, 0.005), leather, 0, 0.1, 0.0, -0.35, 0, 0); // tongue
+      }
       b.position.x = x; b.rotation.y = ry;
       g.add(b);
     };
