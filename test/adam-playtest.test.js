@@ -2,19 +2,22 @@
 // injuries 90% rarer and scaled by severity, Rest gives back 25% energy an hour.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, carryLimit } from '../src/engine/state.js';
+import { newGame } from '../src/engine/state.js';
+import { packFull } from '../src/engine/packgrid.js';
 import { addInjury, injuryName, injuryFactor, advanceTime } from '../src/engine/tick.js';
 import { walkSpeed } from '../src/engine/travel.js';
 import { doAction } from '../src/engine/actions.js';
 
 const strong = (s) => { s.player.weak = false; s.player.energyMax = 100; s.player.food = s.player.water = s.player.warmth = 90; };
 
-test('carry: 15 lb with no pack, 30 lb with a backpack; the game starts with no pack', () => {
+test('carry: no weight limit, only grid space; the game starts with no pack', () => {
   const s = newGame(1); strong(s);
   assert.equal(s.carried.backpack, undefined);
-  assert.equal(carryLimit(s), 15);
-  s.carried.backpack = 1;
-  assert.equal(carryLimit(s), 30);
+  assert.equal(s.player.worn.back, false, 'new game: back slot empty');
+  s.carried = { canned_food: 200 }; // far over the old 15 lb limit
+  assert.equal(packFull(s), true);
+  s.carried = { canned_food: 1 };
+  assert.equal(packFull(s), false);
 });
 
 test('injuries: about 3 in 4 injury rolls hurt you (year tuning)', () => {

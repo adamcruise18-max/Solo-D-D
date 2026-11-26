@@ -11,7 +11,7 @@ export const JOBS = {
     text: 'Twelve years on a hospital ward.',
     skills: { first_aid: 2 },
     item: ['bandages', 2],
-    weakness: 'Bad back from lifting patients: you carry 4 lb less.',
+    weakness: 'Bad back from lifting patients: hard work uses 15% more energy.',
   },
   tow_driver: {
     name: 'Tow-truck driver',
@@ -91,7 +91,6 @@ export function applyBackground(state, job, traits) {
 export function xpFactor(state) {
   return hasTrait(state, 'fast_learner') ? 1.3 : hasTrait(state, 'slow_learner') ? 0.7 : 1;
 }
-export function carryMinus(state) { return jobOf(state) === 'nurse' ? 4 : 0; }
 export function walkSpeedFactor(state) { return jobOf(state) === 'roofer' ? 0.9 : 1; }
 export function searchJobFactor(state) { return (jobOf(state) === 'fishing_guide' ? 1.1 : 1) * (hasLegacy(state, 'sharp_eyes') ? 0.95 : 1); }
 export function foodLossFactor(state) { return jobOf(state) === 'line_cook' ? 1.1 : 1; }
@@ -100,6 +99,7 @@ export function sleepGainFactor(state) { return hasTrait(state, 'light_sleeper')
 export function energyUseFactor(state, mode) {
   let f = 1;
   if (mode === 'walk' && jobOf(state) === 'tow_driver') f *= 1.15;
+  if (mode === 'heavy' && jobOf(state) === 'nurse') f *= 1.15; // was 4 lb less carry; grid-only carry (Adam, 2026-11-26)
   if (mode === 'walk' && hasLegacy(state, 'road_legs')) f *= 0.95;
   if ((mode === 'walk' || mode === 'work' || mode === 'heavy') && hasTrait(state, 'asthmatic')) f *= 1.2;
   return f;

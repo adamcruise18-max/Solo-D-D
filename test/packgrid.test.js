@@ -15,7 +15,7 @@ test('packgrid: grid space is the only carry limit (Adam, 2026-11-26)', () => {
   assert.equal(roomFor(s, 'first_aid', 1), 0, '2 x 2 kit has no room');
   s.carried.canned_food = 48;
   assert.ok(packFull(s));
-  s.carried.backpack = 1;
+  s.player.worn.back = 'backpack'; // worn, like a hoodie (Adam, 2026-11-26)
   assert.ok(!packFull(s), 'a backpack gives a bigger grid');
   assert.equal(packUse(s).total, 60);
 });
