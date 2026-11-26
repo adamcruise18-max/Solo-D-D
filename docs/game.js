@@ -5014,19 +5014,36 @@
     const id = `${key}#${n}`;
     const near = key === "home" ? "on your street" : `near ${getPlace(key)?.name || "here"}`;
     const label = `House ${n} ${near}`;
-    const r = randInt(state2, 0, 999) / 1e3;
-    state2.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
-    const parent = { ...state2.location, pos: { ...state2.pos } };
+    newHouse(state2, id);
+    const from = state2.pos;
     const ang = randInt(state2, 0, 359) * Math.PI / 180;
     const meters = randInt(state2, 80, 250);
     const pos = {
-      lat: parent.pos.lat + meters * Math.sin(ang) / 111320,
-      lon: parent.pos.lon + meters * Math.cos(ang) / (111320 * Math.cos(parent.pos.lat * Math.PI / 180))
+      lat: from.lat + meters * Math.sin(ang) / 111320,
+      lon: from.lon + meters * Math.cos(ang) / (111320 * Math.cos(from.lat * Math.PI / 180))
     };
-    state2.houses[id].pos = pos;
-    state2.pos = { ...pos };
-    advanceTime(state2, 5, "walk");
-    log(state2, endDot(`You walk to a house ${near}`));
+    enterHouse(state2, id, label, pos, { walkText: `You walk to a house ${near}`, newId: id });
+  }
+  function newHouse(state2, id) {
+    const r = randInt(state2, 0, 999) / 1e3;
+    state2.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
+    return state2.houses[id];
+  }
+  function enterHouse(state2, id, label, pos, opts = {}) {
+    const first = !state2.houses[id] || id === opts.newId;
+    const hs = state2.houses[id] || newHouse(state2, id);
+    const parent = { ...state2.location, pos: { ...state2.pos } };
+    if (pos) {
+      hs.pos = { ...pos };
+      state2.pos = { ...pos };
+    }
+    advanceTime(state2, opts.walkMinutes ?? 5, "walk");
+    if (opts.walkText) log(state2, endDot(opts.walkText));
+    if (!first) {
+      state2.location = { kind: "house", id, label, parent };
+      log(state2, "You go back into the house.");
+      return;
+    }
     if (chance(state2, 0.7)) {
       if (has2(state2, "pry_bar")) {
         log(state2, "The door is locked. You open it with the pry bar.");
@@ -5048,7 +5065,7 @@
     state2.stats.housesSearched += 1;
     state2.location = { kind: "house", id, label, parent };
     const hn = state2.stats.housesSearched;
-    if (state2.houses[id].body) seeBody(state2, BODY_LINES[hn % BODY_LINES.length]);
+    if (hs.body) seeBody(state2, BODY_LINES[hn % BODY_LINES.length]);
     else log(state2, EMPTY_LINES[hn % EMPTY_LINES.length]);
   }
   var BODY_LINES = [
@@ -6834,6 +6851,348 @@
     };
   }
 
+  // src/data/gridsize.js
+  var SIZE = {
+    // small, stack many
+    energy_bar: [1, 1, 6],
+    jerky: [1, 1, 5],
+    instant_noodles: [1, 1, 4],
+    garlic: [1, 1, 6],
+    ors: [1, 1, 6],
+    antibiotics: [1, 1, 3],
+    pain_pills: [1, 1, 2],
+    ibuprofen: [1, 1, 2],
+    batteries: [1, 1, 4],
+    n95: [1, 1, 10],
+    seeds: [1, 1, 10],
+    lighter: [1, 1, 4],
+    matches: [1, 1, 4],
+    water_tablets: [1, 1, 10],
+    hand_warmers: [1, 1, 6],
+    wool_socks: [1, 1, 3],
+    soap: [1, 1, 3],
+    toothpaste: [1, 1, 2],
+    vitamins: [1, 1, 2],
+    rifle_rounds: [1, 1, 3],
+    snare_wire: [1, 1, 3],
+    fishing_line: [1, 1, 3],
+    salad_greens: [1, 1, 2],
+    // small, one or two per tile
+    canned_food: [1, 1, 2],
+    canned_fruit: [1, 1, 2],
+    peanut_butter: [1, 1, 1],
+    snacks: [1, 1, 3],
+    toilet_paper: [1, 1, 1],
+    bandages: [1, 1, 2],
+    flashlight: [1, 1, 1],
+    knife: [1, 1, 1],
+    multitool: [1, 1, 1],
+    can_opener: [1, 1, 1],
+    phone: [1, 1, 1],
+    water_filter: [1, 1, 1],
+    gloves: [1, 1, 1],
+    winter_hat: [1, 1, 1],
+    paper_map: [1, 1, 2],
+    duct_tape: [1, 1, 1],
+    hardware_parts: [1, 1, 1],
+    kale: [1, 1, 2],
+    // tall or long
+    soda: [1, 2, 1],
+    sports_drink: [1, 2, 1],
+    propane_1lb: [1, 2, 1],
+    flea_spray: [1, 2, 1],
+    chips: [1, 2, 1],
+    candles: [1, 2, 1],
+    trash_bags: [1, 2, 1],
+    toothbrush: [1, 2, 1],
+    book_first_aid: [1, 2, 1],
+    book_repair: [1, 2, 1],
+    book_cooking: [1, 2, 1],
+    book_survival: [1, 2, 1],
+    pry_bar: [1, 4, 1],
+    fishing_rod: [1, 5, 1],
+    bow: [1, 5, 1],
+    arrows: [1, 4, 1],
+    rifle: [1, 5, 1],
+    radio: [2, 1, 1],
+    thermal_underwear: [2, 1, 1],
+    windbreaker: [2, 1, 1],
+    fresh_fish: [2, 1, 1],
+    raw_meat: [2, 1, 1],
+    potatoes: [2, 1, 2],
+    green_beans: [2, 1, 2],
+    fava_beans: [2, 1, 2],
+    saline: [2, 1, 1],
+    extension_cord: [2, 1, 1],
+    wiring: [2, 1, 1],
+    pipe_fittings: [2, 1, 1],
+    // medium
+    water_bottle: [2, 2, 1],
+    first_aid: [2, 2, 1],
+    dry_food: [2, 2, 1],
+    oatmeal: [1, 2, 1],
+    cooking_pot: [2, 2, 1],
+    rope: [2, 2, 1],
+    boots: [2, 2, 1],
+    rain_jacket: [2, 2, 1],
+    fleece_jacket: [2, 2, 1],
+    wool_sweater: [2, 2, 1],
+    cotton_hoodie: [2, 2, 1],
+    blanket: [2, 2, 1],
+    tarp: [2, 2, 1],
+    bleach: [2, 2, 1],
+    formula: [2, 2, 1],
+    waxed_cheese: [1, 1, 1],
+    squash: [2, 2, 1],
+    comfort: [2, 2, 1],
+    broken_radio: [2, 1, 1],
+    desk_lamp: [2, 2, 1],
+    plastic_sheet: [2, 2, 1],
+    insulation: [2, 2, 1],
+    // big
+    winter_coat: [2, 3, 1],
+    sleeping_bag: [2, 3, 1],
+    toolkit: [3, 2, 1],
+    backpack: [3, 3, 1],
+    gas_can: [3, 3, 1],
+    firewood: [3, 2, 1],
+    dog_food: [3, 3, 1],
+    old_toaster: [2, 2, 1],
+    scrap_wood: [1, 4, 1],
+    garden_hose: [3, 3, 1],
+    metal_bin: [3, 3, 1],
+    car_battery: [3, 2, 1],
+    wooden_chair: [3, 4, 1],
+    rain_barrel: [4, 4, 1],
+    generator: [4, 4, 1],
+    broken_bike: [5, 4, 1],
+    stove_kit: [4, 4, 1],
+    battery_module: [4, 3, 1]
+  };
+  function sizeOf(id) {
+    const s = SIZE[id];
+    if (s) return { w: s[0], h: s[1], stack: s[2] || 1 };
+    const wt = ITEMS[id]?.weight ?? 1;
+    if (wt <= 0.35) return { w: 1, h: 1, stack: 3 };
+    if (wt <= 1.2) return { w: 1, h: 2, stack: 1 };
+    if (wt <= 4) return { w: 2, h: 2, stack: 1 };
+    if (wt <= 10) return { w: 2, h: 3, stack: 1 };
+    return { w: 3, h: 4, stack: 1 };
+  }
+  var GRID_COLS = 6;
+  function packRows(hasBackpack) {
+    return hasBackpack ? 10 : 4;
+  }
+
+  // src/ui/grid.js
+  function tilesFor(bag, order = Object.keys(bag)) {
+    const out = [];
+    for (const id of order) {
+      let q = bag[id] || 0;
+      if (q <= 1e-9) continue;
+      const s = sizeOf(id);
+      let n = 0;
+      while (q > 1e-9) {
+        const take = Math.min(s.stack, q);
+        out.push({ key: `${id}#${n}`, id, q: Math.round(take * 1e3) / 1e3, w: s.w, h: s.h });
+        q -= take;
+        n++;
+        if (n > 60) break;
+      }
+    }
+    return out;
+  }
+  function layoutGrid(tiles, cols, rows, saved = {}) {
+    const occ = [];
+    const free = (x, y, w, h2) => {
+      if (x < 0 || y < 0 || x + w > cols) return false;
+      for (let j = y; j < y + h2; j++) for (let i = x; i < x + w; i++) if (occ[j]?.[i]) return false;
+      return true;
+    };
+    const mark = (x, y, w, h2, key) => {
+      for (let j = y; j < y + h2; j++) {
+        occ[j] || (occ[j] = []);
+        for (let i = x; i < x + w; i++) occ[j][i] = key;
+      }
+    };
+    const placed = [];
+    const rest2 = [];
+    for (const t of tiles) {
+      const s = saved[t.key];
+      if (s) {
+        const rot = !!s[2];
+        const w = rot ? t.h : t.w;
+        const h2 = rot ? t.w : t.h;
+        if (w <= cols && s[1] + h2 <= rows && free(s[0], s[1], w, h2)) {
+          mark(s[0], s[1], w, h2, t.key);
+          placed.push({ ...t, x: s[0], y: s[1], w, h: h2, rot });
+          continue;
+        }
+      }
+      rest2.push(t);
+    }
+    const order = rest2.map((t, i) => [t, i]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h || a[1] - b[1]).map((e) => e[0]);
+    for (const t of order) {
+      let spot = null;
+      for (let y = 0; !spot && y < rows + 400; y++) {
+        for (let x = 0; x < cols && !spot; x++) {
+          if (t.w <= cols && free(x, y, t.w, t.h) && (y + t.h <= rows || y >= rows)) spot = { x, y, w: t.w, h: t.h, rot: false };
+          else if (t.h <= cols && t.w !== t.h && free(x, y, t.h, t.w) && (y + t.w <= rows || y >= rows)) spot = { x, y, w: t.h, h: t.w, rot: true };
+        }
+        if (!spot && t.w > cols && t.h > cols && y >= rows) spot = { x: 0, y, w: Math.min(cols, t.w), h: t.h, rot: false };
+      }
+      if (!spot) continue;
+      mark(spot.x, spot.y, spot.w, spot.h, t.key);
+      placed.push({ ...t, ...spot });
+    }
+    const used = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
+    const overflow = placed.filter((p) => p.y + p.h > rows).length;
+    return { tiles: placed, cols, rows, height: Math.max(rows, used), overflow };
+  }
+  function fitsAt(layout, key, x, y, w, h2) {
+    if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
+    return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
+  }
+  var LS = "lastlight.grid.v1";
+  var memo = null;
+  function savedPos(which) {
+    if (!memo) {
+      memo = {};
+      try {
+        memo = JSON.parse(localStorage.getItem(LS) || "{}") || {};
+      } catch {
+        memo = {};
+      }
+    }
+    return memo[which] || (memo[which] = {});
+  }
+  function setPos(which, key, x, y, rot) {
+    savedPos(which)[key] = [x, y, rot ? 1 : 0];
+    try {
+      localStorage.setItem(LS, JSON.stringify(memo));
+    } catch {
+    }
+  }
+  var esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  var KIND_ICON = { food: "\u{1F96B}", dogfood: "\u{1F9B4}", drink: "\u{1F4A7}", med: "\u271A", tool: "\u{1F527}", batteries: "\u{1F50B}", wear: "\u{1F9E5}", fuel: "\u26FD", part: "\u2699", junk: "\u2699", book: "\u{1F4D5}", misc: "\u25C6", comfort: "\u2665", warm: "\u2668" };
+  function gridHtml(which, opts) {
+    const L = opts.layout;
+    const tiles = L.tiles.map((t) => {
+      const url = opts.icon?.(t.id);
+      const img = url ? `<img src="${url}" alt="" draggable="false"${t.h >= t.w * 3 ? ' class="tall"' : t.w >= t.h * 3 ? ' class="wide"' : ""}>` : `<span class="ig">${KIND_ICON[opts.kind(t.id)] || "\u25C6"}</span>`;
+      const over = t.y + t.h > L.rows ? " over" : "";
+      const sel = opts.selected === `${which}:${t.key}` ? " sel" : "";
+      const qty = opts.qtyText(t.q, t.id);
+      return `<div class="itile k-${esc(opts.kind(t.id))}${over}${sel}" data-gw="${which}" data-gk="${esc(t.key)}" data-gid="${esc(t.id)}" data-gq="${t.q}"
+      style="--x:${t.x};--y:${t.y};--w:${t.w};--h:${t.h}" title="${esc(opts.name(t.id))} \xB7 ${esc(qty)}">${img}
+      <span class="in">${esc(opts.name(t.id))}</span>${qty ? `<b class="iq">${esc(qty)}</b>` : ""}</div>`;
+    }).join("");
+    return `<div class="igrid igrid-${which}" data-grid="${which}" style="--cols:${L.cols};--rows:${L.height};--real:${L.rows}">
+    ${L.height > L.rows ? `<div class="ig-over" style="--top:${L.rows}"><span>Over the edge: no room</span></div>` : ""}${tiles}</div>`;
+  }
+  var H = null;
+  var bound = false;
+  function setGridHandlers(h2) {
+    H = h2;
+    if (bound || typeof document === "undefined") return;
+    bound = true;
+    let drag = null;
+    document.addEventListener("pointerdown", (e) => {
+      const t = e.target.closest?.(".itile");
+      if (!t || e.button > 0) return;
+      const r = t.getBoundingClientRect();
+      drag = { el: t, which: t.dataset.gw, key: t.dataset.gk, id: t.dataset.gid, q: Number(t.dataset.gq), sx: e.clientX, sy: e.clientY, ox: e.clientX - r.left, oy: e.clientY - r.top, ghost: null, rot: false, w: Number(t.style.getPropertyValue("--w")), h: Number(t.style.getPropertyValue("--h")) };
+      e.preventDefault();
+    });
+    document.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      if (!drag.ghost) {
+        if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
+        drag.ghost = drag.el.cloneNode(true);
+        drag.ghost.classList.add("ghost");
+        const r = drag.el.getBoundingClientRect();
+        drag.ghost.style.width = `${r.width}px`;
+        drag.ghost.style.height = `${r.height}px`;
+        document.body.appendChild(drag.ghost);
+        drag.el.classList.add("lifted");
+      }
+      drag.ghost.style.left = `${e.clientX - drag.ox}px`;
+      drag.ghost.style.top = `${e.clientY - drag.oy}px`;
+      showDrop(e);
+    });
+    const end = (e) => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      clearDrop();
+      if (!d.ghost) return;
+      justDragged = performance.now();
+      d.ghost.remove();
+      d.el.classList.remove("lifted");
+      const hit = dropTarget(e, d);
+      if (!hit) return;
+      if (hit.which === d.which) H?.move(d.which, d.key, hit.x, hit.y, hit.rot);
+      else H?.transfer(d.which, hit.which, d.id, d.q, hit);
+    };
+    document.addEventListener("pointerup", end);
+    let justDragged = 0;
+    document.addEventListener("click", (e) => {
+      const t = e.target.closest?.(".itile");
+      if (!t || performance.now() - justDragged < 300) return;
+      e.stopPropagation();
+      setTimeout(() => H?.select(t.dataset.gw, t.dataset.gk), 0);
+    }, true);
+    document.addEventListener("pointercancel", () => {
+      if (drag?.ghost) drag.ghost.remove();
+      drag?.el.classList.remove("lifted");
+      drag = null;
+      clearDrop();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (!drag?.ghost || e.key !== "r" && e.key !== "R") return;
+      drag.rot = !drag.rot;
+      [drag.w, drag.h] = [drag.h, drag.w];
+      const gw = drag.ghost.offsetWidth;
+      const gh = drag.ghost.offsetHeight;
+      drag.ghost.style.width = `${gh}px`;
+      drag.ghost.style.height = `${gw}px`;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+    function dropTarget(e, d) {
+      const g = d.ghost;
+      g.style.display = "none";
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      g.style.display = "";
+      const grid = under?.closest?.(".igrid");
+      if (!grid) return null;
+      const which = grid.dataset.grid;
+      const r = grid.getBoundingClientRect();
+      const cols = Number(grid.style.getPropertyValue("--cols"));
+      const cell = r.width / cols;
+      const x = Math.round((e.clientX - d.ox - r.left) / cell);
+      const y = Math.round((e.clientY - d.oy - r.top) / cell);
+      const L = H?.layout?.(which);
+      const ok = L ? fitsAt(L, which === d.which ? d.key : null, x, y, d.w, d.h) : true;
+      return { which, x, y, rot: d.rot !== !!L?.tiles.find((t) => t.key === d.key)?.rot, ok, grid, cell };
+    }
+    let mark = null;
+    function showDrop(e) {
+      const hit = dropTarget(e, drag);
+      clearDrop();
+      if (!hit) return;
+      mark = document.createElement("div");
+      mark.className = `idrop${hit.ok || hit.which !== drag.which ? "" : " bad"}`;
+      if (hit.which === drag.which) mark.style.cssText = `--x:${hit.x};--y:${hit.y};--w:${drag.w};--h:${drag.h}`;
+      else mark.classList.add("all");
+      hit.grid.appendChild(mark);
+    }
+    function clearDrop() {
+      mark?.remove();
+      mark = null;
+    }
+  }
+
   // src/ui/fx.js
   var FX_KEY = "lastlight.fx";
   function fxEnabled() {
@@ -7024,7 +7383,7 @@
   var fx = null;
   var openWings = /* @__PURE__ */ new Set();
   var $ = (sel) => document.querySelector(sel);
-  var esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  var esc2 = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   var STAT_INFO = {
     food: { label: "Food" },
     water: { label: "Water" },
@@ -7040,7 +7399,7 @@
     const cls = ["ok", "warn", "bad", "bad"][st.stage];
     return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
       <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
-      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc(st.effect)}</span>` : ""}</div>`;
+      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc2(st.effect)}</span>` : ""}</div>`;
   }
   function riskChips() {
     return risks(state).map((r) => ["risk", r.text]);
@@ -7049,6 +7408,7 @@
     setPlaces(window.LL_PLACES || []);
     state = loadGame();
     bindEvents();
+    initGridHandlers();
     fx = createFx($("#mapwrap"));
     $("#legend").innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== "house").map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join("") + '<span><i class="part"></i>Visited: more to search or items left</span><span><i class="done"></i>All searched</span><span><i style="background:#4aa3d8"></i>Fishing spot</span><span><i style="background:#7fae5a"></i>Hunting spot</span><span><i class="edge"></i>15-mile edge</span>';
     try {
@@ -7104,9 +7464,9 @@
     <span class="h-day">DAY ${dayIndex(t) + 1}</span>
     <span class="h-time">${formatClock(t)}</span>
     <span class="h-season">${SEASONS[seasonOf(t)].label}</span>
-    <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc(weatherInfo(state).label)}</span>
+    <span class="h-wx">${night ? "\u263E" : "\u2600"} ${esc2(weatherInfo(state).label)}</span>
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
-    ${low.length ? `<span class="h-alert">\u26A0 ${esc(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
+    ${low.length ? `<span class="h-alert">\u26A0 ${esc2(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
     $("#hud").hidden = false;
     if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
   }
@@ -7121,12 +7481,12 @@
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc2(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
     ${outlookHtml()}`;
   }
   function outlookHtml() {
     const o = weatherOutlook(state);
-    const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc(e.text)}</li>`).join("");
+    const fx2 = o.effects.map((e) => `<li class="wx-${e.level}">${esc2(e.text)}</li>`).join("");
     return `<div class="wx-next">Weather changes at ${o.next.atText} (in ${formatDuration(o.next.inMinutes)}). Low tonight ${o.next.lowF}\xB0F.</div>${fx2 ? `<ul class="wx-fx">${fx2}</ul>` : ""}`;
   }
   function tripRisks(t) {
@@ -7146,8 +7506,8 @@
   function tripHtml(dest) {
     const t = tripPreview(state, dest);
     const risks2 = tripRisks(t);
-    const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc(e.text)).join("<br>");
-    return `${risks2.length ? `<p class="warn-line">\u26A0 Think first: ${esc(risks2.join("; "))}.</p>` : ""}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
+    const fx2 = t.weather.effects.filter((e) => e.level !== "ok").map((e) => esc2(e.text)).join("<br>");
+    return `${risks2.length ? `<p class="warn-line">\u26A0 Think first: ${esc2(risks2.join("; "))}.</p>` : ""}<p>${describeTrip(state, t)}<br>You arrive at ${t.endText}${t.darkOnArrival ? " (dark)" : ""}.${t.dayStartText ? `<br><small>${esc2(t.dayStartText)}</small>` : ""}</p>${t.slowBecause.length ? `<p><small>Slow: ${t.slowBecause.join(", ")}</small></p>` : ""}${fx2 ? `<p class="wx-trip"><small>${fx2}</small></p>` : ""}`;
   }
   function freshTag(id) {
     const l = stageLabel(state, id);
@@ -7160,7 +7520,7 @@
       const id = p.worn[sl];
       const it = id && ITEMS[id];
       const tags = it ? [`+${it.warmth || 0}\xB0F`, it.wind ? `wind ${Math.round(it.wind * 100)}%` : "", it.waterproof ? "waterproof" : "", it.wetWarm ? "warm when wet" : "cold when wet"].filter(Boolean).join(" \xB7 ") : "";
-      return `<li><span>${esc(SLOT_NAMES[sl])}</span><span class="q">${it ? esc(it.name) : "\u2014"}</span><span class="b">${it ? `<small>${esc(tags)}</small> <button class="small" data-use="${sl}" data-verb="take_off">Take off</button>` : ""}</span></li>`;
+      return `<li><span>${esc2(SLOT_NAMES[sl])}</span><span class="q">${it ? esc2(it.name) : "\u2014"}</span><span class="b">${it ? `<small>${esc2(tags)}</small> <button class="small" data-use="${sl}" data-verb="take_off">Take off</button>` : ""}</span></li>`;
     }).join("");
     const out = environment(state, "walk");
     const feltOut = Math.round(feltTemp(state, "walk", out));
@@ -7183,8 +7543,8 @@
     const g = ensureGoals(state);
     const rows = g.picked.map((id) => {
       const pr = goalProgress(state, id);
-      const steps = pr.steps.map((st) => `<li class="${st.done ? "done" : ""}">${st.done ? "\u2713" : "\u25CB"} ${esc(st.text)}</li>`).join("");
-      return `<div class="goal"><div class="goal-h"><b>${esc(pr.goal.title)}</b><span class="goal-k">${esc(GOAL_KINDS[pr.goal.kind].label)}</span><span class="goal-n">${pr.done} / ${pr.total}</span>
+      const steps = pr.steps.map((st) => `<li class="${st.done ? "done" : ""}">${st.done ? "\u2713" : "\u25CB"} ${esc2(st.text)}</li>`).join("");
+      return `<div class="goal"><div class="goal-h"><b>${esc2(pr.goal.title)}</b><span class="goal-k">${esc2(GOAL_KINDS[pr.goal.kind].label)}</span><span class="goal-n">${pr.done} / ${pr.total}</span>
       <button class="link goal-drop" data-goaldrop="${id}" ${canChange(state) ? "" : "disabled"} title="${canChange(state) ? "Put this goal aside (steps done are kept)" : `You can change a goal once per ${CHANGE_GAP_DAYS} days`}">Put aside</button></div><ul class="goal-steps">${steps}</ul></div>`;
     }).join("");
     const free = MAX_GOALS - g.picked.length;
@@ -7199,10 +7559,10 @@
       const items = GOALS.filter((x) => x.kind === kind).map((x) => {
         const on = g.picked.includes(x.id);
         const pr = goalProgress(state, x.id);
-        return `<div class="gb-goal"><div><b>${esc(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc(x.why)}</p></div>
+        return `<div class="gb-goal"><div><b>${esc2(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc2(x.why)}</p></div>
         <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
       }).join("");
-      return `<h4>${esc(k.label)} <span class="hint">${esc(k.hint)}</span></h4>${items}`;
+      return `<h4>${esc2(k.label)} <span class="hint">${esc2(k.hint)}</span></h4>${items}`;
     }).join("");
     modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
     <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
@@ -7229,11 +7589,11 @@
     const rows = allSkills(state).map((k) => {
       const sk = SKILLS[k.key];
       const next2 = k.next == null ? "max level" : `${k.next} xp to level ${k.level + 1}`;
-      return `<div class="skill" title="${esc(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc(next2)}</span><span class="sh">${esc(sk.perLevel)}</span></div>`;
+      return `<div class="skill" title="${esc2(`${sk.how} ${sk.perLevel}`)}"><span class="sl">${esc2(k.name)}</span><span class="lv">${k.level}</span><span class="bar"><i style="width:${Math.round(k.frac * 100)}%"></i></span><span class="sn">${esc2(next2)}</span><span class="sh">${esc2(sk.perLevel)}</span></div>`;
     }).join("");
     const read2 = (state.skills && state.skills.books || []).length;
     const bg = backgroundText(state);
-    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read2 ? ` (${read2} read)` : ""}.</p></details>`;
+    return `<details class="skills"${open || skillsOpen ? " open" : ""}><summary>Skills</summary>${bg ? `<p class="hint bg-line">Before: ${esc2(bg)}</p>` : ""}${rows}<p class="hint">You learn by doing. A book teaches a skill once${read2 ? ` (${read2} read)` : ""}.</p></details>`;
   }
   function renderStats() {
     const p = state.player;
@@ -7251,7 +7611,7 @@
     if ((state.carried.flashlight || 0) > 0) chips.push([p.lightHours > 0 ? "" : "warn", `Flashlight ${p.lightHours.toFixed(1)} h`]);
     if (p.wetness >= 10) chips.push([p.wetness >= 50 ? "bad" : "warn", `Wet ${Math.round(p.wetness)}%`]);
     chips.push(["", `Wearing: ${wornText(p)}`]);
-    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false) + goalsHtml();
+    $("#stats").innerHTML = '<div class="eyebrow">Vitals</div>' + rows + `<div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc2(t)}</span>`).join("")}</div><details class="clothes"${clothesOpen ? " open" : ""}><summary>Clothes</summary>${clothesHtml()}</details>` + skillsHtml(false) + goalsHtml();
   }
   function renderLocation() {
     const loc = state.location;
@@ -7266,21 +7626,16 @@
     const acts = listActions(state).map((a) => {
       const dis = a.disabled ? "disabled" : "";
       const note = a.disabled ? a.disabled : a.note || "";
-      return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
+      return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc2(a.label)}</span>${note ? `<small>${esc2(note)}</small>` : ""}</button>`;
     }).join("");
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
-    $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc(locationLabel(state))}</h2><p class="sub">${esc(sub)}</p><div class="acts">${acts}</div>${hint}`;
+    $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc2(locationLabel(state))}</h2><p class="sub">${esc2(sub)}</p><div class="acts">${acts}</div>${hint}`;
   }
   function qtyText(q) {
     return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
   }
-  function itemRow(id, q, from, buttons) {
-    const it = ITEMS[id];
-    const w = Math.round(it.weight * q * 10) / 10;
-    return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
-  }
   function useButtons(id, from) {
-    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc(u.note)}</small>` : ""}</button>${u.disabled && u.note && u.verb !== "salvage" ? `<small class="need">${esc(u.note)}</small>` : ""}`).join("");
+    return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc2(u.note)}"` : ""}>${esc2(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc2(u.note)}</small>` : ""}</button>${u.disabled && u.note && u.verb !== "salvage" ? `<small class="need">${esc2(u.note)}</small>` : ""}`).join("");
   }
   var KIND_GROUPS = [
     ["Food", ["food", "dogfood"]],
@@ -7300,54 +7655,132 @@
   function sortedIds(bag) {
     return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
   }
-  function groupedRows(ids, row) {
-    let last = -1;
-    return ids.map((id) => {
-      const g = groupOf(id);
-      const head = g !== last ? `<li class="grp">${KIND_GROUPS[g][0]}</li>` : "";
-      last = g;
-      return head + row(id);
-    }).join("");
+  var gridSel = null;
+  var gridLayouts = {};
+  function hereGridCols() {
+    return GRID_COLS + 2;
+  }
+  function buildGrid(which) {
+    const bag = which === "pack" ? state.carried : hereBag(state);
+    const tiles = tilesFor(bag, sortedIds(bag));
+    const cols = which === "pack" ? GRID_COLS : hereGridCols();
+    const rows = which === "pack" ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
+    const L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
+    gridLayouts[which] = L;
+    return L;
+  }
+  function iconUrl(id) {
+    return window.LLInside3D?.iconCache?.get(id) || null;
+  }
+  var iconTimer = 0;
+  function wantIcons(ids) {
+    const miss = ids.filter((id) => !window.LLInside3D?.iconCache?.has(id));
+    if (!miss.length) return;
+    loadInside3d().then((api) => api.itemIcons?.(miss, () => {
+      clearTimeout(iconTimer);
+      iconTimer = setTimeout(refreshGrids, 120);
+    })).catch(() => {
+    });
+  }
+  function refreshGrids() {
+    if (!state) return;
+    if ($("#items")) renderItems();
+    insideRefresh?.();
+  }
+  function gridOpts(which) {
+    return {
+      layout: buildGrid(which),
+      name: itemName,
+      kind: (id) => ITEMS[id]?.kind || "misc",
+      qtyText: (q, id) => q === 1 && sizeOf(id).stack === 1 ? "" : qtyText(q),
+      icon: iconUrl,
+      selected: gridSel
+    };
+  }
+  function selectedHtml(compact) {
+    if (!gridSel) return "";
+    const [which, key] = gridSel.split(/:(.*)/s);
+    const id = key.split("#")[0];
+    const bag = which === "pack" ? state.carried : hereBag(state);
+    if (!bag[id]) {
+      gridSel = null;
+      return "";
+    }
+    const it = ITEMS[id];
+    const home = state.location.kind === "home";
+    const from = which === "pack" ? "carried" : "storage";
+    const uses = which === "pack" || home ? useButtons(id, from) : "";
+    const move = which === "pack" ? `<button data-drop="${id}">${home ? "Store" : "Drop"}</button>` : `<button class="primary" data-take="${id}">Take</button>`;
+    const w = Math.round(it.weight * bag[id] * 10) / 10;
+    return `<div class="isel${compact ? " compact" : ""}"><img class="isel-img" src="${iconUrl(id) || ""}" alt=""${iconUrl(id) ? "" : " hidden"}>
+    <div><b>${esc2(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc2(it.unit)} \xB7 ${w} lb${which === "pack" ? "" : " \xB7 not yours yet"}</small></div>
+    <div class="isel-b">${uses}${move}</div></div>`;
+  }
+  function initGridHandlers() {
+    setGridHandlers({
+      layout: (which) => gridLayouts[which],
+      select: (which, key) => {
+        const k = `${which}:${key}`;
+        gridSel = gridSel === k ? null : k;
+        refreshGrids();
+      },
+      move: (which, key, x, y, rot) => {
+        const L = gridLayouts[which];
+        const t = L?.tiles.find((v) => v.key === key);
+        if (!t) return;
+        const w = rot !== t.rot ? t.h : t.w;
+        const h2 = rot !== t.rot ? t.w : t.h;
+        if (!fitsAt(L, key, x, y, w, h2)) return;
+        setPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, key, x, y, rot);
+        refreshGrids();
+      },
+      transfer: (from, to, id, qty, hit) => {
+        const n0 = state.log.length;
+        if (from === "here" && to === "pack") act("take", id, qty);
+        else if (from === "pack" && to === "here") act("drop", id, qty);
+        else return;
+        const L = buildGrid(to);
+        const t = L.tiles.find((v) => v.id === id && v.key.endsWith("#0"));
+        if (t && hit && fitsAt(L, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, t.key, hit.x, hit.y, t.rot);
+        gridSel = null;
+        const said = state.log.slice(n0).map((e) => e.text).join(" ");
+        insideToast?.(said);
+        refreshGrids();
+      }
+    });
   }
   function renderItems() {
     const loc = state.location;
+    const home = loc.kind === "home";
+    const hereTitle = home ? "House storage" : "Items you found here";
+    const hereTag = home ? "stored" : "not yours yet";
     const here = hereBag(state);
-    const hereIds = sortedIds(here);
-    const hereTitle = loc.kind === "home" ? "House storage" : "Items you found here";
-    let hereHtml = groupedRows(hereIds, (id) => itemRow(
-      id,
-      here[id],
-      "here",
-      (loc.kind === "home" ? useButtons(id, "storage") : "") + `<button data-take="${id}">Take</button>`
-    ));
-    if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === "home" ? "Nothing stored." : "Nothing here yet. Search to find items."}</li>`;
-    const takeAll2 = hereIds.length && loc.kind !== "home" ? '<button class="small" data-takeall="1">Take all that fits</button>' : "";
-    const carried = state.carried;
-    const cIds = sortedIds(carried);
-    const weight = bagWeight(carried);
+    const takeAll2 = Object.keys(here).length && !home ? '<button class="small" data-takeall="1">Take all that fits</button>' : "";
+    const hereO = gridOpts("here");
+    const packO = gridOpts("pack");
+    const weight = bagWeight(state.carried);
     const limit = carryLimit(state);
     const over = weight > limit;
-    let cHtml = groupedRows(cIds, (id) => itemRow(
-      id,
-      carried[id],
-      "carried",
-      useButtons(id, "carried") + `<button data-drop="${id}">${loc.kind === "home" ? "Store" : "Drop"}</button>`
-    ));
-    if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
     const fill = Math.min(100, Math.round(weight / Math.max(1, limit) * 100));
-    const hereTag = loc.kind === "home" ? "stored" : "not yours yet";
+    wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
+    const hereBody = Object.keys(here).length ? gridHtml("here", hereO) : `<p class="empty">${home ? "Nothing stored." : "Nothing here yet. Search to find items."}</p>`;
     $("#items").innerHTML = `
-    <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
-    <section class="bag bag-here${loc.kind === "home" ? " bag-home" : ""}">
-      <h3><span class="bag-ico" aria-hidden="true">${loc.kind === "home" ? "\u2302" : "\u2315"}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll2}</h3>
-      <ul class="items">${hereHtml}</ul>
-    </section>
+    <p class="stock">${esc2(stockLine(state))} <small>at rest, carried + stored at home</small></p>
+    ${selectedHtml(false)}
+    <div class="grids">
     <section class="bag bag-pack">
       <h3><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span>
         <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
       <div class="bag-load${over ? " over" : ""}"><i style="width:${fill}%"></i></div>
-      <ul class="items">${cHtml}</ul>
-    </section>`;
+      ${gridHtml("pack", packO)}
+      <p class="hint">${state.carried.backpack ? "Backpack: big grid." : "No backpack: pockets and hands only. Find a backpack for more room (+15 lb)."} Drag to move \xB7 R turns a tile while you drag \xB7 tap for buttons.</p>
+    </section>
+    <section class="bag bag-here${home ? " bag-home" : ""}">
+      <h3><span class="bag-ico" aria-hidden="true">${home ? "\u2302" : "\u2315"}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll2}</h3>
+      ${hereBody}
+      <p class="hint">Drag a tile into your pack to take it${home ? "" : ", or drag from your pack to here to drop it"}.</p>
+    </section>
+    </div>`;
   }
   function renderHome() {
     const h2 = state.home;
@@ -7380,8 +7813,8 @@
       const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
       const cards = w.projects.map(projectCard).join("");
       return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? "open" : ""}>
-      <summary><span class="wi">${w.icon}</span><span class="wn">${esc(w.label)}</span><span class="pips">${pips}</span></summary>
-      <p class="hint">${esc(w.blurb)}</p>${cards}</details>`;
+      <summary><span class="wi">${w.icon}</span><span class="wn">${esc2(w.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc2(w.blurb)}</p>${cards}</details>`;
     }).join("");
     const need = {};
     for (const p of PROJECTS) {
@@ -7396,7 +7829,7 @@
       for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || "a house");
       return at.length ? ` \xB7 left at ${at.slice(0, 2).join(", ")}${at.length > 2 ? ` +${at.length - 2}` : ""}` : "";
     };
-    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc(itemName(id))} \xD7${q}${esc(leftAt(id))}</span>`).join("");
+    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc2(itemName(id))} \xD7${q}${esc2(leftAt(id))}</span>`).join("");
     return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
@@ -7406,8 +7839,8 @@
   }
   function projectCard(p) {
     const st = projectStatus(state, p);
-    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
-    const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc(itemName(t.id))}</span>`).join("");
+    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc2(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
+    const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc2(itemName(t.id))}</span>`).join("");
     let foot;
     if (st.built) foot = '<span class="built">\u2713 Built</span>';
     else {
@@ -7415,11 +7848,11 @@
       const label = st.started ? `Work ${block} h (${st.leftH} h left)` : `Start project (${p.hours} h total)`;
       foot = `${st.started ? `<div class="basebar small"><i style="width:${st.doneH / p.hours * 100}%"></i></div>` : ""}
       <button class="small" data-build="${p.id}" ${st.canWork ? "" : "disabled"}>${label}</button>
-      ${st.blocked ? `<small class="why">${esc(st.blocked)}</small>` : ""}`;
+      ${st.blocked ? `<small class="why">${esc2(st.blocked)}</small>` : ""}`;
     }
     return `<div class="proj ${st.built ? "is-built" : ""}">
-    <div class="pn">${esc(p.name)}</div>
-    <div class="pe">${esc(p.effect)}</div>
+    <div class="pn">${esc2(p.name)}</div>
+    <div class="pe">${esc2(p.effect)}</div>
     ${st.built ? "" : `<div class="chips">${parts}${tools}</div>`}
     <div class="pf">${foot}</div>
   </div>`;
@@ -7429,19 +7862,19 @@
     let html = "";
     if (d.stage === "joined") {
       const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
-      html = `<h3>${esc(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
-      ${d.sick ? `<p class="warn-line">\u26A0 ${esc(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
+      html = `<h3>${esc2(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
+      ${d.sick ? `<p class="warn-line">\u26A0 ${esc2(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
     } else if (d.stage === "visiting") {
       html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
     } else if (d.stage === "dead") {
-      html = `<h3>${esc(d.name || "The dog")}</h3><p class="hint">Gone.</p>`;
+      html = `<h3>${esc2(d.name || "The dog")}</h3><p class="hint">Gone.</p>`;
     }
     $("#dog").innerHTML = html;
     $("#dog").hidden = !html;
   }
   function renderLog() {
-    const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+    const items = state.log.slice(-60).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc2(e.text)}</li>`).join("");
     $("#log").innerHTML = `<h3>Journal</h3><div class="journal">${journalHtml(3)}</div><h3>Log</h3><ul>${items}</ul>`;
   }
   function showPlacePopup(id, lngLat) {
@@ -7453,14 +7886,14 @@
     if (id === "__home") {
       pos = homeOf(state);
       const atHome = state.location.kind === "home";
-      html = `<h4>Home</h4><p>Your house ${esc(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
+      html = `<h4>Home</h4><p>Your house ${esc2(state.homeLabel || "in Aloha")}.</p>${atHome ? "<p><i>You are here.</i></p>" : `${tripHtml(pos)}<button class="go" data-gohome="1">Walk home</button>`}`;
     } else if (id.startsWith("wild:")) {
       const sid = id.slice(5);
       const sp = SPOTS[sid];
       pos = sp;
       const here = state.location.kind === "wild" && state.location.id === sid;
       const fromHome = straightMiles(homeOf(state), sp).toFixed(1);
-      html = `<h4>${esc(sp.name)}</h4><p>${sp.kind === "fish" ? "Fishing" : "Hunting"} \xB7 ${fromHome} mi from home</p><p><i>${esc(wildSub(sp))}</i></p>
+      html = `<h4>${esc2(sp.name)}</h4><p>${sp.kind === "fish" ? "Fishing" : "Hunting"} \xB7 ${fromHome} mi from home</p><p><i>${esc2(wildSub(sp))}</i></p>
       ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(sp)}<button class="go" data-gowild="${sid}">Walk here</button>`}`;
     } else {
       const p = getPlace(id);
@@ -7471,7 +7904,7 @@
       const status = (!ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched all of it" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`) + (left > 0 ? ` \xB7 items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ": nothing left" : "");
       const here = state.location.kind === "place" && state.location.id === id;
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
-      html = `<h4>${esc(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
+      html = `<h4>${esc2(p.name)}</h4><p>${cat.label} \xB7 ${fromHome} mi from home</p><p><i>${status}</i></p>
       ${here ? "<p><i>You are here.</i></p>" : `${tripHtml(p)}
       <button class="go" data-goplace="${p.id}">Walk here</button>`}`;
     }
@@ -7570,10 +8003,10 @@
       const f = prev[h2] = sleepPreview(h2);
       const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
       const warn = !f ? "" : f.dead ? " \xB7 you may not wake" : low ? ` \xB7 wake ${[f.water < 15 && "very thirsty", f.food < 15 && "starving", f.warmth < 15 && "freezing"].filter(Boolean).join(", ")}` : "";
-      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc(warn)}</small></button>`;
+      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc2(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc2(warn)}</small></button>`;
     }).join("");
     const need = [p.water < 40 && "Drink first: you are thirsty.", p.food < 40 && "Eat first: you are hungry.", p.warmth < 40 && "Get warm first: you are cold."].filter(Boolean);
-    const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc(need.join(" "))}</p>` : ""}`;
+    const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc2(need.join(" "))}</p>` : ""}`;
     modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
       m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
         closeModal();
@@ -7599,15 +8032,15 @@
   function legacyEpilogueHtml() {
     const ep = epilogue(state);
     if (!ep.length) return "";
-    return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc(e.title)}</b> <span class="hint">${esc(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc(e.line)}</li>`).join("")}</ul>`;
+    return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc2(e.title)}</b> <span class="hint">${esc2(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc2(e.line)}</li>`).join("")}</ul>`;
   }
   function showDeath() {
     const d = state.dead;
-    const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc(r.cause)}${r.dog ? ` \xB7 with ${esc(r.dog)}` : ""}</li>`).join("");
+    const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc2(r.cause)}${r.dog ? ` \xB7 with ${esc2(r.dog)}` : ""}</li>`).join("");
     modal(`<h2>You died</h2>
-    <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc(d.cause)}.</p>
+    <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc2(d.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
-    <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc(state.dog.name) : "none"}</b></div>
+    <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc2(state.dog.name) : "none"}</b></div>
     ${legacyEpilogueHtml()}
     <h3>Best runs</h3><ol>${runs}</ol>
     ${startChoicesHtml()}`, bindStartChoices);
@@ -7656,13 +8089,13 @@
       const left = pointsLeft(traits);
       const jobs = Object.entries(JOBS).map(([id, J]) => {
         const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
-        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc(J.name)}</b><small>${esc(J.text)}</small>
-        <small class="good">${esc(sk)} \xB7 starts with ${esc(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc(J.weakness)}</small></button>`;
+        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc2(J.name)}</b><small>${esc2(J.text)}</small>
+        <small class="good">${esc2(sk)} \xB7 starts with ${esc2(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc2(J.weakness)}</small></button>`;
       }).join("");
       const tr = Object.entries(TRAITS).map(([id, T2]) => {
         const on = traits.includes(id);
         const blocked = !on && ((T2.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
-        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc(T2.text)}</small></button>`;
+        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc2(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc2(T2.text)}</small></button>`;
       }).join("");
       m.querySelector(".box").innerHTML = `<h2>Who were you?</h2>
       <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
@@ -7710,7 +8143,7 @@
         const has3 = earned.includes(id);
         const on = has3 && legacy.includes(id);
         const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
-        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc(L.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc(L.progress(rec))}</span><small>${esc(L.deed)}</small><small class="good">${esc(L.bonus)}</small></button>`;
+        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc2(L.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc2(L.progress(rec))}</span><small>${esc2(L.deed)}</small><small class="good">${esc2(L.bonus)}</small></button>`;
       }).join("")}</div>` : "";
       return `<h3>Carry-over bonuses <small>(game option)</small></h3>
       <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? "checked" : ""}> Use small bonuses earned in earlier runs</label>${list}`;
@@ -7743,7 +8176,7 @@
       }
       finish();
       const label = nearLabel(pos);
-      modal(`<h3>Start here?</h3><p>Your new home is a house ${esc(label)}.</p>
+      modal(`<h3>Start here?</h3><p>Your new home is a house ${esc2(label)}.</p>
       <div class="col"><button class="primary" id="pickYes">Wake up here</button><button id="pickAgain">Choose again</button></div>`, (m) => {
         m.querySelector("#pickYes").addEventListener("click", () => beginRun({ home: pos, homeLabel: label }));
         m.querySelector("#pickAgain").addEventListener("click", pickStart);
@@ -7901,7 +8334,7 @@
     const night = isNight(state.time);
     document.body.classList.add("inside-open");
     const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === "warn" || e.kind === "bad" || e.kind === "story").map((e) => e.text);
-    api.openInside({
+    const insideH = api.openInside({
       plan,
       title,
       subtitle: `${cat.label} \xB7 inside`,
@@ -7951,7 +8384,7 @@
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
-        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
       },
       projectInfo: (id) => homeProjectText(state, id, true),
       // Lamps at home: LED lights need the project built and charge in the battery.
@@ -7959,12 +8392,12 @@
       describe: (n) => {
         if (n.type === "exit") return loc.kind === "home" ? "<kbd>E</kbd> Back to the home panel" : "<kbd>E</kbd> Leave the building <small>back to the map</small>";
         if (n.type === "project") return homeProjectText(state, n.id, false);
-        if (zoneList().includes(n.zone)) return `<span class="done">${esc(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
+        if (zoneList().includes(n.zone)) return `<span class="done">${esc2(n.label)}: searched</span>${Object.keys(hereBag(state)).length ? " <kbd>F</kbd> Take all" : ""}`;
         if (n.zone === counterIdx && !placeState(state, getPlace(loc.id)).counterOpen) {
-          return `<kbd>E</kbd> Open the ${esc(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
+          return `<kbd>E</kbd> Open the ${esc2(cat.lockedZone.name)} gate <small>${has(state, "pry_bar") ? "pry bar: sure to work" : esc2(oddsText(odds(state, cat.lockedZone.dc, forceBonus(state), forceOpts(state))))}</small>`;
         }
         const e = environment(state, "work");
-        return `${esc(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;
+        return `${esc2(n.label)} <small>Look at an item and press <kbd>E</kbd> to take it${e.dark && !hasLight(state) ? " \xB7 dark, no light: 2 min an item" : ""}</small>`;
       },
       onWalk: (m) => {
         perform(state, "action", "walk_inside", m);
@@ -8007,7 +8440,7 @@
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
         const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
-        return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -8036,6 +8469,8 @@
       },
       onLeave: (died, why) => {
         document.body.classList.remove("inside-open");
+        insideRefresh = null;
+        insideToast = null;
         if (why === "quickload") {
           const saved = loadGame();
           if (saved) state = saved;
@@ -8046,7 +8481,11 @@
         commit();
       }
     });
+    insideRefresh = () => insideH?.refresh?.();
+    insideToast = (t) => insideH?.toast?.(t);
   }
+  var insideRefresh = null;
+  var insideToast = null;
   function projectNeeds() {
     const out = {};
     for (const p of PROJECTS) {
@@ -8066,45 +8505,39 @@
       if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? "s" : ""}.`);
       if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? "s" : ""}.`);
       if (!parts.length && !d.events.length) parts.push("You stayed close to home.");
-      const ev = d.events.map((t) => `<li>${esc(t)}</li>`).join("");
-      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc(formatDate(d.day * 1440))}</b><p>${esc(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
+      const ev = d.events.map((t) => `<li>${esc2(t)}</li>`).join("");
+      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc2(formatDate(d.day * 1440))}</b><p>${esc2(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
     }).join("");
   }
   function insidePanel(name) {
     const p = state.player;
     if (name === "inventory") {
-      const c = state.carried;
-      const ids = sortedIds(c);
-      const rows = groupedRows(ids, (id) => {
-        const it = ITEMS[id];
-        const btns = itemUses(state, id).filter((u) => u.verb !== "feeddog" || state.dog.withPlayer).map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc(u.note)}"` : ""}>${esc(u.label)}</button>${u.disabled && u.note ? `<small class="need">${esc(u.note)}</small>` : ""}`).join("");
-        return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
-      }) || '<li class="empty">You carry nothing.</li>';
       const here = hereBag(state);
-      const hereIds = Object.keys(here);
-      const hereList = hereIds.length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">\u2315</span>Found here <span class="bag-tag">not yours yet</span></h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join("")}</ul>
-      <button class="primary small" data-in="take">Take all that fits (F)</button></section>` : "";
+      wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
       const w = bagWeight(state.carried);
       const lim = carryLimit(state);
       const fill = Math.min(100, Math.round(w / Math.max(1, lim) * 100));
-      return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>
-      <section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? "bad" : ""}">${w} / ${lim} lb</span></h5>
-      <div class="bag-load${w > lim ? " over" : ""}"><i style="width:${fill}%"></i></div><ul class="inv">${rows}</ul></section>${hereList}`;
+      const hereList = Object.keys(here).length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">\u2315</span>Found here <span class="bag-tag">not yours yet</span>
+      <button class="primary small" data-in="take">Take all that fits (F)</button></h5>${gridHtml("here", gridOpts("here"))}</section>` : "";
+      return `<h4>Inventory</h4><p class="stock">${esc2(stockLine(state))}</p>${selectedHtml(true)}
+      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? "bad" : ""}">${w} / ${lim} lb</span></h5>
+      <div class="bag-load${w > lim ? " over" : ""}"><i style="width:${fill}%"></i></div>${gridHtml("pack", gridOpts("pack"))}</section>${hereList}</div>
+      <p class="hint">Drag to move or to take \xB7 R turns a tile \xB7 tap a tile for its buttons.</p>`;
     }
     if (name === "character") {
-      const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc(r.text)}</div>`).join("");
+      const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join("") + risks(state).map((r) => `<div class="risk-line">\u26A0 ${esc2(r.text)}</div>`).join("");
       const notes = [];
       for (const i of p.injuries) notes.push(`${injuryName(i)}${i.bandaged ? " (bandaged)" : ""}`);
       if (p.illness.infection) notes.push("Infection");
       if (p.illness.stomachH > 0) notes.push("Stomach bug");
       if (p.wet) notes.push("Wet");
       return `<h4>Character</h4>${rows}
-      <p class="hint">${notes.length ? esc(notes.join(" \xB7 ")) : "No injuries or illness."}</p>
+      <p class="hint">${notes.length ? esc2(notes.join(" \xB7 ")) : "No injuries or illness."}</p>
       ${clothesHtml()}
       ${skillsHtml(true)}`;
     }
     if (name === "journal") {
-      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc(e.text)}</li>`).join("");
+      const items = state.log.slice(-10).reverse().map((e) => `<li class="${e.kind}"><time>D${dayIndex(e.t) + 1} ${formatClock(e.t)}</time> ${esc2(e.text)}</li>`).join("");
       return `<h4>Journal</h4>${journalHtml(6)}<h5>Last events</h5><ul class="jr">${items}</ul>`;
     }
     if (name === "objectives") {
@@ -8116,6 +8549,15 @@
     document.body.addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b || b.disabled || !state || b.closest("#modal") || b.closest(".maplibregl-popup")) return;
+      if (!b.isConnected) return;
+      if (b.closest("#inside")) {
+        if (b.dataset.take) act("take", b.dataset.take);
+        else if (b.dataset.drop) act("drop", b.dataset.drop);
+        else return;
+        gridSel = null;
+        insideRefresh?.();
+        return;
+      }
       if (b.dataset.act) {
         if (b.dataset.act === "sleep") return showSleep();
         if (b.dataset.act === "walk_in") return walkInside2();
@@ -8173,12 +8615,12 @@
     const proj = PROJECTS.find((p) => p.id === id);
     if (!proj) return "";
     const st = projectStatus(state2, proj);
-    if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc(proj.name)} <small>built \xB7 ${esc(proj.effect || "")}</small>`;
+    if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc2(proj.name)} <small>built \xB7 ${esc2(proj.effect || "")}</small>`;
     const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
     const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
     const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
     if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
-    return `<span class="done">${esc(proj.name)}: not built</span> <small>needs ${esc(parts)}${esc(tools)}${esc(req)} \xB7 <kbd>E</kbd> details</small>`;
+    return `<span class="done">${esc2(proj.name)}: not built</span> <small>needs ${esc2(parts)}${esc2(tools)}${esc2(req)} \xB7 <kbd>E</kbd> details</small>`;
   }
   function renderHeat(atHome) {
     const hh = homeHeat(state);
@@ -8196,16 +8638,16 @@
       const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
       const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
       return `<div class="heat-row">
-      <span class="hn">${esc(r.label)}</span>
+      <span class="hn">${esc2(r.label)}</span>
       <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
       <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
-      <small>${esc(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
+      <small>${esc2(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
       <span class="hb">${board}${door}${bed}</span>
     </div>`;
     }).join("");
     return `<div class="heat">
     <h3>Heat <small>outside ${hh.outside}\xB0F</small></h3>
-    <p class="sub">Heat from: ${src.length ? esc(src.join(", ")) : "nothing now (light a fire or turn on the heater)"} \u2192 living room \u2192 rooms with open doors. Closed doors keep a room's heat in or out.</p>
+    <p class="sub">Heat from: ${src.length ? esc2(src.join(", ")) : "nothing now (light a fire or turn on the heater)"} \u2192 living room \u2192 rooms with open doors. Closed doors keep a room's heat in or out.</p>
     ${rows}
   </div>`;
   }
@@ -8231,12 +8673,12 @@
         continue;
       }
       const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
-      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc(b.name)}</b> <span>${stage}</span>
+      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc2(b.name)}</b> <span>${stage}</span>
       <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? "" : `${b.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b.crop].days * (100 - b.growth) / 100))} days left if warm \xB7 `}water ${b.water}%</small></div>`);
     }
     const sow = g.canSow.map((id) => {
       const why = canPlant(state, id);
-      return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc(why || "")}">Sow ${esc(CROPS[id].name.toLowerCase())}</button>`;
+      return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc2(why || "")}">Sow ${esc2(CROPS[id].name.toLowerCase())}</button>`;
     }).join("");
     const any = g.planted.some((b) => !b.dead && !b.ready);
     const ripe = g.planted.some((b) => b.ready);
@@ -8249,7 +8691,7 @@
     </div>
     <p class="sub">${sow ? `Sow now (30 min, 1 seed packet):` : "Nothing to sow this month."}</p>
     <div class="row">${sow}</div>
-    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(" \xB7 ")}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
+    <p class="hint">When to sow: ${Object.values(CROPS).map((c) => `${esc2(c.name.toLowerCase())} ${monthsText(c.plant)}`).join(" \xB7 ")}. In winter the soil is too cold: crops grow slowly or not at all, and frost kills tender ones.</p>
   </div>`;
   }
 

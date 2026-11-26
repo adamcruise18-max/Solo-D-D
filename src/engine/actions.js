@@ -972,6 +972,7 @@ export function nearbyHousesLeft(state) {
   return 12 - (state.houseAreas[areaKey(state)] || 0);
 }
 
+// A random house near where you are (the map's "Search a house" action).
 export function enterNearbyHouse(state) {
   const key = areaKey(state);
   const n = (state.houseAreas[key] || 0) + 1;
@@ -979,20 +980,42 @@ export function enterNearbyHouse(state) {
   const id = `${key}#${n}`;
   const near = key === 'home' ? 'on your street' : `near ${getPlace(key)?.name || 'here'}`;
   const label = `House ${n} ${near}`;
-  const r = randInt(state, 0, 999) / 1000;
-  state.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
-  const parent = { ...state.location, pos: { ...state.pos } };
+  newHouse(state, id); // first: keeps the same random draws as before the split
+  const from = state.pos;
   // The house is 80 to 250 m away, in a random direction. The map marker moves there.
   const ang = (randInt(state, 0, 359) * Math.PI) / 180;
   const meters = randInt(state, 80, 250);
   const pos = {
-    lat: parent.pos.lat + (meters * Math.sin(ang)) / 111320,
-    lon: parent.pos.lon + (meters * Math.cos(ang)) / (111320 * Math.cos((parent.pos.lat * Math.PI) / 180)),
+    lat: from.lat + (meters * Math.sin(ang)) / 111320,
+    lon: from.lon + (meters * Math.cos(ang)) / (111320 * Math.cos((from.lat * Math.PI) / 180)),
   };
-  state.houses[id].pos = pos;
-  state.pos = { ...pos };
-  advanceTime(state, 5, 'walk');
-  log(state, endDot(`You walk to a house ${near}`));
+  enterHouse(state, id, label, pos, { walkText: `You walk to a house ${near}`, newId: id });
+}
+
+function newHouse(state, id) {
+  const r = randInt(state, 0, 999) / 1000;
+  state.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
+  return state.houses[id];
+}
+
+// Go into one house. id: any stable id ('home#3' for a random house, 'osm:123' for a real
+// building on the 3D streets). A new house is made on the first visit (lock, body or not);
+// on a later visit you walk back in. opts.walkText: the log line for the walk there.
+export function enterHouse(state, id, label, pos, opts = {}) {
+  const first = !state.houses[id] || id === opts.newId;
+  const hs = state.houses[id] || newHouse(state, id);
+  const parent = { ...state.location, pos: { ...state.pos } };
+  if (pos) {
+    hs.pos = { ...pos };
+    state.pos = { ...pos };
+  }
+  advanceTime(state, opts.walkMinutes ?? 5, 'walk');
+  if (opts.walkText) log(state, endDot(opts.walkText));
+  if (!first) {
+    state.location = { kind: 'house', id, label, parent };
+    log(state, 'You go back into the house.');
+    return;
+  }
   // Entry: 70% of doors are locked.
   if (chance(state, 0.7)) {
     if (has(state, 'pry_bar')) {
@@ -1015,7 +1038,7 @@ export function enterNearbyHouse(state) {
   state.stats.housesSearched += 1;
   state.location = { kind: 'house', id, label, parent };
   const hn = state.stats.housesSearched;
-  if (state.houses[id].body) seeBody(state, BODY_LINES[hn % BODY_LINES.length]);
+  if (hs.body) seeBody(state, BODY_LINES[hn % BODY_LINES.length]);
   else log(state, EMPTY_LINES[hn % EMPTY_LINES.length]);
 }
 
