@@ -3987,6 +3987,23 @@ const FIXTURES = {
       rbx(g, F, x0, x1, seatH - 0.13, seatH - sag, -D / 2 + bt + 0.005, D / 2 - 0.005, 0.05);
       const back = rbx(g, F, x0 + 0.01, x1 - 0.01, seatH - 0.02, Math.min(H - 0.02, seatH + (H - seatH) * 0.85), -D / 2 + bt, -D / 2 + bt + 0.16, 0.06);
       back.rotation.x = -0.08 - r() * 0.08;
+      if (FINE) {
+        // piped front edge of the seat cushion, tufted buttons and a top seam on the back cushion
+        add(g, gCyl(0.009, 0.009, x1 - x0 - 0.06, 8), F, x0 + 0.03, seatH - sag - 0.012, D / 2 - 0.012, 0, 0, -Math.PI / 2);
+        const bh = Math.min(H - 0.02, seatH + (H - seatH) * 0.85) - (seatH - 0.02);
+        for (const fx of [-0.3, 0, 0.3]) add(back, gSphere(0.011, 6, 4), F, fx * (x1 - x0 - 0.02), bh * 0.58, 0.079);
+        add(back, gCyl(0.008, 0.008, x1 - x0 - 0.1, 8), F, -(x1 - x0 - 0.1) / 2, bh - 0.012, 0.07, 0, 0, -Math.PI / 2);
+      }
+    }
+    if (FINE) {
+      // rolled arm tops with round front caps, a base trim rail and turned leg feet
+      for (const s of [-1, 1]) {
+        const ax = s < 0 ? -L / 2 + a / 2 : L / 2 - a / 2;
+        add(g, gCyl(a * 0.42, a * 0.42, D - 0.04, 12), F, ax, armH - a * 0.3, -D / 2 + 0.02, Math.PI / 2, 0, 0);
+        add(g, gCyl(a * 0.36, a * 0.36, 0.012, 12), F, ax, armH - a * 0.38, D / 2 - 0.014, Math.PI / 2, 0, 0);
+      }
+      bx(g, W, -L / 2 + a, L / 2 - a, legH, legH + 0.025, D / 2 - 0.02, D / 2 - 0.004);
+      for (const x of [-L / 2 + 0.06, L / 2 - 0.06]) for (const z of [-D / 2 + 0.06, D / 2 - 0.06]) add(g, gCyl(0.022, 0.022, 0.012, 8), W, x, 0, z);
     }
     if (r() < 0.8) { // throw pillow and a blanket over the arm
       const P = new THREE.Group();
@@ -4004,7 +4021,17 @@ const FIXTURES = {
     for (const x of [-lx, lx]) for (const z of [-lz, lz]) bx(g, W, x - 0.03, x + 0.03, 0, H - top, z - 0.03, z + 0.03);
     bx(g, W, -lx, lx, H - top - 0.08, H - top, -lz - 0.01, -lz + 0.01); bx(g, W, -lx, lx, H - top - 0.08, H - top, lz - 0.01, lz + 0.01);
     bx(g, W, -lx - 0.01, -lx + 0.01, H - top - 0.08, H - top, -lz, lz); bx(g, W, lx - 0.01, lx + 0.01, H - top - 0.08, H - top, -lz, lz);
+    if (FINE) {
+      // moulded top edge, leg brackets and feet
+      bx(g, T, -L / 2 + 0.015, L / 2 - 0.015, H - top - 0.012, H - top, -D / 2 + 0.015, D / 2 - 0.015);
+      for (const x of [-lx, lx]) for (const z of [-lz, lz]) {
+        bx(g, W, x - 0.036, x + 0.036, 0, 0.025, z - 0.036, z + 0.036);
+        const bk = bx(g, W, x - 0.05 * Math.sign(x) - 0.01, x - 0.05 * Math.sign(x) + 0.01, H - top - 0.12, H - top - 0.08, z - 0.05 * Math.sign(z) - 0.01, z - 0.05 * Math.sign(z) + 0.01);
+        bk.rotation.y = Math.PI / 4;
+      }
+    }
     if (D < 0.5 || H < 0.5) return;
+    const Cu = FX.fabric('#7a4a3a');
     const per = Math.max(1, Math.floor((L - 0.2) / 0.6));
     const seatY = Math.min(0.45, H - 0.22);
     const chair = (x, z, ry) => {
@@ -4015,6 +4042,18 @@ const FIXTURES = {
       for (const cx of [-sw / 2 + 0.03, sw / 2 - 0.03]) bx(C, W, cx - 0.017, cx + 0.017, seatY, H - top - 0.012, 0.2 - 0.03, 0.2 - 0.005);
       bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, H - top - 0.1, H - top - 0.02, 0.2 - 0.03, 0.2 - 0.008);
       bx(C, W, -sw / 2 + 0.02, sw / 2 - 0.02, seatY + 0.12, seatY + 0.16, 0.2 - 0.028, 0.2 - 0.01);
+      if (FINE) {
+        // seat aprons, leg stretchers, back spindles, a rounded top rail and a seat pad
+        bx(C, W, -sw / 2 + 0.03, sw / 2 - 0.03, seatY - 0.09, seatY - 0.035, -0.19, -0.175);
+        for (const cx of [-sw / 2 + 0.03, sw / 2 - 0.03]) {
+          bx(C, W, cx - 0.008, cx + 0.008, seatY - 0.09, seatY - 0.035, -0.17, 0.17);
+          bx(C, W, cx - 0.009, cx + 0.009, 0.12, 0.145, -0.17, 0.17);
+        }
+        bx(C, W, -sw / 2 + 0.03, sw / 2 - 0.03, 0.17, 0.19, -0.009, 0.009);
+        for (const sx of [-0.06, 0.06]) bx(C, W, sx - 0.012, sx + 0.012, seatY + 0.16, H - top - 0.1, 0.2 - 0.024, 0.2 - 0.014);
+        add(C, gCyl(0.012, 0.012, sw - 0.04, 8), W, -sw / 2 + 0.02, H - top - 0.02, 0.2 - 0.019, 0, 0, -Math.PI / 2);
+        rbx(C, Cu, -sw / 2 + 0.03, sw / 2 - 0.03, seatY, seatY + 0.025, -0.18, 0.16, 0.012);
+      }
       C.position.set(x, 0, z); C.rotation.y = ry + (r() - 0.5) * 0.08;
       g.add(C);
     };
@@ -4031,6 +4070,7 @@ const FIXTURES = {
   },
   bed(g, L, D, H, r) {
     const W = FX.wood(pick(r, ['#5a3a22', '#7a5a3a', '#3a2a1e']));
+    const K = FX.metal('#b8a070', 'brass');
     const S = FX.sheet();
     const B = texPlaidMat(r, true);
     const mTop = Math.min(0.6, H * 0.62);
@@ -4069,6 +4109,18 @@ const FIXTURES = {
     add(g, geo, B);
     // folded-back edge
     add(g, gCyl(0.03, 0.03, 2 * halfW, 8), B, x0 + 0.02, mTop + 0.03, -halfW, Math.PI / 2, 0, 0);
+    if (FINE) {
+      // corner posts with round finials, headboard slats, rail bolt covers and mattress piping
+      for (const z of [-D / 2 + 0.035, D / 2 - 0.035]) {
+        bx(g, W, -L / 2, -L / 2 + hb + 0.012, 0, H - 0.045, z - 0.035, z + 0.035);
+        add(g, gSphere(0.03, 8, 6), W, -L / 2 + hb / 2 + 0.006, H - 0.03, z);
+        bx(g, W, L / 2 - 0.06, L / 2, 0, fbH - 0.03, z - 0.035, z + 0.035);
+        add(g, gSphere(0.026, 8, 6), W, L / 2 - 0.03, fbH - 0.026, z);
+      }
+      for (let i = 1; i <= 4; i++) { const z = -D / 2 + i * D / 5; bx(g, W, -L / 2 + hb, -L / 2 + hb + 0.01, mTop + 0.1, H - 0.08, z - 0.03, z + 0.03); }
+      for (const z of [-D / 2 - 0.0, D / 2 - 0.004]) for (const x of [-L / 2 + hb + 0.05, L / 2 - 0.1]) add(g, gCyl(0.012, 0.012, 0.004, 8), K, x, 0.23, z, Math.PI / 2, 0, 0);
+      for (const z of [-D / 2 + 0.035, D / 2 - 0.035]) add(g, gCyl(0.008, 0.008, L - hb - 0.1, 8), S, -L / 2 + hb + 0.02, mTop - 0.01, z, 0, 0, -Math.PI / 2);
+    }
   },
   dresser(g, L, D, H, r) {
     const W = FX.wood(pick(r, ['#6a4528', '#5a3a22', '#8a6a48']));
@@ -4089,6 +4141,19 @@ const FIXTURES = {
       bx(g, W, x0, x1, y0, y1, D / 2 - 0.022 + out, D / 2);
       const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
       for (const hx of cw > 0.5 ? [-0.12, 0.12] : [0]) add(g, gCyl(0.012, 0.012, 0.012, 8), K, cx + hx, cy, D / 2 - 0.012, Math.PI / 2, 0, 0);
+      if (FINE) {
+        // raised drawer panel, brass backplates behind the knobs and a keyhole plate
+        bx(g, W, x0 + 0.03, x1 - 0.03, y0 + 0.025, y1 - 0.025, D / 2, D / 2 + 0.004);
+        for (const hx of cw > 0.5 ? [-0.12, 0.12] : [0]) bx(g, K, cx + hx - 0.022, cx + hx + 0.022, cy - 0.012, cy + 0.012, D / 2 + 0.004, D / 2 + 0.006);
+        bx(g, K, cx - 0.008, cx + 0.008, y1 - 0.045, y1 - 0.03, D / 2 + 0.004, D / 2 + 0.006);
+      }
+    }
+    if (FINE) {
+      // top moulding lip, recessed side panels, bun feet and a low back rail
+      bx(g, W, -L / 2 - 0.0, L / 2, H - 0.045, H - 0.03, D / 2 - 0.012, D / 2);
+      for (const s of [-1, 1]) bx(g, W, s * (L / 2 - 0.004) - 0.004, s * (L / 2 - 0.004) + 0.004, 0.14, H - 0.08, -D / 2 + 0.05, D / 2 - 0.07);
+      for (const x of [-L / 2 + 0.05, L / 2 - 0.05]) for (const z of [-D / 2 + 0.05, D / 2 - 0.06]) add(g, gSphere(0.035, 8, 6), W, x, 0.035, z, 0, 0, 0, 1, 0.9, 1);
+      bx(g, W, -L / 2 + 0.02, L / 2 - 0.02, H, Math.min(H, H), -D / 2, -D / 2 + 0.02);
     }
   },
   fridge(g, L, D, H, r) {
@@ -4128,6 +4193,18 @@ const FIXTURES = {
       add(g, q, P, Math.max(-L / 2 + 0.1, Math.min(L / 2 - 0.15, x * L / 0.75)), y, D / 2 - 0.0015, 0, 0, rot ? 0.12 : -0.06);
       add(g, gCyl(0.008, 0.008, 0.004, 8), K, Math.max(-L / 2 + 0.1, Math.min(L / 2 - 0.15, x * L / 0.75)), y + 0.075, D / 2 - 0.004, Math.PI / 2, 0, 0);
     }
+    if (FINE) {
+      // door gaskets, hinges, handle stand-offs, a vent grille, a blank badge and levelling feet
+      bx(g, K, -L / 2 + 0.01, L / 2 - 0.01, 0.1, split - 0.006, D / 2 - dz - 0.002, D / 2 - dz + 0.003);
+      bx(g, K, -L / 2 + 0.01, L / 2 - 0.01, split + 0.006, H - 0.01, D / 2 - dz - 0.002, D / 2 - dz + 0.003);
+      const hingeX = -L / 2 + 0.03;
+      for (const y of [0.1, split - 0.01, split + 0.006, H - 0.015]) bx(g, K, hingeX - 0.02, hingeX + 0.02, y - 0.006, y + 0.006, D / 2 - dz - 0.01, D / 2 + 0.002);
+      const lo0 = split - 0.42 > 0.2 ? split - 0.42 : 0.2;
+      for (const y of [lo0 + 0.02, split - 0.1, split + 0.08, Math.min(H - 0.06, split + 0.32) - 0.02]) add(g, gCyl(0.009, 0.009, 0.012, 8), K, hx, y, D / 2 - 0.014, Math.PI / 2, 0, 0);
+      for (let i = 0; i < 4; i++) bx(g, E, -L / 2 + 0.05, L / 2 - 0.05, 0.015 + i * 0.018, 0.022 + i * 0.018, D / 2 - dz + 0.01, D / 2 - dz + 0.014);
+      bx(g, FX.metal('#b8bcc0', 'ss'), -0.05, 0.05, H - 0.1, H - 0.085, D / 2, D / 2 + 0.002);
+      for (const x of [-L / 2 + 0.06, L / 2 - 0.06]) add(g, gCyl(0.015, 0.015, 0.012, 8), K, x, 0, D / 2 - dz - 0.02);
+    }
   },
   counter(g, L, D, H, r) {
     const C = FX.painted(pick(r, ['#e8e2d2', '#8a9a88', '#5a6a7a']));
@@ -4158,6 +4235,12 @@ const FIXTURES = {
       bx(g, S, cx - 0.06, cx + 0.06, H - top - 0.1, H - top - 0.085, D / 2 - 0.008, D / 2);
       bx(g, C, x0, x1, kick + 0.01, H - top - 0.19, D / 2 - 0.03, D / 2 - 0.008);
       bx(g, S, x1 - 0.04, x1 - 0.028, H - top - 0.4, H - top - 0.26, D / 2 - 0.008, D / 2);
+      if (FINE) {
+        // shaker panels on drawer and door, hinge knuckles
+        bx(g, C, x0 + 0.03, x1 - 0.03, H - top - 0.15, H - top - 0.03, D / 2 - 0.008, D / 2 - 0.004);
+        bx(g, C, x0 + 0.04, x1 - 0.06, kick + 0.05, H - top - 0.23, D / 2 - 0.008, D / 2 - 0.004);
+        for (const y of [kick + 0.05, H - top - 0.25]) add(g, gCyl(0.005, 0.005, 0.04, 6), S, x0 + 0.006, y, D / 2 - 0.006);
+      }
     }
     if (stoveX !== null) { // oven front
       const x0 = stoveX - stoveW / 2, x1 = stoveX + stoveW / 2;
@@ -4165,6 +4248,16 @@ const FIXTURES = {
       bx(g, S, x0 + 0.1, x1 - 0.1, kick + 0.2, H - top - 0.25, D / 2 - 0.006, D / 2 - 0.003);
       bx(g, S, x0 + 0.06, x1 - 0.06, H - top - 0.17, H - top - 0.15, D / 2 - 0.004, D / 2);
       for (let k = 0; k < 4; k++) add(g, gCyl(0.018, 0.018, 0.02, 8), S, x0 + 0.1 + k * (stoveW - 0.2) / 3, H - top - 0.07, D / 2 - 0.02, Math.PI / 2, 0, 0);
+      if (FINE) {
+        // knob bezels, oven window frame, handle stand-offs and a dish towel on the handle
+        for (let k = 0; k < 4; k++) add(g, gCyl(0.024, 0.024, 0.004, 10), K, x0 + 0.1 + k * (stoveW - 0.2) / 3, H - top - 0.07, D / 2 - 0.006, Math.PI / 2, 0, 0);
+        const wy0 = kick + 0.2, wy1 = H - top - 0.25, wx0 = x0 + 0.1, wx1 = x1 - 0.1;
+        bx(g, S, wx0 - 0.012, wx1 + 0.012, wy0 - 0.012, wy0, D / 2 - 0.007, D / 2 - 0.002); bx(g, S, wx0 - 0.012, wx1 + 0.012, wy1, wy1 + 0.012, D / 2 - 0.007, D / 2 - 0.002);
+        bx(g, S, wx0 - 0.012, wx0, wy0, wy1, D / 2 - 0.007, D / 2 - 0.002); bx(g, S, wx1, wx1 + 0.012, wy0, wy1, D / 2 - 0.007, D / 2 - 0.002);
+        for (const sx of [x0 + 0.07, x1 - 0.07]) bx(g, S, sx - 0.006, sx + 0.006, H - top - 0.165, H - top - 0.155, D / 2 - 0.012, D / 2 - 0.004);
+        const tw = rbx(g, FX.sheet(), stoveX - 0.07, stoveX + 0.07, H - top - 0.33, H - top - 0.15, D / 2 - 0.004, D / 2 + 0.0, 0.004);
+        tw.rotation.z = 0.04;
+      }
     }
     // worktop with openings
     const holes = [];
@@ -4185,12 +4278,38 @@ const FIXTURES = {
         if (h1 - h0 > 0.45) bx(g, S, (h0 + h1) / 2 - 0.005, (h0 + h1) / 2 + 0.005, d0, H - 0.02, zb, zf);
         add(g, gCyl(0.03, 0.03, 0.004, 10), K, (h0 + h1) / 2 - (h1 - h0) / 4, d0 + 0.01, (zb + zf) / 2);
         add(g, gCyl(0.025, 0.025, 0.004, 10), S, (h0 + h1) / 2, H - 0.004, zb - 0.045);
+        if (FINE) {
+          // faucet: base, neck, spout and two handles; a cross in the drain
+          const fx = (h0 + h1) / 2, fz = zb - 0.045;
+          add(g, gCyl(0.008, 0.01, 0.16, 8), S, fx, H, fz);
+          add(g, gCyl(0.008, 0.008, 0.11, 8), S, fx, H + 0.152, fz, Math.PI / 2, 0, 0);
+          for (const s of [-1, 1]) { add(g, gCyl(0.012, 0.014, 0.03, 8), S, fx + s * 0.07, H, fz); bx(g, S, fx + s * 0.07 - 0.025, fx + s * 0.07 + 0.025, H + 0.03, H + 0.04, fz - 0.006, fz + 0.006); }
+          bx(g, S, (h0 + h1) / 2 - (h1 - h0) / 4 - 0.025, (h0 + h1) / 2 - (h1 - h0) / 4 + 0.025, d0 + 0.014, d0 + 0.016, (zb + zf) / 2 - 0.003, (zb + zf) / 2 + 0.003, false);
+        }
       } else {
         bx(g, K, h0, h1, H - top, H, zb, zf);
+        if (FINE) {
+          // burner grates and caps
+          const gx = [h0 + (h1 - h0) * 0.27, h0 + (h1 - h0) * 0.73], gz = [zb + (zf - zb) * 0.27, zb + (zf - zb) * 0.73];
+          for (const x of gx) for (const z of gz) {
+            add(g, gTorus(0.07, 0.006, 4, 12), S, x, H + 0.006, z, Math.PI / 2, 0, 0);
+            add(g, gCyl(0.025, 0.028, 0.012, 10), K, x, H, z);
+          }
+        }
       }
       xs = h1;
     }
     bx(g, T, xs, L / 2, H - top, H, -D / 2, D / 2);
+    if (FINE) {
+      // rounded worktop nosing, a backsplash strip, a wall outlet and a paper towel holder
+      add(g, gCyl(0.012, 0.012, L, 8), T, -L / 2, H - 0.012, D / 2 - 0.002, 0, 0, -Math.PI / 2);
+      bx(g, T, -L / 2, L / 2, H, Math.min(H + 0.0, H), -D / 2, -D / 2 + 0.012);
+      bx(g, T, -L / 2, L / 2, H - top - 0.01, H - top, -D / 2, -D / 2 + 0.01);
+      bx(g, T, -L / 2 + 0.25, -L / 2 + 0.32, kick + 0.02, kick + 0.12, D / 2 - 0.008, D / 2 - 0.004);
+      for (const y of [kick + 0.05, kick + 0.09]) bx(g, K, -L / 2 + 0.275, -L / 2 + 0.295, y - 0.008, y + 0.008, D / 2 - 0.004, D / 2 - 0.002);
+      add(g, gCyl(0.004, 0.004, 0.24, 6), S, -L / 2 + 0.02, H - top - 0.04, D / 2 - 0.01, 0, 0, -Math.PI / 2);
+      add(g, gCyl(0.045, 0.045, 0.2, 12), FX.sheet(), -L / 2 + 0.04, H - top - 0.04, D / 2 - 0.004, 0, 0, -Math.PI / 2, 1, 1, 0.3);
+    }
   },
   tub(g, L, D, H, r) {
     const E = FX.enamel('tub', '#ecebe6');
@@ -4200,6 +4319,7 @@ const FIXTURES = {
       dust(c, w, h, rr, 2);
     }), roughness: 0.35 });
     const S = FX.metal('#c8ccd0', 'chrome');
+    const K2 = FX.dark('fridgek', '#2a2b2d', 0.5);
     const wt = 0.07;
     bx(g, E, -L / 2, L / 2, 0, 0.06, -D / 2, D / 2);
     bx(g, R, -L / 2 + wt, L / 2 - wt, 0.06, 0.07, -D / 2 + wt, D / 2 - wt);
@@ -4212,6 +4332,20 @@ const FIXTURES = {
     add(g, gCyl(0.025, 0.025, 0.005, 10), S, -L / 2 + wt + 0.1, 0.07, 0);
     add(g, gCyl(0.018, 0.018, 0.12, 8), S, -L / 2 + wt, H - 0.12, 0, 0, 0, -Math.PI / 2);
     for (const z of [-0.09, 0.09]) add(g, gCyl(0.022, 0.022, 0.03, 8), S, -L / 2 + wt, H - 0.07, z, 0, 0, -Math.PI / 2);
+    if (FINE) {
+      // rolled rim, cross handles, overflow plate, drain cross, soap dish and soap, a hand shower
+      add(g, gCyl(0.02, 0.02, L - 0.04, 10), E, -L / 2 + 0.02, H - 0.012, D / 2 - wt / 2, 0, 0, -Math.PI / 2);
+      add(g, gCyl(0.02, 0.02, L - 0.04, 10), E, -L / 2 + 0.02, H - 0.012, -D / 2 + wt / 2, 0, 0, -Math.PI / 2);
+      add(g, gCyl(0.02, 0.02, D - 0.04, 10), E, -L / 2 + wt / 2, H - 0.012, -D / 2 + 0.02, Math.PI / 2, 0, 0);
+      add(g, gCyl(0.02, 0.02, D - 0.04, 10), E, L / 2 - wt * 0.8, H - 0.012, -D / 2 + 0.02, Math.PI / 2, 0, 0);
+      for (const z of [-0.09, 0.09]) { bx(g, S, -L / 2 + wt + 0.03, -L / 2 + wt + 0.036, H - 0.08, H - 0.06, z - 0.03, z + 0.03); bx(g, S, -L / 2 + wt + 0.03, -L / 2 + wt + 0.036, H - 0.1, H - 0.04, z - 0.008, z + 0.008); }
+      add(g, gCyl(0.03, 0.03, 0.006, 12), S, -L / 2 + wt, H * 0.6, 0, 0, 0, -Math.PI / 2);
+      bx(g, K2, -L / 2 + wt + 0.085, -L / 2 + wt + 0.115, 0.075, 0.077, -0.003, 0.003, false);
+      bx(g, E, L / 2 - wt * 1.6 - 0.12, L / 2 - wt * 1.6 - 0.01, H - 0.05, H - 0.04, -D / 2 + wt, -D / 2 + wt + 0.08);
+      rbx(g, R, L / 2 - wt * 1.6 - 0.1, L / 2 - wt * 1.6 - 0.03, H - 0.04, H - 0.02, -D / 2 + wt + 0.015, -D / 2 + wt + 0.065, 0.008);
+      add(g, gTube('tubhose', [[-L / 2 + wt + 0.01, H - 0.05, 0.12], [-L / 2 + wt + 0.05, H * 0.45, 0.18], [-L / 2 + wt + 0.12, 0.09, 0.15], [-L / 2 + wt + 0.25, 0.075, 0.05]], 0.007, 16, 5), S);
+      add(g, gCyl(0.018, 0.012, 0.09, 8), S, -L / 2 + wt + 0.25, 0.075, 0.05, 0, 0, -Math.PI / 2);
+    }
   },
   cabinet(g, L, D, H, r) {
     const P = FX.painted(pick(r, ['#d8d4c8', '#6a7a6a', '#8a7a6a']));
@@ -4225,8 +4359,22 @@ const FIXTURES = {
       bx(g, P, x0 + 0.05, x1 - 0.05, y0 + 0.05, y1 - 0.05, D / 2 - 0.005, D / 2 + 0.0);
       const hx = nd === 2 ? (j === 0 ? x1 - 0.04 : x0 + 0.04) : x1 - 0.04;
       bx(g, S, hx - 0.008, hx + 0.008, (y0 + y1) / 2 - 0.06, (y0 + y1) / 2 + 0.06, D / 2 - 0.0, D / 2);
+      if (FINE) {
+        // hinge knuckles on the outer edge, handle stand-offs, a keyhole
+        const ex = nd === 2 ? (j === 0 ? x0 + 0.004 : x1 - 0.004) : x0 + 0.004;
+        for (const y of [y0 + 0.06, y1 - 0.06]) add(g, gCyl(0.006, 0.006, 0.05, 6), S, ex, y - 0.025, D / 2 - 0.004);
+        for (const dy of [-0.05, 0.05]) add(g, gCyl(0.006, 0.006, 0.012, 6), S, hx, (y0 + y1) / 2 + dy, D / 2 - 0.004, Math.PI / 2, 0, 0);
+        bx(g, S, hx - 0.006, hx + 0.006, (y0 + y1) / 2 + 0.08, (y0 + y1) / 2 + 0.095, D / 2, D / 2 + 0.002);
+      }
     }
     bx(g, FX.dark('kickc'), -L / 2 + 0.02, L / 2 - 0.02, 0, 0.08, D / 2 - 0.05, D / 2 - 0.03);
+    if (FINE) {
+      // crown moulding and recessed side panels
+      bx(g, P, -L / 2, L / 2, H - 0.03, H, D / 2 - 0.022, D / 2 + 0.0);
+      bx(g, P, -L / 2 + 0.01, L / 2 - 0.01, H - 0.045, H - 0.03, D / 2 - 0.02, D / 2 - 0.008);
+      for (const s of [-1, 1]) bx(g, P, s * L / 2 - 0.003, s * L / 2 + 0.003, 0.12, H - 0.08, -D / 2 + 0.05, D / 2 - 0.08);
+      for (const s of [-1, 1]) bx(g, P, s * L / 2 - 0.004, s * L / 2 + 0.004, 0.1, 0.11, -D / 2 + 0.03, D / 2 - 0.06);
+    }
   },
   checkout(g, L, D, H, r) {
     const P = FX.laminate('#8a8e92'); // lanes in one store match
@@ -4261,6 +4409,21 @@ const FIXTURES = {
       bx(g, K, L / 2 - 0.5, L / 2 - 0.3, ch, ch + 0.035, D / 2 - 0.2, D / 2 - 0.06);
       const cr = add(g, gBox(0.08, Math.min(0.12, room - 0.005), 0.05), K, L / 2 - 0.15, ch, D / 2 - 0.12);
       cr.rotation.x = -0.3;
+    }
+    if (FINE) {
+      // belt slats, front trim strips, bumper rail, kick plate, scanner window, bag rack and a receipt printer
+      const slats = Math.max(4, Math.floor((beltEnd + L / 2 - 0.05) / 0.12));
+      for (let i = 0; i < slats; i++) { const x = -L / 2 + 0.08 + i * (beltEnd + L / 2 - 0.1) / slats; bx(g, S, x - 0.004, x + 0.004, ch - 0.006, ch - 0.004, -D / 2 + 0.07, D / 2 - 0.07); }
+      for (const y of [0.25, ch * 0.62]) bx(g, S, -L / 2, L / 2, y, y + 0.02, D / 2 - 0.02, D / 2 - 0.012);
+      add(g, gCyl(0.018, 0.018, L - 0.1, 8), K, -L / 2 + 0.05, 0.42, D / 2 - 0.02, 0, 0, -Math.PI / 2);
+      bx(g, S, -L / 2 + 0.03, L / 2 - 0.03, 0.06, 0.12, D / 2 - 0.022, D / 2 - 0.018);
+      bx(g, FX.glass(), beltEnd + 0.1, beltEnd + 0.32, ch - 0.02, ch - 0.017, -0.11, 0.11);
+      if (room > 0.12) {
+        const ry = Math.min(H - 0.02, ch + 0.28);
+        for (const z of [D / 2 - 0.08, -D / 2 + 0.3]) add(g, gCyl(0.008, 0.008, ry - ch, 6), S, L / 2 - 0.06, ch, z);
+        add(g, gCyl(0.008, 0.008, D / 2 - 0.08 - (-D / 2 + 0.3), 6), S, L / 2 - 0.06, ry, -D / 2 + 0.3, Math.PI / 2, 0, 0);
+      }
+      if (room > 0.06) bx(g, K, L / 2 - 0.5, L / 2 - 0.4, ch, ch + Math.min(0.05, room - 0.005), -D / 2 + 0.06, -D / 2 + 0.16);
     }
   },
   coolers(g, L, D, H, r) {
@@ -4306,6 +4469,23 @@ const FIXTURES = {
       bx(g, G, x0 + 0.04, x1 - 0.04, 0.12, H - 0.16, D / 2 - ft + 0.02, D / 2 - ft + 0.026);
       const hx = k % 2 ? x0 + 0.08 : x1 - 0.08;
       bx(g, F, hx - 0.012, hx + 0.012, H * 0.35, H * 0.65, D / 2 - 0.022, D / 2);
+      if (FINE) {
+        // door rails, hinges, handle stand-offs, an inside light strip
+        bx(g, F, x0 + 0.04, x1 - 0.04, 0.12, 0.16, D / 2 - ft, D / 2 - ft + 0.03);
+        bx(g, F, x0 + 0.04, x1 - 0.04, H - 0.2, H - 0.16, D / 2 - ft, D / 2 - ft + 0.03);
+        const ex = k % 2 ? x1 - 0.02 : x0 + 0.02;
+        for (const y of [0.16, H - 0.22]) add(g, gCyl(0.012, 0.012, 0.06, 8), F, ex, y, D / 2 - 0.01);
+        for (const y of [H * 0.38, H * 0.62]) add(g, gCyl(0.007, 0.007, 0.02, 6), F, hx, y, D / 2 - 0.022, Math.PI / 2, 0, 0);
+        bx(g, FX.enamel('w'), ex - 0.01, ex + 0.01, 0.2, H - 0.22, D / 2 - ft - 0.01, D / 2 - ft - 0.004);
+      }
+    }
+    if (FINE) {
+      // vent grille, lit header panel, price strips on each shelf, a thermometer dial
+      for (let i = 0; i < 4; i++) bx(g, FX.enamel('w'), -L / 2 + 0.06, L / 2 - 0.06, 0.02 + i * 0.022, 0.032 + i * 0.022, D / 2, D / 2 + 0.003);
+      bx(g, FX.enamel('w'), -L / 2 + 0.05, L / 2 - 0.05, H - 0.13, H - 0.04, D / 2, D / 2 + 0.003);
+      for (let s = 0; s < shelves; s++) bx(g, FX.enamel('w'), -L / 2 + 0.04, L / 2 - 0.04, 0.12 + s * sy - 0.02, 0.12 + s * sy, D / 2 - ft - 0.015, D / 2 - ft - 0.008);
+      add(g, gCyl(0.03, 0.03, 0.01, 12), FX.enamel('w'), L / 2 - 0.12, H - 0.085, D / 2 + 0.003, Math.PI / 2, 0, 0);
+      bx(g, F, -L / 2 + 0.04, L / 2 - 0.04, H - 0.16, H - 0.15, -D / 2 + 0.03, D / 2 - ft);
     }
   },
   rx_counter(g, L, D, H, r) {
@@ -4339,6 +4519,23 @@ const FIXTURES = {
       for (let i = 0; i < nb; i++) if (r() < 0.55) addBin(-L / 2 + 0.09 + i * 0.16, y, -D / 2 + 0.12, (r() - 0.5) * 0.1);
     }
     for (const mm of merger.meshes([B])) g.add(mm);
+    if (FINE) {
+      // counter nosing, ledge trim, cubby dividers, kick, service bell, a screen and keyboard
+      const K = FX.dark('desk', '#1d1e20', 0.45);
+      const S = FX.metal('#b8bcc0', 'ss');
+      add(g, gCyl(0.012, 0.012, L, 8), T, -L / 2, H - 0.012, D / 2 - 0.002, 0, 0, -Math.PI / 2);
+      bx(g, T, -L / 2, L / 2, H - 0.045, H - 0.03, D / 2 - 0.02, D / 2 - 0.004);
+      for (let i = 1; i < 5; i++) { const x = -L / 2 + i * L / 5; bx(g, P, x - 0.008, x + 0.008, 0.105, 0.6, -D / 2, D / 2 - ledge - 0.02); }
+      bx(g, K, -L / 2 + 0.02, L / 2 - 0.02, 0, 0.08, D / 2 - 0.035, D / 2 - 0.02);
+      add(g, gCyl(0.04, 0.045, 0.012, 12), S, L / 2 - 0.15, H, D / 2 - 0.1);
+      add(g, gSphere(0.035, 10, 6, 0), S, L / 2 - 0.15, H + 0.012, D / 2 - 0.1, 0, 0, 0, 1, 0.75, 1);
+      if (H - wy > 0.25) {
+        add(g, gBox(0.16, 0.012, 0.12), K, -L / 2 + 0.35, wy, -D / 2 + 0.25 > D / 2 - ledge - 0.08 ? -D / 2 + 0.1 : -D / 2 + 0.25);
+        add(g, gBox(0.03, 0.12, 0.03), K, -L / 2 + 0.35, wy, -D / 2 + 0.1);
+        bx(g, K, -L / 2 + 0.17, -L / 2 + 0.53, wy + 0.1, Math.min(H - 0.01, wy + 0.27), -D / 2 + 0.08, -D / 2 + 0.1);
+        bx(g, K, -L / 2 + 0.2, -L / 2 + 0.5, wy, wy + 0.015, -D / 2 + 0.16, -D / 2 + 0.22);
+      }
+    }
   },
   desk(g, L, D, H, r) {
     const W = FX.wood(pick(r, ['#6a4528', '#9a7a5a', '#4a4a4c']));
@@ -4364,6 +4561,34 @@ const FIXTURES = {
     add(g, gBox(0.44, 0.02, 0.14), K, mx, wy, -D / 2 + 0.48 > D / 2 - panel - 0.08 ? D / 2 - panel - 0.09 : -D / 2 + 0.48, 0, (r() - 0.5) * 0.2, 0);
     add(g, gBox(0.18, 0.05, 0.2), K, mx + 0.45 < L / 2 - 0.15 ? mx + 0.45 : mx - 0.45, wy, -D / 2 + 0.22);
     for (let i = 0; i < 4; i++) add(g, gBox(0.216, 0.002, 0.28), T, (r() - 0.5) * (L - 0.4), wy + 0.001 + i * 0.002, (r() - 0.5) * 0.2 - 0.05, 0, r() * 3, 0);
+    if (FINE) {
+      // drawer pedestal (three fronts with pulls), edge banding, modesty panel inset, screen face,
+      // keyboard key rows, mouse and pad, a pen cup with pens, a mug, a cable
+      const px0 = L / 2 - 0.44, px1 = L / 2 - 0.04;
+      for (let i = 0; i < 3; i++) {
+        const y0 = 0.04 + i * (wy - 0.08) / 3, y1 = y0 + (wy - 0.08) / 3 - 0.01;
+        bx(g, W, px0, px1, y0, y1, -D / 2, -D / 2 + 0.02);
+        bx(g, K, (px0 + px1) / 2 - 0.05, (px0 + px1) / 2 + 0.05, y1 - 0.05, y1 - 0.038, -D / 2 - 0.004, -D / 2);
+      }
+      bx(g, K, -L / 2, L / 2, wy - 0.035, wy - 0.025, -D / 2 - 0.002, -D / 2 + 0.002);
+      bx(g, W, -L / 2 + 0.08, L / 2 - 0.08, 0.15, wy - 0.12, D / 2 - panel - 0.004, D / 2 - panel);
+      if (mh > 0.12) {
+        const sc = new THREE.Group();
+        bx(sc, T, -0.24, 0.24, 0.02, mh * 0.75 - 0.02, -0.024, -0.021, false);
+        sc.position.set(mx, wy + mh * 0.25, -D / 2 + 0.27); sc.rotation.x = -0.05; g.add(sc);
+      }
+      const kz = -D / 2 + 0.48 > D / 2 - panel - 0.08 ? D / 2 - panel - 0.09 : -D / 2 + 0.48;
+      for (let i = 0; i < 3; i++) bx(g, T, mx - 0.2, mx + 0.2, wy + 0.02, wy + 0.026, kz - 0.05 + i * 0.035, kz - 0.025 + i * 0.035, false);
+      const mox = mx + 0.32 < L / 2 - 0.1 ? mx + 0.32 : mx - 0.32;
+      add(g, gBox(0.22, 0.003, 0.18), K, mox, wy, kz);
+      add(g, gSphere(0.03, 10, 6), K, mox, wy + 0.006, kz, 0, 0, 0, 0.7, 0.45, 1.1);
+      const cx = -L / 2 + 0.15;
+      add(g, gCyl(0.035, 0.032, 0.1, 10, true), K, cx, wy, -D / 2 + 0.12);
+      for (let i = 0; i < 3; i++) { const p = add(g, gCyl(0.004, 0.004, 0.14, 6), [W, T, K][i], cx + (i - 1) * 0.012, wy + 0.01, -D / 2 + 0.12 + (i - 1) * 0.008); p.rotation.z = (i - 1) * 0.15; }
+      add(g, gCyl(0.04, 0.037, 0.095, 12), T, cx + 0.15, wy, -D / 2 + 0.14);
+      add(g, gTorus(0.026, 0.007, 5, 10, Math.PI), T, cx + 0.19, wy + 0.048, -D / 2 + 0.14, 0, 0, -Math.PI / 2);
+      if (mh > 0.12) add(g, gTube('deskcable', [[0, 0.05, 0], [0, 0, -0.04], [0.05, -0.2, -0.06], [0.1, -0.4, -0.05]], 0.005, 12, 4), K, mx, wy, -D / 2 + 0.24);
+    }
   },
   bench(g, L, D, H, r) {
     const W = FX.wood(pick(r, ['#8a6440', '#6a4a30']));
@@ -4382,6 +4607,20 @@ const FIXTURES = {
       if (back) bx(g, M2, x - 0.025, x + 0.025, 0, H - 0.02, -D / 2, -D / 2 + 0.04);
     }
     if (back) for (let i = 0; i < 2; i++) bx(g, W, -L / 2, L / 2, H - 0.12 - i * 0.14, H - 0.02 - i * 0.14, -D / 2 + 0.04, -D / 2 + 0.075);
+    if (FINE) {
+      // carriage bolts through each slat over each leg, foot pads, back slat bolts and end arm rests
+      for (let i = 0; i < legs; i++) {
+        const x = -L / 2 + 0.08 + i * (L - 0.16) / (legs - 1);
+        for (let k = 0; k < ns; k++) { const z = D / 2 - sd + (k + 0.5) * sd / ns; add(g, gCyl(0.008, 0.008, 0.004, 6), M2, x, sy, z); }
+        for (const z of [D / 2 - sd + 0.05, D / 2 - 0.05]) bx(g, M2, x - 0.035, x + 0.035, 0, 0.012, z - 0.03, z + 0.03);
+        if (back) for (let k = 0; k < 2; k++) add(g, gCyl(0.008, 0.008, 0.004, 6), M2, x, H - 0.07 - k * 0.14, -D / 2 + 0.075, Math.PI / 2, 0, 0);
+      }
+      if (back) for (const s of [-1, 1]) {
+        const ax = s * (L / 2 - 0.04);
+        bx(g, M2, ax - 0.015, ax + 0.015, sy, Math.min(H - 0.05, sy + 0.2), D / 2 - 0.1, D / 2 - 0.07);
+        bx(g, W, ax - 0.03, ax + 0.03, Math.min(H - 0.05, sy + 0.2), Math.min(H - 0.03, sy + 0.23), -D / 2 + 0.08, D / 2 - 0.04);
+      }
+    }
   },
   locker(g, L, D, H, r) {
     const color = pick(r, ['#4a5a6a', '#6a7a5a', '#8a8a86']);
@@ -4398,11 +4637,26 @@ const FIXTURES = {
     }), roughness: 0.45, metalness: 0.3 });
     const n = Math.max(1, Math.round(L / 0.32));
     const lw = L / n;
+    const S = FX.metal('#b8bcc0', 'ss');
+    const Lk = FX.metal('#b8a070', 'brass');
     bx(g, P, -L / 2, L / 2, 0, H, -D / 2, D / 2 - 0.02);
     bx(g, FX.dark('lockbase'), -L / 2, L / 2, 0, 0.1, D / 2 - 0.02, D / 2);
     for (let i = 0; i < n; i++) {
       const x0 = -L / 2 + i * lw + 0.006;
       add(g, gBox(lw - 0.012, H - 0.12 - 0.01, 0.018), [P, P, P, P, Dm, P], x0 + (lw - 0.012) / 2, 0.11, D / 2 - 0.009);
+      if (FINE) {
+        // lift handle, padlock hasp (some with a padlock), number plate, hinge strip
+        const cx = x0 + (lw - 0.012) / 2, hy = 0.11 + (H - 0.13) * 0.52;
+        bx(g, S, cx + lw * 0.22 - 0.012, cx + lw * 0.22 + 0.012, hy - 0.06, hy + 0.06, D / 2, D / 2 + 0.012);
+        bx(g, S, cx + lw * 0.22 - 0.02, cx + lw * 0.22 + 0.02, hy + 0.08, hy + 0.1, D / 2, D / 2 + 0.006);
+        if (i % 3 === 1) { add(g, gTorus(0.012, 0.003, 4, 8, Math.PI), S, cx + lw * 0.22, hy + 0.12, D / 2 + 0.012); bx(g, Lk, cx + lw * 0.22 - 0.018, cx + lw * 0.22 + 0.018, hy + 0.075, hy + 0.12, D / 2 + 0.006, D / 2 + 0.022); }
+        bx(g, S, cx - 0.03, cx + 0.03, 0.11 + (H - 0.13) * 0.72, 0.11 + (H - 0.13) * 0.72 + 0.025, D / 2, D / 2 + 0.002);
+        bx(g, S, x0 + 0.002, x0 + 0.008, 0.13, H - 0.04, D / 2 - 0.004, D / 2 + 0.004);
+      }
+    }
+    if (FINE) {
+      bx(g, P, -L / 2, L / 2, H - 0.025, H, D / 2 - 0.02, D / 2 + 0.006);
+      for (const s of [-1, 1]) bx(g, P, s * L / 2 - 0.003, s * L / 2 + 0.003, 0.1, H - 0.03, -D / 2 + 0.03, D / 2 - 0.05);
     }
   },
   rack(g, L, D, H, r) {
@@ -4410,6 +4664,8 @@ const FIXTURES = {
     const O = FX.painted('#d8601c');
     const Wd = FX.wood('#a8845a');
     const C = FX.card();
+    const Tp = Wd;
+    const Bolt = U;
     const bays = Math.max(1, Math.round(L / 2.7));
     const bw = L / bays;
     for (let b = 0; b <= bays; b++) {
@@ -4418,12 +4674,24 @@ const FIXTURES = {
       for (const z of [-D / 2, D / 2 - 0.08]) bx(g, U, xa, xa + 0.08, 0, H, z, z + 0.08);
       const span = D - 0.16, ang = Math.atan2(span, 0.6);
       for (let k = 0; k < Math.floor((H - 0.3) / 0.6); k++) { const sg = k % 2 ? 1 : -1; add(g, gBoxW(0.03, Math.hypot(0.6, span), 0.02), U, xa + 0.04, 0.2 + k * 0.6, -sg * span / 2, sg * ang, 0, 0); }
+      if (FINE) for (const z of [-D / 2, D / 2 - 0.08]) { // base plates with anchor bolts, and a column guard on the front
+        bx(g, U, xa - 0.01, xa + 0.09, 0, 0.01, z - 0.0, z + 0.08);
+        for (const bxp of [xa + 0.0, xa + 0.08]) add(g, gCyl(0.008, 0.008, 0.02, 6), Bolt, bxp, 0.01, z + 0.04);
+        if (z > 0) bx(g, O, xa - 0.005, xa + 0.085, 0, 0.3, z + 0.075, z + 0.08);
+      }
     }
     const levels = Math.max(1, Math.floor((H - 0.2) / 1.2));
     const lh = (H - 0.12) / levels;
     for (let lv = 0; lv <= levels; lv++) {
       const y = lv === 0 ? 0 : lv * lh;
-      if (lv > 0) for (const z of [-D / 2 + 0.005, D / 2 - 0.065]) bx(g, O, -L / 2, L / 2, y - 0.12, y, z, z + 0.06);
+      if (lv > 0) for (const z of [-D / 2 + 0.005, D / 2 - 0.065]) {
+        bx(g, O, -L / 2, L / 2, y - 0.12, y, z, z + 0.06);
+        if (FINE) for (let b = 0; b <= bays; b++) { // beam end connectors and safety pins
+          const x = Math.max(-L / 2 + 0.08, Math.min(L / 2 - 0.08, -L / 2 + b * bw));
+          for (const s of [-1, 1]) { if ((b === 0 && s < 0) || (b === bays && s > 0)) continue; bx(g, O, x + s * 0.04 - 0.02, x + s * 0.04 + 0.02, y - 0.14, y + 0.01, z - 0.004, z + 0.064); }
+          add(g, gCyl(0.005, 0.005, 0.03, 6), Bolt, x, y - 0.05, z + (z > 0 ? 0.064 : -0.004));
+        }
+      }
       if (lv === levels) break;
       const avail = lh - 0.18;
       for (let b = 0; b < bays; b++) for (let p = 0; p < 2; p++) {
@@ -4441,6 +4709,14 @@ const FIXTURES = {
           const cw = pw / nx - 0.02, cd = pd / nz - 0.02;
           const c = bx(g, C, px - pw / 2 + i * pw / nx + 0.01, px - pw / 2 + i * pw / nx + 0.01 + cw, y + 0.13 + s * bh, y + 0.13 + (s + 1) * bh - 0.005, -pd / 2 + j * pd / nz + 0.01, -pd / 2 + j * pd / nz + 0.01 + cd);
           c.rotation.y = (r() - 0.5) * 0.06;
+          if (FINE) { // packing tape over the flaps
+            const x0c = px - pw / 2 + i * pw / nx + 0.01, z0c = -pd / 2 + j * pd / nz + 0.01, yt = y + 0.13 + (s + 1) * bh - 0.005;
+            bx(g, Tp, x0c + cw / 2 - 0.025, x0c + cw / 2 + 0.025, yt, yt + 0.002, z0c, z0c + cd);
+          }
+        }
+        if (FINE) { // pallet deck gaps and the dark openings between the blocks
+          for (const fx of [-0.25, 0, 0.25]) bx(g, FX.dark('palgap', '#3a2a1a'), px + fx * pw - 0.01, px + fx * pw + 0.01, y + 0.129, y + 0.131, -pd / 2, pd / 2);
+          for (const s2 of [-1, 1]) bx(g, FX.dark('palgap', '#3a2a1a'), px + s2 * pw / 4 - pw * 0.15, px + s2 * pw / 4 + pw * 0.15, y + 0.02, y + 0.1, pd / 2 - 0.004, pd / 2 + 0.001);
         }
       }
     }
