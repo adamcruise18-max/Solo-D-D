@@ -7,6 +7,7 @@ import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, Fog, HemisphereLight, DirectionalLight, SpotLight, Object3D,
   Mesh, Group, MeshLambertMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace,
 } from 'three';
+import { createPrecip } from './precip.js';
 import { buildCell, collide } from './geometry.js';
 import { createStreamer } from '../../core/streamer.js';
 import { classify } from '../../core/cells.js';
@@ -121,8 +122,12 @@ export function openStreets(opts) {
   flash.target.position.set(0, -0.3, -1);
   scene.add(camera);
   let lastLook = '';
+  // rain and snow around the player (from the weather now)
+  const precip = createPrecip({ count: isTouch ? 450 : 1100 });
+  scene.add(precip.object);
   function applyLight() {
     const sc = opts.getScene ? opts.getScene() : opts.scene;
+    precip.set(sc);
     const L = skyLight(sc, sc && sc.daylight === 0);
     const key = `${L.sky}|${L.level.toFixed(2)}`;
     if (key !== lastLook) {
@@ -131,7 +136,13 @@ export function openStreets(opts) {
       // clear daytime: a light blue sky (the stylized look), clouds keep it gray
       if (!L.night && sc) sky.lerp(new Color(0xa9c8e4), Math.max(0, 0.75 - (sc.cloud ?? 0.5)) * Math.min(1, sc.daylight * 1.5));
       scene.background = sky;
-      const fogNear = sc?.fog ? 30 : 90, fogFar = sc?.fog ? 220 : 520;
+      const wet = sc?.precip === 'rain' ? 0.5 + 0.5 * (sc.precipStrength ?? 0.6) : 0;
+      const fogNear = sc?.fog ? 30 : wet ? 60 : 90, fogFar = sc?.fog ? 220 : wet ? 380 : 520;
+      // wet streets and roofs are darker
+      // (snow cover: a little brighter, so it reads as snow under a gray sky)
+      const snowLift = 0.25 * (look.snow || 0);
+      mats.ground.color.setScalar(1 - 0.22 * wet + snowLift);
+      mats.roofs.color.setScalar(1 - 0.15 * wet + snowLift);
       scene.fog = new Fog(sky, fogNear, fogFar);
       hemi.color.set(L.color);
       hemi.groundColor.set(0x4d4c3e);
@@ -160,13 +171,14 @@ export function openStreets(opts) {
   // ---------- cells ----------
   const known = new Set(opts.cells || []);
   const shown = new Map(); // key -> { group, props, colliders, doors, roads, x0, z0 }
-  const bare = !!opts.bare;
+  // season, overgrowth and snow cover: fixed while this view is open (cells made later match)
+  const look = opts.look || { season: opts.bare ? 'winter' : 'summer' };
   async function load(key) {
     if (!known.has(key)) return { empty: true };
     const res = await fetch(`${opts.base || 'data/streets/'}${key.replace(',', '_')}.json`);
     if (!res.ok) throw new Error(`cell ${key}: ${res.status}`);
     const data = await res.json();
-    const m = buildCell(data, { lod: 0, bare });
+    const m = buildCell(data, { lod: 0, look });
     const [cx, cz] = key.split(',').map(Number);
     const group = new Group();
     group.position.set(cx * CELL, 0, cz * CELL);
@@ -449,6 +461,7 @@ export function openStreets(opts) {
     const dt = Math.min(0.1, (t - last) / 1000);
     last = t;
     step(dt);
+    precip.update(dt, camera.position);
     updateCells(false);
     applyLight();
     prompt();
@@ -482,6 +495,7 @@ export function openStreets(opts) {
     if (document.pointerLockElement) document.exitPointerLock?.();
     for (const [key, d] of [...shown]) unload(key, d);
     for (const m of Object.values(mats)) { m.map?.dispose(); m.dispose(); }
+    precip.dispose();
     renderer.dispose();
     root.remove();
     delete window.__llStreets;
@@ -490,10 +504,11 @@ export function openStreets(opts) {
   // test hooks (browser checks)
   window.__llStreets = {
     pos, look: (y, p = 0) => { yaw = y; pitch = p; }, teleport: (x, z) => { pos.x = x; pos.z = z; lastSent = { x, z }; updateCells(true); },
-    info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, fps, cells: streamer.report(), shown: [...shown.keys()] }),
+    info: () => ({ precip: precip.kind(), calls: renderer.info.render.calls, tris: renderer.info.render.triangles, fps, cells: streamer.report(), shown: [...shown.keys()] }),
     // walk in a straight line in 2 m steps (tests: game time and miles)
     walk: (dx, dz) => { const n = Math.ceil(Math.hypot(dx, dz) / 2); for (let i = 0; i < n; i++) { pos.x += dx / n; pos.z += dz / n; flushMove(false); } flushMove(true); },
-    door: () => promptDoor, close, fly: (h) => { feet = h; vy = 0; }, idle: () => streamer.idle({ timeoutMs: 15000 }),
+    door: () => promptDoor, close,
+    doors: (kind) => [...shown.values()].flatMap((d) => d.doors.filter((x) => kind === undefined || x.kind === kind).map((x) => ({ ...x, wx: x.x + d.x0, wz: x.z + d.z0 }))), fly: (h) => { feet = h; vy = 0; }, idle: () => streamer.idle({ timeoutMs: 15000 }),
   };
   return { close };
 }

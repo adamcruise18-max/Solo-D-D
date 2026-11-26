@@ -13,6 +13,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import {
   KIND, ROOF, ROAD, ROAD_LOOK, AREA, PROP, WALL_COLORS, ROOF_COLORS, COMMERCIAL_WALLS, isCarRoad,
 } from '../../data/streets.js';
+import { tones } from './look.js';
+import { streetDetails } from './details.js';
 
 const D = 0.1; // file units: decimetres
 
@@ -217,11 +219,7 @@ function protos() {
   if (PROTO) return PROTO;
   const P = {};
   P.trunk = painted(new CylinderGeometry(0.12, 0.2, 1, 6), C.trunk);
-  P.crown = painted(new IcosahedronGeometry(1, 0), C.leaf);
-  P.crown2 = painted(new IcosahedronGeometry(1, 0), C.leaf2);
   P.branch = painted(new CylinderGeometry(0.03, 0.08, 1, 4), C.bare);
-  P.cone = painted(new ConeGeometry(1, 1, 7), C.fir);
-  P.cone2 = painted(new ConeGeometry(1, 1, 7), C.fir2);
   P.pole = painted(new CylinderGeometry(0.09, 0.12, 1, 6), C.pole);
   P.metalPole = painted(new CylinderGeometry(0.06, 0.08, 1, 6), C.metal);
   P.box = (c) => painted(new BoxGeometry(1, 1, 1), c);
@@ -229,13 +227,15 @@ function protos() {
   PROTO = P;
   return P;
 }
-function treeGeo(list, kind, x, z, h, rnd, bare) {
+// T: tones(look) (season leaf colours, snow on firs)
+function treeGeo(list, kind, x, z, h, rnd, bare, T) {
   const P = protos();
   if (kind === 1) { // fir: tall narrow cone layers
     const w = h * 0.2;
+    const c1 = T.fir(rnd() < 0.5 ? C.fir : C.fir2), c2 = T.fir(C.fir);
     list.push(at(P.trunk.clone(), x, h * 0.15, z, 1.4, h * 0.3, 1.4));
-    list.push(at((rnd() < 0.5 ? P.cone : P.cone2).clone(), x, h * 0.45, z, w, h * 0.55, w));
-    list.push(at(P.cone.clone(), x, h * 0.72, z, w * 0.7, h * 0.45, w * 0.7));
+    list.push(at(painted(new ConeGeometry(1, 1, 7), c1), x, h * 0.45, z, w, h * 0.55, w));
+    list.push(at(painted(new ConeGeometry(1, 1, 7), c2), x, h * 0.72, z, w * 0.7, h * 0.45, w * 0.7));
   } else {
     const r = h * 0.32;
     list.push(at(P.trunk.clone(), x, h * 0.25, z, 1.2, h * 0.5, 1.2));
@@ -247,7 +247,7 @@ function treeGeo(list, kind, x, z, h, rnd, bare) {
         const g = P.branch.clone().applyMatrix4(new Matrix4().makeRotationZ(0.55 + rnd() * 0.3));
         list.push(at(g, x + Math.cos(a) * len * 0.25, h * (0.55 + rnd() * 0.15), z + Math.sin(a) * len * 0.25, 1, len, 1, a));
       }
-    } else list.push(at((rnd() < 0.5 ? P.crown : P.crown2).clone(), x, h * 0.62, z, r, r * 0.85, r, rnd() * 6));
+    } else list.push(at(painted(new IcosahedronGeometry(1, 0), T.leaf(rnd())), x, h * 0.62, z, r, r * 0.85, r, rnd() * 6));
   }
 }
 function propGeo(list, type, x, z, yawDeg) {
@@ -286,9 +286,21 @@ function propGeo(list, type, x, z, yawDeg) {
 }
 
 // ---------- the cell ----------
-// opts: { lod: 0 full | 1 no props, bare: deciduous trees without leaves (winter) }
+// opts: { lod: 0 full | 1 no props, look: { season, growth, snow } (look.js) }
+// (old opts.bare: true = a winter look)
+const NATURAL = new Set([AREA.lawn, AREA.grass, AREA.pitch, AREA.wood, AREA.scrub, AREA.wetland]);
+const SOFT = new Set([AREA.playground, AREA.sand, AREA.track]);
 export function buildCell(data, opts = {}) {
   const lod = opts.lod ?? 0;
+  const T = tones(opts.look ?? { season: opts.bare ? 'winter' : 'summer' });
+  const areaCol = (cls) => {
+    const c = AREA_COL[cls] || C.grass;
+    if (NATURAL.has(cls)) return T.green(c);
+    if (SOFT.has(cls)) return T.walk(c);
+    if (cls === AREA.water || cls === AREA.pool) return c;
+    return T.road(c);
+  };
+  const rings = [];
   const ground = new Builder();
   const wallsHouse = new Builder(true);
   const wallsShop = new Builder(true);
@@ -299,19 +311,19 @@ export function buildCell(data, opts = {}) {
   const S = 256;
 
   // ground: the cell base, then areas, then roads
-  ground.quad([0, 0, S], [S, 0, S], [S, 0, 0], [0, 0, 0], C.ground);
-  for (const [cls, flat] of data.a || []) flatPoly(ground, pts(flat), AREA_Y[cls] ?? 0.015, AREA_COL[cls] || C.grass);
+  ground.quad([0, 0, S], [S, 0, S], [S, 0, 0], [0, 0, 0], T.green(C.ground));
+  for (const [cls, flat] of data.a || []) flatPoly(ground, pts(flat), AREA_Y[cls] ?? 0.015, areaCol(cls));
   const roads = (data.r || []).map(([cls, w, flat, ni]) => ({ cls, w: w * D, line: pts(flat), name: ni >= 0 ? data.n[ni] : null }));
   const order = (r) => (roadLook(r.cls) === 'concrete' ? 2 : roadLook(r.cls) === 'crosswalk' ? 3 : roadLook(r.cls) === 'water' ? 0 : 1);
   for (const r of [...roads].sort((a, b) => order(a) - order(b) || b.w - a.w)) {
     const look = roadLook(r.cls);
-    if (look === 'rail') { ribbon(ground, r.line, 2.6, 0.04, C.dirt); ribbon(ground, r.line, 1.6, 0.06, C.rail); continue; }
+    if (look === 'rail') { ribbon(ground, r.line, 2.6, 0.04, T.walk(C.dirt)); ribbon(ground, r.line, 1.6, 0.06, T.road(C.rail)); continue; }
     if (look === 'water') { ribbon(ground, r.line, r.w, 0.03, C.stream); continue; }
-    if (look === 'crosswalk') { ribbon(ground, r.line, r.w, 0.075, C.asphalt); dashes(ground, r.line, r.w * 0.9, 0.085, C.white, 0.5, 0.5); continue; }
+    if (look === 'crosswalk') { ribbon(ground, r.line, r.w, 0.075, T.road(C.asphalt)); dashes(ground, r.line, r.w * 0.9, 0.085, T.road(C.white), 0.5, 0.5); continue; }
     const y = look === 'concrete' ? 0.09 : look === 'dirt' ? 0.045 : 0.06 - Math.min(0.02, r.cls * 0.001);
     const c = look === 'concrete' ? C.concrete : look === 'dirt' ? C.dirt : r.cls >= ROAD.residential ? C.asphaltMinor : C.asphalt;
-    ribbon(ground, r.line, r.w, y, c);
-    if (r.cls <= ROAD.tertiary) dashes(ground, r.line, 0.14, y + 0.01, C.line, 3, 6);
+    ribbon(ground, r.line, r.w, y, look === 'asphalt' ? T.road(c) : T.walk(c));
+    if (r.cls <= ROAD.tertiary) dashes(ground, r.line, 0.14, y + 0.01, T.road(C.line), 3, 6);
   }
 
   // buildings
@@ -320,6 +332,7 @@ export function buildCell(data, opts = {}) {
     const [kind, roofType, hdm, risedm, wc, rc, flat, box, placeId, ni, sid] = rec;
     const ring = pts(flat);
     if (ring.length < 3) return;
+    rings.push(ring);
     const bld = { h: hdm * D, rise: risedm * D, roof: roofType, box: { cx: box[0] * D, cz: box[1] * D, hu: box[2] * D, hv: box[3] * D, ang: box[4] / 1000 } };
     const rf = roofFn(bld);
     const shop = kind === KIND.commercial || kind === KIND.industrial || kind === KIND.school || kind === KIND.civic;
@@ -357,7 +370,7 @@ export function buildCell(data, opts = {}) {
       }
     }
     // roof
-    const roofCol = roofType === ROOF.flat ? FLAT_ROOF[rc % FLAT_ROOF.length] : ROOFS[rc % ROOFS.length];
+    const roofCol = T.roof(roofType === ROOF.flat ? FLAT_ROOF[rc % FLAT_ROOF.length] : ROOFS[rc % ROOFS.length]);
     for (const piece of roofPieces(rf, ring)) {
       const v2 = piece.map(([x, z]) => new Vector2(x, z));
       let tris;
@@ -388,13 +401,13 @@ export function buildCell(data, opts = {}) {
     const list = [];
     let seed = 1;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (const [kind, x, z, h] of data.t || []) treeGeo(list, kind, x * D, z * D, h * D, rnd, opts.bare && kind === 0);
+    for (const [kind, x, z, h] of data.t || []) treeGeo(list, kind, x * D, z * D, h * D, rnd, T.bare && kind === 0, T);
     for (const [type, x, z, yaw] of data.p || []) propGeo(list, type, x * D, z * D, yaw);
     const fb = new Builder();
     for (const [type, flat] of data.f || []) {
       const line = pts(flat);
       const h = type === 2 ? 1.6 : type === 1 ? 1.5 : 1.2, w = type === 2 ? 0.8 : 0.12;
-      const c = type === 2 ? C.hedge : type === 1 ? C.wallStone : C.fence;
+      const c = type === 2 ? T.green(C.hedge) : type === 1 ? T.roof(C.wallStone) : T.roof(C.fence);
       for (let i = 1; i < line.length; i++) {
         const a = line[i - 1], b = line[i];
         const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -404,6 +417,11 @@ export function buildCell(data, opts = {}) {
         colliders.push([a[0], a[1], b[0], b[1]]);
       }
     }
+    // abandoned cars, trash, barricades, grass in the cracks
+    const det = streetDetails(data.k, roads, rings, T);
+    list.push(...det.geos);
+    colliders.push(...det.colliders);
+    doors.push(...det.doors);
     const fg = fb.geometry();
     if (fg) list.push(fg);
     if (list.length) props = mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)), false);
