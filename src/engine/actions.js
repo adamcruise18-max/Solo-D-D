@@ -5,7 +5,7 @@ import { chance, randInt } from '../rng.js';
 import {
   log, addItem, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
-import { roomFor, packFitsWithout } from './packgrid.js';
+import { roomFor, wearsPack, canTakeOffPack, pocketsFit } from './packgrid.js';
 import { sizeOf } from '../data/gridsize.js';
 import { advanceTime, addInjury, startStomachBug, injuryName, injuryFactor, environment } from './tick.js';
 import { check, odds, oddsText } from './checks.js';
@@ -338,6 +338,7 @@ export function takeItem(state, id, qty) {
   const bag = hereBag(state);
   const have = bag[id] || 0;
   if (!have) return;
+  if (wearPackFrom(state, bag, id)) { advanceTime(state, 2); return; }
   let want = Math.min(qty ?? have, have);
   // Whole things (parts, tools, clothes) cannot be split.
   if (['part', 'tool', 'wear'].includes(ITEMS[id].kind)) want = Math.floor(want + 1e-9);
@@ -349,8 +350,18 @@ export function takeItem(state, id, qty) {
   advanceTime(state, 1);
 }
 
+// A backpack you pick up goes on your back (Adam: worn gear, not a thing in the grid).
+function wearPackFrom(state, bag, id) {
+  if (id !== 'backpack' || wearsPack(state) || !(bag[id] >= 1)) return false;
+  addItem(bag, id, -1);
+  putOn(state.player, 'backpack');
+  log(state, 'You put the backpack on. Your pack grid is much bigger now.', 'good');
+  return true;
+}
+
 export function takeAll(state) {
   const bag = hereBag(state);
+  wearPackFrom(state, bag, 'backpack');
   // small things first, so more of them fit
   const cells = (id) => { const z = sizeOf(id); return z.w * z.h / z.stack; };
   const ids = Object.keys(bag).sort((a, b) => cells(a) - cells(b) || (a < b ? -1 : 1));
@@ -371,7 +382,7 @@ export function takeAll(state) {
 export function dropItem(state, id, qty) {
   const have = state.carried[id] || 0;
   if (!have) return;
-  if (id === 'backpack' && !packFitsWithout(state, 'backpack')) {
+  if (id === 'backpack' && state.player.worn?.back !== 'backpack' && !pocketsFit(state)) {
     log(state, 'Your things do not fit in your pockets. Take some out of the backpack first.', 'warn');
     return;
   }
@@ -828,7 +839,8 @@ export function pickUp(state, pid) {
   }
   const it = zoneItemList(state, ctx, zone).find((x) => x.pid === pid);
   if (!it || ctx.holder.taken.includes(pid)) return false;
-  if (roomFor(state, it.item, 1) < 1) {
+  const wearIt = it.item === 'backpack' && !wearsPack(state);
+  if (!wearIt && roomFor(state, it.item, 1) < 1) {
     log(state, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, 'warn');
     return false;
   }
@@ -837,8 +849,13 @@ export function pickUp(state, pid) {
   if (state.dead) return true;
   touchZone(state, ctx, zone);
   ctx.holder.taken.push(pid);
-  addItem(state.carried, it.item, 1);
-  log(state, `You take: ${itemName(it.item)}.`);
+  if (wearIt) {
+    putOn(state.player, 'backpack');
+    log(state, 'You put the backpack on. Your pack grid is much bigger now.', 'good');
+  } else {
+    addItem(state.carried, it.item, 1);
+    log(state, `You take: ${itemName(it.item)}.`);
+  }
   practice(state, 'scavenging', SCAV_XP);
   if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
     markZoneDone(ctx, zone);
@@ -1231,6 +1248,10 @@ export function listActions(state) {
 
 // Take off one layer (it goes into the pack).
 export function takeOffSlot(state, slot) {
+  if (slot === 'back' && state.player.worn?.back && !canTakeOffPack(state)) {
+    log(state, 'Your things will not fit in your pockets. Put some down before you take off the backpack.', 'warn');
+    return false;
+  }
   const old = takeOff(state.player, slot);
   if (!old) return false;
   addItem(state.carried, old, 1);

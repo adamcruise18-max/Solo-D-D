@@ -1,5 +1,6 @@
 // Walking on the real map. First version: route length = straight line × 1.25.
-import { packUse } from './packgrid.js';
+import { packUse, wearsPack } from './packgrid.js';
+import { putOn } from './clothes.js';
 import { randInt, chance } from '../rng.js';
 import { advanceTime, addInjury, environment, injuryFactor } from './tick.js';
 import { check } from './checks.js';
@@ -190,7 +191,7 @@ export function roadEvent(state) {
       names.push(`${itemName(id)}${q > 1 ? ' ×' + q : ''}`);
     }
     log(state, `You find an abandoned backpack by the road. Inside: ${names.join(', ') || 'nothing useful'}.`, 'good');
-    if (!state.carried.backpack) { addItem(state.carried, 'backpack', 1); log(state, 'You put the backpack on. Your pack grid is much bigger now.', 'good'); }
+    if (!wearsPack(state)) { putOn(state.player, 'backpack'); log(state, 'You put the backpack on. Your pack grid is much bigger now.', 'good'); }
   }
 }
 
