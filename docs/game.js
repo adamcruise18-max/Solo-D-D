@@ -5490,6 +5490,7 @@
       add("car_siphon", c.siphoned ? "Gas tank: done" : `Siphon gas (${SIPHON_MIN} min)`, { disabled: c.siphoned && "Done" || !hasAny2(SIPHON_TOOLS) && "You need a garden hose or pipe and fittings", note: c.siphoned ? void 0 : "many tanks are dry" });
       add("car_battery", c.battery ? "Battery: taken" : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: c.battery && "Done" || !hasAny2(WRENCH_TOOLS) && "You need a tool kit or multitool", note: c.battery ? void 0 : "adds storage to the home battery" });
       add("car_wire", c.wire ? "Wire and mirror: taken" : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: c.wire && "Done" || !hasAny2(["toolkit", "multitool", "knife"]) && "You need a knife or a tool" });
+      add("walk_out", "Back to the street (3D)", { note: "walk on from the car" });
       add("go_home", "Walk home");
     }
     if (loc.kind === "street") {
@@ -7531,6 +7532,16 @@
     return { ok: true };
   }
 
+  // src/render/streets/snow.js
+  function snowFromScene(sc) {
+    if (!sc) return 0;
+    const k = Math.max(0, Math.min(1, Number(sc.precipStrength ?? 0.6) || 0));
+    if (sc.precip === "snow") return 0.45 + 0.55 * k;
+    if (sc.ice) return 0.25;
+    if (Number.isFinite(sc.airF) && sc.airF <= 28) return 0.12;
+    return 0;
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
@@ -8704,7 +8715,8 @@
       credit: `Map data ${streetCredit}`,
       scene: sc,
       getScene: () => sceneEnv(state),
-      bare: sc.season === "winter" || sc.season === "autumn" && dayIndex(state.time) % 365 > 60,
+      // season, overgrowth and snow cover (the view keeps this look while it is open)
+      look: { season: sc.season, growth: overgrowth(state.time), snow: snowFromScene(sc) },
       isLightOn: () => hasLight(state) && isNight(state.time),
       toggleLight: () => {
         const n0 = state.log.length;
@@ -8726,6 +8738,10 @@
         return lastLines(n0).map(esc2).join(" ");
       },
       describeDoor: (door, ll) => {
+        if (door.kind === "car") {
+          const c = state.cars && state.cars[door.id];
+          return c && c.searched ? "<kbd>E</kbd> Abandoned car <small>searched</small>" : "<kbd>E</kbd> Search the abandoned car";
+        }
         if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc2(getPlace(door.placeId).name)}`;
         if (door.kind === 0 && atHomeDoor(ll)) return "<kbd>E</kbd> Go inside your home";
         if (door.name) return `${esc2(door.name)} <small>closed. Nothing to find here</small>`;
@@ -8738,6 +8754,12 @@
         return "The door is locked <small>nothing to find here</small>";
       },
       onDoor: (door, ll) => {
+        if (door.kind === "car") {
+          state.pos = { lat: ll.lat, lon: ll.lon };
+          perform(state, "action", "go_car", `${door.id}|${ll.lat}|${ll.lon}`);
+          afterAction2();
+          return state.location.kind === "car" ? { close: true } : { text: "You cannot reach the car." };
+        }
         if (door.placeId && getPlace(door.placeId)) {
           state.pos = { lat: ll.lat, lon: ll.lon };
           const r = enterPlaceFromStreet(state, door.placeId);

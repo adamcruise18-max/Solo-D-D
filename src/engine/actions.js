@@ -1187,6 +1187,7 @@ export function listActions(state) {
     add('car_siphon', c.siphoned ? 'Gas tank: done' : `Siphon gas (${SIPHON_MIN} min)`, { disabled: (c.siphoned && 'Done') || (!hasAny(SIPHON_TOOLS) && 'You need a garden hose or pipe and fittings'), note: c.siphoned ? undefined : 'many tanks are dry' });
     add('car_battery', c.battery ? 'Battery: taken' : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: (c.battery && 'Done') || (!hasAny(WRENCH_TOOLS) && 'You need a tool kit or multitool'), note: c.battery ? undefined : 'adds storage to the home battery' });
     add('car_wire', c.wire ? 'Wire and mirror: taken' : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: (c.wire && 'Done') || (!hasAny(['toolkit', 'multitool', 'knife']) && 'You need a knife or a tool') });
+    add('walk_out', 'Back to the street (3D)', { note: 'walk on from the car' });
     add('go_home', 'Walk home');
   }
   if (loc.kind === 'street') {

@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { openStreets } from '../render/streets/view.js';
+import { snowFromScene } from '../render/streets/look.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
 import { itemIcon, itemIcons, iconCache } from './icons3d.js';
@@ -93,11 +94,12 @@ const SKY_PRESETS = {
   smoke: { daylight: 1, phase: 'day', sunHeight: 0.6, cloud: 0.4, precip: 'none', fog: 0.5, haze: '#d9822b', outdoorLight: 0.76 },
   heat: { daylight: 1, phase: 'day', sunHeight: 0.9, cloud: 0, precip: 'none', fog: 0.1, haze: '#f3d9a4', outdoorLight: 1 },
   ice: { daylight: 1, phase: 'day', sunHeight: 0.5, cloud: 0.95, precip: 'rain', precipStrength: 0.6, fog: 0.2, ice: true, outdoorLight: 0.43 },
+  snow: { daylight: 1, phase: 'day', sunHeight: 0.5, cloud: 0.9, precip: 'snow', precipStrength: 0.6, fog: 0.2, outdoorLight: 0.45 },
   night: { daylight: 0, phase: 'night', sunHeight: 0, cloud: 0.5, precip: 'none', outdoorLight: 0 },
 };
 export function openInside(opts) {
   // ?sky=morning|noon|dusk|overcast|night in the page address forces the light (to compare looks).
-  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
+  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice|snow)\b/.exec(location.search || '') || [])[1];
   if (forceSky) {
     const sc = SKY_PRESETS[forceSky];
     opts = { ...opts, scene: sc, night: sc.daylight === 0, dark: sc.daylight === 0 ? true : opts.dark };
@@ -1964,10 +1966,19 @@ function buildShelf(f, material) {
 }
 
 // ?sky=morning|noon|dusk|overcast|night in the page address forces the light outside too.
+// Test overrides in the page address: ?sky=<preset> (light and weather),
+// ?season=winter|spring|summer|fall and ?growth=0..1 (how the streets look).
 function openStreetsWithSky(opts) {
-  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
-  if (!forceSky) return openStreets(opts);
-  const sc = SKY_PRESETS[forceSky];
-  return openStreets({ ...opts, scene: sc, getScene: () => sc });
+  const q = typeof location !== 'undefined' ? location.search || '' : '';
+  const forceSky = (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice|snow)\b/.exec(q) || [])[1];
+  const season = (/[?&]season=(winter|spring|summer|fall)\b/.exec(q) || [])[1];
+  const growth = (/[?&]growth=([0-9.]+)/.exec(q) || [])[1];
+  let o = opts;
+  if (forceSky) {
+    const sc = SKY_PRESETS[forceSky];
+    o = { ...o, scene: sc, getScene: () => sc, look: { ...(o.look || {}), snow: snowFromScene(sc) } };
+  }
+  if (season || growth) o = { ...o, look: { ...(o.look || {}), ...(season ? { season } : {}), ...(growth ? { growth: Number(growth) } : {}) } };
+  return openStreets(o);
 }
 window.LLInside3D = { openInside, openStreets: openStreetsWithSky, itemIcon, itemIcons, iconCache };

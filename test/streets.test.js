@@ -78,3 +78,41 @@ test('streets: real stores in the pilot area get a door with their game place id
   }
   assert.ok(found >= 3, `store doors: ${found}`);
 });
+
+test('streets: abandoned cars are the same each time, inside the cell and searchable', () => {
+  const data = readCell(cellKeyAt(HOME));
+  const a = buildCell(data).doors.filter((d) => d.kind === 'car');
+  const b = buildCell(data).doors.filter((d) => d.kind === 'car');
+  assert.ok(a.length >= 5, `cars: ${a.length}`);
+  assert.deepEqual(a.map((d) => [d.id, d.x, d.z]), b.map((d) => [d.id, d.x, d.z]));
+  assert.equal(new Set(a.map((d) => d.id)).size, a.length, 'car ids are unique');
+  for (const d of a) assert.ok(d.x > 0 && d.z > 0 && d.x < 256 && d.z < 256, d.id);
+  // no cars at low detail (the far ring)
+  assert.equal(buildCell(data, { lod: 1 }).doors.filter((d) => d.kind === 'car').length, 0);
+});
+
+test('streets: look: seasons, overgrowth and snow change the colours', async () => {
+  const { tones, normLook, snowFromScene } = await import('../src/render/streets/look.js');
+  const { Color } = await import('three');
+  const grass = new Color(0x7f9a58);
+  const g = (look) => tones(look).green(grass).getHex();
+  assert.notEqual(g({ season: 'winter' }), g({ season: 'summer' }));
+  assert.ok(tones({ season: 'winter', snow: 1 }).green(grass).r > 3 * tones({ season: 'winter' }).green(grass).r, 'deep snow is white');
+  const road = new Color(0x5f6062);
+  assert.ok(tones({ growth: 1 }).road(road).g > tones({ growth: 0 }).road(road).g, 'roads turn green');
+  assert.equal(tones({ season: 'winter' }).bare, true);
+  assert.equal(normLook({ season: 'x', growth: 5 }).season, 'winter');
+  assert.equal(normLook({ growth: 5 }).growth, 1);
+  assert.ok(snowFromScene({ precip: 'snow', precipStrength: 1 }) === 1);
+  assert.equal(snowFromScene({ precip: 'rain', airF: 45 }), 0);
+  assert.ok(snowFromScene({ precip: 'none', airF: 20 }) > 0, 'frost');
+});
+
+test('streets: more grass in the cracks as the city grows over (and the cell stays in budget)', () => {
+  const data = readCell(cellKeyAt(HOME));
+  const tris = (m) => ['ground', 'wallsHouse', 'wallsShop', 'wallsPlain', 'roofs', 'props'].reduce((n, k) => n + (m[k] ? m[k].attributes.position.count / 3 : 0), 0);
+  const young = tris(buildCell(data, { look: { season: 'summer', growth: 0.08 } }));
+  const old = tris(buildCell(data, { look: { season: 'summer', growth: 1 } }));
+  assert.ok(old > young, `${old} > ${young}`);
+  assert.ok(old < 40000, `one cell: ${old} triangles`); // 9 full cells stay far under 500k
+});

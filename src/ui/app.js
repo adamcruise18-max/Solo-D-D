@@ -36,12 +36,13 @@ import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostic
 import { homeHeat } from '../engine/home.js';
 import { enterStreet, streetMove, enterPlaceFromStreet, metersBetween } from '../engine/streetwalk.js';
 import { cellKeyAt, WORLD_GRID } from '../engine/worldgrid.js';
+import { snowFromScene } from '../render/streets/snow.js';
 import { gardenInfo, canPlant } from '../engine/garden.js';
 import { CROPS } from '../data/crops.js';
 import { SALVAGE } from '../data/salvage.js';
 import { SPOTS, GAME } from '../data/wild.js';
 import { gameHere } from '../engine/wild.js';
-import { seasonOf, SEASONS } from '../engine/season.js';
+import { seasonOf, SEASONS, overgrowth } from '../engine/season.js';
 import { projectStatus, wingSummary, builtCount, WORK_BLOCK_H, built, autoFilterToday, SAFE_TANK_GAL, AUTO_FILTER_GAL_PER_DAY } from '../engine/base.js';
 
 let state = null;
@@ -1255,7 +1256,8 @@ async function walkOutside() {
     credit: `Map data ${streetCredit}`,
     scene: sc,
     getScene: () => sceneEnv(state),
-    bare: sc.season === 'winter' || (sc.season === 'autumn' && dayIndex(state.time) % 365 > 60),
+    // season, overgrowth and snow cover (the view keeps this look while it is open)
+    look: { season: sc.season, growth: overgrowth(state.time), snow: snowFromScene(sc) },
     isLightOn: () => hasLight(state) && isNight(state.time),
     toggleLight: () => {
       const n0 = state.log.length;
@@ -1278,6 +1280,10 @@ async function walkOutside() {
       return lastLines(n0).map(esc).join(' ');
     },
     describeDoor: (door, ll) => {
+      if (door.kind === 'car') {
+        const c = state.cars && state.cars[door.id];
+        return c && c.searched ? '<kbd>E</kbd> Abandoned car <small>searched</small>' : '<kbd>E</kbd> Search the abandoned car';
+      }
       if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc(getPlace(door.placeId).name)}`;
       if (door.kind === 0 && atHomeDoor(ll)) return '<kbd>E</kbd> Go inside your home';
       if (door.name) return `${esc(door.name)} <small>closed. Nothing to find here</small>`;
@@ -1290,6 +1296,13 @@ async function walkOutside() {
       return 'The door is locked <small>nothing to find here</small>';
     },
     onDoor: (door, ll) => {
+      if (door.kind === 'car') {
+        // The same car rules as on the map: search, siphon gas, take the battery or wire.
+        state.pos = { lat: ll.lat, lon: ll.lon };
+        perform(state, 'action', 'go_car', `${door.id}|${ll.lat}|${ll.lon}`);
+        afterAction();
+        return state.location.kind === 'car' ? { close: true } : { text: 'You cannot reach the car.' };
+      }
       if (door.placeId && getPlace(door.placeId)) {
         state.pos = { lat: ll.lat, lon: ll.lon };
         const r = enterPlaceFromStreet(state, door.placeId);
