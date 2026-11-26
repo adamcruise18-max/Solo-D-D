@@ -8606,6 +8606,106 @@
   }
   var insideRefresh = null;
   var insideToast = null;
+  var streetIndex = null;
+  function loadStreetIndex() {
+    if (!streetIndex) {
+      streetIndex = fetch("data/streets/index.json").then((r) => r.ok ? r.json() : null).catch(() => null).then((ix) => {
+        streetCells = new Set(ix?.cells || []);
+        streetCredit = ix?.credit || "";
+        return ix;
+      });
+    }
+    return streetIndex;
+  }
+  var streetCells = null;
+  var streetCredit = "";
+  function streetsHere(st = state) {
+    return !!(streetCells && st && streetCells.has(cellKeyAt(st.pos)));
+  }
+  async function walkOutside() {
+    if (!state || state.dead || document.getElementById("inside")) return;
+    if (!webglOk()) {
+      alert("This browser cannot show 3D.");
+      return;
+    }
+    const ix = await loadStreetIndex();
+    if (!ix || !streetsHere()) {
+      alert("There are no 3D streets here yet. The pilot area is about 2 km around your home.");
+      return;
+    }
+    let api;
+    try {
+      api = await loadInside3d();
+    } catch (e) {
+      alert("The 3D view did not load. Check the connection and try again.");
+      return;
+    }
+    const fromBuilding = state.location.kind !== "street";
+    enterStreet(state);
+    saveGame(state);
+    const start2 = WORLD_GRID.toMeters(state.pos);
+    const sc = sceneEnv(state);
+    const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === "warn" || e.kind === "bad" || e.kind === "story" || e.kind === "event").map((e) => e.text);
+    const atHomeDoor = (ll) => metersBetween(ll, homeOf(state)) < 30;
+    document.body.classList.add("inside-open");
+    api.openStreets({
+      title: "Outside",
+      start: { x: start2.x, z: start2.z },
+      snapToDoor: fromBuilding,
+      cells: ix.cells,
+      credit: `Map data ${streetCredit}`,
+      scene: sc,
+      getScene: () => sceneEnv(state),
+      bare: sc.season === "winter" || sc.season === "autumn" && dayIndex(state.time) % 365 > 60,
+      isLightOn: () => hasLight(state) && isNight(state.time),
+      toggleLight: () => {
+        const n0 = state.log.length;
+        act("action", "flashlight");
+        return state.log.slice(n0).map((e) => e.text).join(" ");
+      },
+      getStatus: () => {
+        const low = needWarnings(state).map((n) => n.word);
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 ${esc2(weatherInfo(state).label || "")} \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
+      },
+      isDead: () => !!state.dead,
+      onMove: (ll) => {
+        const n0 = state.log.length;
+        const wasDead = !!state.dead;
+        const r = streetMove(state, ll);
+        afterAction2();
+        if (!wasDead && state.dead) recordRun(state);
+        if (r.minutes > 0 || state.log.length > n0) saveGame(state);
+        return lastLines(n0).map(esc2).join(" ");
+      },
+      describeDoor: (door, ll) => {
+        if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc2(getPlace(door.placeId).name)}`;
+        if (door.kind === 0 && atHomeDoor(ll)) return "<kbd>E</kbd> Go inside your home";
+        if (door.name) return `${esc2(door.name)} <small>closed. Nothing to find here</small>`;
+        if (door.kind === 0) return 'A house <small>Going into real houses from the street comes next. Use "Search a house" on the map for now.</small>';
+        return "The door is locked <small>nothing to find here</small>";
+      },
+      onDoor: (door, ll) => {
+        if (door.placeId && getPlace(door.placeId)) {
+          state.pos = { lat: ll.lat, lon: ll.lon };
+          const r = enterPlaceFromStreet(state, door.placeId);
+          if (!r.ok) return { text: "You cannot go in here." };
+          afterAction2();
+          return { close: true };
+        }
+        if (door.kind === 0 && atHomeDoor(ll)) {
+          perform(state, "action", "go_home");
+          afterAction2();
+          return { close: true };
+        }
+        return null;
+      },
+      onClose: () => {
+        document.body.classList.remove("inside-open");
+        if (state.player.lightOff) state.player.lightOff = false;
+        commit(true);
+      }
+    });
+  }
   function projectNeeds() {
     const out = {};
     for (const p of PROJECTS) {
