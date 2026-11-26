@@ -1,3 +1,4 @@
+import { packUse } from '../src/engine/packgrid.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { newGame, formatClock, formatDate, bagWeight, carryLimit } from '../src/engine/state.js';
@@ -93,7 +94,7 @@ test('walk to a store, search it, take items, walk home', () => {
   for (let i = 0; i < 3; i++) perform(s, 'action', 'search');
   assert.equal(s.places.n1.zonesDone, 3);
   perform(s, 'takeall');
-  assert.ok(bagWeight(s.carried) <= carryLimit(s) * 1.5);
+  assert.ok(!packUse(s).over, 'take all keeps the pack inside its grid');
   perform(s, 'action', 'go_home');
   if (!s.dead) assert.equal(s.location.kind, 'home');
 });

@@ -3,8 +3,10 @@ import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES, HOUSE_ROOMS } from '../data/places.js';
 import { chance, randInt } from '../rng.js';
 import {
-  log, addItem, bagWeight, carryLimit, dayIndex, hasLight, HOME, homeOf, formatDuration,
+  log, addItem, dayIndex, hasLight, HOME, homeOf, formatDuration,
 } from './state.js';
+import { roomFor, packFitsWithout } from './packgrid.js';
+import { sizeOf } from '../data/gridsize.js';
 import { advanceTime, addInjury, startStomachBug, injuryName, injuryFactor, environment } from './tick.js';
 import { check, odds, oddsText } from './checks.js';
 import { RAW_WATER_SICK } from './status.js';
@@ -108,9 +110,6 @@ function addWater(state, points) {
   state.player.water = clamp(state.player.water + points, 0, 100);
 }
 
-function freeWeight(state) {
-  return carryLimit(state) * 1.5 - bagWeight(state.carried);
-}
 
 // ---------- item use ----------
 export function itemUses(state, id) {
@@ -339,12 +338,12 @@ export function takeItem(state, id, qty) {
   const bag = hereBag(state);
   const have = bag[id] || 0;
   if (!have) return;
-  const w = ITEMS[id].weight;
-  const maxByWeight = w > 0 ? Math.floor((freeWeight(state) / w) * 1000) / 1000 : have;
-  let n = Math.min(qty ?? have, have, maxByWeight);
+  let want = Math.min(qty ?? have, have);
   // Whole things (parts, tools, clothes) cannot be split.
-  if (['part', 'tool', 'wear'].includes(ITEMS[id].kind)) n = Math.floor(n + 1e-9);
-  if (n <= 0) { log(state, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, 'warn'); return; }
+  if (['part', 'tool', 'wear'].includes(ITEMS[id].kind)) want = Math.floor(want + 1e-9);
+  // Grid space is the only limit (Adam, 2026-11-26).
+  const n = roomFor(state, id, want);
+  if (n <= 0) { log(state, `No room in your pack for the ${itemName(id).toLowerCase()}.`, 'warn'); return; }
   addItem(bag, id, -n);
   addItem(state.carried, id, n);
   advanceTime(state, 1);
@@ -352,15 +351,15 @@ export function takeItem(state, id, qty) {
 
 export function takeAll(state) {
   const bag = hereBag(state);
-  const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+  // small things first, so more of them fit
+  const cells = (id) => { const z = sizeOf(id); return z.w * z.h / z.stack; };
+  const ids = Object.keys(bag).sort((a, b) => cells(a) - cells(b) || (a < b ? -1 : 1));
   const took = [];
   let left = false;
   for (const id of ids) {
     const before = bag[id];
-    const w = ITEMS[id].weight;
-    const room = freeWeight(state) / w;
     // Whole units, but a part-unit (0.5 roll of wire) can be taken whole if it fits.
-    const n = before < 1 ? (room >= before ? before : 0) : Math.min(Math.floor(before), Math.floor(room));
+    const n = roomFor(state, id, before < 1 ? before : Math.floor(before));
     if (n > 0) { addItem(bag, id, -n); addItem(state.carried, id, n); took.push(itemName(id).toLowerCase()); }
     if (bag[id]) left = true;
   }
@@ -372,6 +371,10 @@ export function takeAll(state) {
 export function dropItem(state, id, qty) {
   const have = state.carried[id] || 0;
   if (!have) return;
+  if (id === 'backpack' && !packFitsWithout(state, 'backpack')) {
+    log(state, 'Your things do not fit in your pockets. Take some out of the backpack first.', 'warn');
+    return;
+  }
   const n = Math.min(qty ?? have, have);
   addItem(state.carried, id, -n);
   addItem(hereBag(state), id, n);
@@ -692,8 +695,6 @@ export function searchMinutes(state, base, dark) {
   if (dark && !hasLight(state)) m *= 2;
   if (p.water < 25) m *= 1.25;
   m /= injuryFactor(state, 'hand');
-  const extra = Math.max(0, bagWeight(state.carried) - 10);
-  m *= 1 + Math.floor(extra / 10) * 0.1;
   return m;
 }
 
@@ -827,9 +828,8 @@ export function pickUp(state, pid) {
   }
   const it = zoneItemList(state, ctx, zone).find((x) => x.pid === pid);
   if (!it || ctx.holder.taken.includes(pid)) return false;
-  const w = ITEMS[it.item].weight;
-  if (w > freeWeight(state) + 1e-9) {
-    log(state, `Your pack is too full to take the ${itemName(it.item).toLowerCase()} (${w} lb).`, 'warn');
+  if (roomFor(state, it.item, 1) < 1) {
+    log(state, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, 'warn');
     return false;
   }
   const env = environment(state, 'work');

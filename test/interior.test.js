@@ -121,12 +121,12 @@ test('panel search takes what is left in the zone, and the 3D view agrees', asyn
   assert.equal(buildingItems(s).filter((i) => i.zone === 0).length, 0);
 });
 
-test('a too heavy item stays', async () => {
+test('an item stays when the pack grid has no room', async () => {
   const { buildingItems } = await import('../src/engine/actions.js');
   setPlaces([{ id: 'h8', name: 'Hardware', cat: 'hardware', lat: 45.5, lon: -122.8 }]);
   const s = newGame(13);
   s.location = { kind: 'place', id: 'h8' };
-  s.carried = { firewood: 1 }; // 20 lb, limit 10 * 1.5
+  s.carried = { canned_food: 48 }; // 24 tiles of 2 cans: the 6 x 4 pack grid is full
   const it = buildingItems(s)[0];
   perform(s, 'action', 'pickup', it.pid);
   assert.ok(!(placeState(s, { id: 'h8', cat: 'hardware' }).taken || []).includes(it.pid));
