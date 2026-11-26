@@ -8,6 +8,7 @@ import {
   Vector3, Matrix4, BufferGeometry, Float32BufferAttribute, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { openStreets } from '../render/streets/view.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
@@ -1961,4 +1962,11 @@ function buildShelf(f, material) {
   return out;
 }
 
-window.LLInside3D = { openInside };
+// ?sky=morning|noon|dusk|overcast|night in the page address forces the light outside too.
+function openStreetsWithSky(opts) {
+  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
+  if (!forceSky) return openStreets(opts);
+  const sc = SKY_PRESETS[forceSky];
+  return openStreets({ ...opts, scene: sc, getScene: () => sc });
+}
+window.LLInside3D = { openInside, openStreets: openStreetsWithSky };

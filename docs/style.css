@@ -497,3 +497,8 @@ small.need::before { content: '⚠ '; }
 .bag-here h3, .bag-here h5 { color: var(--warn); }
 .bag-home h3 { color: var(--signal); }
 .bag-pack h3, .bag-pack h5 { color: var(--ok); }
+
+/* 3D streets */
+#inside.streets .in-credit { position: absolute; right: 8px; bottom: 6px; font-size: 10px; color: rgba(230,235,240,.75); text-shadow: 0 1px 2px #000; pointer-events: none; max-width: 50%; text-align: right; }
+#inside.streets .in-debug { position: absolute; left: 12px; bottom: 40px; font: 12px/1.3 monospace; color: #e8f0f4; background: rgba(0,0,0,.55); padding: 4px 8px; }
+@media (max-width: 640px) { #inside.streets .in-help { display: none; } #inside.streets .in-credit { max-width: 90%; } }

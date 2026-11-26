@@ -1631,6 +1631,50 @@
   // src/core/profiler.js
   var FRAME_BUDGET_MS = 1e3 / 30;
 
+  // src/core/cells.js
+  var M_PER_DEG_LAT = 111320;
+  var DEFAULT_CELL_METERS = 256;
+  function createGrid({ origin, cellMeters = DEFAULT_CELL_METERS, radiusMiles = 15 } = {}) {
+    if (!origin || !Number.isFinite(origin.lat) || !Number.isFinite(origin.lon)) throw new Error("The grid needs an origin { lat, lon }");
+    if (!(cellMeters > 0)) throw new Error("cellMeters must be above 0");
+    const mPerDegLon = M_PER_DEG_LAT * Math.cos(origin.lat * Math.PI / 180);
+    const radiusM = radiusMiles * 1609.344;
+    const maxCell = Math.ceil(radiusM / cellMeters);
+    const toMeters = ({ lat, lon }) => ({ x: (lon - origin.lon) * mPerDegLon, z: (origin.lat - lat) * M_PER_DEG_LAT });
+    const toLatLon = ({ x, z }) => ({ lat: origin.lat - z / M_PER_DEG_LAT, lon: origin.lon + x / mPerDegLon });
+    const keyOf = (cx, cz) => `${cx},${cz}`;
+    const parse = (key) => {
+      const [cx, cz] = key.split(",").map(Number);
+      return { cx, cz };
+    };
+    function cellAt(pos) {
+      const m = toMeters(pos);
+      const cx = Math.floor(m.x / cellMeters);
+      const cz = Math.floor(m.z / cellMeters);
+      return { cx, cz, key: keyOf(cx, cz) };
+    }
+    function center(key) {
+      const { cx, cz } = parse(key);
+      return toLatLon({ x: (cx + 0.5) * cellMeters, z: (cz + 0.5) * cellMeters });
+    }
+    function inArea(key) {
+      const { cx, cz } = parse(key);
+      const x = (cx + 0.5) * cellMeters;
+      const z = (cz + 0.5) * cellMeters;
+      return Math.hypot(x, z) <= radiusM + cellMeters;
+    }
+    function bucket(list) {
+      const out = /* @__PURE__ */ new Map();
+      for (const it of list) {
+        const k = cellAt(it).key;
+        if (!out.has(k)) out.set(k, []);
+        out.get(k).push(it);
+      }
+      return out;
+    }
+    return { origin, cellMeters, radiusM, maxCell, toMeters, toLatLon, keyOf, parse, cellAt, center, inArea, bucket };
+  }
+
   // src/core/changes.js
   var CHANGE_KINDS = ["taken", "opened", "closed", "emptied", "moved", "damaged", "discovered", "set"];
   function log2(state2) {
@@ -4140,6 +4184,7 @@
     if (loc.kind === "house") return loc.label;
     if (loc.kind === "wild") return spotHere(state2)?.name || "Outside";
     if (loc.kind === "car") return "Abandoned car";
+    if (loc.kind === "street") return "On the street";
     return "";
   }
   function canHeat(state2, kwh) {
@@ -5136,6 +5181,7 @@
         add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
       add("walk_in", "Walk around your home (first person)", { note: "see what you built" });
+      add("walk_out", "Step outside (3D streets)", { note: "walk the real streets near home" });
       if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
       add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
       const cookId = cookPick(state2);
@@ -5188,6 +5234,10 @@
       add("car_wire", c.wire ? "Wire and mirror: taken" : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: c.wire && "Done" || !hasAny2(["toolkit", "multitool", "knife"]) && "You need a knife or a tool" });
       add("go_home", "Walk home");
     }
+    if (loc.kind === "street") {
+      add("walk_out", "Walk the streets (3D)", { note: "time passes as you walk" });
+      add("go_home", "Walk home");
+    }
     if (loc.kind === "wild") {
       const spot = spotHere(state2);
       if (spot?.kind === "fish") {
@@ -5215,7 +5265,7 @@
       add("go_home", "Walk home");
     }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? `Sleep ${sleepWhere(state2)}\u2026` : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : "Sleep here on the floor\u2026");
+    add("sleep", state2.location.kind === "home" ? `Sleep ${sleepWhere(state2)}\u2026` : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : state2.location.kind === "street" ? "Sleep here by a wall\u2026" : "Sleep here on the floor\u2026");
     if (state2.dog.stage === "joined") {
       add("play_dog", `Play with ${state2.dog.name}`);
       if (state2.dog.sick) {
@@ -7017,6 +7067,71 @@
     return out.join("\n");
   }
 
+  // src/engine/worldgrid.js
+  var WORLD_CELL_METERS = DEFAULT_CELL_METERS;
+  var WORLD_GRID = createGrid({ origin: HOME, cellMeters: WORLD_CELL_METERS, radiusMiles: MAP_RADIUS_MILES });
+  var cellKeyAt = (pos) => WORLD_GRID.cellAt(pos).key;
+
+  // src/engine/streetwalk.js
+  var M_PER_MILE = 1609.344;
+  var MAX_STEP_M = 250;
+  var EVENT_EVERY_MILES = 0.5;
+  var M_PER_DEG_LAT2 = 111320;
+  function metersBetween(a, b) {
+    const dz = (a.lat - b.lat) * M_PER_DEG_LAT2;
+    const dx = (a.lon - b.lon) * M_PER_DEG_LAT2 * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+    return Math.hypot(dx, dz);
+  }
+  function walkState(state2) {
+    if (!state2.streetWalk || typeof state2.streetWalk !== "object") state2.streetWalk = { m: 0, eventMiles: 0 };
+    return state2.streetWalk;
+  }
+  function enterStreet(state2) {
+    if (state2.dead) return null;
+    const cell = cellKeyAt(state2.pos);
+    state2.location = { kind: "street", cell };
+    walkState(state2);
+    return cell;
+  }
+  function streetMove(state2, pos) {
+    if (state2.dead) return { ok: false, why: "dead" };
+    if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return { ok: false, why: "bad position" };
+    const d = metersBetween(state2.pos, pos);
+    if (d > MAX_STEP_M) return { ok: false, why: "too far in one step" };
+    const w = walkState(state2);
+    if (state2.location?.kind !== "street") enterStreet(state2);
+    state2.pos = { lat: pos.lat, lon: pos.lon };
+    state2.location.cell = cellKeyAt(state2.pos);
+    state2.stats.miles += d / M_PER_MILE;
+    w.m += d;
+    w.eventMiles += d / M_PER_MILE;
+    const mPerMin = walkSpeed(state2).mph * M_PER_MILE / 60;
+    const minutes = Math.floor(w.m / mPerMin);
+    if (minutes > 0) {
+      w.m -= minutes * mPerMin;
+      advanceTime(state2, minutes, "walk");
+    }
+    if (!state2.dead && w.eventMiles >= EVENT_EVERY_MILES) {
+      w.eventMiles -= EVENT_EVERY_MILES;
+      roadEvent(state2);
+    }
+    if (!state2.dead && state2.player.energy <= 0) {
+      log(state2, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
+      advanceTime(state2, 180, "sleep");
+    }
+    return { ok: !state2.dead, minutes, cell: state2.location.cell };
+  }
+  var DOOR_RANGE_M = 80;
+  function enterPlaceFromStreet(state2, placeId) {
+    const place = getPlace(placeId);
+    if (!place) return { ok: false, why: "no such place" };
+    if (metersBetween(state2.pos, place) > DOOR_RANGE_M) return { ok: false, why: "not at the door" };
+    state2.location = { kind: "place", id: placeId };
+    log(state2, `You arrive at ${place.name}.`.replace("..", "."), "travel");
+    enterPlace(state2, place);
+    return { ok: true };
+  }
+
   // src/ui/app.js
   var state = null;
   var mapApi = null;
@@ -7262,8 +7377,13 @@
     } else if (loc.kind === "home") sub = "Your house. One story, a fireplace, solar panels and a home battery.";
     else if (loc.kind === "wild") sub = wildSub(SPOTS[loc.id]);
     else if (loc.kind === "car") sub = "An abandoned car at the curb. Zoom in on the map to find more.";
+    else if (loc.kind === "street") sub = "Out on the street. Walk on in 3D, or tap a place on the map.";
     else sub = "A house. Search it room by room.";
+    if (!streetCells) loadStreetIndex().then(() => {
+      if (state) renderLocation();
+    });
     const acts = listActions(state).map((a) => {
+      if (a.id === "walk_out" && !a.disabled && !streetsHere()) a = { ...a, disabled: "No 3D streets here yet (pilot: about 2 km around your home)" };
       const dis = a.disabled ? "disabled" : "";
       const note = a.disabled ? a.disabled : a.note || "";
       return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ""}</button>`;
@@ -8047,6 +8167,106 @@
       }
     });
   }
+  var streetIndex = null;
+  function loadStreetIndex() {
+    if (!streetIndex) {
+      streetIndex = fetch("data/streets/index.json").then((r) => r.ok ? r.json() : null).catch(() => null).then((ix) => {
+        streetCells = new Set(ix?.cells || []);
+        streetCredit = ix?.credit || "";
+        return ix;
+      });
+    }
+    return streetIndex;
+  }
+  var streetCells = null;
+  var streetCredit = "";
+  function streetsHere(st = state) {
+    return !!(streetCells && st && streetCells.has(cellKeyAt(st.pos)));
+  }
+  async function walkOutside() {
+    if (!state || state.dead || document.getElementById("inside")) return;
+    if (!webglOk()) {
+      alert("This browser cannot show 3D.");
+      return;
+    }
+    const ix = await loadStreetIndex();
+    if (!ix || !streetsHere()) {
+      alert("There are no 3D streets here yet. The pilot area is about 2 km around your home.");
+      return;
+    }
+    let api;
+    try {
+      api = await loadInside3d();
+    } catch (e) {
+      alert("The 3D view did not load. Check the connection and try again.");
+      return;
+    }
+    const fromBuilding = state.location.kind !== "street";
+    enterStreet(state);
+    saveGame(state);
+    const start2 = WORLD_GRID.toMeters(state.pos);
+    const sc = sceneEnv(state);
+    const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === "warn" || e.kind === "bad" || e.kind === "story" || e.kind === "event").map((e) => e.text);
+    const atHomeDoor = (ll) => metersBetween(ll, homeOf(state)) < 30;
+    document.body.classList.add("inside-open");
+    api.openStreets({
+      title: "Outside",
+      start: { x: start2.x, z: start2.z },
+      snapToDoor: fromBuilding,
+      cells: ix.cells,
+      credit: `Map data ${streetCredit}`,
+      scene: sc,
+      getScene: () => sceneEnv(state),
+      bare: sc.season === "winter" || sc.season === "autumn" && dayIndex(state.time) % 365 > 60,
+      isLightOn: () => hasLight(state) && isNight(state.time),
+      toggleLight: () => {
+        const n0 = state.log.length;
+        act("action", "flashlight");
+        return state.log.slice(n0).map((e) => e.text).join(" ");
+      },
+      getStatus: () => {
+        const low = needWarnings(state).map((n) => n.word);
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 ${esc(weatherInfo(state).label || "")} \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc(low.join(", "))}</span>` : "");
+      },
+      isDead: () => !!state.dead,
+      onMove: (ll) => {
+        const n0 = state.log.length;
+        const wasDead = !!state.dead;
+        const r = streetMove(state, ll);
+        afterAction2();
+        if (!wasDead && state.dead) recordRun(state);
+        if (r.minutes > 0 || state.log.length > n0) saveGame(state);
+        return lastLines(n0).map(esc).join(" ");
+      },
+      describeDoor: (door, ll) => {
+        if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc(getPlace(door.placeId).name)}`;
+        if (door.kind === 0 && atHomeDoor(ll)) return "<kbd>E</kbd> Go inside your home";
+        if (door.name) return `${esc(door.name)} <small>closed. Nothing to find here</small>`;
+        if (door.kind === 0) return 'A house <small>Going into real houses from the street comes next. Use "Search a house" on the map for now.</small>';
+        return "The door is locked <small>nothing to find here</small>";
+      },
+      onDoor: (door, ll) => {
+        if (door.placeId && getPlace(door.placeId)) {
+          state.pos = { lat: ll.lat, lon: ll.lon };
+          const r = enterPlaceFromStreet(state, door.placeId);
+          if (!r.ok) return { text: "You cannot go in here." };
+          afterAction2();
+          return { close: true };
+        }
+        if (door.kind === 0 && atHomeDoor(ll)) {
+          perform(state, "action", "go_home");
+          afterAction2();
+          return { close: true };
+        }
+        return null;
+      },
+      onClose: () => {
+        document.body.classList.remove("inside-open");
+        if (state.player.lightOff) state.player.lightOff = false;
+        commit(true);
+      }
+    });
+  }
   function projectNeeds() {
     const out = {};
     for (const p of PROJECTS) {
@@ -8119,6 +8339,7 @@
       if (b.dataset.act) {
         if (b.dataset.act === "sleep") return showSleep();
         if (b.dataset.act === "walk_in") return walkInside2();
+        if (b.dataset.act === "walk_out") return walkOutside();
         act("action", b.dataset.act);
       } else if (b.dataset.use && b.dataset.verb === "take_off") act("action", "take_off", b.dataset.use);
       else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);

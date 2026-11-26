@@ -73,6 +73,7 @@ export function locationLabel(state) {
   if (loc.kind === 'house') return loc.label;
   if (loc.kind === 'wild') return spotHere(state)?.name || 'Outside';
   if (loc.kind === 'car') return 'Abandoned car';
+  if (loc.kind === 'street') return 'On the street';
   return '';
 }
 
@@ -1112,6 +1113,7 @@ export function listActions(state) {
       add('run_generator', 'Run the generator to charge the battery (2 h)', { disabled: (gas < 1 && 'No gas') || (h.batteryMax - h.battery < 0.1 && 'Battery is full'), note: `${gas} gal${startP < 0.99 ? ` · old gas: ${Math.round(startP * 100)}% it starts` : ''}`, risk: startP < 0.99 });
     }
     add('walk_in', 'Walk around your home (first person)', { note: 'see what you built' });
+    add('walk_out', 'Step outside (3D streets)', { note: 'walk the real streets near home' });
     if (h.furniture > 0) add('break_furniture', 'Break furniture for firewood (1 h)', { note: `${h.furniture} left` });
     add('heater', h.heaterOn ? 'Turn off the electric heater' : 'Turn on the electric heater', { disabled: !h.heaterOn && h.battery < 1 && 'Battery too low' });
     const cookId = cookPick(state);
@@ -1164,6 +1166,10 @@ export function listActions(state) {
     add('car_wire', c.wire ? 'Wire and mirror: taken' : `Take wire and the mirror (${WIRE_MIN} min)`, { disabled: (c.wire && 'Done') || (!hasAny(['toolkit', 'multitool', 'knife']) && 'You need a knife or a tool') });
     add('go_home', 'Walk home');
   }
+  if (loc.kind === 'street') {
+    add('walk_out', 'Walk the streets (3D)', { note: 'time passes as you walk' });
+    add('go_home', 'Walk home');
+  }
   if (loc.kind === 'wild') {
     const spot = spotHere(state);
     if (spot?.kind === 'fish') {
@@ -1191,7 +1197,7 @@ export function listActions(state) {
     add('go_home', 'Walk home');
   }
   add('rest', 'Rest 1 hour');
-  add('sleep', state.location.kind === 'home' ? `Sleep ${sleepWhere(state)}…` : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : 'Sleep here on the floor…');
+  add('sleep', state.location.kind === 'home' ? `Sleep ${sleepWhere(state)}…` : state.location.kind === 'wild' ? 'Sleep here on the ground…' : state.location.kind === 'car' ? 'Sleep in the car…' : state.location.kind === 'street' ? 'Sleep here by a wall…' : 'Sleep here on the floor…');
   if (state.dog.stage === 'joined') {
     add('play_dog', `Play with ${state.dog.name}`);
     if (state.dog.sick) { const why = canTreatDog(state); add('treat_dog', `Treat ${state.dog.name} (antibiotics)`, { disabled: why, note: why ? undefined : '1 course of antibiotics' }); }
