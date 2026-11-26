@@ -25,6 +25,8 @@ import { setPlaces, getPlace, allPlaces } from '../engine/placesdb.js';
 import { saveGame, loadGame, clearGame, parseSave, recordRun, bestRuns, loadLegacy, saveLegacy } from '../engine/save.js';
 import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
+import { tilesFor, layoutGrid, gridHtml, setGridHandlers, savedPos, setPos, fitsAt } from './grid.js';
+import { GRID_COLS, packRows, sizeOf } from '../data/gridsize.js';
 import { createFx } from './fx.js';
 import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
@@ -82,6 +84,7 @@ export async function start() {
   setPlaces(window.LL_PLACES || []);
   state = loadGame();
   bindEvents();
+  initGridHandlers();
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
@@ -341,12 +344,6 @@ function qtyText(q) {
   return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, '');
 }
 
-function itemRow(id, q, from, buttons) {
-  const it = ITEMS[id];
-  const w = Math.round(it.weight * q * 10) / 10;
-  return `<li><span class="in">${esc(it.name)}${freshTag(id)}</span><span class="iq">${qtyText(q)} ${esc(it.unit)}</span><span class="iw">${w} lb</span><span class="ib">${buttons}</span></li>`;
-}
-
 function useButtons(id, from) {
   return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}${u.verb === 'salvage' && u.note ? ` <small>${esc(u.note)}</small>` : ''}</button>${u.disabled && u.note && u.verb !== 'salvage' ? `<small class="need">${esc(u.note)}</small>` : ''}`).join('');
 }
@@ -365,49 +362,131 @@ function groupOf(id) {
 function sortedIds(bag) {
   return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
 }
-// Item rows with a small group header when the group changes.
-function groupedRows(ids, row) {
-  let last = -1;
-  return ids.map((id) => {
-    const g = groupOf(id);
-    const head = g !== last ? `<li class="grp">${KIND_GROUPS[g][0]}</li>` : '';
-    last = g;
-    return head + row(id);
-  }).join('');
+// ---------- grid inventory (Adam, 2026-11-25) ----------
+// Your pack and the things found here are grids; items are tiles sized by the item. Drag a
+// tile to move it, drag it to the other grid to take or drop it, tap it for its buttons.
+// Weight is still the carry rule (the load bar); tiles that have no room go "over the edge".
+let gridSel = null; // 'pack:key' or 'here:key'
+const gridLayouts = {};
+function hereGridCols() { return GRID_COLS + 2; }
+function buildGrid(which) {
+  const bag = which === 'pack' ? state.carried : hereBag(state);
+  const tiles = tilesFor(bag, sortedIds(bag));
+  const cols = which === 'pack' ? GRID_COLS : hereGridCols();
+  const rows = which === 'pack' ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
+  const L = layoutGrid(tiles, cols, rows, savedPos(which === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`));
+  gridLayouts[which] = L;
+  return L;
+}
+function iconUrl(id) {
+  return window.LLInside3D?.iconCache?.get(id) || null;
+}
+let iconTimer = 0;
+function wantIcons(ids) {
+  const miss = ids.filter((id) => !window.LLInside3D?.iconCache?.has(id));
+  if (!miss.length) return;
+  loadInside3d().then((api) => api.itemIcons?.(miss, () => {
+    clearTimeout(iconTimer);
+    iconTimer = setTimeout(refreshGrids, 120);
+  })).catch(() => {});
+}
+function refreshGrids() {
+  if (!state) return;
+  if ($('#items')) renderItems();
+  insideRefresh?.();
+}
+function gridOpts(which) {
+  return {
+    layout: buildGrid(which), name: itemName, kind: (id) => ITEMS[id]?.kind || 'misc',
+    qtyText: (q, id) => (q === 1 && sizeOf(id).stack === 1 ? '' : qtyText(q)), icon: iconUrl, selected: gridSel,
+  };
+}
+// Buttons for the tile you tapped.
+function selectedHtml(compact) {
+  if (!gridSel) return '';
+  const [which, key] = gridSel.split(/:(.*)/s);
+  const id = key.split('#')[0];
+  const bag = which === 'pack' ? state.carried : hereBag(state);
+  if (!bag[id]) { gridSel = null; return ''; }
+  const it = ITEMS[id];
+  const home = state.location.kind === 'home';
+  const from = which === 'pack' ? 'carried' : 'storage';
+  const uses = which === 'pack' || home ? useButtons(id, from) : '';
+  const move = which === 'pack'
+    ? `<button data-drop="${id}">${home ? 'Store' : 'Drop'}</button>`
+    : `<button class="primary" data-take="${id}">Take</button>`;
+  const w = Math.round(it.weight * bag[id] * 10) / 10;
+  return `<div class="isel${compact ? ' compact' : ''}"><img class="isel-img" src="${iconUrl(id) || ''}" alt=""${iconUrl(id) ? '' : ' hidden'}>
+    <div><b>${esc(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc(it.unit)} · ${w} lb${which === 'pack' ? '' : ' · not yours yet'}</small></div>
+    <div class="isel-b">${uses}${move}</div></div>`;
+}
+function initGridHandlers() {
+  setGridHandlers({
+    layout: (which) => gridLayouts[which],
+    select: (which, key) => {
+      const k = `${which}:${key}`;
+      gridSel = gridSel === k ? null : k;
+      refreshGrids();
+    },
+    move: (which, key, x, y, rot) => {
+      const L = gridLayouts[which];
+      const t = L?.tiles.find((v) => v.key === key);
+      if (!t) return;
+      const w = rot !== t.rot ? t.h : t.w; const h = rot !== t.rot ? t.w : t.h;
+      if (!fitsAt(L, key, x, y, w, h)) return;
+      setPos(which === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`, key, x, y, rot);
+      refreshGrids();
+    },
+    transfer: (from, to, id, qty, hit) => {
+      const n0 = state.log.length;
+      if (from === 'here' && to === 'pack') act('take', id, qty);
+      else if (from === 'pack' && to === 'here') act('drop', id, qty);
+      else return;
+      // keep the tile where you dropped it, when it has room there
+      const L = buildGrid(to);
+      const t = L.tiles.find((v) => v.id === id && v.key.endsWith('#0'));
+      if (t && hit && fitsAt(L, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`, t.key, hit.x, hit.y, t.rot);
+      gridSel = null;
+      const said = state.log.slice(n0).map((e) => e.text).join(' ');
+      insideToast?.(said);
+      refreshGrids();
+    },
+  });
 }
 
 function renderItems() {
   const loc = state.location;
+  const home = loc.kind === 'home';
+  const hereTitle = home ? 'House storage' : 'Items you found here';
+  const hereTag = home ? 'stored' : 'not yours yet';
   const here = hereBag(state);
-  const hereIds = sortedIds(here);
-  const hereTitle = loc.kind === 'home' ? 'House storage' : 'Items you found here';
-  let hereHtml = groupedRows(hereIds, (id) => itemRow(id, here[id], 'here',
-    (loc.kind === 'home' ? useButtons(id, 'storage') : '') + `<button data-take="${id}">Take</button>`));
-  if (!hereIds.length) hereHtml = `<li class="empty">${loc.kind === 'home' ? 'Nothing stored.' : 'Nothing here yet. Search to find items.'}</li>`;
-  const takeAll = hereIds.length && loc.kind !== 'home' ? '<button class="small" data-takeall="1">Take all that fits</button>' : '';
-
-  const carried = state.carried;
-  const cIds = sortedIds(carried);
-  const weight = bagWeight(carried);
+  const takeAll = Object.keys(here).length && !home ? '<button class="small" data-takeall="1">Take all that fits</button>' : '';
+  const hereO = gridOpts('here');
+  const packO = gridOpts('pack');
+  const weight = bagWeight(state.carried);
   const limit = carryLimit(state);
   const over = weight > limit;
-  let cHtml = groupedRows(cIds, (id) => itemRow(id, carried[id], 'carried',
-    useButtons(id, 'carried') + `<button data-drop="${id}">${loc.kind === 'home' ? 'Store' : 'Drop'}</button>`));
-  if (!cIds.length) cHtml = '<li class="empty">You carry nothing.</li>';
   const fill = Math.min(100, Math.round((weight / Math.max(1, limit)) * 100));
-  const hereTag = loc.kind === 'home' ? 'stored' : 'not yours yet';
+  wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
+  const hereBody = Object.keys(here).length ? gridHtml('here', hereO)
+    : `<p class="empty">${home ? 'Nothing stored.' : 'Nothing here yet. Search to find items.'}</p>`;
   $('#items').innerHTML = `
     <p class="stock">${esc(stockLine(state))} <small>at rest, carried + stored at home</small></p>
-    <section class="bag bag-here${loc.kind === 'home' ? ' bag-home' : ''}">
-      <h3><span class="bag-ico" aria-hidden="true">${loc.kind === 'home' ? '⌂' : '⌕'}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll}</h3>
-      <ul class="items">${hereHtml}</ul>
-    </section>
+    ${selectedHtml(false)}
+    <div class="grids">
     <section class="bag bag-pack">
       <h3><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span>
         <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
       <div class="bag-load${over ? ' over' : ''}"><i style="width:${fill}%"></i></div>
-      <ul class="items">${cHtml}</ul>
-    </section>`;
+      ${gridHtml('pack', packO)}
+      <p class="hint">${state.carried.backpack ? 'Backpack: big grid.' : 'No backpack: pockets and hands only. Find a backpack for more room (+15 lb).'} Drag to move · R turns a tile while you drag · tap for buttons.</p>
+    </section>
+    <section class="bag bag-here${home ? ' bag-home' : ''}">
+      <h3><span class="bag-ico" aria-hidden="true">${home ? '⌂' : '⌕'}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll}</h3>
+      ${hereBody}
+      <p class="hint">Drag a tile into your pack to take it${home ? '' : ', or drag from your pack to here to drop it'}.</p>
+    </section>
+    </div>`;
 }
 
 function renderHome() {
@@ -976,7 +1055,7 @@ async function walkInside() {
   const night = isNight(state.time);
   document.body.classList.add('inside-open');
   const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === 'warn' || e.kind === 'bad' || e.kind === 'story').map((e) => e.text);
-  api.openInside({
+  const insideH = api.openInside({
     plan,
     title,
     subtitle: `${cat.label} · inside`,
@@ -1111,6 +1190,7 @@ async function walkInside() {
     },
     onLeave: (died, why) => {
       document.body.classList.remove('inside-open');
+      insideRefresh = null; insideToast = null;
       if (why === 'quickload') {
         const saved = loadGame();
         if (saved) state = saved;
@@ -1122,7 +1202,11 @@ async function walkInside() {
       commit();
     },
   });
+  insideRefresh = () => insideH?.refresh?.();
+  insideToast = (t) => insideH?.toast?.(t);
 }
+let insideRefresh = null;
+let insideToast = null;
 
 // ---------- first-person view of the real streets (3D pilot area) ----------
 // Cells with 3D street data: docs/data/streets/index.json (built by tools/streets/).
@@ -1246,24 +1330,17 @@ function journalHtml(maxDays) {
 function insidePanel(name) {
   const p = state.player;
   if (name === 'inventory') {
-    const c = state.carried;
-    const ids = sortedIds(c);
-    const rows = groupedRows(ids, (id) => {
-      const it = ITEMS[id];
-      const btns = itemUses(state, id).filter((u) => u.verb !== 'feeddog' || state.dog.withPlayer)
-        .map((u) => `<button class="small" data-use="${id}" data-verb="${u.verb}"${u.disabled ? ' disabled' : ''}${u.note ? ` title="${esc(u.note)}"` : ''}>${esc(u.label)}</button>${u.disabled && u.note ? `<small class="need">${esc(u.note)}</small>` : ''}`).join('');
-      return `<li><span>${esc(it.name)}${freshTag(id)}</span><span class="q">${qtyText(c[id])} ${esc(it.unit)}</span><span class="b">${btns}</span></li>`;
-    }) || '<li class="empty">You carry nothing.</li>';
     const here = hereBag(state);
-    const hereIds = Object.keys(here);
-    const hereList = hereIds.length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">⌕</span>Found here <span class="bag-tag">not yours yet</span></h5><ul class="inv">${hereIds.map((id) => `<li><span>${esc(itemName(id))}</span><span class="q">${qtyText(here[id])}</span></li>`).join('')}</ul>
-      <button class="primary small" data-in="take">Take all that fits (F)</button></section>` : '';
+    wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
     const w = bagWeight(state.carried);
     const lim = carryLimit(state);
     const fill = Math.min(100, Math.round((w / Math.max(1, lim)) * 100));
-    return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>
-      <section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? 'bad' : ''}">${w} / ${lim} lb</span></h5>
-      <div class="bag-load${w > lim ? ' over' : ''}"><i style="width:${fill}%"></i></div><ul class="inv">${rows}</ul></section>${hereList}`;
+    const hereList = Object.keys(here).length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">⌕</span>Found here <span class="bag-tag">not yours yet</span>
+      <button class="primary small" data-in="take">Take all that fits (F)</button></h5>${gridHtml('here', gridOpts('here'))}</section>` : '';
+    return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>${selectedHtml(true)}
+      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? 'bad' : ''}">${w} / ${lim} lb</span></h5>
+      <div class="bag-load${w > lim ? ' over' : ''}"><i style="width:${fill}%"></i></div>${gridHtml('pack', gridOpts('pack'))}</section>${hereList}</div>
+      <p class="hint">Drag to move or to take · R turns a tile · tap a tile for its buttons.</p>`;
   }
   if (name === 'character') {
     const rows = Object.keys(STAT_INFO).map((k) => statRow(k, p, true)).join('')
@@ -1293,6 +1370,18 @@ function bindEvents() {
   document.body.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled || !state || b.closest('#modal') || b.closest('.maplibregl-popup')) return;
+    // A button the 3D view already handled and redrew is no longer in the page: done.
+    // (Before this check, Eat in the 3D inventory ate twice.)
+    if (!b.isConnected) return;
+    if (b.closest('#inside')) {
+      // The 3D view handles its own buttons; only the grid's Take/Drop come here.
+      if (b.dataset.take) act('take', b.dataset.take);
+      else if (b.dataset.drop) act('drop', b.dataset.drop);
+      else return;
+      gridSel = null;
+      insideRefresh?.();
+      return;
+    }
     if (b.dataset.act) {
       if (b.dataset.act === 'sleep') return showSleep();
       if (b.dataset.act === 'walk_in') return walkInside();

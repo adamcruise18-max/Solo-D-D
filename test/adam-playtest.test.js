@@ -17,10 +17,10 @@ test('carry: 15 lb with no pack, 30 lb with a backpack; the game starts with no 
   assert.equal(carryLimit(s), 30);
 });
 
-test('injuries: about 1 in 10 injury rolls hurt you', () => {
+test('injuries: about 3 in 4 injury rolls hurt you (year tuning)', () => {
   let hurt = 0;
   for (let seed = 1; seed <= 400; seed++) { const s = newGame(seed); if (addInjury(s, 'small_cut')) hurt++; }
-  assert.ok(hurt >= 20 && hurt <= 65, `hurt ${hurt} of 400`);
+  assert.ok(hurt >= 270 && hurt <= 330, `hurt ${hurt} of 400`);
 });
 
 test('injuries scale by severity; a small cut hurts less than a sprained wrist', () => {

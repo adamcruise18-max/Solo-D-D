@@ -11,6 +11,7 @@ import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { openStreets } from '../render/streets/view.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
+import { itemIcon, itemIcons, iconCache } from './icons3d.js';
 import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
@@ -1795,7 +1796,7 @@ export function openInside(opts) {
   };
   window.__llInside = { clipReport, scene, renderer, plan, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, reach: () => itemsInReach(camera.position).map(({ o }) => o.it.zone), boxes: () => [...containers.values()].filter(Boolean).map((c) => ({ cid: c.cid, x: c.x, y: c.y, z: c.z, opened: c.opened })), census: () => { const c = {}; scene.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) { let n = o; while (n.parent && n.parent !== scene) n = n.parent; const k = n.name || n.type; c[k] = (c[k] || 0) + 1; } }); return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 25).map((e) => e.join(':')).join(' '); }, items: () => [...itemObjs.values()].map((o) => ({ pid: o.it.pid, id: o.it.item, zone: o.it.zone, x: o.x, y: o.y, z: o.z })), state: () => ({ stance, feet, slowWalk, aiming, panel, fov: camera.fov, light: flash ? flash.isOn() : null, quality, info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }) }) };
 
-  return { close: () => leave() };
+  return { close: () => leave(), refresh: () => refreshPanel(), toast: (t) => { if (t) toast(t, 3000); } };
 }
 
 // Simple item shapes (used until the detailed models load). Size in meters, origin at the bottom.
@@ -1962,11 +1963,4 @@ function buildShelf(f, material) {
   return out;
 }
 
-// ?sky=morning|noon|dusk|overcast|night in the page address forces the light outside too.
-function openStreetsWithSky(opts) {
-  const forceSky = typeof location !== 'undefined' && (/[?&]sky=(morning|noon|dusk|overcast|night|smoke|heat|ice)\b/.exec(location.search || '') || [])[1];
-  if (!forceSky) return openStreets(opts);
-  const sc = SKY_PRESETS[forceSky];
-  return openStreets({ ...opts, scene: sc, getScene: () => sc });
-}
-window.LLInside3D = { openInside, openStreets: openStreetsWithSky };
+window.LLInside3D = { openInside, itemIcon, itemIcons, iconCache };
