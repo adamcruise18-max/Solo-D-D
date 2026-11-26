@@ -401,3 +401,10 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 ## World grid
 
 `src/engine/worldgrid.js`: the one grid for the game. Origin HOME (map centre), 256 m cells, 15-mile area. `cellKeyAt({ lat, lon })` gives the "cx,cz" key; `WORLD_GRID` has `cellAt`, `center`, `inArea` and works with `classify` and the streamer. Street files (docs/data/streets/) are keyed by these cells, so the origin and size are fixed.
+
+## Street walking (3D streets)
+
+`src/engine/streetwalk.js`. The street view moves the player and calls the engine:
+- `enterStreet(state)`: location `{ kind: 'street', cell }` at the player's position. A street is outside (environment, pacer).
+- `streetMove(state, { lat, lon })`: at most 250 m a call. Adds miles, turns distance into game minutes at `walkSpeed()` (whole minutes; the rest waits in `state.streetWalk.m`), rolls `roadEvent` each 0.5 mi, and makes the player rest at 0 energy. Returns `{ ok, minutes, cell }`.
+- `enterPlaceFromStreet(state, placeId)`: go in through a place door within 80 m; same place as a map trip.
