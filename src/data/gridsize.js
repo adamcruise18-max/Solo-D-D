@@ -1,6 +1,6 @@
 // Grid inventory (Adam, 2026-11-25): each item takes a block of cells by its size, as in
-// survival-loot games. Our own sizes and layout. Weight (15 lb, +15 with a backpack) is still
-// the carry rule; the grid shows how the things fit.
+// survival-loot games. Our own sizes and layout. Grid space is the only carry limit
+// (Adam, 2026-11-26): src/engine/packgrid.js checks room before you take something.
 import { ITEMS } from './items.js';
 
 // [width, height] in cells, and how many units one tile holds (a stack).

@@ -2,7 +2,7 @@
 import { ITEMS, itemName } from '../data/items.js';
 import { CATEGORIES } from '../data/places.js';
 import {
-  newGame, formatClock, formatDate, formatDuration, dayIndex, bagWeight, carryLimit, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight, log,
+  newGame, formatClock, formatDate, formatDuration, dayIndex, HOME, homeOf, randomStartPoint, MAP_RADIUS_MILES, has, hasLight, log,
 } from '../engine/state.js';
 import { airTemp, isNight, sunFor, weatherInfo } from '../engine/world.js';
 import { feltTemp, injuryName, environment } from '../engine/tick.js';
@@ -27,6 +27,7 @@ import { LEGACY, MAX_SLOTS, earnedIds, validLegacy } from '../engine/legacy.js';
 import { createMap } from './map.js';
 import { tilesFor, layoutGrid, gridHtml, setGridHandlers, savedPos, setPos, fitsAt } from './grid.js';
 import { GRID_COLS, packRows, sizeOf } from '../data/gridsize.js';
+import { roomFor, packUse, packTiles } from '../engine/packgrid.js';
 import { createFx } from './fx.js';
 import { GOALS, GOAL_KINDS } from '../data/legacy-goals.js';
 import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goalProgress, epilogue, MAX_GOALS, BOARD_OPENS_DAY, CHANGE_GAP_DAYS } from '../engine/goals.js';
@@ -371,12 +372,19 @@ const gridLayouts = {};
 function hereGridCols() { return GRID_COLS + 2; }
 function buildGrid(which) {
   const bag = which === 'pack' ? state.carried : hereBag(state);
-  const tiles = tilesFor(bag, sortedIds(bag));
+  const tiles = which === 'pack' ? packTiles(bag, sortedIds(bag)) : tilesFor(bag, sortedIds(bag));
   const cols = which === 'pack' ? GRID_COLS : hereGridCols();
   const rows = which === 'pack' ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
-  const L = layoutGrid(tiles, cols, rows, savedPos(which === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`));
+  let L = layoutGrid(tiles, cols, rows, savedPos(which === 'pack' ? 'pack' : `here:${state.location.kind}:${state.location.id || ''}`));
+  // Your own tile places must never make the pack look fuller than it is: the rules use the
+  // packed layout, so show that when your places leave tiles over the edge.
+  if (L.overflow) { const auto = layoutGrid(tiles, cols, rows); if (auto.overflow < L.overflow) L = auto; }
   gridLayouts[which] = L;
   return L;
+}
+function packText() {
+  const u = packUse(state);
+  return `Pack ${u.used} / ${u.total} cells${u.over ? ' (over full)' : ''}`;
 }
 function iconUrl(id) {
   return window.LLInside3D?.iconCache?.get(id) || null;
@@ -417,7 +425,7 @@ function selectedHtml(compact) {
     : `<button class="primary" data-take="${id}">Take</button>`;
   const w = Math.round(it.weight * bag[id] * 10) / 10;
   return `<div class="isel${compact ? ' compact' : ''}"><img class="isel-img" src="${iconUrl(id) || ''}" alt=""${iconUrl(id) ? '' : ' hidden'}>
-    <div><b>${esc(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc(it.unit)} · ${w} lb${which === 'pack' ? '' : ' · not yours yet'}</small></div>
+    <div><b>${esc(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc(it.unit)} · ${sizeOf(id).w}×${sizeOf(id).h} cells${which === 'pack' ? '' : ' · not yours yet'}</small></div>
     <div class="isel-b">${uses}${move}</div></div>`;
 }
 function initGridHandlers() {
@@ -463,10 +471,9 @@ function renderItems() {
   const takeAll = Object.keys(here).length && !home ? '<button class="small" data-takeall="1">Take all that fits</button>' : '';
   const hereO = gridOpts('here');
   const packO = gridOpts('pack');
-  const weight = bagWeight(state.carried);
-  const limit = carryLimit(state);
-  const over = weight > limit;
-  const fill = Math.min(100, Math.round((weight / Math.max(1, limit)) * 100));
+  const use = packUse(state);
+  const over = use.over;
+  const fill = Math.min(100, Math.round((use.used / Math.max(1, use.total)) * 100));
   wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
   const hereBody = Object.keys(here).length ? gridHtml('here', hereO)
     : `<p class="empty">${home ? 'Nothing stored.' : 'Nothing here yet. Search to find items.'}</p>`;
@@ -476,10 +483,10 @@ function renderItems() {
     <div class="grids">
     <section class="bag bag-pack">
       <h3><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span>
-        <span class="${over ? 'bad' : ''}">${weight} / ${limit} lb${over ? ' (too heavy: slow)' : ''}</span></h3>
+        <span class="${over ? 'bad' : ''}">${use.used} / ${use.total} cells${over ? ' (over full: slow)' : ''}</span></h3>
       <div class="bag-load${over ? ' over' : ''}"><i style="width:${fill}%"></i></div>
       ${gridHtml('pack', packO)}
-      <p class="hint">${state.carried.backpack ? 'Backpack: big grid.' : 'No backpack: pockets and hands only. Find a backpack for more room (+15 lb).'} Drag to move · R turns a tile while you drag · tap for buttons.</p>
+      <p class="hint">${state.carried.backpack ? `Backpack on: big grid. <button class="small" data-drop="backpack">Take it off</button>` : 'No backpack: pockets and hands only. Find a backpack for a bigger grid.'} Drag to move · R turns a tile while you drag · tap for buttons.</p>
     </section>
     <section class="bag bag-here${home ? ' bag-home' : ''}">
       <h3><span class="bag-ico" aria-hidden="true">${home ? '⌂' : '⌕'}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll}</h3>
@@ -1105,7 +1112,7 @@ async function walkInside() {
       const p = state.player;
       const low = needWarnings(state).map((n) => n.word);
       const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : 'No flashlight';
-      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb · ${light}`
+      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · ${packText()} · ${light}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
     },
     projectInfo: (id) => homeProjectText(state, id, true),
@@ -1157,8 +1164,9 @@ async function walkInside() {
     describeItem: (it, near, touch) => {
       const def = ITEMS[it.item];
       const need = projectNeeds()[it.item];
-      const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
-      return `<kbd>E</kbd> Take ${esc(def.name)} <small>${def.weight} lb${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
+      const bagFull = roomFor(state, it.item, 1) < 1;
+      const z = sizeOf(it.item);
+      return `<kbd>E</kbd> Take ${esc(def.name)} <small>${z.w}×${z.h}${bagFull ? ' · <span class="bad">pack too full</span>' : ''}</small>`
         + (need ? `<span class="need">Needed: ${esc(need)}</span>` : '')
         + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc(SALVAGE[it.item].what)}</small>` : '')
         + (near > 1 ? `<small class="more">Hold ${touch ? 'USE' : 'E'}: take all ${near} in reach</small>` : '');
@@ -1186,7 +1194,7 @@ async function walkInside() {
     onTakeAll: () => {
       const n0 = state.log.length;
       act('takeall');
-      return state.log.slice(n0).map((e) => e.text).join(' ') || `You put it in your pack. Bag: ${bagWeight(state.carried)} / ${carryLimit(state)} lb.`;
+      return state.log.slice(n0).map((e) => e.text).join(' ') || `You put it in your pack. ${packText()}.`;
     },
     onLeave: (died, why) => {
       document.body.classList.remove('inside-open');
@@ -1256,7 +1264,7 @@ async function walkOutside() {
     },
     getStatus: () => {
       const low = needWarnings(state).map((n) => n.word);
-      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · ${esc(weatherInfo(state).label || '')} · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb`
+      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · ${esc(weatherInfo(state).label || '')} · ${packText()}`
         + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
     },
     isDead: () => !!state.dead,
@@ -1332,14 +1340,13 @@ function insidePanel(name) {
   if (name === 'inventory') {
     const here = hereBag(state);
     wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
-    const w = bagWeight(state.carried);
-    const lim = carryLimit(state);
-    const fill = Math.min(100, Math.round((w / Math.max(1, lim)) * 100));
+    const use = packUse(state);
+    const fill = Math.min(100, Math.round((use.used / Math.max(1, use.total)) * 100));
     const hereList = Object.keys(here).length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">⌕</span>Found here <span class="bag-tag">not yours yet</span>
       <button class="primary small" data-in="take">Take all that fits (F)</button></h5>${gridHtml('here', gridOpts('here'))}</section>` : '';
     return `<h4>Inventory</h4><p class="stock">${esc(stockLine(state))}</p>${selectedHtml(true)}
-      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? 'bad' : ''}">${w} / ${lim} lb</span></h5>
-      <div class="bag-load${w > lim ? ' over' : ''}"><i style="width:${fill}%"></i></div>${gridHtml('pack', gridOpts('pack'))}</section>${hereList}</div>
+      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">▣</span>In your pack <span class="bag-tag">yours</span> <span class="${use.over ? 'bad' : ''}">${use.used} / ${use.total} cells</span></h5>
+      <div class="bag-load${use.over ? ' over' : ''}"><i style="width:${fill}%"></i></div>${gridHtml('pack', gridOpts('pack'))}</section>${hereList}</div>
       <p class="hint">Drag to move or to take · R turns a tile · tap a tile for its buttons.</p>`;
   }
   if (name === 'character') {

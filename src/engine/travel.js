@@ -1,10 +1,11 @@
 // Walking on the real map. First version: route length = straight line × 1.25.
+import { packUse } from './packgrid.js';
 import { randInt, chance } from '../rng.js';
 import { advanceTime, addInjury, environment, injuryFactor } from './tick.js';
 import { check } from './checks.js';
 import { isNight, isBadWeather } from './world.js';
 import { WEATHER_TYPES } from '../data/climate.js';
-import { HOME, MAP_RADIUS_MILES, bagWeight, carryLimit, hasLight, log, addItem, formatDuration, has } from './state.js';
+import { HOME, MAP_RADIUS_MILES, hasLight, log, addItem, formatDuration, has } from './state.js';
 import { rollZone } from './loot.js';
 import { itemName } from '../data/items.js';
 import { walkSpeedFactor, energyUseFactor } from './background.js';
@@ -36,7 +37,8 @@ export function walkSpeed(state, t = state.time) {
   if (isNight(t) && !hasLight(state)) apply(0.6, 'dark, no light');
   const wx = WEATHER_TYPES[state.weather.type];
   if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
-  if (bagWeight(state.carried) > carryLimit(state)) apply(0.7, 'heavy pack');
+  // Things that did not fit hang off the pack (grid over full): slow.
+  if (packUse(state).over) apply(0.7, 'pack over full');
   const legF = injuryFactor(state, 'leg');
   if (legF < 1) apply(legF, 'sprained ankle');
   if (p.warmth < 25) apply(0.8, 'hypothermia');
@@ -80,8 +82,7 @@ export function estimateTrip(state, dest) {
   const miles = tripMiles(state, dest);
   const { mph, why } = walkSpeed(state);
   const minutes = (miles / mph) * 60;
-  const overload = bagWeight(state.carried) > carryLimit(state);
-  const energy = (minutes / 60) * 8 * (overload ? 1.5 : 1) * (state.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state, 'walk');
+  const energy = (minutes / 60) * 8 * (state.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state, 'walk');
   return { miles, minutes, energy, mph, why };
 }
 
@@ -189,7 +190,7 @@ export function roadEvent(state) {
       names.push(`${itemName(id)}${q > 1 ? ' ×' + q : ''}`);
     }
     log(state, `You find an abandoned backpack by the road. Inside: ${names.join(', ') || 'nothing useful'}.`, 'good');
-    if (!state.carried.backpack) { addItem(state.carried, 'backpack', 1); log(state, 'You put the backpack on. You can carry 15 lb more.', 'good'); }
+    if (!state.carried.backpack) { addItem(state.carried, 'backpack', 1); log(state, 'You put the backpack on. Your pack grid is much bigger now.', 'good'); }
   }
 }
 
