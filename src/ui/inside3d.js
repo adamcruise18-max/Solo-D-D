@@ -13,7 +13,7 @@ import { snowFromScene } from '../render/streets/look.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
 import { itemIcon, itemIcons, iconCache } from './icons3d.js';
-import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
+import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS, setAssetDetail } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import { getQualityChoice, autoStepDown } from './quality.js';
@@ -167,6 +167,7 @@ export function openInside(opts) {
 
   // Light, tone, fog, flashlight and room effects come from look3d.js.
   const quality = pickQuality();
+  setAssetDetail(quality);
   // Low draws fewer pixels on sharp screens; medium a little fewer.
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.5 : touch ? 1.5 : 2));
   const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight(), scene: opts.scene });

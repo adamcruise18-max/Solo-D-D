@@ -2,9 +2,10 @@
 // Build: npx esbuild tools/asset-gallery/gallery.js --bundle --format=iife --outfile=<dir>/gallery.js
 // Open gallery.html?group=item|prop|fixture&from=0&n=24&yaw=0.6
 import * as THREE from 'three';
-import { makeItemModel, makeProp, makeFixture, ITEM_MODEL_IDS, PROP_KINDS, FIXTURE_TYPES } from '../../src/ui/props3d.js';
+import { makeItemModel, makeProp, makeFixture, ITEM_MODEL_IDS, PROP_KINDS, FIXTURE_TYPES, setAssetDetail } from '../../src/ui/props3d.js';
 
 const q = new URLSearchParams(location.search);
+if (q.get('detail') === 'low') setAssetDetail('low');
 const group = q.get('group') || 'item';
 const only = q.get('ids') ? q.get('ids').split(',') : null;
 const ids = only || (group === 'item' ? ITEM_MODEL_IDS : group === 'prop' ? PROP_KINDS : FIXTURE_TYPES);

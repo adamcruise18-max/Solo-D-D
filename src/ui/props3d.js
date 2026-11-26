@@ -36,6 +36,12 @@ function hashStr(s) {
 let ROUND = true;
 function squareOnly(fn) { const was = ROUND; ROUND = false; try { return fn(); } finally { ROUND = was; } }
 export { TOON };
+// Fine detail (bevels, screws, seams, small sub-parts): on for Medium and High 3D quality, off for Low,
+// so weak devices keep the older, lighter shapes. Builders wrap small extra parts in `if (FINE)`.
+// Bake merges parts per material, so fine parts add triangles but no draw calls.
+let FINE = true;
+export function setAssetDetail(quality) { FINE = quality !== 'low'; }
+export function assetDetail() { return FINE; }
 const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const TAU = Math.PI * 2;
 
