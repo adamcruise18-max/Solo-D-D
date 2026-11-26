@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, carryLimit } from '../src/engine/state.js';
+import { newGame } from '../src/engine/state.js';
 import { skillLevel, practice } from '../src/engine/skills.js';
 import { walkSpeed, estimateTrip } from '../src/engine/travel.js';
 import { advanceTime } from '../src/engine/tick.js';
-import { JOBS, TRAITS, validTraits, pointsLeft, searchJobFactor } from '../src/engine/background.js';
+import { JOBS, TRAITS, validTraits, pointsLeft, searchJobFactor, energyUseFactor } from '../src/engine/background.js';
 
 test('no job and no traits: old behavior', () => {
   const s = newGame(5);
@@ -26,7 +26,7 @@ test('each job has a real weakness', () => {
   const base = newGame(5);
   base.player.weak = false;
   const nurse = newGame(5, { job: 'nurse' }); nurse.player.weak = false;
-  assert.equal(carryLimit(base) - carryLimit(nurse), 4);
+  assert.ok(energyUseFactor(nurse, 'heavy') > energyUseFactor(base, 'heavy'));
   const roofer = newGame(5, { job: 'roofer' }); roofer.player.weak = false;
   assert.ok(walkSpeed(roofer).mph < walkSpeed(base).mph);
   const tow = newGame(5, { job: 'tow_driver' });
