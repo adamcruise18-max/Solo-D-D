@@ -3,7 +3,7 @@ import { hashString, mulberry32 } from '../rng.js';
 import { ITEMS } from '../data/items.js';
 import { HOME_LAT, HOME_LON } from '../sun.js';
 import { initWeather } from './world.js';
-import { applyBackground, carryMinus } from './background.js';
+import { applyBackground } from './background.js';
 import { applyLegacy } from './legacy.js';
 import { systemVersions, initNewSystems } from './systems.js';
 import { activity } from './activity.js';
@@ -167,16 +167,8 @@ export function bagWeight(bag) {
   return Math.round(w * 10) / 10;
 }
 
-export const BASE_CARRY = 15;
-export const BACKPACK_CARRY = 15;
-export function carryLimit(state) {
-  // Adam (playtest): 15 lb without a pack; a backpack found in the world adds 15 lb.
-  let lim = BASE_CARRY + (state.carried.backpack ? BACKPACK_CARRY : 0);
-  if (state.player.weak) lim *= 0.5;
-  if (state.player.food < 25) lim *= 0.9;
-  lim -= carryMinus(state) * (state.player.weak ? 0.5 : 1);
-  return Math.round(lim);
-}
+// No weight limit: only pack grid space limits what you carry (Adam, 2026-11-26).
+// See src/engine/packgrid.js.
 
 export function has(state, id) {
   return (state.carried[id] || 0) > 0 || (state.location.kind === 'home' && (state.home.storage[id] || 0) > 0);
