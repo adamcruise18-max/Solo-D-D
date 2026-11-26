@@ -317,7 +317,7 @@ export function buildCell(data, opts = {}) {
   // buildings
   const carRoads = roads.filter((r) => isCarRoad(r.cls));
   (data.b || []).forEach((rec, bi) => {
-    const [kind, roofType, hdm, risedm, wc, rc, flat, box, placeId, ni] = rec;
+    const [kind, roofType, hdm, risedm, wc, rc, flat, box, placeId, ni, sid] = rec;
     const ring = pts(flat);
     if (ring.length < 3) return;
     const bld = { h: hdm * D, rise: risedm * D, roof: roofType, box: { cx: box[0] * D, cz: box[1] * D, hu: box[2] * D, hv: box[3] * D, ang: box[4] / 1000 } };
@@ -353,7 +353,7 @@ export function buildCell(data, opts = {}) {
           const dx = near[0] - mx, dz = near[1] - mz, dl = Math.hypot(dx, dz) || 1;
           score += ((dx * nx + dz * nz) / dl) * 3 - Math.min(dl, 80) * 0.01;
         }
-        if (!best || score > best.score) best = { score, mx, mz, nx, nz, len, a, c };
+        if (!best || score > best.score) best = { score, mx, mz, nx, nz, len, a, c, street: near?.[2] || null };
       }
     }
     // roof
@@ -378,7 +378,7 @@ export function buildCell(data, opts = {}) {
       const L = [cx - tx * dw / 2, cz - tz * dw / 2], R = [cx + tx * dw / 2, cz + tz * dw / 2];
       wallsPlain.quad([L[0], 0.02, L[1]], [R[0], 0.02, R[1]], [R[0], dh, R[1]], [L[0], dh, L[1]], shop ? C.shopDoor : C.door, [[0, 0], [0, 0], [0, 0], [0, 0]]);
       wallsPlain.quad([R[0], 0.02, R[1]], [L[0], 0.02, L[1]], [L[0], dh, L[1]], [R[0], dh, R[1]], shop ? C.shopDoor : C.door, [[0, 0], [0, 0], [0, 0], [0, 0]]);
-      doors.push({ x: best.mx + best.nx * 0.9, z: best.mz + best.nz * 0.9, nx: best.nx, nz: best.nz, kind, placeId: placeId || null, name: ni >= 0 ? data.n[ni] : null, bi });
+      doors.push({ x: best.mx + best.nx * 0.9, z: best.mz + best.nz * 0.9, nx: best.nx, nz: best.nz, kind, placeId: placeId || null, name: ni >= 0 ? data.n[ni] : null, bi, id: sid || `${data.k}#${bi}`, street: best.street });
     }
   });
 
@@ -431,7 +431,7 @@ function nearestOn(roads, x, z) {
       const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L));
       const px = a[0] + t * dx, pz = a[1] + t * dz;
       const d = Math.hypot(x - px, z - pz);
-      if (d < bd) { bd = d; best = [px, pz]; }
+      if (d < bd) { bd = d; best = [px, pz, r.name]; }
     }
   }
   return best;
