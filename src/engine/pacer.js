@@ -39,7 +39,7 @@ export function initPacer(state) {
 export function whereNow(state, mode) {
   if (mode === 'sleep') return 'asleep';
   const k = state.location?.kind;
-  if (mode === 'walk' || k === 'wild') return 'outside';
+  if (mode === 'walk' || k === 'wild' || k === 'street') return 'outside';
   if (k === 'home') return 'home';
   return 'inside';
 }

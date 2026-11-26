@@ -62,6 +62,7 @@ export function parseSave(raw) {
   // systemVersions: its weather and legacy fields are version 1 already.
   // Fields added after the first saves (same version; empty means "nothing yet").
   for (const k of ['wild', 'cars']) if (!st[k] || typeof st[k] !== 'object') st[k] = {};
+  if (!st.streetWalk || typeof st.streetWalk !== 'object') st.streetWalk = { m: 0, eventMiles: 0 };
   return migrate(st, { systems: gameSystems() });
 }
 

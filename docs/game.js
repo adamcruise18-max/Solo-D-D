@@ -1794,7 +1794,7 @@
   function whereNow(state2, mode) {
     if (mode === "sleep") return "asleep";
     const k = state2.location?.kind;
-    if (mode === "walk" || k === "wild") return "outside";
+    if (mode === "walk" || k === "wild" || k === "street") return "outside";
     if (k === "home") return "home";
     return "inside";
   }
@@ -2481,7 +2481,7 @@
   function environment(state2, mode, t = state2.time) {
     const air = airTemp(state2, t);
     const night = isNight(t);
-    if (mode === "walk" || state2.location.kind === "wild") {
+    if (mode === "walk" || state2.location.kind === "wild" || state2.location.kind === "street") {
       return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
     }
     if (state2.location.kind === "home") {
@@ -3228,7 +3228,8 @@
       wild: {},
       // hunting and fishing: scared spots, snares, spot pressure (engine/wild.js)
       cars: {},
-      // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
+      streetWalk: { m: 0, eventMiles: 0 },
+      // 3D street walking: distance not yet turned into minutes (engine/streetwalk.js) // abandoned cars: { [id]: { lat, lon, searched, siphoned, battery, wire } } (engine/cars.js)
       dog: {
         stage: "none",
         arriveDay: 1 + Math.floor(r() * 4),
@@ -5895,6 +5896,7 @@
     const st = JSON.parse(raw);
     if (!st || st.version !== SAVE_VERSION || !st.player || !st.home) throw new Error("Not a Last Light save file");
     for (const k of ["wild", "cars"]) if (!st[k] || typeof st[k] !== "object") st[k] = {};
+    if (!st.streetWalk || typeof st.streetWalk !== "object") st.streetWalk = { m: 0, eventMiles: 0 };
     return migrate(st, { systems: gameSystems() });
   }
   function clearGame() {
