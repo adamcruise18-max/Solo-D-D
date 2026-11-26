@@ -33,6 +33,8 @@ import { ensureGoals, boardOpen, canChange, pickGoal, dropGoal, checkGoals, goal
 import { PROJECTS } from '../data/projects.js';
 import { diagnostics, setDeepActivity, activityText } from '../engine/diagnostics.js';
 import { homeHeat } from '../engine/home.js';
+import { enterStreet, streetMove, enterPlaceFromStreet, metersBetween } from '../engine/streetwalk.js';
+import { cellKeyAt, WORLD_GRID } from '../engine/worldgrid.js';
 import { gardenInfo, canPlant } from '../engine/garden.js';
 import { CROPS } from '../data/crops.js';
 import { SALVAGE } from '../data/salvage.js';
@@ -325,8 +327,11 @@ function renderLocation() {
   } else if (loc.kind === 'home') sub = 'Your house. One story, a fireplace, solar panels and a home battery.';
   else if (loc.kind === 'wild') sub = wildSub(SPOTS[loc.id]);
   else if (loc.kind === 'car') sub = 'An abandoned car at the curb. Zoom in on the map to find more.';
+  else if (loc.kind === 'street') sub = 'Out on the street. Walk on in 3D, or tap a place on the map.';
   else sub = 'A house. Search it room by room.';
+  if (!streetCells) loadStreetIndex().then(() => { if (state) renderLocation(); });
   const acts = listActions(state).map((a) => {
+    if (a.id === 'walk_out' && !a.disabled && !streetsHere()) a = { ...a, disabled: 'No 3D streets here yet (pilot: about 2 km around your home)' };
     const dis = a.disabled ? 'disabled' : '';
     const note = a.disabled ? a.disabled : a.note || '';
     return `<button class="act${a.risk && !a.disabled ? ' risky' : ''}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
@@ -1203,6 +1208,97 @@ async function walkInside() {
 let insideRefresh = null;
 let insideToast = null;
 
+// ---------- first-person view of the real streets (3D pilot area) ----------
+// Cells with 3D street data: docs/data/streets/index.json (built by tools/streets/).
+let streetIndex = null;
+function loadStreetIndex() {
+  if (!streetIndex) {
+    streetIndex = fetch('data/streets/index.json').then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      .then((ix) => { streetCells = new Set(ix?.cells || []); streetCredit = ix?.credit || ''; return ix; });
+  }
+  return streetIndex;
+}
+let streetCells = null;
+let streetCredit = '';
+export function streetsHere(st = state) {
+  return !!(streetCells && st && streetCells.has(cellKeyAt(st.pos)));
+}
+
+async function walkOutside() {
+  if (!state || state.dead || document.getElementById('inside')) return;
+  if (!webglOk()) { alert('This browser cannot show 3D.'); return; }
+  const ix = await loadStreetIndex();
+  if (!ix || !streetsHere()) { alert('There are no 3D streets here yet. The pilot area is about 2 km around your home.'); return; }
+  let api;
+  try { api = await loadInside3d(); } catch (e) { alert('The 3D view did not load. Check the connection and try again.'); return; }
+  const fromBuilding = state.location.kind !== 'street';
+  enterStreet(state);
+  saveGame(state);
+  const start = WORLD_GRID.toMeters(state.pos);
+  const sc = sceneEnv(state);
+  const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === 'warn' || e.kind === 'bad' || e.kind === 'story' || e.kind === 'event').map((e) => e.text);
+  const atHomeDoor = (ll) => metersBetween(ll, homeOf(state)) < 30;
+  document.body.classList.add('inside-open');
+  api.openStreets({
+    title: 'Outside',
+    start: { x: start.x, z: start.z },
+    snapToDoor: fromBuilding,
+    cells: ix.cells,
+    credit: `Map data ${streetCredit}`,
+    scene: sc,
+    getScene: () => sceneEnv(state),
+    bare: sc.season === 'winter' || (sc.season === 'autumn' && dayIndex(state.time) % 365 > 60),
+    isLightOn: () => hasLight(state) && isNight(state.time),
+    toggleLight: () => {
+      const n0 = state.log.length;
+      act('action', 'flashlight');
+      return state.log.slice(n0).map((e) => e.text).join(' ');
+    },
+    getStatus: () => {
+      const low = needWarnings(state).map((n) => n.word);
+      return `<b>Day ${dayIndex(state.time) + 1} · ${formatClock(state.time)}</b> · ${esc(weatherInfo(state).label || '')} · Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb`
+        + (low.length ? ` · <span class="bad">⚠ ${esc(low.join(', '))}</span>` : '');
+    },
+    isDead: () => !!state.dead,
+    onMove: (ll) => {
+      const n0 = state.log.length;
+      const wasDead = !!state.dead;
+      const r = streetMove(state, ll);
+      afterAction();
+      if (!wasDead && state.dead) recordRun(state);
+      if (r.minutes > 0 || state.log.length > n0) saveGame(state);
+      return lastLines(n0).map(esc).join(' ');
+    },
+    describeDoor: (door, ll) => {
+      if (door.placeId && getPlace(door.placeId)) return `<kbd>E</kbd> Go in: ${esc(getPlace(door.placeId).name)}`;
+      if (door.kind === 0 && atHomeDoor(ll)) return '<kbd>E</kbd> Go inside your home';
+      if (door.name) return `${esc(door.name)} <small>closed. Nothing to find here</small>`;
+      if (door.kind === 0) return 'A house <small>Going into real houses from the street comes next. Use "Search a house" on the map for now.</small>';
+      return 'The door is locked <small>nothing to find here</small>';
+    },
+    onDoor: (door, ll) => {
+      if (door.placeId && getPlace(door.placeId)) {
+        state.pos = { lat: ll.lat, lon: ll.lon };
+        const r = enterPlaceFromStreet(state, door.placeId);
+        if (!r.ok) return { text: 'You cannot go in here.' };
+        afterAction();
+        return { close: true };
+      }
+      if (door.kind === 0 && atHomeDoor(ll)) {
+        perform(state, 'action', 'go_home');
+        afterAction();
+        return { close: true };
+      }
+      return null;
+    },
+    onClose: () => {
+      document.body.classList.remove('inside-open');
+      if (state.player.lightOff) state.player.lightOff = false;
+      commit(true);
+    },
+  });
+}
+
 // Parts that unbuilt home projects still need: item id -> "Rain barrels 1/2".
 function projectNeeds() {
   const out = {};
@@ -1289,6 +1385,7 @@ function bindEvents() {
     if (b.dataset.act) {
       if (b.dataset.act === 'sleep') return showSleep();
       if (b.dataset.act === 'walk_in') return walkInside();
+      if (b.dataset.act === 'walk_out') return walkOutside();
       act('action', b.dataset.act);
     } else if (b.dataset.use && b.dataset.verb === 'take_off') act('action', 'take_off', b.dataset.use);
     else if (b.dataset.use) act('use', b.dataset.use, b.dataset.verb, b.dataset.from);

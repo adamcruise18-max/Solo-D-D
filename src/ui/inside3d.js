@@ -8,6 +8,7 @@ import {
   Vector3, Matrix4, BufferGeometry, Float32BufferAttribute, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
 import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { openStreets } from '../render/streets/view.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
 import { itemIcon, itemIcons, iconCache } from './icons3d.js';
