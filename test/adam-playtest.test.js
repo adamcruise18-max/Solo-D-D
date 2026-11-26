@@ -13,6 +13,7 @@ const strong = (s) => { s.player.weak = false; s.player.energyMax = 100; s.playe
 test('carry: no weight limit, only grid space; the game starts with no pack', () => {
   const s = newGame(1); strong(s);
   assert.equal(s.carried.backpack, undefined);
+  assert.equal(s.player.worn.back, false, 'new game: back slot empty');
   s.carried = { canned_food: 200 }; // far over the old 15 lb limit
   assert.equal(packFull(s), true);
   s.carried = { canned_food: 1 };
