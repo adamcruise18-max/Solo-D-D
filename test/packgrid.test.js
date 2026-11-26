@@ -44,3 +44,28 @@ test('packgrid: an over full pack (things added by other actions) slows walking'
   assert.ok(packUse(s).over);
   assert.ok(walkSpeed(s).mph < base);
 });
+
+test('packgrid: the backpack is worn gear (back slot), never a tile, and makes the grid bigger', async () => {
+  const { takeOffSlot } = await import('../src/engine/actions.js');
+  const { ITEMS } = await import('../src/data/items.js');
+  assert.equal(ITEMS.backpack.kind, 'wear');
+  assert.equal(ITEMS.backpack.slot, 'back');
+  const s = newGame(5);
+  s.location = { kind: 'home' };
+  s.carried = { canned_food: 2 };
+  const here = hereBag(s);
+  here.backpack = 1;
+  takeItem(s, 'backpack');
+  assert.equal(s.player.worn.back, 'backpack');
+  assert.ok(!s.carried.backpack, 'not in the bag');
+  assert.equal(packUse(s).total, 60);
+  // too much for the pockets: it stays on
+  s.carried = { broken_bike: 1, generator: 1 };
+  assert.equal(takeOffSlot(s, 'back'), false);
+  assert.equal(s.player.worn.back, 'backpack');
+  // little in the pack: it comes off and goes in the bag (a 3 x 3 tile)
+  s.carried = { canned_food: 2 };
+  assert.equal(takeOffSlot(s, 'back'), true);
+  assert.equal(s.carried.backpack, 1);
+  assert.equal(packUse(s).total, 24);
+});

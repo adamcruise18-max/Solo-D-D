@@ -46,7 +46,7 @@ export const ITEMS = {
   flashlight: { name: 'Flashlight', unit: 'pc', weight: 0.5, kind: 'tool' },
   batteries: { name: 'Batteries (1 set)', unit: 'set', weight: 0.2, kind: 'batteries', portion: 1 },
   pry_bar: { name: 'Pry bar', unit: 'pc', weight: 3, kind: 'tool' },
-  backpack: { name: 'Backpack', unit: 'pc', weight: 1, kind: 'tool' },
+  backpack: { name: 'Backpack', unit: 'pc', weight: 1, kind: 'wear', slot: 'back', warmth: 0, short: 'backpack' },
 
   winter_coat: { name: 'Winter coat (down)', unit: 'pc', weight: 3, kind: 'wear', slot: 'mid', warmth: 18, wind: 0.5, wetWarm: false, short: 'winter coat' },
   winter_hat: { name: 'Winter hat (wool)', unit: 'pc', weight: 0.3, kind: 'wear', slot: 'hat', warmth: 4, wetWarm: true, short: 'hat' },
