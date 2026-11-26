@@ -3394,6 +3394,249 @@
     if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
   }
 
+  // src/data/gridsize.js
+  var SIZE = {
+    // small, stack many
+    energy_bar: [1, 1, 6],
+    jerky: [1, 1, 5],
+    instant_noodles: [1, 1, 4],
+    garlic: [1, 1, 6],
+    ors: [1, 1, 6],
+    antibiotics: [1, 1, 3],
+    pain_pills: [1, 1, 2],
+    ibuprofen: [1, 1, 2],
+    batteries: [1, 1, 4],
+    n95: [1, 1, 10],
+    seeds: [1, 1, 10],
+    lighter: [1, 1, 4],
+    matches: [1, 1, 4],
+    water_tablets: [1, 1, 10],
+    hand_warmers: [1, 1, 6],
+    wool_socks: [1, 1, 3],
+    soap: [1, 1, 3],
+    toothpaste: [1, 1, 2],
+    vitamins: [1, 1, 2],
+    rifle_rounds: [1, 1, 3],
+    snare_wire: [1, 1, 3],
+    fishing_line: [1, 1, 3],
+    salad_greens: [1, 1, 2],
+    // small, one or two per tile
+    canned_food: [1, 1, 2],
+    canned_fruit: [1, 1, 2],
+    peanut_butter: [1, 1, 1],
+    snacks: [1, 1, 3],
+    toilet_paper: [1, 1, 1],
+    bandages: [1, 1, 2],
+    flashlight: [1, 1, 1],
+    knife: [1, 1, 1],
+    multitool: [1, 1, 1],
+    can_opener: [1, 1, 1],
+    phone: [1, 1, 1],
+    water_filter: [1, 1, 1],
+    gloves: [1, 1, 1],
+    winter_hat: [1, 1, 1],
+    paper_map: [1, 1, 2],
+    duct_tape: [1, 1, 1],
+    hardware_parts: [1, 1, 1],
+    kale: [1, 1, 2],
+    // tall or long
+    soda: [1, 2, 1],
+    sports_drink: [1, 2, 1],
+    propane_1lb: [1, 2, 1],
+    flea_spray: [1, 2, 1],
+    chips: [1, 2, 1],
+    candles: [1, 2, 1],
+    trash_bags: [1, 2, 1],
+    toothbrush: [1, 2, 1],
+    book_first_aid: [1, 2, 1],
+    book_repair: [1, 2, 1],
+    book_cooking: [1, 2, 1],
+    book_survival: [1, 2, 1],
+    pry_bar: [1, 4, 1],
+    fishing_rod: [1, 5, 1],
+    bow: [1, 5, 1],
+    arrows: [1, 4, 1],
+    rifle: [1, 5, 1],
+    radio: [2, 1, 1],
+    thermal_underwear: [2, 1, 1],
+    windbreaker: [2, 1, 1],
+    fresh_fish: [2, 1, 1],
+    raw_meat: [2, 1, 1],
+    potatoes: [2, 1, 2],
+    green_beans: [2, 1, 2],
+    fava_beans: [2, 1, 2],
+    saline: [2, 1, 1],
+    extension_cord: [2, 1, 1],
+    wiring: [2, 1, 1],
+    pipe_fittings: [2, 1, 1],
+    // medium
+    water_bottle: [2, 2, 1],
+    first_aid: [2, 2, 1],
+    dry_food: [2, 2, 1],
+    oatmeal: [1, 2, 1],
+    cooking_pot: [2, 2, 1],
+    rope: [2, 2, 1],
+    boots: [2, 2, 1],
+    rain_jacket: [2, 2, 1],
+    fleece_jacket: [2, 2, 1],
+    wool_sweater: [2, 2, 1],
+    cotton_hoodie: [2, 2, 1],
+    blanket: [2, 2, 1],
+    tarp: [2, 2, 1],
+    bleach: [2, 2, 1],
+    formula: [2, 2, 1],
+    waxed_cheese: [1, 1, 1],
+    squash: [2, 2, 1],
+    comfort: [2, 2, 1],
+    broken_radio: [2, 1, 1],
+    desk_lamp: [2, 2, 1],
+    plastic_sheet: [2, 2, 1],
+    insulation: [2, 2, 1],
+    // big
+    winter_coat: [2, 3, 1],
+    sleeping_bag: [2, 3, 1],
+    toolkit: [3, 2, 1],
+    backpack: [3, 3, 1],
+    gas_can: [3, 3, 1],
+    firewood: [3, 2, 1],
+    dog_food: [3, 3, 1],
+    old_toaster: [2, 2, 1],
+    scrap_wood: [1, 4, 1],
+    garden_hose: [3, 3, 1],
+    metal_bin: [3, 3, 1],
+    car_battery: [3, 2, 1],
+    wooden_chair: [3, 4, 1],
+    rain_barrel: [4, 4, 1],
+    generator: [4, 4, 1],
+    broken_bike: [5, 4, 1],
+    stove_kit: [4, 4, 1],
+    battery_module: [4, 3, 1]
+  };
+  function sizeOf(id) {
+    const s = SIZE[id];
+    if (s) return { w: s[0], h: s[1], stack: s[2] || 1 };
+    const wt = ITEMS[id]?.weight ?? 1;
+    if (wt <= 0.35) return { w: 1, h: 1, stack: 3 };
+    if (wt <= 1.2) return { w: 1, h: 2, stack: 1 };
+    if (wt <= 4) return { w: 2, h: 2, stack: 1 };
+    if (wt <= 10) return { w: 2, h: 3, stack: 1 };
+    return { w: 3, h: 4, stack: 1 };
+  }
+  var GRID_COLS = 6;
+  function packRows(hasBackpack) {
+    return hasBackpack ? 10 : 4;
+  }
+
+  // src/engine/packgrid.js
+  function tilesFor(bag, order = Object.keys(bag)) {
+    const out = [];
+    for (const id of order) {
+      let q = bag[id] || 0;
+      if (q <= 1e-9) continue;
+      const s = sizeOf(id);
+      let n = 0;
+      while (q > 1e-9) {
+        const take = Math.min(s.stack, q);
+        out.push({ key: `${id}#${n}`, id, q: Math.round(take * 1e3) / 1e3, w: s.w, h: s.h });
+        q -= take;
+        n++;
+        if (n > 60) break;
+      }
+    }
+    return out;
+  }
+  function layoutGrid(tiles, cols, rows, saved = {}) {
+    const occ = [];
+    const free = (x, y, w, h2) => {
+      if (x < 0 || y < 0 || x + w > cols) return false;
+      for (let j = y; j < y + h2; j++) for (let i = x; i < x + w; i++) if (occ[j]?.[i]) return false;
+      return true;
+    };
+    const mark = (x, y, w, h2, key) => {
+      for (let j = y; j < y + h2; j++) {
+        occ[j] || (occ[j] = []);
+        for (let i = x; i < x + w; i++) occ[j][i] = key;
+      }
+    };
+    const placed = [];
+    const rest2 = [];
+    for (const t of tiles) {
+      const s = saved[t.key];
+      if (s) {
+        const rot = !!s[2];
+        const w = rot ? t.h : t.w;
+        const h2 = rot ? t.w : t.h;
+        if (w <= cols && s[1] + h2 <= rows && free(s[0], s[1], w, h2)) {
+          mark(s[0], s[1], w, h2, t.key);
+          placed.push({ ...t, x: s[0], y: s[1], w, h: h2, rot });
+          continue;
+        }
+      }
+      rest2.push(t);
+    }
+    const order = rest2.map((t, i) => [t, i]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h || a[1] - b[1]).map((e) => e[0]);
+    for (const t of order) {
+      let spot = null;
+      for (let y = 0; !spot && y < rows + 400; y++) {
+        for (let x = 0; x < cols && !spot; x++) {
+          if (t.w <= cols && free(x, y, t.w, t.h) && (y + t.h <= rows || y >= rows)) spot = { x, y, w: t.w, h: t.h, rot: false };
+          else if (t.h <= cols && t.w !== t.h && free(x, y, t.h, t.w) && (y + t.w <= rows || y >= rows)) spot = { x, y, w: t.h, h: t.w, rot: true };
+        }
+        if (!spot && t.w > cols && t.h > cols && y >= rows) spot = { x: 0, y, w: Math.min(cols, t.w), h: t.h, rot: false };
+      }
+      if (!spot) continue;
+      mark(spot.x, spot.y, spot.w, spot.h, t.key);
+      placed.push({ ...t, ...spot });
+    }
+    const used = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
+    const overflow = placed.filter((p) => p.y + p.h > rows).length;
+    return { tiles: placed, cols, rows, height: Math.max(rows, used), overflow };
+  }
+  function fitsAt(layout, key, x, y, w, h2) {
+    if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
+    return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
+  }
+  var WORN = ["backpack"];
+  function packTiles(bag, order = Object.keys(bag)) {
+    return tilesFor(bag, order.filter((id) => !WORN.includes(id)));
+  }
+  function packSize(state2) {
+    return { cols: GRID_COLS, rows: packRows(!!state2.carried.backpack) };
+  }
+  function bagFits(state2, bag) {
+    const { cols, rows } = packSize(state2);
+    return layoutGrid(packTiles(bag), cols, rows).overflow === 0;
+  }
+  function roomFor(state2, id, want) {
+    if (!(want > 0)) return 0;
+    const bag = { ...state2.carried };
+    const test = (n) => {
+      bag[id] = (state2.carried[id] || 0) + n;
+      return bagFits(state2, bag);
+    };
+    if (test(want)) return want;
+    let lo = 0;
+    let hi = Math.floor(want);
+    if (hi >= 1 && !test(1)) return 0;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (test(mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+  function packUse(state2) {
+    const { cols, rows } = packSize(state2);
+    const L = layoutGrid(packTiles(state2.carried), cols, rows);
+    const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
+    return { used, total: cols * rows, over: L.overflow > 0 };
+  }
+  function packFitsWithout(state2, id) {
+    const bag = { ...state2.carried };
+    delete bag[id];
+    return bagFits({ ...state2, carried: bag }, bag);
+  }
+
   // src/engine/checks.js
   function standardMods(state2, { outside = false } = {}) {
     const p = state2.player;
@@ -3515,7 +3758,7 @@
     if (isNight(t) && !hasLight(state2)) apply(0.6, "dark, no light");
     const wx = WEATHER_TYPES[state2.weather.type];
     if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
-    if (bagWeight(state2.carried) > carryLimit(state2)) apply(0.7, "heavy pack");
+    if (packUse(state2).over) apply(0.7, "pack over full");
     const legF = injuryFactor(state2, "leg");
     if (legF < 1) apply(legF, "sprained ankle");
     if (p.warmth < 25) apply(0.8, "hypothermia");
@@ -3549,8 +3792,7 @@
     const miles = tripMiles(state2, dest);
     const { mph, why } = walkSpeed(state2);
     const minutes = miles / mph * 60;
-    const overload = bagWeight(state2.carried) > carryLimit(state2);
-    const energy = minutes / 60 * 8 * (overload ? 1.5 : 1) * (state2.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state2, "walk");
+    const energy = minutes / 60 * 8 * (state2.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state2, "walk");
     return { miles, minutes, energy, mph, why };
   }
   function lerp(a, b, f) {
@@ -3652,7 +3894,7 @@
       log(state2, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
       if (!state2.carried.backpack) {
         addItem(state2.carried, "backpack", 1);
-        log(state2, "You put the backpack on. You can carry 15 lb more.", "good");
+        log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
       }
     }
   }
@@ -4213,9 +4455,6 @@
   function addWater(state2, points) {
     state2.player.water = clamp3(state2.player.water + points, 0, 100);
   }
-  function freeWeight(state2) {
-    return carryLimit(state2) * 1.5 - bagWeight(state2.carried);
-  }
   function itemUses(state2, id) {
     const it = ITEMS[id];
     if (!it) return [];
@@ -4460,12 +4699,11 @@
     const bag = hereBag(state2);
     const have = bag[id] || 0;
     if (!have) return;
-    const w = ITEMS[id].weight;
-    const maxByWeight = w > 0 ? Math.floor(freeWeight(state2) / w * 1e3) / 1e3 : have;
-    let n = Math.min(qty ?? have, have, maxByWeight);
-    if (["part", "tool", "wear"].includes(ITEMS[id].kind)) n = Math.floor(n + 1e-9);
+    let want = Math.min(qty ?? have, have);
+    if (["part", "tool", "wear"].includes(ITEMS[id].kind)) want = Math.floor(want + 1e-9);
+    const n = roomFor(state2, id, want);
     if (n <= 0) {
-      log(state2, `Your pack is too full to take the ${itemName(id).toLowerCase()}.`, "warn");
+      log(state2, `No room in your pack for the ${itemName(id).toLowerCase()}.`, "warn");
       return;
     }
     addItem(bag, id, -n);
@@ -4474,14 +4712,16 @@
   }
   function takeAll(state2) {
     const bag = hereBag(state2);
-    const ids = Object.keys(bag).sort((a, b) => ITEMS[a].weight - ITEMS[b].weight);
+    const cells = (id) => {
+      const z = sizeOf(id);
+      return z.w * z.h / z.stack;
+    };
+    const ids = Object.keys(bag).sort((a, b) => cells(a) - cells(b) || (a < b ? -1 : 1));
     const took = [];
     let left = false;
     for (const id of ids) {
       const before = bag[id];
-      const w = ITEMS[id].weight;
-      const room = freeWeight(state2) / w;
-      const n = before < 1 ? room >= before ? before : 0 : Math.min(Math.floor(before), Math.floor(room));
+      const n = roomFor(state2, id, before < 1 ? before : Math.floor(before));
       if (n > 0) {
         addItem(bag, id, -n);
         addItem(state2.carried, id, n);
@@ -4496,6 +4736,10 @@
   function dropItem(state2, id, qty) {
     const have = state2.carried[id] || 0;
     if (!have) return;
+    if (id === "backpack" && !packFitsWithout(state2, "backpack")) {
+      log(state2, "Your things do not fit in your pockets. Take some out of the backpack first.", "warn");
+      return;
+    }
     const n = Math.min(qty ?? have, have);
     addItem(state2.carried, id, -n);
     addItem(hereBag(state2), id, n);
@@ -4813,8 +5057,6 @@
     if (dark && !hasLight(state2)) m *= 2;
     if (p.water < 25) m *= 1.25;
     m /= injuryFactor(state2, "hand");
-    const extra = Math.max(0, bagWeight(state2.carried) - 10);
-    m *= 1 + Math.floor(extra / 10) * 0.1;
     return m;
   }
   function dogExtra(state2) {
@@ -4921,9 +5163,8 @@
     }
     const it = zoneItemList(state2, ctx, zone).find((x) => x.pid === pid);
     if (!it || ctx.holder.taken.includes(pid)) return false;
-    const w = ITEMS[it.item].weight;
-    if (w > freeWeight(state2) + 1e-9) {
-      log(state2, `Your pack is too full to take the ${itemName(it.item).toLowerCase()} (${w} lb).`, "warn");
+    if (roomFor(state2, it.item, 1) < 1) {
+      log(state2, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, "warn");
       return false;
     }
     const env = environment(state2, "work");
@@ -6901,208 +7142,7 @@
     };
   }
 
-  // src/data/gridsize.js
-  var SIZE = {
-    // small, stack many
-    energy_bar: [1, 1, 6],
-    jerky: [1, 1, 5],
-    instant_noodles: [1, 1, 4],
-    garlic: [1, 1, 6],
-    ors: [1, 1, 6],
-    antibiotics: [1, 1, 3],
-    pain_pills: [1, 1, 2],
-    ibuprofen: [1, 1, 2],
-    batteries: [1, 1, 4],
-    n95: [1, 1, 10],
-    seeds: [1, 1, 10],
-    lighter: [1, 1, 4],
-    matches: [1, 1, 4],
-    water_tablets: [1, 1, 10],
-    hand_warmers: [1, 1, 6],
-    wool_socks: [1, 1, 3],
-    soap: [1, 1, 3],
-    toothpaste: [1, 1, 2],
-    vitamins: [1, 1, 2],
-    rifle_rounds: [1, 1, 3],
-    snare_wire: [1, 1, 3],
-    fishing_line: [1, 1, 3],
-    salad_greens: [1, 1, 2],
-    // small, one or two per tile
-    canned_food: [1, 1, 2],
-    canned_fruit: [1, 1, 2],
-    peanut_butter: [1, 1, 1],
-    snacks: [1, 1, 3],
-    toilet_paper: [1, 1, 1],
-    bandages: [1, 1, 2],
-    flashlight: [1, 1, 1],
-    knife: [1, 1, 1],
-    multitool: [1, 1, 1],
-    can_opener: [1, 1, 1],
-    phone: [1, 1, 1],
-    water_filter: [1, 1, 1],
-    gloves: [1, 1, 1],
-    winter_hat: [1, 1, 1],
-    paper_map: [1, 1, 2],
-    duct_tape: [1, 1, 1],
-    hardware_parts: [1, 1, 1],
-    kale: [1, 1, 2],
-    // tall or long
-    soda: [1, 2, 1],
-    sports_drink: [1, 2, 1],
-    propane_1lb: [1, 2, 1],
-    flea_spray: [1, 2, 1],
-    chips: [1, 2, 1],
-    candles: [1, 2, 1],
-    trash_bags: [1, 2, 1],
-    toothbrush: [1, 2, 1],
-    book_first_aid: [1, 2, 1],
-    book_repair: [1, 2, 1],
-    book_cooking: [1, 2, 1],
-    book_survival: [1, 2, 1],
-    pry_bar: [1, 4, 1],
-    fishing_rod: [1, 5, 1],
-    bow: [1, 5, 1],
-    arrows: [1, 4, 1],
-    rifle: [1, 5, 1],
-    radio: [2, 1, 1],
-    thermal_underwear: [2, 1, 1],
-    windbreaker: [2, 1, 1],
-    fresh_fish: [2, 1, 1],
-    raw_meat: [2, 1, 1],
-    potatoes: [2, 1, 2],
-    green_beans: [2, 1, 2],
-    fava_beans: [2, 1, 2],
-    saline: [2, 1, 1],
-    extension_cord: [2, 1, 1],
-    wiring: [2, 1, 1],
-    pipe_fittings: [2, 1, 1],
-    // medium
-    water_bottle: [2, 2, 1],
-    first_aid: [2, 2, 1],
-    dry_food: [2, 2, 1],
-    oatmeal: [1, 2, 1],
-    cooking_pot: [2, 2, 1],
-    rope: [2, 2, 1],
-    boots: [2, 2, 1],
-    rain_jacket: [2, 2, 1],
-    fleece_jacket: [2, 2, 1],
-    wool_sweater: [2, 2, 1],
-    cotton_hoodie: [2, 2, 1],
-    blanket: [2, 2, 1],
-    tarp: [2, 2, 1],
-    bleach: [2, 2, 1],
-    formula: [2, 2, 1],
-    waxed_cheese: [1, 1, 1],
-    squash: [2, 2, 1],
-    comfort: [2, 2, 1],
-    broken_radio: [2, 1, 1],
-    desk_lamp: [2, 2, 1],
-    plastic_sheet: [2, 2, 1],
-    insulation: [2, 2, 1],
-    // big
-    winter_coat: [2, 3, 1],
-    sleeping_bag: [2, 3, 1],
-    toolkit: [3, 2, 1],
-    backpack: [3, 3, 1],
-    gas_can: [3, 3, 1],
-    firewood: [3, 2, 1],
-    dog_food: [3, 3, 1],
-    old_toaster: [2, 2, 1],
-    scrap_wood: [1, 4, 1],
-    garden_hose: [3, 3, 1],
-    metal_bin: [3, 3, 1],
-    car_battery: [3, 2, 1],
-    wooden_chair: [3, 4, 1],
-    rain_barrel: [4, 4, 1],
-    generator: [4, 4, 1],
-    broken_bike: [5, 4, 1],
-    stove_kit: [4, 4, 1],
-    battery_module: [4, 3, 1]
-  };
-  function sizeOf(id) {
-    const s = SIZE[id];
-    if (s) return { w: s[0], h: s[1], stack: s[2] || 1 };
-    const wt = ITEMS[id]?.weight ?? 1;
-    if (wt <= 0.35) return { w: 1, h: 1, stack: 3 };
-    if (wt <= 1.2) return { w: 1, h: 2, stack: 1 };
-    if (wt <= 4) return { w: 2, h: 2, stack: 1 };
-    if (wt <= 10) return { w: 2, h: 3, stack: 1 };
-    return { w: 3, h: 4, stack: 1 };
-  }
-  var GRID_COLS = 6;
-  function packRows(hasBackpack) {
-    return hasBackpack ? 10 : 4;
-  }
-
   // src/ui/grid.js
-  function tilesFor(bag, order = Object.keys(bag)) {
-    const out = [];
-    for (const id of order) {
-      let q = bag[id] || 0;
-      if (q <= 1e-9) continue;
-      const s = sizeOf(id);
-      let n = 0;
-      while (q > 1e-9) {
-        const take = Math.min(s.stack, q);
-        out.push({ key: `${id}#${n}`, id, q: Math.round(take * 1e3) / 1e3, w: s.w, h: s.h });
-        q -= take;
-        n++;
-        if (n > 60) break;
-      }
-    }
-    return out;
-  }
-  function layoutGrid(tiles, cols, rows, saved = {}) {
-    const occ = [];
-    const free = (x, y, w, h2) => {
-      if (x < 0 || y < 0 || x + w > cols) return false;
-      for (let j = y; j < y + h2; j++) for (let i = x; i < x + w; i++) if (occ[j]?.[i]) return false;
-      return true;
-    };
-    const mark = (x, y, w, h2, key) => {
-      for (let j = y; j < y + h2; j++) {
-        occ[j] || (occ[j] = []);
-        for (let i = x; i < x + w; i++) occ[j][i] = key;
-      }
-    };
-    const placed = [];
-    const rest2 = [];
-    for (const t of tiles) {
-      const s = saved[t.key];
-      if (s) {
-        const rot = !!s[2];
-        const w = rot ? t.h : t.w;
-        const h2 = rot ? t.w : t.h;
-        if (w <= cols && s[1] + h2 <= rows && free(s[0], s[1], w, h2)) {
-          mark(s[0], s[1], w, h2, t.key);
-          placed.push({ ...t, x: s[0], y: s[1], w, h: h2, rot });
-          continue;
-        }
-      }
-      rest2.push(t);
-    }
-    const order = rest2.map((t, i) => [t, i]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h || a[1] - b[1]).map((e) => e[0]);
-    for (const t of order) {
-      let spot = null;
-      for (let y = 0; !spot && y < rows + 400; y++) {
-        for (let x = 0; x < cols && !spot; x++) {
-          if (t.w <= cols && free(x, y, t.w, t.h) && (y + t.h <= rows || y >= rows)) spot = { x, y, w: t.w, h: t.h, rot: false };
-          else if (t.h <= cols && t.w !== t.h && free(x, y, t.h, t.w) && (y + t.w <= rows || y >= rows)) spot = { x, y, w: t.h, h: t.w, rot: true };
-        }
-        if (!spot && t.w > cols && t.h > cols && y >= rows) spot = { x: 0, y, w: Math.min(cols, t.w), h: t.h, rot: false };
-      }
-      if (!spot) continue;
-      mark(spot.x, spot.y, spot.w, spot.h, t.key);
-      placed.push({ ...t, ...spot });
-    }
-    const used = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
-    const overflow = placed.filter((p) => p.y + p.h > rows).length;
-    return { tiles: placed, cols, rows, height: Math.max(rows, used), overflow };
-  }
-  function fitsAt(layout, key, x, y, w, h2) {
-    if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
-    return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
-  }
   var LS = "lastlight.grid.v1";
   var memo = null;
   function savedPos(which) {
@@ -7782,12 +7822,20 @@
   }
   function buildGrid(which) {
     const bag = which === "pack" ? state.carried : hereBag(state);
-    const tiles = tilesFor(bag, sortedIds(bag));
+    const tiles = which === "pack" ? packTiles(bag, sortedIds(bag)) : tilesFor(bag, sortedIds(bag));
     const cols = which === "pack" ? GRID_COLS : hereGridCols();
     const rows = which === "pack" ? packRows(!!state.carried.backpack) : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
-    const L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
+    let L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
+    if (L.overflow) {
+      const auto = layoutGrid(tiles, cols, rows);
+      if (auto.overflow < L.overflow) L = auto;
+    }
     gridLayouts[which] = L;
     return L;
+  }
+  function packText() {
+    const u = packUse(state);
+    return `Pack ${u.used} / ${u.total} cells${u.over ? " (over full)" : ""}`;
   }
   function iconUrl(id) {
     return window.LLInside3D?.iconCache?.get(id) || null;
@@ -7833,7 +7881,7 @@
     const move = which === "pack" ? `<button data-drop="${id}">${home ? "Store" : "Drop"}</button>` : `<button class="primary" data-take="${id}">Take</button>`;
     const w = Math.round(it.weight * bag[id] * 10) / 10;
     return `<div class="isel${compact ? " compact" : ""}"><img class="isel-img" src="${iconUrl(id) || ""}" alt=""${iconUrl(id) ? "" : " hidden"}>
-    <div><b>${esc2(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc2(it.unit)} \xB7 ${w} lb${which === "pack" ? "" : " \xB7 not yours yet"}</small></div>
+    <div><b>${esc2(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc2(it.unit)} \xB7 ${sizeOf(id).w}\xD7${sizeOf(id).h} cells${which === "pack" ? "" : " \xB7 not yours yet"}</small></div>
     <div class="isel-b">${uses}${move}</div></div>`;
   }
   function initGridHandlers() {
@@ -7878,10 +7926,9 @@
     const takeAll2 = Object.keys(here).length && !home ? '<button class="small" data-takeall="1">Take all that fits</button>' : "";
     const hereO = gridOpts("here");
     const packO = gridOpts("pack");
-    const weight = bagWeight(state.carried);
-    const limit = carryLimit(state);
-    const over = weight > limit;
-    const fill = Math.min(100, Math.round(weight / Math.max(1, limit) * 100));
+    const use = packUse(state);
+    const over = use.over;
+    const fill = Math.min(100, Math.round(use.used / Math.max(1, use.total) * 100));
     wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
     const hereBody = Object.keys(here).length ? gridHtml("here", hereO) : `<p class="empty">${home ? "Nothing stored." : "Nothing here yet. Search to find items."}</p>`;
     $("#items").innerHTML = `
@@ -7890,10 +7937,10 @@
     <div class="grids">
     <section class="bag bag-pack">
       <h3><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span>
-        <span class="${over ? "bad" : ""}">${weight} / ${limit} lb${over ? " (too heavy: slow)" : ""}</span></h3>
+        <span class="${over ? "bad" : ""}">${use.used} / ${use.total} cells${over ? " (over full: slow)" : ""}</span></h3>
       <div class="bag-load${over ? " over" : ""}"><i style="width:${fill}%"></i></div>
       ${gridHtml("pack", packO)}
-      <p class="hint">${state.carried.backpack ? "Backpack: big grid." : "No backpack: pockets and hands only. Find a backpack for more room (+15 lb)."} Drag to move \xB7 R turns a tile while you drag \xB7 tap for buttons.</p>
+      <p class="hint">${state.carried.backpack ? `Backpack on: big grid. <button class="small" data-drop="backpack">Take it off</button>` : "No backpack: pockets and hands only. Find a backpack for a bigger grid."} Drag to move \xB7 R turns a tile while you drag \xB7 tap for buttons.</p>
     </section>
     <section class="bag bag-here${home ? " bag-home" : ""}">
       <h3><span class="bag-ico" aria-hidden="true">${home ? "\u2302" : "\u2315"}</span>${hereTitle} <span class="bag-tag">${hereTag}</span> ${takeAll2}</h3>
@@ -8504,7 +8551,7 @@
         const p = state.player;
         const low = needWarnings(state).map((n) => n.word);
         const light = (state.carried.flashlight || 0) > 0 ? `Flashlight ${p.lightHours.toFixed(1)} h${p.lightOff ? " (off)" : ""}` : "No flashlight";
-        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 ${packText()} \xB7 ${light}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
       },
       projectInfo: (id) => homeProjectText(state, id, true),
       // Lamps at home: LED lights need the project built and charge in the battery.
@@ -8559,8 +8606,9 @@
       describeItem: (it, near, touch) => {
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
-        const bagFull = def.weight > carryLimit(state) * 1.5 - bagWeight(state.carried) + 1e-9;
-        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${def.weight} lb${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        const bagFull = roomFor(state, it.item, 1) < 1;
+        const z = sizeOf(it.item);
+        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${z.w}\xD7${z.h}${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -8585,7 +8633,7 @@
       onTakeAll: () => {
         const n0 = state.log.length;
         act("takeall");
-        return state.log.slice(n0).map((e) => e.text).join(" ") || `You put it in your pack. Bag: ${bagWeight(state.carried)} / ${carryLimit(state)} lb.`;
+        return state.log.slice(n0).map((e) => e.text).join(" ") || `You put it in your pack. ${packText()}.`;
       },
       onLeave: (died, why) => {
         document.body.classList.remove("inside-open");
@@ -8665,7 +8713,7 @@
       },
       getStatus: () => {
         const low = needWarnings(state).map((n) => n.word);
-        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 ${esc2(weatherInfo(state).label || "")} \xB7 Bag ${bagWeight(state.carried)} / ${carryLimit(state)} lb` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
+        return `<b>Day ${dayIndex(state.time) + 1} \xB7 ${formatClock(state.time)}</b> \xB7 ${esc2(weatherInfo(state).label || "")} \xB7 ${packText()}` + (low.length ? ` \xB7 <span class="bad">\u26A0 ${esc2(low.join(", "))}</span>` : "");
       },
       isDead: () => !!state.dead,
       onMove: (ll) => {
@@ -8758,14 +8806,13 @@
     if (name === "inventory") {
       const here = hereBag(state);
       wantIcons([...Object.keys(here), ...Object.keys(state.carried)]);
-      const w = bagWeight(state.carried);
-      const lim = carryLimit(state);
-      const fill = Math.min(100, Math.round(w / Math.max(1, lim) * 100));
+      const use = packUse(state);
+      const fill = Math.min(100, Math.round(use.used / Math.max(1, use.total) * 100));
       const hereList = Object.keys(here).length ? `<section class="bag bag-here"><h5><span class="bag-ico" aria-hidden="true">\u2315</span>Found here <span class="bag-tag">not yours yet</span>
       <button class="primary small" data-in="take">Take all that fits (F)</button></h5>${gridHtml("here", gridOpts("here"))}</section>` : "";
       return `<h4>Inventory</h4><p class="stock">${esc2(stockLine(state))}</p>${selectedHtml(true)}
-      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span> <span class="${w > lim ? "bad" : ""}">${w} / ${lim} lb</span></h5>
-      <div class="bag-load${w > lim ? " over" : ""}"><i style="width:${fill}%"></i></div>${gridHtml("pack", gridOpts("pack"))}</section>${hereList}</div>
+      <div class="grids"><section class="bag bag-pack"><h5><span class="bag-ico" aria-hidden="true">\u25A3</span>In your pack <span class="bag-tag">yours</span> <span class="${use.over ? "bad" : ""}">${use.used} / ${use.total} cells</span></h5>
+      <div class="bag-load${use.over ? " over" : ""}"><i style="width:${fill}%"></i></div>${gridHtml("pack", gridOpts("pack"))}</section>${hereList}</div>
       <p class="hint">Drag to move or to take \xB7 R turns a tile \xB7 tap a tile for its buttons.</p>`;
     }
     if (name === "character") {
