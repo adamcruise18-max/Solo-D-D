@@ -392,9 +392,9 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 
 ## Adam's playtest rules (2026-11-25)
 
-- **Needs 25% slower:** `NEED_PACE = 0.75` in vitals.js scales food, water and energy loss.
+- **Needs 15% slower:** `NEED_PACE = 0.85` in vitals.js scales food, water and energy loss (was 0.75 after the playtest; tuned 2026-11-26 to Adam's year target of 65-75% alive).
 - **Carry:** `BASE_CARRY = 15` lb, a backpack adds `BACKPACK_CARRY = 15`. A new game starts with no backpack. An abandoned backpack by the road is kept when you have none.
-- **Injuries 90% rarer:** `addInjury` rolls `INJURY_RATE = 0.1` on rng stream `injury`; a miss logs a close call and returns null. `{ always: true }` skips the roll (tests).
+- **Injuries 25% rarer:** `addInjury` rolls `INJURY_RATE = 0.75` on rng stream `injury` (was 0.1; year tuning 2026-11-26); a miss logs a close call and returns null. `{ always: true }` skips the roll (tests).
 - **Severity:** each injury is minor (60%), moderate (30%) or serious (10%): health lost ×0.5 / ×1 / ×1.8, heal time ×0.5 / ×1 / ×1.6. Base: small cut 2, sprain 4, deep cut 12, bite 10. A sprain has a part: ankle (walking ×0.9 / ×0.75 / ×0.6) or wrist (`injuryFactor(state, 'hand')`). `injuryName(inj)` gives "Sprained wrist (serious)".
 - **Rest:** `advanceTime(..., 'rest', { restPerHour })`: the Rest action gives back 25% of max energy an hour (`REST_ENERGY_PER_HOUR`).
 

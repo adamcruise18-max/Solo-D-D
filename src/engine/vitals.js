@@ -6,8 +6,9 @@ export const CAL_PER_FOOD_POINT = 70;
 // One quart of water refills 25 points (about 2.5 quarts a day at rest).
 export const WATER_PER_QUART = 25;
 
-// Adam (playtest, 2026-11-25): tired, hungry and thirsty 25% slower (NEED_PACE).
-export const NEED_PACE = 0.75;
+// Adam (playtest, 2026-11-25): tired, hungry and thirsty slower. Tuned 2026-11-26 to
+// Adam's year target (65-75% of bot runs alive): 15% slower (research sweep).
+export const NEED_PACE = 0.85;
 export const FOOD_LOSS_PER_HOUR = 1.5 * NEED_PACE;
 export const WATER_LOSS_PER_HOUR = 2.5 * NEED_PACE;
 // Walking and work burn more. Sleep burns less.
@@ -18,8 +19,9 @@ export const SLEEP_FACTOR = 0.75;
 export const ENERGY_LOSS = { rest: 3 * NEED_PACE, work: 5 * NEED_PACE, walk: 6 * NEED_PACE, heavy: 9 * NEED_PACE };
 // Adam: the Rest action gives back 25% of max energy for each hour of rest.
 export const REST_ENERGY_PER_HOUR = 0.25;
-// Adam: injuries 90% less often. Each injury roll that hits still only hurts you 1 time in 10.
-export const INJURY_RATE = 0.1;
+// Adam: injuries less often. Tuned 2026-11-26 to the 65-75% year target: an injury
+// roll that hits hurts you 3 times in 4 (25% less often than before the playtest).
+export const INJURY_RATE = 0.75;
 
 // Health loss per hour when a stat is at 0.
 export const STARVING_DAMAGE = 0.2; // weeks without food

@@ -1016,14 +1016,14 @@
   // src/engine/vitals.js
   var CAL_PER_FOOD_POINT = 70;
   var WATER_PER_QUART = 25;
-  var NEED_PACE = 0.75;
+  var NEED_PACE = 0.85;
   var FOOD_LOSS_PER_HOUR = 1.5 * NEED_PACE;
   var WATER_LOSS_PER_HOUR = 2.5 * NEED_PACE;
   var WORK_FACTOR = 1.5;
   var SLEEP_FACTOR = 0.75;
   var ENERGY_LOSS = { rest: 3 * NEED_PACE, work: 5 * NEED_PACE, walk: 6 * NEED_PACE, heavy: 9 * NEED_PACE };
   var REST_ENERGY_PER_HOUR = 0.25;
-  var INJURY_RATE = 0.1;
+  var INJURY_RATE = 0.75;
   var STARVING_DAMAGE = 0.2;
   var DEHYDRATED_DAMAGE = 2;
   var SEARCH_INJURY_CHANCE = 0.03;
