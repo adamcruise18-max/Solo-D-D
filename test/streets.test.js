@@ -16,7 +16,7 @@ const readCell = (key) => JSON.parse(fs.readFileSync(path.join(DIR, `${key.repla
 test('streets: the index lists the pilot cells, with credit, on the world grid', () => {
   assert.equal(index.v, FORMAT_VERSION);
   assert.equal(index.cellMeters, WORLD_GRID.cellMeters);
-  assert.ok(index.cells.length >= 36, `cells: ${index.cells.length}`);
+  assert.ok(index.cells.length >= 400, `cells: ${index.cells.length}`);
   assert.ok(index.cells.includes(cellKeyAt(HOME)), 'the home cell has 3D streets');
   assert.match(index.credit, /OpenStreetMap contributors/);
   for (const key of index.cells) assert.ok(fs.existsSync(path.join(DIR, `${key.replace(',', '_')}.json`)), key);
@@ -69,7 +69,7 @@ test('streets: collide pushes the player out of a wall', () => {
   assert.ok(Math.abs(x - 0.35) < 1e-9 && z === 0);
 });
 
-test('streets: real stores in the pilot area get a door with their game place id', () => {
+test('streets: real stores in the 3D area get a door with their game place id', () => {
   let found = 0;
   for (const key of index.cells) {
     const d = readCell(key);

@@ -7811,7 +7811,7 @@
       if (state) renderLocation();
     });
     const acts = listActions(state).map((a) => {
-      if (a.id === "walk_out" && !a.disabled && !streetsHere()) a = { ...a, disabled: "No 3D streets here yet (pilot: about 2 km around your home)" };
+      if (a.id === "walk_out" && !a.disabled && !streetsHere()) a = { ...a, disabled: "No 3D streets here yet (about 6 km around your home)" };
       const dis = a.disabled ? "disabled" : "";
       const note = a.disabled ? a.disabled : a.note || "";
       return `<button class="act${a.risk && !a.disabled ? " risky" : ""}" data-act="${a.id}" ${dis}><span>${esc2(a.label)}</span>${note ? `<small>${esc2(note)}</small>` : ""}</button>`;
@@ -8707,7 +8707,7 @@
     }
     const ix = await loadStreetIndex();
     if (!ix || !streetsHere()) {
-      alert("There are no 3D streets here yet. The pilot area is about 2 km around your home.");
+      alert("There are no 3D streets here yet. They cover about 6 km around your home.");
       return;
     }
     let api;
