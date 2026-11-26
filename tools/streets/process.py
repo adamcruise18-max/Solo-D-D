@@ -1,9 +1,14 @@
 import pyarrow.parquet as pq, shapely, json, math, collections, struct, gzip, sys, os
 import numpy as np
 from shapely import STRtree
-D='/tmp/claude-0/dl-overture/'; OUT=sys.argv[1]
+# usage: process.py OUTDIR [INDIR S W N E SIZE_KM]  (defaults: the 2 x 2 km pilot)
+OUT=sys.argv[1]
+D=sys.argv[2] if len(sys.argv)>2 else '/tmp/claude-0/dl-overture/'
+if not D.endswith('/'): D+='/'
+if not OUT.endswith('/'): OUT+='/'
 LAT0,LON0=45.4826,-122.8738
-S,W,N,E=45.473602,-122.886591,45.491598,-122.861009
+S,W,N,E=(map(float,sys.argv[3:7]) if len(sys.argv)>6 else (45.473602,-122.886591,45.491598,-122.861009))
+SIZE_KM=float(sys.argv[7]) if len(sys.argv)>7 else 2.0
 p=math.radians(LAT0)
 MLAT=111132.92-559.82*math.cos(2*p)+1.175*math.cos(4*p); MLON=111412.84*math.cos(p)-93.5*math.cos(3*p)
 def loc(g): return shapely.transform(g, lambda c: np.column_stack([(c[:,0]-LON0)*MLON,(c[:,1]-LAT0)*MLAT]))
@@ -18,7 +23,7 @@ def dump(name,feats):
 C=collections.Counter
 def pct(n,t): return round(100*n/t,1) if t else 0
 def q(a,x): return round(float(np.quantile(a,x)),1) if len(a) else None
-stats={"area":{"center":[LAT0,LON0],"bbox":{"south":S,"west":W,"north":N,"east":E},"size_km":2.0,"overture_release":"2026-11-18.0"}}
+stats={"area":{"center":[LAT0,LON0],"bbox":{"south":S,"west":W,"north":N,"east":E},"size_km":SIZE_KM,"overture_release":"2026-11-18.0"}}
 # ---------- places & addresses ----------
 places=load('place'); addrs=load('address')
 pl_geo=[shapely.from_wkb(r['geometry']) for r in places]

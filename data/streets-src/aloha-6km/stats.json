@@ -1,0 +1,480 @@
+{
+ "area": {
+  "center": [
+   45.4826,
+   -122.8738
+  ],
+  "bbox": {
+   "south": 45.45565,
+   "west": -122.91225,
+   "north": 45.50955,
+   "east": -122.83535
+  },
+  "size_km": 6.0,
+  "overture_release": "2026-11-18.0"
+ },
+ "buildings": {
+  "count": 28763,
+  "building_parts": 167,
+  "attribute_coverage": {
+   "height": {
+    "count": 23472,
+    "pct": 81.6
+   },
+   "num_floors": {
+    "count": 858,
+    "pct": 3.0
+   },
+   "min_height": {
+    "count": 0,
+    "pct": 0.0
+   },
+   "roof_shape": {
+    "count": 197,
+    "pct": 0.7
+   },
+   "roof_height": {
+    "count": 0,
+    "pct": 0.0
+   },
+   "roof_color": {
+    "count": 83,
+    "pct": 0.3
+   },
+   "roof_material": {
+    "count": 179,
+    "pct": 0.6
+   },
+   "facade_color": {
+    "count": 21,
+    "pct": 0.1
+   },
+   "facade_material": {
+    "count": 9,
+    "pct": 0.0
+   },
+   "class": {
+    "count": 8453,
+    "pct": 29.4
+   },
+   "subtype": {
+    "count": 8536,
+    "pct": 29.7
+   }
+  },
+  "with_name": 268,
+  "with_place_inside": 513,
+  "with_address_inside": 19387,
+  "height_m": {
+   "min": 0.0,
+   "p10": 3.5,
+   "median": 5.4,
+   "p90": 8.8,
+   "max": 22.1
+  },
+  "class_raw": {
+   "none": 20310,
+   "house": 4155,
+   "residential": 2441,
+   "detached": 707,
+   "apartments": 294,
+   "terrace": 132,
+   "greenhouse": 107,
+   "carport": 107,
+   "semidetached_house": 96,
+   "roof": 85,
+   "parking": 62,
+   "garages": 46,
+   "shelter": 43,
+   "school": 38,
+   "shed": 35,
+   "commercial": 35,
+   "retail": 23,
+   "office": 15,
+   "garage": 10,
+   "church": 8,
+   "post_office": 3,
+   "kindergarten": 2,
+   "library": 2,
+   "stable": 1,
+   "fire_station": 1,
+   "hotel": 1,
+   "stadium": 1,
+   "grandstand": 1,
+   "temple": 1,
+   "mosque": 1
+  },
+  "subtype_raw": {
+   "none": 20227,
+   "residential": 7881,
+   "outbuilding": 309,
+   "commercial": 123,
+   "agricultural": 108,
+   "education": 40,
+   "civic": 33,
+   "religious": 23,
+   "medical": 17,
+   "entertainment": 2
+  },
+  "class_mix": {
+   "unknown": 20227,
+   "house": 7531,
+   "other civic/school/etc": 390,
+   "apartments": 294,
+   "garage/shed": 198,
+   "commercial/industrial": 123
+  },
+  "roof_shape": {
+   "gabled": 168,
+   "flat": 10,
+   "skillion": 8,
+   "hipped": 7,
+   "pyramidal": 2,
+   "gambrel": 2
+  },
+  "footprint_m2": {
+   "min": 0.7,
+   "p10": 17.8,
+   "median": 165.1,
+   "p90": 263.2,
+   "max": 20169.7,
+   "buckets": {
+    "<20": 3137,
+    "20-50": 1321,
+    "50-100": 2913,
+    "100-200": 11556,
+    "200-500": 9337,
+    "500-2000": 411,
+    ">=2000": 88
+   }
+  },
+  "sources_whole_record": {
+   "OpenStreetMap (ODbL-1.0)": 28272,
+   "Microsoft ML Buildings (ODbL-1.0)": 491
+  },
+  "sources_single_property": {
+   "Microsoft ML Buildings (ODbL-1.0)": 1605,
+   "USGS Lidar (LicenseRef-Public-Domain-US)": 1213
+  },
+  "height_by_footprint_m2": {
+   "0-50": {
+    "n": 1885,
+    "median": 3.0,
+    "p90": 4.1
+   },
+   "50-100": {
+    "n": 2051,
+    "median": 6.1,
+    "p90": 8.9
+   },
+   "100-200": {
+    "n": 10037,
+    "median": 6.7,
+    "p90": 8.9
+   },
+   "200-500": {
+    "n": 9068,
+    "median": 5.0,
+    "p90": 8.8
+   },
+   "500-up": {
+    "n": 431,
+    "median": 6.6,
+    "p90": 9.2
+   }
+  }
+ },
+ "roads": {
+  "segments": 12252,
+  "connectors": 20774,
+  "count_by_class": {
+   "residential": 2960,
+   "footway": 2161,
+   "footway/sidewalk": 1343,
+   "footway/crosswalk": 1062,
+   "service": 1024,
+   "service/driveway": 970,
+   "service/parking_aisle": 740,
+   "path": 596,
+   "tertiary": 250,
+   "secondary": 220,
+   "cycleway": 213,
+   "steps": 193,
+   "service/alley": 142,
+   "primary": 121,
+   "unknown": 73,
+   "unclassified": 66,
+   "track": 52,
+   "rail:light_rail": 31,
+   "primary/link": 10,
+   "cycleway/cycle_crossing": 9,
+   "secondary/link": 8,
+   "rail:unknown": 4,
+   "rail:standard_gauge": 3,
+   "tertiary/link": 1
+  },
+  "length_m_by_class": {
+   "residential": 278992,
+   "footway/sidewalk": 247515,
+   "footway": 138615,
+   "service": 84216,
+   "service/parking_aisle": 55951,
+   "service/driveway": 50228,
+   "path": 37165,
+   "cycleway": 36852,
+   "tertiary": 26778,
+   "secondary": 25655,
+   "footway/crosswalk": 22834,
+   "primary": 17267,
+   "service/alley": 15289,
+   "track": 10775,
+   "rail:standard_gauge": 8449,
+   "unclassified": 8115,
+   "rail:light_rail": 5997,
+   "unknown": 2928,
+   "primary/link": 1156,
+   "steps": 885,
+   "rail:unknown": 817,
+   "secondary/link": 448,
+   "cycleway/cycle_crossing": 198,
+   "tertiary/link": 63
+  },
+  "with_width": 198,
+  "with_surface": 4732,
+  "with_speed_limit": 2154,
+  "flags": {
+   "is_covered": 105,
+   "is_under_construction": 171,
+   "is_tunnel": 18,
+   "is_bridge": 99,
+   "is_link": 19,
+   "is_indoor": 31
+  },
+  "sidewalk": {
+   "mapped_sidewalk_m": 247515,
+   "street_centerline_m": 358474,
+   "coverage_pct_of_both_sides": 34.5
+  }
+ },
+ "landuse_and_infrastructure": {
+  "land_use": {
+   "count": 2886,
+   "by_class": {
+    "residential/residential": 1151,
+    "managed/grass": 543,
+    "recreation/pitch": 254,
+    "recreation/playground": 112,
+    "horticulture/garden": 97,
+    "park/park": 96,
+    "pedestrian/pedestrian": 92,
+    "developed/commercial": 66,
+    "agriculture/meadow": 57,
+    "protected/nature_reserve": 56,
+    "developed/retail": 48,
+    "park/village_green": 38,
+    "construction/construction": 33,
+    "developed/industrial": 32,
+    "agriculture/farmland": 30,
+    "religious/religious": 23,
+    "education/school": 20,
+    "agriculture/farmyard": 18,
+    "horticulture/orchard": 18,
+    "construction/greenfield": 15,
+    "developed/brownfield": 14,
+    "park/dog_park": 10,
+    "education/schoolyard": 10,
+    "education/kindergarten": 9,
+    "horticulture/plant_nursery": 8,
+    "recreation/track": 7,
+    "transportation/railway": 7,
+    "horticulture/allotments": 6,
+    "recreation/recreation_ground": 6,
+    "horticulture/greenhouse_horticulture": 2,
+    "resource_extraction/quarry": 2,
+    "residential/garages": 1,
+    "developed/works": 1,
+    "horticulture/vineyard": 1,
+    "cemetery/cemetery": 1,
+    "recreation/stadium": 1,
+    "education/education": 1
+   }
+  },
+  "land": {
+   "count": 7868,
+   "by_class": {
+    "tree/tree": 7101,
+    "forest/wood": 251,
+    "wetland/wetland": 203,
+    "shrub/scrub": 113,
+    "shrub/shrub": 57,
+    "grass/grass": 40,
+    "tree/tree_row": 30,
+    "sand/sand": 28,
+    "grass/grassland": 21,
+    "shrub/shrubbery": 7,
+    "rock/shingle": 5,
+    "rock/bare_rock": 3,
+    "forest/forest": 2,
+    "land/islet": 1,
+    "rock/stone": 1,
+    "physical/cliff": 1,
+    "physical/peak": 1,
+    "shrub/heath": 1,
+    "land/land": 1,
+    "physical/mountain_range": 1
+   }
+  },
+  "water": {
+   "count": 760,
+   "by_class": {
+    "stream/stream": 328,
+    "human_made/swimming_pool": 282,
+    "water/water": 57,
+    "reservoir/basin": 44,
+    "canal/ditch": 26,
+    "pond/pond": 17,
+    "water/wastewater": 3,
+    "river/river": 2,
+    "reservoir/reservoir": 1
+   }
+  },
+  "land_cover": {
+   "count": 78,
+   "by_class": {
+    "shrub/None": 32,
+    "urban/None": 13,
+    "crop/None": 12,
+    "barren/None": 12,
+    "forest/None": 9
+   }
+  },
+  "infrastructure": {
+   "count": 13180,
+   "by_class": {
+    "transportation/crossing": 3165,
+    "transit/parking_space": 2971,
+    "barrier/kerb": 1699,
+    "transportation/street_lamp": 818,
+    "power/power_pole": 610,
+    "transit/parking": 493,
+    "barrier/fence": 480,
+    "barrier/gate": 316,
+    "pedestrian/bench": 255,
+    "manhole/drain": 228,
+    "transportation/stop": 223,
+    "barrier/bollard": 185,
+    "power/power_tower": 179,
+    "transit/bus_stop": 129,
+    "bridge/bridge": 114,
+    "emergency/fire_hydrant": 106,
+    "transit/bicycle_parking": 104,
+    "waste_management/waste_basket": 95,
+    "transportation/traffic_signals": 72,
+    "pedestrian/information": 70,
+    "barrier/retaining_wall": 70,
+    "barrier/wall": 70,
+    "barrier/hedge": 65,
+    "pedestrian/vending_machine": 65,
+    "power/minor_line": 63,
+    "power/power_line": 61,
+    "power/generator": 61,
+    "pedestrian/toilets": 54,
+    "water/drinking_water": 48,
+    "waste_management/waste_disposal": 43,
+    "tower/lighting": 37,
+    "pedestrian/artwork": 27,
+    "power/catenary_mast": 13,
+    "power/switch": 13,
+    "power/transformer": 12,
+    "bridge/boardwalk": 12,
+    "manhole/sewer": 11,
+    "power/portal": 11,
+    "waste_management/recycling": 9,
+    "barrier/barrier": 8,
+    "barrier/block": 8,
+    "pedestrian/viewpoint": 8,
+    "communication/mobile_phone_tower": 8,
+    "water/fountain": 7,
+    "manhole/manhole": 6,
+    "barrier/guard_rail": 6,
+    "transportation/charging_station": 6,
+    "transit/stop_position": 6,
+    "transportation/give_way": 6,
+    "utility/pipeline": 5,
+    "power/substation": 5,
+    "communication/communication_tower": 5,
+    "transit/platform": 4,
+    "utility/storage_tank": 4,
+    "barrier/chain": 3,
+    "barrier/cycle_barrier": 3,
+    "transportation/street_cabinet": 3,
+    "pedestrian/post_box": 3,
+    "pedestrian/atm": 3,
+    "utility/utility_pole": 3,
+    "transit/bicycle_rental": 3,
+    "barrier/jersey_barrier": 2,
+    "barrier/handrail": 2,
+    "utility/reservoir_covered": 2,
+    "utility/water_tower": 1,
+    "power/cable": 1,
+    "barrier/swing_gate": 1,
+    "transit/railway_halt": 1
+   }
+  }
+ },
+ "trees": {
+  "single_tree_points": 7101,
+  "wood_forest_polygons": 251,
+  "tree_polygons_or_rows": 30
+ },
+ "places": {
+  "count": 1542,
+  "top_categories": {
+   "home_service": 182,
+   "restaurant": 91,
+   "automotive_service": 81,
+   "personal_or_beauty_service": 64,
+   "null": 57,
+   "financial_service": 52,
+   "park": 36,
+   "real_estate_service": 34,
+   "christian_place_of_worship": 33,
+   "hardware_home_and_garden_store": 32,
+   "dental_clinic": 32,
+   "historic_site": 30,
+   "professional_service": 27,
+   "food_and_beverage_store": 25,
+   "casual_eatery": 24
+  }
+ },
+ "addresses": {
+  "count": 28936,
+  "sources": {
+   "us/or/statewide (LicenseRef-Proprietary)": 28936
+  }
+ },
+ "compact_size_pilot_4km2": {
+  "buildings": 1294804,
+  "roads": 502520,
+  "landuse": 332796,
+  "points": 101705,
+  "names": 38603,
+  "total": 2270428,
+  "buildings_plus_roads_delta_blob_raw": 1821828,
+  "buildings_plus_roads_delta_blob_gzip": 1013515
+ },
+ "bytes_per_km2": {
+  "buildings": 323701,
+  "roads": 125630,
+  "landuse": 83199,
+  "points": 25426,
+  "names": 9651,
+  "total": 567607,
+  "buildings_plus_roads_delta_blob_raw": 455457,
+  "buildings_plus_roads_delta_blob_gzip": 253379
+ },
+ "vertices": {
+  "buildings": 251376,
+  "roads": 101126
+ }
+}

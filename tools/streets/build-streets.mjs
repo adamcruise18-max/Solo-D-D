@@ -2,7 +2,7 @@
 //
 //   node tools/streets/build-streets.mjs [srcDir]
 //
-// srcDir (default data/streets-src/pilot-aloha) holds GeoJSON (plain or .gz) made by
+// srcDir (default data/streets-src/aloha-6km) holds GeoJSON (plain or .gz) made by
 // tools/streets/overture_dl.py + process.py from Overture Maps (mostly OpenStreetMap).
 // The output data is a derivative database of OpenStreetMap data: it stays under the
 // ODbL 1.0 (see docs/data/streets/LICENSE.md). Google, Apple and Bing imagery are never
@@ -23,7 +23,7 @@ import {
 } from '../../src/data/streets.js';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..');
-const SRC = path.resolve(process.argv[2] || path.join(ROOT, 'data/streets-src/pilot-aloha'));
+const SRC = path.resolve(process.argv[2] || path.join(ROOT, 'data/streets-src/aloha-6km'));
 const OUT = path.join(ROOT, 'docs/data/streets');
 const CELL = WORLD_GRID.cellMeters;
 

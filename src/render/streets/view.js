@@ -94,7 +94,7 @@ export function openStreets(opts) {
     <div class="in-pause" hidden>
       <div class="box corners">
         <h3>Outside</h3>
-        <p class="hint">Game time moves only when you walk. It is stopped now. This is the 3D pilot area: about 2 km around your home.</p>
+        <p class="hint">Game time moves only when you walk. It is stopped now. The 3D streets cover about 6 x 6 km around your home for now.</p>
         <div class="row"><button class="primary" data-in="resume">Resume</button>
         <button data-in="leave">Back to the map</button></div>
       </div>
@@ -444,7 +444,7 @@ export function openStreets(opts) {
       if (!cellKnown(nx, nz)) {
         nx = pos.x; nz = pos.z;
         const t = performance.now();
-        if (t - edgeWarned > 4000) { edgeWarned = t; toast('The 3D streets end here for now (pilot area around your home). Use the map to travel farther.', 4000); }
+        if (t - edgeWarned > 4000) { edgeWarned = t; toast('The 3D streets end here for now (about 3 km from your home). Use the map to travel farther.', 4000); }
       } else if (!cellReady(nx, nz)) { nx = pos.x; nz = pos.z; } // wait for the cell to load
       [nx, nz] = collide(nx, nz, RADIUS, collidersNear());
       walked += Math.hypot(nx - pos.x, nz - pos.z);

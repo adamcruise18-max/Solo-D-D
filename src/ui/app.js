@@ -333,7 +333,7 @@ function renderLocation() {
   else sub = 'A house. Search it room by room.';
   if (!streetCells) loadStreetIndex().then(() => { if (state) renderLocation(); });
   const acts = listActions(state).map((a) => {
-    if (a.id === 'walk_out' && !a.disabled && !streetsHere()) a = { ...a, disabled: 'No 3D streets here yet (pilot: about 2 km around your home)' };
+    if (a.id === 'walk_out' && !a.disabled && !streetsHere()) a = { ...a, disabled: 'No 3D streets here yet (about 6 km around your home)' };
     const dis = a.disabled ? 'disabled' : '';
     const note = a.disabled ? a.disabled : a.note || '';
     return `<button class="act${a.risk && !a.disabled ? ' risky' : ''}" data-act="${a.id}" ${dis}><span>${esc(a.label)}</span>${note ? `<small>${esc(note)}</small>` : ''}</button>`;
@@ -1218,7 +1218,7 @@ async function walkInside() {
 let insideRefresh = null;
 let insideToast = null;
 
-// ---------- first-person view of the real streets (3D pilot area) ----------
+// ---------- first-person view of the real streets (about 6 x 6 km around home) ----------
 // Cells with 3D street data: docs/data/streets/index.json (built by tools/streets/).
 let streetIndex = null;
 function loadStreetIndex() {
@@ -1238,7 +1238,7 @@ async function walkOutside() {
   if (!state || state.dead || document.getElementById('inside')) return;
   if (!webglOk()) { alert('This browser cannot show 3D.'); return; }
   const ix = await loadStreetIndex();
-  if (!ix || !streetsHere()) { alert('There are no 3D streets here yet. The pilot area is about 2 km around your home.'); return; }
+  if (!ix || !streetsHere()) { alert('There are no 3D streets here yet. They cover about 6 km around your home.'); return; }
   let api;
   try { api = await loadInside3d(); } catch (e) { alert('The 3D view did not load. Check the connection and try again.'); return; }
   const fromBuilding = state.location.kind !== 'street';
