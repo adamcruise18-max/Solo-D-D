@@ -3,6 +3,7 @@
 // with geometry.js, and moves the player. It keeps no game rules: every move goes to
 // opts.onMove (the engine's streetMove: game time, miles, road events), and doors go
 // to opts.onDoor. Built into docs/inside3d.js with the inside view.
+import { pickQuality } from '../../ui/look3d.js';
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Color, Fog, HemisphereLight, DirectionalLight, SpotLight, Object3D,
   Mesh, Group, MeshLambertMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace,
@@ -173,12 +174,14 @@ export function openStreets(opts) {
   const shown = new Map(); // key -> { group, props, colliders, doors, roads, x0, z0 }
   // season, overgrowth and snow cover: fixed while this view is open (cells made later match)
   const look = opts.look || { season: opts.bare ? 'winter' : 'summer' };
+  // Small parts on cars, props, trees and buildings: Medium and High 3D quality only.
+  const fine = opts.fine ?? (pickQuality() !== 'low');
   async function load(key) {
     if (!known.has(key)) return { empty: true };
     const res = await fetch(`${opts.base || 'data/streets/'}${key.replace(',', '_')}.json`);
     if (!res.ok) throw new Error(`cell ${key}: ${res.status}`);
     const data = await res.json();
-    const m = buildCell(data, { lod: 0, look });
+    const m = buildCell(data, { lod: 0, look, fine });
     const [cx, cz] = key.split(',').map(Number);
     const group = new Group();
     group.position.set(cx * CELL, 0, cz * CELL);

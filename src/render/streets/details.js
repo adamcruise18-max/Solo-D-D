@@ -62,8 +62,31 @@ const CAR_TYPES = [
   { L: 5.6, W: 2.0, H: 0.85, cab: 0.32, ch: 0.62, back: 0.2 }, // pickup
 ];
 const GLASS = new Color(0x34414b), TIRE = new Color(0x26282a), SNOWC = new Color(0xf1f4f7);
+const CHROME = new Color(0xb8bcc0), HEAD = new Color(0xeee8d0), TAIL = new Color(0x9a2a24), PLATE = new Color(0xe8e4d6), TRIM = new Color(0x2c2e30);
+const cyl8 = (c) => painted(new CylinderGeometry(1, 1, 1, 8), c);
 
-function carGeo(list, x, z, ang, type, color, T, rnd) {
+// Fine car parts (Medium/High 3D quality): hubcaps, bumpers, lights, mirrors, grille, plate,
+// side skirts, door seams, wipers; a bed with sides on pickups. Placed along the car (u) and across (v).
+function carFine(list, P, ry, t, y0, body, flat, type) {
+  const put = (g, u, v, y, sx, sy, sz, extra = 0) => { const [px, pz] = P(u, v); list.push(at(g, px, y, pz, sx, sy, sz, ry + extra)); };
+  for (const [u, v] of [[0.32, 0.5], [0.32, -0.5], [-0.32, 0.5], [-0.32, -0.5]]) { // hubcaps facing out
+    const [wx, wz] = P(t.L * u, t.W * v);
+    list.push(cyl8(CHROME).applyMatrix4(new Matrix4().makeRotationX(Math.PI / 2)).applyMatrix4(new Matrix4().makeTranslation(wx, 0.33 - flat / 2, wz).multiply(new Matrix4().makeRotationY(ry)).multiply(new Matrix4().makeScale(0.17, 0.17, 0.02))));
+  }
+  for (const s of [1, -1]) { // bumpers front and back, lights at each corner, side skirts
+    put(box(TRIM), s * (t.L / 2 + 0.04), 0, y0 + 0.12, 0.1, 0.2, t.W * 0.96);
+    for (const v of [0.36, -0.36]) put(box(s > 0 ? HEAD : TAIL), s * (t.L / 2 + 0.005), t.W * v, y0 + t.H * 0.68, 0.04, 0.12, 0.3);
+    put(box(TRIM), 0, s * (t.W / 2 + 0.01), y0 + 0.06, t.L * 0.62, 0.1, 0.03);
+    put(box(TRIM), t.L * (t.back + t.cab / 2) + 0.05, s * (t.W * 0.46), y0 + t.H + 0.05, 0.1, 0.1, 0.18); // mirror
+    put(box(TRIM), t.L * t.back, s * (t.W / 2 + 0.003), y0 + t.H * 0.55, 0.02, t.H * 0.75, 0.01); // door seam
+  }
+  put(box(TRIM), t.L / 2 + 0.01, 0, y0 + t.H * 0.5, 0.03, t.H * 0.3, t.W * 0.42); // grille
+  put(box(PLATE), -(t.L / 2 + 0.06), 0, y0 + 0.28, 0.02, 0.15, 0.32); // rear plate (blank)
+  put(box(TRIM), t.L * (t.back + t.cab / 2) + 0.02, 0, y0 + t.H + 0.04, 0.3, 0.02, t.W * 0.6, 0.0); // wipers
+  if (type === 3) for (const s of [1, -1]) put(box(body), -t.L * 0.3, s * (t.W / 2 - 0.04), y0 + t.H + 0.2, t.L * 0.38, 0.4, 0.06); // pickup bed sides
+}
+
+function carGeo(list, x, z, ang, type, color, T, rnd, fine = false) {
   const t = CAR_TYPES[type];
   const body = T.car(new Color(color));
   const ry = -ang; // ang: direction of the car's length in x/z
@@ -80,6 +103,7 @@ function carGeo(list, x, z, ang, type, color, T, rnd) {
     list.push(at(box(TIRE), wx, 0.33 - flat / 2, wz, 0.66, 0.62 - flat, 0.24, ry));
   }
   if (T.look.snow > 0.3) list.push(at(box(SNOWC), cx, y0 + t.H + t.ch + 0.1, cz, t.L * t.cab * 0.9, 0.1 * T.look.snow + 0.04, t.W * 0.84, ry));
+  if (fine) carFine(list, P, ry, t, y0, body, flat, type);
   return t;
 }
 
@@ -108,7 +132,9 @@ function along(line, stepFn, cb) {
   }
 }
 
-export function streetDetails(cellKey, roads, rings, T) {
+// fine: add the small parts (Medium/High 3D quality). They use no random numbers, so the
+// places of cars, trash and barricades (and the car ids) are the same at every quality.
+export function streetDetails(cellKey, roads, rings, T, fine = false) {
   const rnd = seedFrom(`details ${cellKey}`);
   const geos = [], colliders = [], doors = [];
   const cars = [];
@@ -140,7 +166,7 @@ export function streetDetails(cellKey, roads, rings, T) {
       const color = CAR_COLORS[Math.floor(rnd() * CAR_COLORS.length)];
       cars.push({ x: cx, z: cz });
       const i = cars.length - 1;
-      carGeo(geos, cx, cz, a, type, color, T, rnd);
+      carGeo(geos, cx, cz, a, type, color, T, rnd, fine);
       colliders.push(...rectSegs(cx, cz, a, t.L, t.W));
       // the door to search it: on the side toward the middle of the road (or either side)
       const sx = -Math.sin(a), sz = Math.cos(a);
@@ -167,14 +193,27 @@ export function streetDetails(cellKey, roads, rings, T) {
         const n = 1 + Math.floor(rnd() * 3);
         for (let i = 0; i < n; i++) {
           const s = 0.35 + rnd() * 0.15;
-          geos.push(at(painted(new IcosahedronGeometry(1, 0), bag[i % 3]), px + (rnd() - 0.5) * 1.2, s * 0.7, pz + (rnd() - 0.5) * 1.2, s, s * 0.8, s, rnd() * 6));
+          const bx2 = px + (rnd() - 0.5) * 1.2, bz2 = pz + (rnd() - 0.5) * 1.2;
+          geos.push(at(painted(new IcosahedronGeometry(1, 0), bag[i % 3]), bx2, s * 0.7, bz2, s, s * 0.8, s, rnd() * 6));
+          if (fine) { // tied neck and two ears of the tie
+            geos.push(at(painted(new ConeGeometry(0.08, 0.18, 5), bag[i % 3]), bx2, s * 1.4 + 0.05, bz2));
+            for (const e of [-1, 1]) geos.push(at(box(bag[i % 3]), bx2 + e * 0.06, s * 1.4 + 0.15, bz2, 0.1, 0.03, 0.05, e * 0.6));
+          }
         }
       } else if (k < 0.6) { // a wet cardboard box
-        geos.push(at(box(card), px, 0.2, pz, 0.6, 0.4, 0.5, rnd() * 6));
+        const cr = rnd() * 6;
+        geos.push(at(box(card), px, 0.2, pz, 0.6, 0.4, 0.5, cr));
+        if (fine) { // open flaps and a tape strip
+          const ca = Math.cos(cr), sa = Math.sin(cr);
+          for (const s of [1, -1]) geos.push(at(box(card), px - sa * s * 0.3, 0.45, pz - ca * s * 0.3, 0.58, 0.02, 0.2, cr).applyMatrix4(new Matrix4()));
+          geos.push(at(box(paper), px, 0.405, pz, 0.08, 0.01, 0.5, cr));
+        }
       } else if (k < 0.8) { // paper and plastic on the road
         for (let i = 0; i < 4; i++) geos.push(at(box(paper), px + (rnd() - 0.5) * 2, 0.1, pz + (rnd() - 0.5) * 2, 0.3, 0.01, 0.22, rnd() * 6));
       } else if (T.look.season === 'fall' || T.look.season === 'winter') { // leaves in the gutter
-        geos.push(at(painted(new IcosahedronGeometry(1, 0), T.look.season === 'fall' ? leafPile : T.roof(new Color(0x6e5a3e))), px, 0.05, pz, 1.1, 0.12, 0.6, ang));
+        const lc = T.look.season === 'fall' ? leafPile : T.roof(new Color(0x6e5a3e));
+        geos.push(at(painted(new IcosahedronGeometry(1, 0), lc), px, 0.05, pz, 1.1, 0.12, 0.6, ang));
+        if (fine) for (const d of [-1, 1]) geos.push(at(painted(new IcosahedronGeometry(1, 0), lc), px + Math.cos(ang) * d * 1.1, 0.04, pz + Math.sin(ang) * d * 1.1, 0.5, 0.08, 0.35, ang + d));
       }
     });
   }
@@ -197,6 +236,11 @@ export function streetDetails(cellKey, roads, rings, T) {
         if (i === 1 && rnd() < 0.5) continue; // one pushed aside
         geos.push(at(box(i % 2 ? red : white), bx, 0.95, bz, 0.08, 0.25, 2.2, -ang));
         geos.push(at(box(leg), bx + Math.cos(ang) * 0.3, 0.45, bz + Math.sin(ang) * 0.3, 0.06, 0.9, 1.8, -ang));
+        if (fine) { // a lower board, two feet and an amber lamp on top
+          geos.push(at(box(i % 2 ? white : red), bx, 0.55, bz, 0.08, 0.2, 2.0, -ang));
+          for (const e of [-0.85, 0.85]) geos.push(at(box(leg), bx + nx * e, 0.03, bz + nz * e, 0.6, 0.06, 0.15, -ang));
+          geos.push(at(painted(new CylinderGeometry(0.07, 0.07, 0.12, 8), T.roof(new Color(0xd8a030))), bx + nx * 0.9, 1.14, bz + nz * 0.9));
+        }
         colliders.push([bx - nx * 1.1, bz - nz * 1.1, bx + nx * 1.1, bz + nz * 1.1]);
       }
       // the sign: a white board with a red band, at the side of the road (no words)
@@ -204,6 +248,13 @@ export function streetDetails(cellKey, roads, rings, T) {
       geos.push(at(painted(new CylinderGeometry(0.04, 0.04, 1, 5), leg), sx, 0.9, sz, 1, 1.8, 1));
       geos.push(at(box(white), sx, 1.9, sz, 0.05, 0.7, 0.9, -ang));
       geos.push(at(box(red), sx, 2.15, sz, 0.06, 0.16, 0.9, -ang));
+      if (fine) { // a second post, a frame round the board and a sandbag at the foot
+        const tx = Math.cos(ang), tz = Math.sin(ang);
+        geos.push(at(painted(new CylinderGeometry(0.04, 0.04, 1, 5), leg), sx + nx * 0.4, 0.9, sz + nz * 0.4, 1, 1.8, 1));
+        geos.push(at(box(leg), sx - tx * 0.03, 2.26, sz - tz * 0.03, 0.04, 0.04, 0.94, -ang));
+        geos.push(at(box(leg), sx - tx * 0.03, 1.54, sz - tz * 0.03, 0.04, 0.04, 0.94, -ang));
+        geos.push(at(painted(new IcosahedronGeometry(1, 0), T.roof(new Color(0x8a7a5a))), sx + nx * 0.2, 0.1, sz + nz * 0.2, 0.35, 0.12, 0.22, -ang));
+      }
     }
   }
 
