@@ -237,6 +237,9 @@ button.small { font: 600 11px/1 var(--cond); letter-spacing: .12em; text-transfo
 .qual-label { font-size: 13px; color: var(--text); margin-right: 6px; flex-basis: 100%; }
 .qual-row .qual { flex: 1 1 0; min-width: 60px; padding: 6px 4px; font-size: 13px; }
 .qual-row .qual.on { background: var(--accent); color: #111; border-color: var(--accent); }
+.snd-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.snd-vol { display: flex; gap: 8px; align-items: center; flex: 1 1 160px; }
+.snd-vol input { flex: 1; accent-color: var(--accent); }
 
 @media (max-width: 800px) {
   #app { flex-direction: column; height: auto; min-height: 100vh; }

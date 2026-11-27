@@ -1104,6 +1104,7 @@ export function openInside(opts) {
   let busy = false; // searching
   let closed = false;
   let walked = 0;
+  let stepDist = 0;
   let current = null;
   let panel = null; // name of the open panel
   let debugOn = false;
@@ -1704,6 +1705,8 @@ export function openInside(opts) {
         const moved = Math.hypot(next.x - pos.x, next.z - pos.z);
         walked += moved;
         if (feet === 0) bob += moved * (stance === 'stand' ? 3.2 : 2);
+        // a footstep each stride on the floor (sound: src/ui/sound.js, in game.js)
+        if (feet === 0) { stepDist += moved; if (stepDist > (sprint ? 0.95 : 0.7)) { stepDist = 0; window.LLSound?.play('step', stance === 'stand' ? 1 : 0.5); } }
         pos.x = next.x;
         pos.z = next.z;
         if (walked >= WALK_FLUSH_M) { flushWalk(); status(); if (opts.isDead()) { close(true); return; } }

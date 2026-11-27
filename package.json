@@ -28,6 +28,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "three": "^0.170.0"
+    "howler": "^2.2.4",
+    "three": "^0.170.0",
+    "zzfx": "^1.4.0"
   }
 }

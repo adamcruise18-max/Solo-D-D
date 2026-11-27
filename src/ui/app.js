@@ -18,6 +18,7 @@ import { stockLine, powerSummary } from '../engine/stock.js';
 import { estimateTrip, describeTrip, straightMiles } from '../engine/travel.js';
 import { sceneEnv } from '../engine/scene.js';
 import { QUALITY_CHOICES, QUALITY_LABELS, getQualityChoice, setQualityChoice } from './quality.js';
+import { initSound, playSfx, soundForAction, setAmbience, getSoundSettings, setSoundSettings } from './sound.js';
 import { weatherOutlook, actionTiming, tripPreview } from '../engine/preview.js';
 import { placeState } from '../engine/loot.js';
 import { perform } from '../engine/game.js';
@@ -87,6 +88,7 @@ export async function start() {
   state = loadGame();
   bindEvents();
   initGridHandlers();
+  initSound();
   fx = createFx($('#mapwrap'));
   $('#legend').innerHTML = Object.entries(CATEGORIES).filter(([k]) => k !== 'house')
     .map(([, c]) => `<span><i style="background:${c.color}"></i>${c.label}</span>`).join('')
@@ -121,6 +123,7 @@ function commit(focus) {
 function act(kind, a, b, c) {
   const wasDead = !!state.dead;
   perform(state, kind, a, b, c);
+  soundForAction(kind, a, b);
   afterAction();
   if (!wasDead && state.dead) recordRun(state);
   commit();
@@ -137,7 +140,22 @@ function render() {
   renderDog();
   renderLog();
   renderHud();
+  updateSound();
   if (mapApi) mapApi.update(state, allPlaces());
+}
+
+// Rain, wind, fire, hum and crows follow the weather and where you are (src/data/sounds.js).
+function updateSound() {
+  const loc = state.location || {};
+  const home = loc.kind === 'home';
+  const h = state.home || {};
+  const scene = sceneEnv(state);
+  setAmbience(scene, {
+    inside: home || document.body.classList.contains('inside-open'),
+    home,
+    fire: (h.fireHours || 0) > 0,
+    electric: !!h.heaterOn || (built(state, 'led_lights') && scene.daylight < 0.3 && (h.battery || 0) > 0.2),
+  });
 }
 
 // The small readout at the top of the map: day, time, weather, temperature.
@@ -947,14 +965,21 @@ function showMenu() {
         ${QUALITY_CHOICES.map((q) => `<button type="button" class="qual${getQualityChoice() === q ? ' on' : ''}" data-q="${q}" role="radio" aria-checked="${getQualityChoice() === q}">${QUALITY_LABELS[q]}</button>`).join('')}
       </div>
       <p class="hint" id="qualHint">${qualityHint(getQualityChoice())}</p>
+      <div class="snd-row">
+        <label class="toggle"><input type="checkbox" id="sndMute" ${getSoundSettings().mute ? 'checked' : ''}> Mute sound</label>
+        <label class="snd-vol">Volume <input type="range" id="sndVol" min="0" max="100" step="5" value="${Math.round(getSoundSettings().volume * 100)}"></label>
+      </div>
       <button id="exp">Export a backup file</button>
       <label class="filebtn">Import a backup file<input type="file" id="imp" accept=".json,application/json" hidden></label>
       <button id="newrun" class="danger">Give up and start a new run</button>
       <button class="link" id="cancel">Close</button>
     </div>
-    <p class="hint">Map data © OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap.</p>`, (m) => {
+    <p class="hint">Map data © OpenStreetMap contributors (ODbL). Map tiles: OpenFreeMap. Sound made in code with ZzFX (MIT, Frank Force) and howler.js (MIT, GoldFire Studios).</p>`, (m) => {
     m.querySelector('#cancel').addEventListener('click', closeModal);
     m.querySelector('#fxToggle').addEventListener('change', (e) => { if (fx) fx.setEnabled(e.target.checked); });
+    m.querySelector('#sndMute').addEventListener('change', (e) => setSoundSettings({ mute: e.target.checked }));
+    m.querySelector('#sndVol').addEventListener('input', (e) => setSoundSettings({ volume: Number(e.target.value) / 100 }));
+    m.querySelector('#sndVol').addEventListener('change', () => playSfx('pickup'));
     m.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => {
       setQualityChoice(b.dataset.q);
       m.querySelectorAll('[data-q]').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
@@ -1063,6 +1088,8 @@ async function walkInside() {
   const env = environment(state, 'work');
   const night = isNight(state.time);
   document.body.classList.add('inside-open');
+  playSfx('door');
+  updateSound();
   const lastLines = (n0) => state.log.slice(n0).filter((e) => e.kind === 'warn' || e.kind === 'bad' || e.kind === 'story').map((e) => e.text);
   const insideH = api.openInside({
     plan,
@@ -1148,6 +1175,7 @@ async function walkInside() {
       perform(state, 'action', 'pickup', pid);
       if (!wasDead && state.dead) recordRun(state);
       const ok = !buildingItems(state).some((x) => x.pid === pid);
+      if (ok) playSfx('pickup');
       saveGame(state);
       render();
       const msgs = state.log.slice(n0).filter((e) => e.kind !== 'info' || !ok).map((e) => e.text).join(' ');
@@ -1158,6 +1186,7 @@ async function walkInside() {
     notice: () => noticeOf(state),
     onOpenContainer: (cid) => {
       perform(state, 'action', 'open_container', cid);
+      playSfx('box');
       if (state.dead) recordRun(state);
       saveGame(state);
       render();
@@ -1179,6 +1208,7 @@ async function walkInside() {
       delete state.lastFound;
       const wasDead = !!state.dead;
       perform(state, 'action', loc.kind === 'place' ? 'search' : 'room', zone);
+      playSfx('box');
       if (!wasDead && state.dead) recordRun(state);
       const found = state.lastFound || {};
       delete state.lastFound;
