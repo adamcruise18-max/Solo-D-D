@@ -36,6 +36,7 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
   function run(state, minutes, mode) {
     let left = minutes;
     const ctx = { mode, events, clock: api };
+    api.lastStopped = false;
     while (left > 0.0001 && !state.dead) {
       const step = Math.min(stepMinutes, left);
       const before = state.time;
@@ -50,12 +51,13 @@ export function createClock({ systems, events = null, stepMinutes = STEP_MINUTES
       systems.step(state, step / 60, ctx);
       // A rule can end the action early (for example, waking from sleep at a
       // danger level): it sets state._stop, and the rest of the time is not spent.
-      if (state._stop) { delete state._stop; break; }
+      if (state._stop) { delete state._stop; api.lastStopped = true; break; }
     }
     sendDeath(state, events);
     return state;
   }
 
-  const api = { advance, stepMinutes };
+  // lastStopped: the last advance() ended early by a rule (state._stop), even on its last step.
+  const api = { advance, stepMinutes, lastStopped: false };
   return api;
 }

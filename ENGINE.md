@@ -423,3 +423,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 - `docs/map/style.json`, `sprites/`, `fonts/`: the OpenFreeMap "liberty" style (full color) with Noto Sans font ranges for Latin names.
 - `src/map/local-map.js` registers the `pmtiles://` protocol and returns the local style; `map.js` `pickStyle()` tries it first and falls back to the OpenFreeMap styles, then the plain offline map. The local file needs a server with byte ranges (GitHub Pages and `npm run check:browser` have them; `npm run serve` does not, so it falls back).
 - Rebuild (rarely: each rebuild adds about 48 MB to the git history): `NODE_USE_ENV_PROXY=1 node tools/map/build-pmtiles.mjs --pmtiles <go-pmtiles binary>` and `NODE_USE_ENV_PROXY=1 node tools/map/build-style.mjs`.
+
+## Real time (Adam, 2026-11-27)
+
+The game is now real-time first person. Plan: https://claude.ai/artifact/1QhguK84HmkJT4eJ3C7aTq
+- `src/core/realtime.js` `createRealtime({ advance })`: `tick(state, realMs)` each frame. `TIME_SCALE = 12` game seconds per real second (one game day = 2 real hours; overnight default, Adam to confirm). Real time builds up and goes to the clock in whole 1-minute steps, so 30 and 144 FPS give the same game. `pause(reason)` / `resume(reason)` (menu, map, inventory, hidden tab). `setMode('walk'|'rest'|'work'|'heavy')`. `fastForward(minutes, 'sleep', opts, done)` for sleep and long rest at `FAST_SCALE` (1 game hour per real second); a danger line stops it (`done({ stopped: true, left })`). Frames longer than 250 ms count as 250 ms.
+- `src/engine/realtime.js` `createGameRealtime()`: the driver wired to `advanceTime`, so real time runs every rule the turn-based actions run.
+- `clock.lastStopped`: true when a rule (`state._stop`) ended the last advance, even on its last step; `advanceTime` returns it.
+- 1-minute steps and 10-minute steps give the same needs except house heat, which is stepped (warmth differs by under 0.05 per hour).

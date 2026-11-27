@@ -116,7 +116,7 @@ export function advanceTime(state, minutes, mode = 'rest', opts = {}) {
   if (opts.restPerHour) state._restPerHour = opts.restPerHour;
   const t0 = state.time;
   try { gameClock().advance(state, minutes, mode); } finally { delete state._sleepFrom; delete state._restPerHour; }
-  return !state.dead && state.time - t0 < minutes - 0.01;
+  return !state.dead && (gameClock().lastStopped || state.time - t0 < minutes - 0.01);
 }
 
 // Auto-wake (browser playtest 1): you wake when a need falls past its danger line

@@ -37,6 +37,7 @@ export function createEngine({ systems = [], actions = [] } = {}) {
   };
 }
 
+export { createRealtime, TIME_SCALE, FAST_SCALE, MAX_FRAME_MS } from './realtime.js';
 export { createProfiler, FRAME_BUDGET_MS, SECTION_BUDGET_MS, MEMORY_BUDGETS_MB } from './profiler.js';
 export { createGrid, classify, tierOf, simDue, DEFAULT_RINGS, DEFAULT_CELL_METERS, TIER_INFO, TIER_ORDER } from './cells.js';
 export { createStreamer } from './streamer.js';
