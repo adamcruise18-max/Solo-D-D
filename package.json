@@ -30,6 +30,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "pmtiles": "^4.5.0",
     "three": "^0.170.0"
   }
 }

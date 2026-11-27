@@ -519,12 +519,12 @@
     };
   }
   function hashString(str) {
-    let h2 = 2166136261 >>> 0;
+    let h3 = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) {
-      h2 ^= str.charCodeAt(i);
-      h2 = Math.imul(h2, 16777619);
+      h3 ^= str.charCodeAt(i);
+      h3 = Math.imul(h3, 16777619);
     }
-    return h2 >>> 0;
+    return h3 >>> 0;
   }
   function rand(state3) {
     let a = state3.rngState | 0;
@@ -534,8 +534,8 @@
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   }
-  function randInt(state3, min, max) {
-    return min + Math.floor(rand(state3) * (max - min + 1));
+  function randInt(state3, min, max2) {
+    return min + Math.floor(rand(state3) * (max2 - min + 1));
   }
   function chance(state3, p) {
     return rand(state3) < p;
@@ -560,16 +560,16 @@
     const jd = localNoonMs / 864e5 + 24405875e-1;
     const n = Math.round(jd - 2451545 + 8e-4);
     const jStar = n - lon / 360;
-    const M = (357.5291 + 0.98560028 * jStar) % 360;
-    const C = 1.9148 * Math.sin(M * RAD) + 0.02 * Math.sin(2 * M * RAD) + 3e-4 * Math.sin(3 * M * RAD);
-    const lambda = (M + C + 180 + 102.9372) % 360;
-    const jTransit = 2451545 + jStar + 53e-4 * Math.sin(M * RAD) - 69e-4 * Math.sin(2 * lambda * RAD);
+    const M3 = (357.5291 + 0.98560028 * jStar) % 360;
+    const C2 = 1.9148 * Math.sin(M3 * RAD) + 0.02 * Math.sin(2 * M3 * RAD) + 3e-4 * Math.sin(3 * M3 * RAD);
+    const lambda = (M3 + C2 + 180 + 102.9372) % 360;
+    const jTransit = 2451545 + jStar + 53e-4 * Math.sin(M3 * RAD) - 69e-4 * Math.sin(2 * lambda * RAD);
     const sinDec = Math.sin(lambda * RAD) * Math.sin(23.44 * RAD);
     const cosDec = Math.cos(Math.asin(sinDec));
     const cosW = (Math.sin(-0.833 * RAD) - Math.sin(lat * RAD) * sinDec) / (Math.cos(lat * RAD) * cosDec);
-    const w = Math.acos(Math.max(-1, Math.min(1, cosW))) / RAD;
-    const toLocalMin = (j) => ((j - 24405875e-1) * 864e5 - (EPOCH_UTC_MS + day * 864e5)) / 6e4;
-    return { rise: toLocalMin(jTransit - w / 360), set: toLocalMin(jTransit + w / 360) };
+    const w2 = Math.acos(Math.max(-1, Math.min(1, cosW))) / RAD;
+    const toLocalMin = (j2) => ((j2 - 24405875e-1) * 864e5 - (EPOCH_UTC_MS + day * 864e5)) / 6e4;
+    return { rise: toLocalMin(jTransit - w2 / 360), set: toLocalMin(jTransit + w2 / 360) };
   }
 
   // src/data/climate.js
@@ -610,11 +610,11 @@
     cold_snap: { label: "cold snap", colder: 12 }
   };
   function startHazard(state3, id, hours) {
-    var _a;
+    var _a2;
     if (!HAZARDS[id]) throw new Error(`Unknown hazard "${id}"`);
     state3.flags || (state3.flags = {});
     clearOldHazards(state3);
-    const hz = (_a = state3.flags).hazards || (_a.hazards = {});
+    const hz = (_a2 = state3.flags).hazards || (_a2.hazards = {});
     hz[id] = Math.max(hz[id] || 0, state3.time + hours * 60);
   }
   function hazardOn(state3, id, t = state3.time) {
@@ -626,7 +626,7 @@
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
   }
   function hazardColder(state3, t = state3.time) {
-    return activeHazards(state3, t).reduce((a, h2) => a + (h2.colder || 0), 0);
+    return activeHazards(state3, t).reduce((a, h3) => a + (h3.colder || 0), 0);
   }
   function clearOldHazards(state3) {
     const hz = state3.flags?.hazards;
@@ -653,19 +653,19 @@
     if (type === "rain" || type === "heavy_rain") return randInt(state3, 5, 20);
     return randInt(state3, 0, 10);
   }
-  function finishDay(state3, w, month) {
-    if ((w.type === "rain" || w.type === "heavy_rain") && w.low <= 32 && (month === 11 || month <= 1)) {
-      w.type = "snow";
-      w.snowInches = randInt(state3, 1, 6);
-    } else if (w.type === "snow") {
-      if (w.low > 34 || !(month === 11 || month <= 1)) {
-        w.type = "rain";
-        delete w.snowInches;
-      } else if (w.snowInches == null) w.snowInches = randInt(state3, 1, 6);
+  function finishDay(state3, w2, month) {
+    if ((w2.type === "rain" || w2.type === "heavy_rain") && w2.low <= 32 && (month === 11 || month <= 1)) {
+      w2.type = "snow";
+      w2.snowInches = randInt(state3, 1, 6);
+    } else if (w2.type === "snow") {
+      if (w2.low > 34 || !(month === 11 || month <= 1)) {
+        w2.type = "rain";
+        delete w2.snowInches;
+      } else if (w2.snowInches == null) w2.snowInches = randInt(state3, 1, 6);
     }
-    if (w.type === "clear") w.nextLow -= 5;
-    w.nextLow = Math.min(w.nextLow, w.high - 3);
-    return w;
+    if (w2.type === "clear") w2.nextLow -= 5;
+    w2.nextLow = Math.min(w2.nextLow, w2.high - 3);
+    return w2;
   }
   function initWeather(state3) {
     const day = 0;
@@ -711,19 +711,19 @@
     return baseAirTemp(state3, t) - hazardColder(state3, t);
   }
   function baseAirTemp(state3, t) {
-    const w = state3.weather;
+    const w2 = state3.weather;
     const m = (t % 1440 + 1440) % 1440;
     const s = sunFor(t);
     const peak = 15 * 60;
-    const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
+    const ease = (a, b2, f) => a + (b2 - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
     if (m < s.rise) {
       const span2 = 1440 - peak + s.rise;
       const f = (m + 1440 - peak) / span2;
-      return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
+      return Math.floor(t / 1440) === w2.day ? ease(w2.prevHigh, w2.low, f) : ease(w2.high, w2.nextLow, f);
     }
-    if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
+    if (m <= peak) return ease(w2.low, w2.high, (m - s.rise) / (peak - s.rise));
     const span = 1440 - peak + s.rise;
-    return ease(w.high, w.nextLow, (m - peak) / span);
+    return ease(w2.high, w2.nextLow, (m - peak) / span);
   }
   function weatherInfo(state3) {
     return WEATHER_TYPES[state3.weather.type];
@@ -1033,59 +1033,59 @@
   var SPELLS = {
     ice_storm: {
       months: [11, 0, 1],
-      fits: (w) => ["rain", "heavy_rain", "snow"].includes(w.type) && w.low <= 34,
+      fits: (w2) => ["rain", "heavy_rain", "snow"].includes(w2.type) && w2.low <= 34,
       chance: 0.02,
       days: [1, 2],
-      shape: (w, r) => {
-        w.high = Math.min(w.high, 33);
-        w.nextLow = Math.min(w.nextLow, 28);
-        w.wind = 15 + Math.floor(r() * 21);
-        delete w.snowInches;
+      shape: (w2, r) => {
+        w2.high = Math.min(w2.high, 33);
+        w2.nextLow = Math.min(w2.nextLow, 28);
+        w2.wind = 15 + Math.floor(r() * 21);
+        delete w2.snowInches;
       },
       start: "Freezing rain. Every branch and wire wears a coat of ice. Trees and power lines will come down, and the roads are glass."
     },
     heat_wave: {
       months: [6, 7],
-      fits: (w) => ["clear", "cloudy"].includes(w.type),
+      fits: (w2) => ["clear", "cloudy"].includes(w2.type),
       chance: 0.012,
       days: [3, 5],
-      shape: (w, r) => {
-        w.high = 98 + Math.floor(r() * 9);
-        w.nextLow = Math.max(w.nextLow, 64);
-        w.wind = Math.floor(r() * 6);
+      shape: (w2, r) => {
+        w2.high = 98 + Math.floor(r() * 9);
+        w2.nextLow = Math.max(w2.nextLow, 64);
+        w2.wind = Math.floor(r() * 6);
       },
       start: "A heat wave. It will be over 100\xB0F in the afternoon. Drink more, and stay in the shade from noon to evening."
     },
     smoke: {
       months: [7, 8],
-      fits: (w) => ["clear", "cloudy", "fog"].includes(w.type),
+      fits: (w2) => ["clear", "cloudy", "fog"].includes(w2.type),
       chance: 0.012,
       days: [3, 7],
-      shape: (w) => {
-        w.high -= 4;
+      shape: (w2) => {
+        w2.high -= 4;
       },
       start: "Wildfire smoke. The sky is orange and the sun is a red disc. The air burns your throat outside; an N95 mask helps."
     }
   };
-  var pickInt = (r, [a, b]) => a + Math.floor(r() * (b - a + 1));
+  var pickInt = (r, [a, b2]) => a + Math.floor(r() * (b2 - a + 1));
   var SNOW_KEEP = 0.28;
   function rollSpell(state3, day, old = {}) {
     const prev = old.spell;
-    const w = state3.weather;
+    const w2 = state3.weather;
     const r = stream(state3, "weather-rare");
     const month = monthOfDay2(day);
-    if (w.type === "snow") {
+    if (w2.type === "snow") {
       const keep = old.type === "snow" || r() < SNOW_KEEP;
       if (!keep) {
-        w.type = "rain";
-        delete w.snowInches;
+        w2.type = "rain";
+        delete w2.snowInches;
       }
     }
     let spell = null;
     if (prev && prev.daysLeft > 1) spell = { id: prev.id, daysLeft: prev.daysLeft - 1, started: false };
     else {
       for (const [id, s] of Object.entries(SPELLS)) {
-        if (!s.months.includes(month) || !s.fits(w)) continue;
+        if (!s.months.includes(month) || !s.fits(w2)) continue;
         if (r() < s.chance) {
           spell = { id, daysLeft: pickInt(r, s.days), started: true };
           break;
@@ -1093,11 +1093,11 @@
       }
     }
     if (!spell) return null;
-    w.baseType = w.type;
-    w.type = spell.id;
-    SPELLS[spell.id].shape(w, r);
-    w.nextLow = Math.min(w.nextLow, w.high - 3);
-    w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
+    w2.baseType = w2.type;
+    w2.type = spell.id;
+    SPELLS[spell.id].shape(w2, r);
+    w2.nextLow = Math.min(w2.nextLow, w2.high - 3);
+    w2.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
     return spell;
   }
   function spellStartText(id) {
@@ -1106,42 +1106,42 @@
 
   // src/engine/home.js
   function homeStep(state3, dt, env) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     const air = env.air;
     let heat = 0;
-    if (h2.fireHours > 0) {
+    if (h3.fireHours > 0) {
       heat += fireHeat(state3);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state3.location.kind === "home") log(state3, "The fire in the fireplace burns out.");
+      h3.fireHours = Math.max(0, h3.fireHours - dt);
+      if (h3.fireHours === 0 && state3.location.kind === "home") log(state3, "The fire in the fireplace burns out.");
     }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
+    if (h3.heaterOn) {
+      h3.battery -= 1.5 * dt;
       heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
+      if (h3.battery <= 0) {
+        h3.battery = 0;
+        h3.heaterOn = false;
         log(state3, "The home battery is empty. The electric heater stops.", "warn");
       }
     }
     const passive = air + 6;
-    const lw = windowLoss(h2, "living");
+    const lw = windowLoss(h3, "living");
     const target = Math.min(75, passive + heat / lw);
     const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state3) * lw);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    roomsStep(h2, passive, dt);
+    h3.indoorTemp += (target - h3.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h3, passive, dt);
     const m = (state3.time % 1440 + 1440) % 1440;
     const s = sunFor(state3.time);
     if (m > s.rise && m < s.set) {
       const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state3) / hours * dt);
+      h3.battery = Math.min(h3.batteryMax, h3.battery + solarToday(state3) / hours * dt);
     }
-    if (built(state3, "rain_barrels") && h2.rawGal < 110) {
+    if (built(state3, "rain_barrels") && h3.rawGal < 110) {
       const t = state3.weather.type;
       const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+      if (perH) h3.rawGal = Math.min(110, h3.rawGal + perH * dt);
     }
-    if (h2.tapWorks && (air < 25 || dayIndex(state3.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
+    if (h3.tapWorks && (air < 25 || dayIndex(state3.time) >= h3.tapStopDay)) {
+      h3.tapWorks = false;
       log(state3, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
   }
@@ -1156,51 +1156,51 @@
   var DOOR_CLOSED = 0.02;
   var BROKEN = 1.5;
   var BOARDED = 0.3;
-  function ensureRooms(h2) {
-    if (!h2.rooms) {
-      h2.rooms = {};
-      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+  function ensureRooms(h3) {
+    if (!h3.rooms) {
+      h3.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h3.rooms[r.id] = { temp: h3.indoorTemp };
     }
-    if (!h2.windows) h2.windows = {};
-    if (!h2.doorsClosed) h2.doorsClosed = {};
-    return h2;
+    if (!h3.windows) h3.windows = {};
+    if (!h3.doorsClosed) h3.doorsClosed = {};
+    return h3;
   }
-  function windowLoss(h2, room) {
-    const w = h2.windows?.[room];
-    if (!w) return 1;
-    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  function windowLoss(h3, room) {
+    const w2 = h3.windows?.[room];
+    if (!w2) return 1;
+    return 1 + BROKEN * Math.max(0, (w2.broken || 0) - (w2.boarded || 0)) + BROKEN * BOARDED * (w2.boarded || 0);
   }
   var LIVING_SHARE = 1 / 3;
-  function roomsStep(h2, passive, dt) {
-    ensureRooms(h2);
-    for (const [id, r] of Object.entries(h2.rooms)) {
-      const kDoor = (h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
-      h2.indoorTemp += (r.temp - h2.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+  function roomsStep(h3, passive, dt) {
+    ensureRooms(h3);
+    for (const [id, r] of Object.entries(h3.rooms)) {
+      const kDoor = (h3.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+      h3.indoorTemp += (r.temp - h3.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
     }
-    for (const [id, r] of Object.entries(h2.rooms)) {
-      const kOut = OUT_RATE * windowLoss(h2, id);
-      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
-      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+    for (const [id, r] of Object.entries(h3.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h3, id);
+      const kDoor = h3.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h3.indoorTemp) / (kOut + kDoor);
       const rate = Math.min(0.9, kOut + kDoor);
       r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
     }
   }
   function roomTemp(state3, room) {
-    const h2 = state3.home;
-    if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
-    return h2.rooms[room].temp;
+    const h3 = state3.home;
+    if (room === "living" || !h3.rooms?.[room]) return h3.indoorTemp;
+    return h3.rooms[room].temp;
   }
   function breakWindow(state3, room) {
-    var _a;
-    const h2 = ensureRooms(state3.home);
-    const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
-    w.broken += 1;
+    var _a2;
+    const h3 = ensureRooms(state3.home);
+    const w2 = (_a2 = h3.windows)[room] || (_a2[room] = { broken: 0, boarded: 0 });
+    w2.broken += 1;
   }
   function boardWindow(state3, room) {
-    const h2 = ensureRooms(state3.home);
-    const w = h2.windows[room];
-    if (!w || (w.boarded || 0) >= (w.broken || 0)) return false;
-    w.boarded = (w.boarded || 0) + 1;
+    const h3 = ensureRooms(state3.home);
+    const w2 = h3.windows[room];
+    if (!w2 || (w2.boarded || 0) >= (w2.broken || 0)) return false;
+    w2.boarded = (w2.boarded || 0) + 1;
     return true;
   }
   var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
@@ -1217,29 +1217,29 @@
     return { temp: roomTemp(state3, spot), bed: SLEEP_SPOTS[spot].bed, spot };
   }
   function setDoor(state3, room, closed) {
-    const h2 = ensureRooms(state3.home);
-    if (!h2.rooms[room]) return false;
-    h2.doorsClosed[room] = !!closed;
+    const h3 = ensureRooms(state3.home);
+    if (!h3.rooms[room]) return false;
+    h3.doorsClosed[room] = !!closed;
     return true;
   }
   function homeHeat(state3) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     const air = environment(state3, "rest").air;
     return {
       outside: Math.round(air),
-      sources: { fire: h2.fireHours > 0 ? fireHeat(state3) : 0, fireHours: h2.fireHours, heater: h2.heaterOn ? 20 : 0, stove: built(state3, "wood_stove") },
+      sources: { fire: h3.fireHours > 0 ? fireHeat(state3) : 0, fireHours: h3.fireHours, heater: h3.heaterOn ? 20 : 0, stove: built(state3, "wood_stove") },
       insulated: built(state3, "insulate_living"),
       sleepSpot: sleepSpot(state3),
       rooms: ROOMS.map((r) => {
-        const w = h2.windows?.[r.id] || { broken: 0, boarded: 0 };
+        const w2 = h3.windows?.[r.id] || { broken: 0, boarded: 0 };
         return {
           id: r.id,
           label: r.label,
           temp: Math.round(roomTemp(state3, r.id) * 10) / 10,
-          brokenWindows: (w.broken || 0) - (w.boarded || 0),
-          boardedWindows: w.boarded || 0,
-          doorClosed: r.id === "living" ? null : !!h2.doorsClosed?.[r.id],
-          loss: Math.round(windowLoss(h2, r.id) * 100) / 100
+          brokenWindows: (w2.broken || 0) - (w2.boarded || 0),
+          boardedWindows: w2.boarded || 0,
+          doorClosed: r.id === "living" ? null : !!h3.doorsClosed?.[r.id],
+          loss: Math.round(windowLoss(h3, r.id) * 100) / 100
           // 1 = a whole, closed-up room
         };
       })
@@ -1254,22 +1254,22 @@
     if (r() >= p) return null;
     const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
     breakWindow(state3, room);
-    const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
+    const label = ROOMS.find((x2) => x2.id === room)?.label?.toLowerCase() || room;
     log(state3, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
     return room;
   }
   var WATER_WARN = [10, 3];
   function waterWarning(state3) {
-    const h2 = state3.home;
-    if (h2.tapWorks) return null;
-    const gal = (h2.tankGal || 0) + (h2.safeGal || 0);
-    const lvl = WATER_WARN.filter((x) => gal < x).pop() ?? null;
+    const h3 = state3.home;
+    if (h3.tapWorks) return null;
+    const gal = (h3.tankGal || 0) + (h3.safeGal || 0);
+    const lvl = WATER_WARN.filter((x2) => gal < x2).pop() ?? null;
     if (lvl == null) {
-      delete h2.waterWarned;
+      delete h3.waterWarned;
       return null;
     }
-    if (h2.waterWarned != null && h2.waterWarned <= lvl) return null;
-    h2.waterWarned = lvl;
+    if (h3.waterWarned != null && h3.waterWarned <= lvl) return null;
+    h3.waterWarned = lvl;
     log(state3, lvl <= 3 ? `Only ${gal.toFixed(1)} gal of clean water left. Find water today: rain, a creek to boil, or bottles in stores.` : `The stored water is getting low (${gal.toFixed(1)} gal). Rain barrels and a filter would keep it full.`, lvl <= 3 ? "danger" : "warn");
     return lvl;
   }
@@ -1373,14 +1373,14 @@
   }
   var SPLIT = /* @__PURE__ */ new Set(["player", "home", "location", "dog", "weather", "stats", "places", "houses", "houseAreas", "flags", "world", "systemVersions", "rngStreams"]);
   var SKIP = /* @__PURE__ */ new Set(["log", "journal"]);
-  var h = (v) => hashString(JSON.stringify(v ?? null)).toString(36);
+  var h = (v2) => hashString(JSON.stringify(v2 ?? null)).toString(36);
   function fieldHashes(s) {
     const out = {};
-    for (const [k, v] of Object.entries(s)) {
+    for (const [k, v2] of Object.entries(s)) {
       if (SKIP.has(k)) continue;
-      if (SPLIT.has(k) && v && typeof v === "object" && !Array.isArray(v)) {
-        for (const [k2, v2] of Object.entries(v)) out[`${k}.${k2}`] = h(v2);
-      } else out[k] = h(v);
+      if (SPLIT.has(k) && v2 && typeof v2 === "object" && !Array.isArray(v2)) {
+        for (const [k2, v22] of Object.entries(v2)) out[`${k}.${k2}`] = h(v22);
+      } else out[k] = h(v2);
     }
     return out;
   }
@@ -1463,8 +1463,8 @@
     for (const k of Object.keys(sys)) {
       if (!KNOWN.has(k)) throw new Error(`System "${sys.id}": unknown field "${k}"`);
     }
-    for (const h2 of HOOKS) {
-      if (sys[h2] != null && typeof sys[h2] !== "function") throw new Error(`System "${sys.id}": ${h2} must be a function`);
+    for (const h3 of HOOKS) {
+      if (sys[h3] != null && typeof sys[h3] !== "function") throw new Error(`System "${sys.id}": ${h3} must be a function`);
     }
     const version = sys.version ?? 1;
     if (!Number.isInteger(version) || version < 1) throw new Error(`System "${sys.id}": version must be a whole number from 1`);
@@ -1475,8 +1475,8 @@
       throw new Error(`System "${sys.id}": catchUp must be one of ${CATCH_UP.join(", ")}`);
     }
     const migrations = sys.migrations || {};
-    for (let v = 2; v <= version; v++) {
-      if (typeof migrations[v] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v}`);
+    for (let v2 = 2; v2 <= version; v2++) {
+      if (typeof migrations[v2] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v2}`);
     }
     return Object.freeze({ order: 100, ...sys, version, migrations });
   }
@@ -1492,7 +1492,7 @@
       }
       for (const f of s.owns || []) owner.set(f, s.id);
       byId3.set(s.id, s);
-      ordered = [...byId3.values()].sort((a, b) => a.order - b.order);
+      ordered = [...byId3.values()].sort((a, b2) => a.order - b2.order);
       return s;
     }
     for (const s of list) add(s);
@@ -1512,8 +1512,8 @@
         }
         const before = snapOthers(state3, s.id);
         withSource({ sys: s.id, hook }, call);
-        for (const [f, v] of Object.entries(before)) {
-          if (JSON.stringify(state3[f] ?? null) !== v) {
+        for (const [f, v2] of Object.entries(before)) {
+          if (JSON.stringify(state3[f] ?? null) !== v2) {
             throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);
           }
         }
@@ -1570,9 +1570,9 @@
         left -= step;
         const dBefore = gameDay(before);
         const dAfter = gameDay(state3.time);
-        for (let d = dBefore + 1; d <= dAfter; d++) {
-          systems.daily(state3, d, ctx);
-          events?.emit("day.start", { day: d, time: state3.time });
+        for (let d2 = dBefore + 1; d2 <= dAfter; d2++) {
+          systems.daily(state3, d2, ctx);
+          events?.emit("day.start", { day: d2, time: state3.time });
         }
         systems.step(state3, step / 60, ctx);
         if (state3._stop) {
@@ -1608,18 +1608,18 @@
         s.systemVersions = Object.fromEntries(systems.list().filter((sys) => sys.legacy).map((sys) => [sys.id, 1]));
       }
       for (const sys of systems.list()) {
-        let v = s.systemVersions[sys.id];
-        if (v == null) {
+        let v2 = s.systemVersions[sys.id];
+        if (v2 == null) {
           if (sys.init) sys.init(s, {});
           s.systemVersions[sys.id] = sys.version;
           continue;
         }
-        if (v > sys.version) throw new Error(`Save has ${sys.id} v${v}, game has v${sys.version}`);
-        while (v < sys.version) {
-          v += 1;
-          s = sys.migrations[v](s) || s;
+        if (v2 > sys.version) throw new Error(`Save has ${sys.id} v${v2}, game has v${sys.version}`);
+        while (v2 < sys.version) {
+          v2 += 1;
+          s = sys.migrations[v2](s) || s;
         }
-        s.systemVersions[sys.id] = v;
+        s.systemVersions[sys.id] = v2;
       }
     }
     return s;
@@ -1641,7 +1641,7 @@
     const radiusM = radiusMiles * 1609.344;
     const maxCell = Math.ceil(radiusM / cellMeters);
     const toMeters = ({ lat, lon }) => ({ x: (lon - origin.lon) * mPerDegLon, z: (origin.lat - lat) * M_PER_DEG_LAT });
-    const toLatLon = ({ x, z }) => ({ lat: origin.lat - z / M_PER_DEG_LAT, lon: origin.lon + x / mPerDegLon });
+    const toLatLon = ({ x: x2, z: z2 }) => ({ lat: origin.lat - z2 / M_PER_DEG_LAT, lon: origin.lon + x2 / mPerDegLon });
     const keyOf = (cx, cz) => `${cx},${cz}`;
     const parse = (key) => {
       const [cx, cz] = key.split(",").map(Number);
@@ -1659,9 +1659,9 @@
     }
     function inArea(key) {
       const { cx, cz } = parse(key);
-      const x = (cx + 0.5) * cellMeters;
-      const z = (cz + 0.5) * cellMeters;
-      return Math.hypot(x, z) <= radiusM + cellMeters;
+      const x2 = (cx + 0.5) * cellMeters;
+      const z2 = (cz + 0.5) * cellMeters;
+      return Math.hypot(x2, z2) <= radiusM + cellMeters;
     }
     function bucket(list) {
       const out = /* @__PURE__ */ new Map();
@@ -1788,15 +1788,15 @@
       [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
     ]
   };
-  function statStage(key, v) {
+  function statStage(key, v2) {
     const rows = STAGES[key];
-    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
+    for (let i = 0; i < rows.length; i++) if (v2 >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
     const last = rows.length - 1;
     return { stage: last, word: rows[last][1], effect: rows[last][2] };
   }
   function needWarnings(state3) {
     const p = state3.player;
-    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
+    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b2) => b2.stage - a.stage);
   }
   function risks(state3) {
     const p = state3.player;
@@ -1804,14 +1804,14 @@
     if (!p.illness.infection) {
       const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
       if (open.length) {
-        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
+        const pct = Math.round((1 - open.reduce((q2, i) => q2 * (1 - i.infectRisk), 1)) * 100);
         out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
       }
     }
     const rate = warmthRate(feltTemp(state3, "rest"));
     if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
-      const h2 = (p.warmth - 25) / -rate;
-      out.push({ id: "hypothermia", text: `Hypothermia in about ${h2 < 1 ? `${Math.max(5, Math.round(h2 * 60 / 5) * 5)} min` : `${Math.round(h2)} h`} here: get warm` });
+      const h3 = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h3 < 1 ? `${Math.max(5, Math.round(h3 * 60 / 5) * 5)} min` : `${Math.round(h3)} h`} here: get warm` });
     }
     if (p.wetness >= 50 && feltTemp(state3, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
     if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
@@ -1865,11 +1865,11 @@
   }
   function pick(state3, list, rng) {
     const mercy = inTrouble(state3);
-    const w = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
-    const total = list.reduce((a, e) => a + w(e), 0);
+    const w2 = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
+    const total = list.reduce((a, e) => a + w2(e), 0);
     let r = rng() * total;
     for (const e of list) {
-      r -= w(e);
+      r -= w2(e);
       if (r < 0) return e;
     }
     return list[list.length - 1];
@@ -1990,7 +1990,7 @@
     const next2 = DECAY.filter((r) => started[r.id] == null).map((r) => {
       const k = r.chanceByDay >= 0.02 ? 1 : Math.ceil(Math.log(0.98) / Math.log(1 - r.chanceByDay));
       return { id: r.id, day: Math.max(day, monthStartDay(r.month) + k - 1) };
-    }).sort((a, b) => a.day - b.day)[0] || null;
+    }).sort((a, b2) => a.day - b2.day)[0] || null;
     return {
       shown: Object.keys(started),
       next: next2,
@@ -2011,32 +2011,32 @@
   };
 
   // src/engine/dog.js
-  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
   function dogStep(state3, dt, sleeping) {
-    const d = state3.dog;
-    if (d.stage !== "joined") return;
-    d.food = clamp(d.food - 4 * dt, 0, 100);
-    d.water = 80;
-    if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
-    if (d.sick) d.health -= SICK_PER_HOUR * dt;
-    if (!sleeping && d.health > 0) {
-      feralWarning(state3, d);
-      sniff(state3, d, dt);
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
+    d2.food = clamp(d2.food - 4 * dt, 0, 100);
+    d2.water = 80;
+    if (d2.food <= 0) d2.health -= 1 * dt;
+    else if (sleeping && !d2.sick) d2.health = Math.min(100, d2.health + 1 * dt);
+    if (d2.sick) d2.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d2.health > 0) {
+      feralWarning(state3, d2);
+      sniff(state3, d2, dt);
     }
-    if (d.health <= 50 && d.warned < 1) {
-      d.warned = 1;
-      log(state3, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
+    if (d2.health <= 50 && d2.warned < 1) {
+      d2.warned = 1;
+      log(state3, `${d2.name} is weak. Feed ${d2.name} and let ${d2.name} rest.`, "warn");
     }
-    if (d.health <= 25 && d.warned < 2) {
-      d.warned = 2;
-      log(state3, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
+    if (d2.health <= 25 && d2.warned < 2) {
+      d2.warned = 2;
+      log(state3, `${d2.name} is very sick. ${d2.name} needs food or medicine now.`, "danger");
     }
-    if (d.health > 60) d.warned = 0;
-    if (d.health <= 0) {
-      d.health = 0;
-      d.stage = "dead";
-      log(state3, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
+    if (d2.health > 60) d2.warned = 0;
+    if (d2.health <= 0) {
+      d2.health = 0;
+      d2.stage = "dead";
+      log(state3, `${d2.name} lies down and does not get up again. ${d2.name} is gone.`, "danger");
       state3.player.morale = Math.max(0, state3.player.morale - 25);
     }
   }
@@ -2053,57 +2053,57 @@
     ["batteries", 1],
     ["raw_meat", 1]
   ];
-  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
+  var able = (d2) => d2.stage === "joined" && !d2.sick && d2.health > 50;
   function dogWarns(state3) {
-    const d = state3.dog;
-    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+    const d2 = state3.dog;
+    return !!d2 && d2.stage === "joined" && d2.bond >= 30 && d2.health > 25;
   }
-  function feralWarning(state3, d) {
+  function feralWarning(state3, d2) {
     if (!dogWarns(state3) || !hazardOn(state3, "feral_dogs")) return;
     const end = state3.flags.hazards.feral_dogs;
-    if (d.feralWarned === end) return;
-    d.feralWarned = end;
-    log(state3, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+    if (d2.feralWarned === end) return;
+    d2.feralWarned = end;
+    log(state3, `${d2.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
   }
-  function sniff(state3, d, dt) {
+  function sniff(state3, d2, dt) {
     const loc = state3.location;
-    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    if (!able(d2) || d2.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
     const key = `${loc.kind}:${loc.id}:${Math.floor(state3.time / 1440)}`;
-    if (d.foundAt === key) return;
+    if (d2.foundAt === key) return;
     const r = stream(state3, "dog");
-    if (r() >= 0.12 * (d.bond / 100) * dt) return;
-    d.foundAt = key;
-    const total = FINDS.reduce((a, [, w]) => a + w, 0);
-    let x = r() * total;
-    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
+    if (r() >= 0.12 * (d2.bond / 100) * dt) return;
+    d2.foundAt = key;
+    const total = FINDS.reduce((a, [, w2]) => a + w2, 0);
+    let x2 = r() * total;
+    const [id] = FINDS.find(([, w2]) => (x2 -= w2) < 0) || FINDS[0];
     addItem(state3.carried, id, 1);
-    d.finds = (d.finds || 0) + 1;
-    log(state3, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+    d2.finds = (d2.finds || 0) + 1;
+    log(state3, `${d2.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
   }
   function dogSickDaily(state3, day) {
-    const d = state3.dog;
-    if (d.stage !== "joined") return;
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
     const r = stream(state3, "dog");
-    if (d.sick) {
-      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
-        d.sick = null;
-        log(state3, `${d.name} eats with interest again. The sickness is over.`, "good");
+    if (d2.sick) {
+      if (day - d2.sick.since >= 4 && d2.food >= 25 && r() < 0.4) {
+        d2.sick = null;
+        log(state3, `${d2.name} eats with interest again. The sickness is over.`, "good");
       }
       return;
     }
-    const w = state3.weather || {};
+    const w2 = state3.weather || {};
     let p = 0.012;
-    if (d.food < 25) p += 0.03;
-    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (d2.food < 25) p += 0.03;
+    if (w2.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w2.type)) p += 0.015;
     if (r() < p) {
-      d.sick = { since: day };
-      log(state3, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
+      d2.sick = { since: day };
+      log(state3, `${d2.name} will not eat this morning and lies by the door, shaking. ${d2.name} is sick.`, "warn");
     }
   }
   function canTreatDog(state3) {
-    const d = state3.dog;
-    if (!d || d.stage !== "joined") return "No dog";
-    if (!d.sick) return `${d.name} is not sick`;
+    const d2 = state3.dog;
+    if (!d2 || d2.stage !== "joined") return "No dog";
+    if (!d2.sick) return `${d2.name} is not sick`;
     if (!has(state3, "antibiotics")) return "You need antibiotics";
     return null;
   }
@@ -2113,45 +2113,45 @@
       log(state3, why + ".");
       return false;
     }
-    const d = state3.dog;
+    const d2 = state3.dog;
     const bag = (state3.carried.antibiotics || 0) > 0 ? state3.carried : state3.home.storage;
     addItem(bag, "antibiotics", -1);
-    d.sick = null;
-    d.health = Math.min(100, d.health + 10);
-    log(state3, `You push the pills into a bit of food. ${d.name} swallows them. By evening ${d.name} looks better.`, "good");
+    d2.sick = null;
+    d2.health = Math.min(100, d2.health + 10);
+    log(state3, `You push the pills into a bit of food. ${d2.name} swallows them. By evening ${d2.name} looks better.`, "good");
     return true;
   }
   function dogBondDaily(state3) {
-    const d = state3.dog;
-    if (d.stage !== "joined") return;
-    if (d.food >= 25) d.bond += 3;
-    else d.bond -= 10;
-    d.bond = clamp(d.bond, 0, 100);
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
+    if (d2.food >= 25) d2.bond += 3;
+    else d2.bond -= 10;
+    d2.bond = clamp(d2.bond, 0, 100);
   }
   function dogDaily(state3, day) {
-    const d = state3.dog;
-    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-    if (d.stage === "none" && day >= d.arriveDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
+    const d2 = state3.dog;
+    const lastFed = d2.feedDays.length ? d2.feedDays[d2.feedDays.length - 1] : null;
+    if (d2.stage === "none" && day >= d2.arriveDay) {
+      d2.stage = "visiting";
+      d2.visitStart = day;
       log(state3, "A thin dog watches the house from the street. It does not come near.", "story");
-    } else if (d.stage === "visiting") {
-      const since = lastFed == null ? day - d.visitStart : day - lastFed;
+    } else if (d2.stage === "visiting") {
+      const since = lastFed == null ? day - d2.visitStart : day - lastFed;
       if (since > 3) {
-        if (!d.revisitUsed) {
-          d.stage = "away";
-          d.revisitUsed = true;
-          d.revisitDay = day + randInt(state3, 5, 8);
+        if (!d2.revisitUsed) {
+          d2.stage = "away";
+          d2.revisitUsed = true;
+          d2.revisitDay = day + randInt(state3, 5, 8);
           log(state3, "The dog is not in the street today.");
         } else {
-          d.stage = "gone";
+          d2.stage = "gone";
           log(state3, "The dog does not come back.");
         }
       }
-    } else if (d.stage === "away" && day >= d.revisitDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      d.feedDays = [];
+    } else if (d2.stage === "away" && day >= d2.revisitDay) {
+      d2.stage = "visiting";
+      d2.visitStart = day;
+      d2.feedDays = [];
       log(state3, "The thin dog is back in the street. It looks at your door.", "story");
     }
   }
@@ -2215,7 +2215,7 @@
   function addFresh(state3, bags2, id, qty, spoil = 0) {
     if (!isPerishable(id)) return;
     const f = freshOf(state3);
-    const have = bags2.reduce((n, b) => n + (b[id] || 0), 0);
+    const have = bags2.reduce((n, b2) => n + (b2[id] || 0), 0);
     f[id] = have + qty > 0 ? ((f[id] || 0) * have + spoil * qty) / (have + qty) : spoil;
   }
   function ageFood(state3, dt, tempAt) {
@@ -2270,27 +2270,27 @@
   function gardenDaily(state3, day) {
     const g = garden(state3);
     if (!g.beds.length) return;
-    const w = state3.weather;
-    const mean = (w.high + w.low) / 2;
-    const rained = RAIN.has(w.type);
-    for (const b of g.beds) {
-      if (!b.crop || b.dead) continue;
-      const c = CROPS[b.crop];
-      if (c.frostF != null && w.low <= c.frostF) {
-        b.dead = true;
+    const w2 = state3.weather;
+    const mean = (w2.high + w2.low) / 2;
+    const rained = RAIN.has(w2.type);
+    for (const b2 of g.beds) {
+      if (!b2.crop || b2.dead) continue;
+      const c = CROPS[b2.crop];
+      if (c.frostF != null && w2.low <= c.frostF) {
+        b2.dead = true;
         log(state3, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
         continue;
       }
-      b.water = rained ? 1 : Math.max(0, b.water - DRY_PER_DAY * (w.type === "heat_wave" ? 1.7 : 1));
-      if (b.growth < 1) {
-        b.growth = Math.min(1, b.growth + dayGrowth(b.crop, mean, b.water));
-        if (b.growth >= 1 - 1e-9) {
-          b.growth = 1;
-          b.ripeDay = day;
+      b2.water = rained ? 1 : Math.max(0, b2.water - DRY_PER_DAY * (w2.type === "heat_wave" ? 1.7 : 1));
+      if (b2.growth < 1) {
+        b2.growth = Math.min(1, b2.growth + dayGrowth(b2.crop, mean, b2.water));
+        if (b2.growth >= 1 - 1e-9) {
+          b2.growth = 1;
+          b2.ripeDay = day;
           log(state3, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
         }
-      } else if (b.ripeDay != null && day - b.ripeDay >= ROT_DAYS) {
-        b.dead = true;
+      } else if (b2.ripeDay != null && day - b2.ripeDay >= ROT_DAYS) {
+        b2.dead = true;
         log(state3, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
       }
     }
@@ -2301,7 +2301,7 @@
     if (!bedCount(state3)) return "Build the garden beds first";
     if (!has(state3, "seeds")) return "You need a seed packet";
     const g = garden(state3);
-    const free = g.beds.filter((b) => b.crop && !b.dead).length < bedCount(state3);
+    const free = g.beds.filter((b2) => b2.crop && !b2.dead).length < bedCount(state3);
     if (!free) return "All beds are in use";
     if (!c.plant.includes(monthOfDay3(dayIndex(state3.time)))) return `Not the season to sow ${c.name.toLowerCase()}`;
     return null;
@@ -2313,7 +2313,7 @@
       return false;
     }
     const g = garden(state3);
-    g.beds = g.beds.filter((b) => b.crop && !b.dead);
+    g.beds = g.beds.filter((b2) => b2.crop && !b2.dead);
     g.beds.push({ crop: cropId, day: dayIndex(state3.time), growth: 0, water: 0.6, ripeDay: null, dead: false });
     const bag = (state3.carried.seeds || 0) > 0 ? state3.carried : state3.home.storage;
     addItem(bag, "seeds", -1);
@@ -2322,18 +2322,18 @@
   }
   function waterGarden(state3) {
     const g = garden(state3);
-    const beds = g.beds.filter((b) => b.crop && !b.dead && b.growth < 1 && b.water < 1);
+    const beds = g.beds.filter((b2) => b2.crop && !b2.dead && b2.growth < 1 && b2.water < 1);
     if (!beds.length) {
       log(state3, "The beds do not need water.");
       return 0;
     }
-    const h2 = state3.home;
+    const h3 = state3.home;
     let n = 0;
-    for (const b of beds) {
-      if (h2.rawGal >= WATER_GAL) h2.rawGal -= WATER_GAL;
-      else if (h2.tankGal >= WATER_GAL) h2.tankGal -= WATER_GAL;
+    for (const b2 of beds) {
+      if (h3.rawGal >= WATER_GAL) h3.rawGal -= WATER_GAL;
+      else if (h3.tankGal >= WATER_GAL) h3.tankGal -= WATER_GAL;
       else break;
-      b.water = 1;
+      b2.water = 1;
       n++;
     }
     log(state3, n ? `You water ${n} garden bed${n > 1 ? "s" : ""} (${n * WATER_GAL} gal).` : "You have no water to spare for the garden.");
@@ -2341,33 +2341,33 @@
   }
   function harvest(state3) {
     const g = garden(state3);
-    const ripe = g.beds.filter((b) => b.crop && !b.dead && b.growth >= 1);
+    const ripe = g.beds.filter((b2) => b2.crop && !b2.dead && b2.growth >= 1);
     if (!ripe.length) {
       log(state3, "Nothing in the garden is ready.");
       return {};
     }
     const got = {};
-    for (const b of ripe) {
-      const [id, qty] = CROPS[b.crop].yield;
+    for (const b2 of ripe) {
+      const [id, qty] = CROPS[b2.crop].yield;
       addFresh(state3, [state3.home.storage, state3.carried], id, qty, 0);
       addItem(state3.home.storage, id, qty);
       got[id] = (got[id] || 0) + qty;
-      const c = CROPS[b.crop];
-      b.cuts = (b.cuts || 0) + 1;
-      if (c.regrow && b.cuts < (c.cuts || 1)) {
-        b.growth = c.regrow;
-        b.ripeDay = null;
-      } else b.dead = true;
+      const c = CROPS[b2.crop];
+      b2.cuts = (b2.cuts || 0) + 1;
+      if (c.regrow && b2.cuts < (c.cuts || 1)) {
+        b2.growth = c.regrow;
+        b2.ripeDay = null;
+      } else b2.dead = true;
     }
-    g.beds = g.beds.filter((b) => !b.dead);
-    log(state3, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
+    g.beds = g.beds.filter((b2) => !b2.dead);
+    log(state3, `You harvest the garden: ${Object.entries(got).map(([id, q2]) => `${q2} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
     return got;
   }
-  function stageOf2(b) {
-    if (b.dead) return "dead";
-    if (b.growth >= 1) return "ready";
-    if (b.growth >= 0.6) return "nearly";
-    if (b.growth >= 0.2) return "growing";
+  function stageOf2(b2) {
+    if (b2.dead) return "dead";
+    if (b2.growth >= 1) return "ready";
+    if (b2.growth >= 0.6) return "nearly";
+    if (b2.growth >= 0.2) return "growing";
     return "seedling";
   }
   function gardenInfo(state3) {
@@ -2375,14 +2375,14 @@
     const month = monthOfDay3(dayIndex(state3.time));
     return {
       beds: bedCount(state3),
-      planted: g.beds.map((b) => ({
-        crop: b.crop,
-        name: CROPS[b.crop]?.name,
-        growth: Math.round(b.growth * 100),
-        water: Math.round(b.water * 100),
-        ready: b.growth >= 1 && !b.dead,
-        dead: b.dead,
-        stage: stageOf2(b)
+      planted: g.beds.map((b2) => ({
+        crop: b2.crop,
+        name: CROPS[b2.crop]?.name,
+        growth: Math.round(b2.growth * 100),
+        water: Math.round(b2.water * 100),
+        ready: b2.growth >= 1 && !b2.dead,
+        dead: b2.dead,
+        stage: stageOf2(b2)
       })),
       canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id)
     };
@@ -2460,20 +2460,20 @@
   var OLD = { coat: ["mid", "winter_coat"], rain: ["shell", "rain_jacket"], hat: ["hat", "winter_hat"], gloves: ["gloves", "gloves"], boots: ["boots", "boots"], socks: ["socks", "wool_socks"] };
   var WET_LIMIT = 50;
   function normalizeWorn(p) {
-    const w = p.worn || {};
-    if (!w._v) {
+    const w2 = p.worn || {};
+    if (!w2._v) {
       const next2 = { _v: 2 };
       for (const s of SLOTS) next2[s] = false;
-      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next2[slot] = id;
-      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next2[s] = w[s];
+      for (const [old, [slot, id]] of Object.entries(OLD)) if (w2[old] === true) next2[slot] = id;
+      for (const s of SLOTS) if (typeof w2[s] === "string" && ITEMS[w2[s]]) next2[s] = w2[s];
       p.worn = next2;
     }
     if (typeof p.wetness !== "number") p.wetness = p.wet ? 80 : 0;
     return p.worn;
   }
   function wornItems(p) {
-    const w = normalizeWorn(p);
-    return SLOTS.filter((s) => w[s]).map((s) => ({ slot: s, id: w[s], it: ITEMS[w[s]] }));
+    const w2 = normalizeWorn(p);
+    return SLOTS.filter((s) => w2[s]).map((s) => ({ slot: s, id: w2[s], it: ITEMS[w2[s]] }));
   }
   function clothingWarmth(p) {
     const wet = Math.min(1, (p.wetness ?? (p.wet ? 80 : 0)) / 100);
@@ -2501,15 +2501,15 @@
   function putOn(p, id) {
     const it = ITEMS[id];
     if (!it || it.kind !== "wear" || !SLOTS.includes(it.slot)) return null;
-    const w = normalizeWorn(p);
-    const old = w[it.slot] || null;
-    w[it.slot] = id;
+    const w2 = normalizeWorn(p);
+    const old = w2[it.slot] || null;
+    w2[it.slot] = id;
     return old;
   }
   function takeOff(p, slot) {
-    const w = normalizeWorn(p);
-    const old = w[slot] || null;
-    w[slot] = false;
+    const w2 = normalizeWorn(p);
+    const old = w2[slot] || null;
+    w2[slot] = false;
     return old;
   }
   function wornText(p) {
@@ -2518,7 +2518,7 @@
   }
 
   // src/engine/tick.js
-  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp2 = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
   function clothingRating(state3) {
     return clothingWarmth(state3.player);
   }
@@ -2549,8 +2549,8 @@
     if (mode === "sleep") {
       if (sleepHome) felt += sleepHome.bed;
       felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state3, id)).map((id) => ITEMS[id].sleepWarm));
-      const d = state3.dog;
-      if (d.stage === "joined" && d.bond >= 80) felt += 5;
+      const d2 = state3.dog;
+      if (d2.stage === "joined" && d2.bond >= 80) felt += 5;
     }
     return felt;
   }
@@ -2719,7 +2719,7 @@
     checkWake(state3);
     if (p.health <= 0) {
       p.health = 0;
-      const causes = Object.entries(state3._damage || {}).sort((a, b) => b[1] - a[1]);
+      const causes = Object.entries(state3._damage || {}).sort((a, b2) => b2[1] - a[1]);
       die(state3, causes.length ? causes[0][0] : "unknown");
     }
     state3._damage = {};
@@ -2790,7 +2790,7 @@
     return f;
   }
   function addInjury(state3, type, opts = {}) {
-    const d = INJURY_DATA[type];
+    const d2 = INJURY_DATA[type];
     const r = stream(state3, "injury");
     if (!opts.always && r() >= INJURY_RATE) {
       log(state3, type === "bite" ? "Teeth snap at you, but you pull free unhurt." : "A close call. You are not hurt.");
@@ -2798,15 +2798,15 @@
     }
     let sev = opts.severity ? SEVERITY.find((s) => s.id === opts.severity) : null;
     if (!sev) {
-      const x = r();
+      const x2 = r();
       let acc = 0;
-      sev = SEVERITY.find((s) => (acc += s.w) > x) || SEVERITY[0];
+      sev = SEVERITY.find((s) => (acc += s.w) > x2) || SEVERITY[0];
     }
     const part = type === "sprain" ? opts.part || (r() < 0.5 ? "ankle" : "wrist") : void 0;
-    const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d.healH * sev.heal, infectRisk: d.infectRisk * infectRiskFactor(state3), infectRolled: false };
+    const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d2.healH * sev.heal, infectRisk: d2.infectRisk * infectRiskFactor(state3), infectRolled: false };
     if (part) inj.part = part;
     state3.player.injuries.push(inj);
-    const full = d.hp * sev.hp;
+    const full = d2.hp * sev.hp;
     const hp = CUTS.has(type) ? Math.min(full, Math.max(0, state3.player.health - 1)) : full;
     damage(state3, hp, type === "bite" ? "an animal attack" : "an injury");
     log(state3, `Injury: ${injuryName(inj)} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
@@ -2859,10 +2859,10 @@
   var WORK_BLOCK_H = 2;
   var MIN_WORK_ENERGY = 15;
   function base(state3) {
-    const h2 = state3.home;
-    if (!h2.projects) h2.projects = {};
-    if (!h2.work) h2.work = {};
-    return h2;
+    const h3 = state3.home;
+    if (!h3.projects) h3.projects = {};
+    if (!h3.work) h3.work = {};
+    return h3;
   }
   function built(state3, id) {
     return !!(state3.home.projects && state3.home.projects[id]);
@@ -2874,13 +2874,13 @@
     return (state3.home.storage[id] || 0) + (state3.carried[id] || 0);
   }
   function projectStatus(state3, proj) {
-    const h2 = base(state3);
-    const started = h2.work[proj.id] != null;
-    const doneH = h2.work[proj.id] || 0;
+    const h3 = base(state3);
+    const started = h3.work[proj.id] != null;
+    const doneH = h3.work[proj.id] || 0;
     const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state3, id) }));
     const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state3, id) > 0 }));
     const missingReq = (proj.requires || []).filter((r) => !built(state3, r));
-    const partsOk = started || parts.every((x) => x.have >= x.need);
+    const partsOk = started || parts.every((x2) => x2.have >= x2.need);
     const toolsOk = tools.every((t) => t.have);
     let blocked = null;
     if (built(state3, proj.id)) blocked = "Built";
@@ -2902,9 +2902,9 @@
     };
   }
   function wingSummary(state3) {
-    return Object.entries(WINGS).map(([id, w]) => {
+    return Object.entries(WINGS).map(([id, w2]) => {
       const list = PROJECTS.filter((p) => p.wing === id);
-      return { id, ...w, projects: list, built: list.filter((p) => built(state3, p.id)).length };
+      return { id, ...w2, projects: list, built: list.filter((p) => built(state3, p.id)).length };
     });
   }
   function takeParts(state3, needs) {
@@ -2920,7 +2920,7 @@
   function workOnProject(state3, id) {
     const proj = PROJECT_BY_ID[id];
     if (!proj) return;
-    const h2 = base(state3);
+    const h3 = base(state3);
     const st = projectStatus(state3, proj);
     if (!st.canWork) {
       log(state3, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
@@ -2928,7 +2928,7 @@
     }
     if (!st.started) {
       takeParts(state3, proj.needs);
-      h2.work[id] = 0;
+      h3.work[id] = 0;
       log(state3, `You start a project: ${proj.name}. You lay out the parts.`);
     }
     let hours = Math.min(WORK_BLOCK_H, st.leftH);
@@ -2936,19 +2936,19 @@
     const stopped = advanceTime(state3, Math.round(hours * 60), "heavy", { stopAtDanger: true });
     if (state3.dead) return;
     if (stopped) hours = Math.max(0, (state3.time - t0) / 60);
-    h2.work[id] += hours;
-    if (h2.work[id] >= proj.hours - 1e-9) {
-      delete h2.work[id];
-      h2.projects[id] = true;
+    h3.work[id] += hours;
+    if (h3.work[id] >= proj.hours - 1e-9) {
+      delete h3.work[id];
+      h3.projects[id] = true;
       finishProject(state3, proj);
     } else {
-      log(state3, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h2.work[id]) * 60)} of work left.`);
+      log(state3, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h3.work[id]) * 60)} of work left.`);
     }
   }
   function finishProject(state3, proj) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     const p = state3.player;
-    if (proj.id === "second_battery") h2.batteryMax = 27;
+    if (proj.id === "second_battery") h3.batteryMax = 27;
     let morale = 5;
     if (proj.id === "sealed_store") morale += 5;
     p.morale = Math.min(100, p.morale + morale);
@@ -2961,9 +2961,9 @@
   var AUTO_FILTER_GAL_PER_DAY = 12;
   var SAFE_TANK_GAL = 40;
   function autoFilterToday(state3) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     if (!built(state3, "rain_barrels") || !built(state3, "filter_station")) return 0;
-    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h2.rawGal, SAFE_TANK_GAL - h2.safeGal));
+    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h3.rawGal, SAFE_TANK_GAL - h3.safeGal));
   }
   function runAutoFilter(state3) {
     const g = autoFilterToday(state3);
@@ -2973,7 +2973,7 @@
     return g;
   }
   function foodItemsStored(state3) {
-    return Object.entries(state3.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
+    return Object.entries(state3.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q2]) => n + q2, 0);
   }
 
   // src/engine/legacy.js
@@ -3121,7 +3121,7 @@
     const out = [];
     for (const t of traits || []) {
       if (!TRAITS[t] || out.includes(t)) continue;
-      if ((TRAITS[t].not || []).some((x) => out.includes(x))) continue;
+      if ((TRAITS[t].not || []).some((x2) => out.includes(x2))) continue;
       out.push(t);
     }
     return pointsLeft(out) >= 0 ? out : [];
@@ -3131,10 +3131,10 @@
     p.job = JOBS[job] ? job : null;
     p.traits = validTraits(traits);
     if (p.job) {
-      const J = JOBS[p.job];
+      const J2 = JOBS[p.job];
       if (!state3.skills) state3.skills = { xp: {}, books: [] };
-      for (const [k, lvl] of Object.entries(J.skills)) state3.skills.xp[k] = Math.max(state3.skills.xp[k] || 0, LEVEL_XP[lvl]);
-      const [id, n] = J.item;
+      for (const [k, lvl] of Object.entries(J2.skills)) state3.skills.xp[k] = Math.max(state3.skills.xp[k] || 0, LEVEL_XP[lvl]);
+      const [id, n] = J2.item;
       state3.home.storage[id] = (state3.home.storage[id] || 0) + n;
     }
     if (p.traits.includes("dog_person")) state3.dog.arriveDay = 1;
@@ -3166,10 +3166,10 @@
     return (hasTrait(state3, "dog_person") ? 20 : 0) + (hasLegacy(state3, "old_friend") ? 10 : 0);
   }
   function backgroundText(state3) {
-    const j = jobOf(state3);
-    const t = (state3.player.traits || []).filter((x) => TRAITS[x]).map((x) => TRAITS[x].name);
-    if (!j && !t.length) return "";
-    return [j ? JOBS[j].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
+    const j2 = jobOf(state3);
+    const t = (state3.player.traits || []).filter((x2) => TRAITS[x2]).map((x2) => TRAITS[x2].name);
+    if (!j2 && !t.length) return "";
+    return [j2 ? JOBS[j2].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
   }
 
   // src/engine/activity.js
@@ -3308,17 +3308,17 @@
   var minuteOfDay2 = (t) => (t % 1440 + 1440) % 1440;
   function formatClock(t) {
     const m = Math.floor(minuteOfDay2(t));
-    let h2 = Math.floor(m / 60);
+    let h3 = Math.floor(m / 60);
     const mm = String(m % 60).padStart(2, "0");
-    const ampm = h2 >= 12 ? "PM" : "AM";
-    h2 = h2 % 12 || 12;
-    return `${h2}:${mm} ${ampm}`;
+    const ampm = h3 >= 12 ? "PM" : "AM";
+    h3 = h3 % 12 || 12;
+    return `${h3}:${mm} ${ampm}`;
   }
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function calendar(t) {
-    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
+    const d2 = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
+    return { year: d2.getUTCFullYear(), month: d2.getUTCMonth(), date: d2.getUTCDate(), weekday: d2.getUTCDay() };
   }
   function formatDate(t) {
     const c = calendar(t);
@@ -3326,10 +3326,10 @@
   }
   function formatDuration(min) {
     min = Math.round(min);
-    const h2 = Math.floor(min / 60);
+    const h3 = Math.floor(min / 60);
     const m = min % 60;
-    if (h2 && m) return `${h2} h ${m} min`;
-    if (h2) return `${h2} h`;
+    if (h3 && m) return `${h3} h ${m} min`;
+    if (h3) return `${h3} h`;
     return `${m} min`;
   }
   function addItem(bag, id, qty = 1) {
@@ -3352,29 +3352,29 @@
   function journalNote(state3, text, kind) {
     if (!state3.journal) state3.journal = [];
     const day = dayIndex(state3.time);
-    let d = state3.journal[state3.journal.length - 1];
-    if (!d || d.day !== day) {
-      d = { day, places: [], taken: 0, searched: 0, events: [] };
-      state3.journal.push(d);
+    let d2 = state3.journal[state3.journal.length - 1];
+    if (!d2 || d2.day !== day) {
+      d2 = { day, places: [], taken: 0, searched: 0, events: [] };
+      state3.journal.push(d2);
     }
     const arrive = /^You arrive at (.+)\.$/.exec(text) || /^You reach ([^.]+)\./.exec(text);
     if (arrive) {
-      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      if (!d2.places.includes(arrive[1])) d2.places.push(arrive[1]);
       return;
     }
     if (/^You walk to a house/.test(text)) {
-      if (!d.places.includes("a house")) d.places.push("a house");
+      if (!d2.places.includes("a house")) d2.places.push("a house");
       return;
     }
     if (/^You take: /.test(text)) {
-      d.taken += 1;
+      d2.taken += 1;
       return;
     }
     if (/^You search the /.test(text)) {
-      d.searched = (d.searched || 0) + 1;
+      d2.searched = (d2.searched || 0) + 1;
       return;
     }
-    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d2.events.length < 8 && !d2.events.includes(text)) d2.events.push(text);
   }
 
   // src/data/gridsize.js
@@ -3514,14 +3514,14 @@
   function tilesFor(bag, order = Object.keys(bag)) {
     const out = [];
     for (const id of order) {
-      let q = bag[id] || 0;
-      if (q <= 1e-9) continue;
+      let q2 = bag[id] || 0;
+      if (q2 <= 1e-9) continue;
       const s = sizeOf(id);
       let n = 0;
-      while (q > 1e-9) {
-        const take = Math.min(s.stack, q);
+      while (q2 > 1e-9) {
+        const take = Math.min(s.stack, q2);
         out.push({ key: `${id}#${n}`, id, q: Math.round(take * 1e3) / 1e3, w: s.w, h: s.h });
-        q -= take;
+        q2 -= take;
         n++;
         if (n > 60) break;
       }
@@ -3530,15 +3530,15 @@
   }
   function layoutGrid(tiles, cols, rows, saved = {}) {
     const occ = [];
-    const free = (x, y, w, h2) => {
-      if (x < 0 || y < 0 || x + w > cols) return false;
-      for (let j = y; j < y + h2; j++) for (let i = x; i < x + w; i++) if (occ[j]?.[i]) return false;
+    const free = (x2, y2, w2, h3) => {
+      if (x2 < 0 || y2 < 0 || x2 + w2 > cols) return false;
+      for (let j2 = y2; j2 < y2 + h3; j2++) for (let i = x2; i < x2 + w2; i++) if (occ[j2]?.[i]) return false;
       return true;
     };
-    const mark = (x, y, w, h2, key) => {
-      for (let j = y; j < y + h2; j++) {
-        occ[j] || (occ[j] = []);
-        for (let i = x; i < x + w; i++) occ[j][i] = key;
+    const mark = (x2, y2, w2, h3, key) => {
+      for (let j2 = y2; j2 < y2 + h3; j2++) {
+        occ[j2] || (occ[j2] = []);
+        for (let i = x2; i < x2 + w2; i++) occ[j2][i] = key;
       }
     };
     const placed = [];
@@ -3547,25 +3547,25 @@
       const s = saved[t.key];
       if (s) {
         const rot = !!s[2];
-        const w = rot ? t.h : t.w;
-        const h2 = rot ? t.w : t.h;
-        if (w <= cols && s[1] + h2 <= rows && free(s[0], s[1], w, h2)) {
-          mark(s[0], s[1], w, h2, t.key);
-          placed.push({ ...t, x: s[0], y: s[1], w, h: h2, rot });
+        const w2 = rot ? t.h : t.w;
+        const h3 = rot ? t.w : t.h;
+        if (w2 <= cols && s[1] + h3 <= rows && free(s[0], s[1], w2, h3)) {
+          mark(s[0], s[1], w2, h3, t.key);
+          placed.push({ ...t, x: s[0], y: s[1], w: w2, h: h3, rot });
           continue;
         }
       }
       rest2.push(t);
     }
-    const order = rest2.map((t, i) => [t, i]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h || a[1] - b[1]).map((e) => e[0]);
+    const order = rest2.map((t, i) => [t, i]).sort((a, b2) => b2[0].w * b2[0].h - a[0].w * a[0].h || a[1] - b2[1]).map((e) => e[0]);
     for (const t of order) {
       let spot = null;
-      for (let y = 0; !spot && y < rows + 400; y++) {
-        for (let x = 0; x < cols && !spot; x++) {
-          if (t.w <= cols && free(x, y, t.w, t.h) && (y + t.h <= rows || y >= rows)) spot = { x, y, w: t.w, h: t.h, rot: false };
-          else if (t.h <= cols && t.w !== t.h && free(x, y, t.h, t.w) && (y + t.w <= rows || y >= rows)) spot = { x, y, w: t.h, h: t.w, rot: true };
+      for (let y2 = 0; !spot && y2 < rows + 400; y2++) {
+        for (let x2 = 0; x2 < cols && !spot; x2++) {
+          if (t.w <= cols && free(x2, y2, t.w, t.h) && (y2 + t.h <= rows || y2 >= rows)) spot = { x: x2, y: y2, w: t.w, h: t.h, rot: false };
+          else if (t.h <= cols && t.w !== t.h && free(x2, y2, t.h, t.w) && (y2 + t.w <= rows || y2 >= rows)) spot = { x: x2, y: y2, w: t.h, h: t.w, rot: true };
         }
-        if (!spot && t.w > cols && t.h > cols && y >= rows) spot = { x: 0, y, w: Math.min(cols, t.w), h: t.h, rot: false };
+        if (!spot && t.w > cols && t.h > cols && y2 >= rows) spot = { x: 0, y: y2, w: Math.min(cols, t.w), h: t.h, rot: false };
       }
       if (!spot) continue;
       mark(spot.x, spot.y, spot.w, spot.h, t.key);
@@ -3575,9 +3575,9 @@
     const overflow = placed.filter((p) => p.y + p.h > rows).length;
     return { tiles: placed, cols, rows, height: Math.max(rows, used), overflow };
   }
-  function fitsAt(layout, key, x, y, w, h2) {
-    if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
-    return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
+  function fitsAt(layout, key, x2, y2, w2, h3) {
+    if (x2 < 0 || y2 < 0 || x2 + w2 > layout.cols || y2 + h3 > layout.rows) return false;
+    return !layout.tiles.some((t) => t.key !== key && x2 < t.x + t.w && t.x < x2 + w2 && y2 < t.y + t.h && t.y < y2 + h3);
   }
   var legacyPack = (state3) => state3.player?.worn?.back === void 0 && (state3.carried.backpack || 0) > 0;
   function wearsPack(state3) {
@@ -3585,10 +3585,10 @@
   }
   function gridBag(state3, bag = state3.carried) {
     if (!legacyPack(state3)) return bag;
-    const b = { ...bag };
-    b.backpack = (b.backpack || 0) - 1;
-    if (b.backpack <= 0) delete b.backpack;
-    return b;
+    const b2 = { ...bag };
+    b2.backpack = (b2.backpack || 0) - 1;
+    if (b2.backpack <= 0) delete b2.backpack;
+    return b2;
   }
   function packSize(state3, pack = wearsPack(state3)) {
     return { cols: GRID_COLS, rows: packRows(pack) };
@@ -3620,9 +3620,9 @@
     return layoutGrid(tilesFor(gridBag(state3)), cols, rows);
   }
   function packUse(state3) {
-    const L = packLayout(state3);
-    const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
-    return { used, total: L.cols * L.rows, over: L.overflow > 0 };
+    const L2 = packLayout(state3);
+    const used = L2.tiles.reduce((a, t) => a + t.w * t.h, 0);
+    return { used, total: L2.cols * L2.rows, over: L2.overflow > 0 };
   }
   function canTakeOffPack(state3) {
     const bag = { ...gridBag(state3), backpack: (gridBag(state3).backpack || 0) + 1 };
@@ -3649,8 +3649,8 @@
     const adv = [...opts.adv || []];
     const dis = [...opts.dis || []];
     if (opts.outside && !isNight(state3.time)) adv.push("daylight");
-    const d = state3.dog;
-    if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
+    const d2 = state3.dog;
+    if (opts.outside && d2 && d2.stage === "joined" && d2.withPlayer && d2.bond >= 50) adv.push(`${d2.name || "dog"} helps`);
     const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
     if (limb && p.painH <= 0) dis.push("injured");
     if (opts.outside && state3.weather && RAIN2.includes(state3.weather.type)) dis.push("rain");
@@ -3663,12 +3663,12 @@
     const mods = [...standardMods(state3, opts), ...extraMods];
     const e = edges(state3, opts);
     const a = randInt(state3, 1, 20);
-    const b = e.mode === "normal" ? a : randInt(state3, 1, 20);
-    const roll = e.mode === "adv" ? Math.max(a, b) : e.mode === "dis" ? Math.min(a, b) : a;
+    const b2 = e.mode === "normal" ? a : randInt(state3, 1, 20);
+    const roll = e.mode === "adv" ? Math.max(a, b2) : e.mode === "dis" ? Math.min(a, b2) : a;
     const total = roll + mods.reduce((s, m) => s + m[1], 0);
     const success = roll === 20 ? true : roll === 1 ? false : total >= dc;
-    const modText = mods.map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"} ${Math.abs(v)} (${n})`).join("");
-    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b}]` : "";
+    const modText = mods.map(([n, v2]) => ` ${v2 >= 0 ? "+" : "\u2212"} ${Math.abs(v2)} (${n})`).join("");
+    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b2}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b2}]` : "";
     const note = roll === 20 ? " natural 20!" : roll === 1 ? " natural 1!" : "";
     log(state3, `\u{1F3B2} ${label}: d20 ${roll}${edgeText}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
     return { roll, total, dc, success, mode: e.mode };
@@ -3684,8 +3684,8 @@
     return { dc, mods, sum, pct: Math.round(p * 100), mode: e.mode, adv: e.adv, dis: e.dis };
   }
   function oddsText(o) {
-    const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
+    const top = [...o.mods].sort((a, b2) => Math.abs(b2[1]) - Math.abs(a[1]));
+    const shown = top.slice(0, 3).map(([n, v2]) => ` ${v2 >= 0 ? "+" : "\u2212"}${Math.abs(v2)} ${n}`).join("");
     const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
     const edge = o.mode === "adv" ? ` adv. (${o.adv.join(", ")})` : o.mode === "dis" ? ` disadv. (${o.dis.join(", ")})` : "";
     return `d20${edge}${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
@@ -3697,7 +3697,7 @@
     if (!ps) {
       const r = mulberry32(hashString(`${state3.seed}:${place.id}:init`));
       const cat = CATEGORIES[place.cat];
-      const big = BIG_BRANDS.some((b) => (place.name || "").includes(b));
+      const big = BIG_BRANDS.some((b2) => (place.name || "").includes(b2));
       const empty = r() < 0.2;
       ps = state3.places[place.id] = {
         zonesDone: 0,
@@ -3732,22 +3732,22 @@
 
   // src/engine/travel.js
   var ROUTE_FACTOR = 1.25;
-  function straightMiles(a, b) {
-    const R = 3958.8;
+  function straightMiles(a, b2) {
+    const R3 = 3958.8;
     const toR = Math.PI / 180;
-    const dLat = (b.lat - a.lat) * toR;
-    const dLon = (b.lon - a.lon) * toR;
-    const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h2));
+    const dLat = (b2.lat - a.lat) * toR;
+    const dLon = (b2.lon - a.lon) * toR;
+    const h3 = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b2.lat * toR) * Math.sin(dLon / 2) ** 2;
+    return 2 * R3 * Math.asin(Math.sqrt(h3));
   }
-  var routeMiles = (a, b) => straightMiles(a, b) * ROUTE_FACTOR;
+  var routeMiles = (a, b2) => straightMiles(a, b2) * ROUTE_FACTOR;
   function walkSpeed(state3, t = state3.time) {
     const p = state3.player;
     let mph = 3;
     const why = [];
-    const apply = (f, w) => {
+    const apply = (f, w2) => {
       mph *= f;
-      why.push(w);
+      why.push(w2);
     };
     if (p.weak) apply(0.7, "weak");
     if (isNight(t) && !hasLight(state3)) apply(0.6, "dark, no light");
@@ -3762,10 +3762,10 @@
     if (walkSpeedFactor(state3) < 1) apply(walkSpeedFactor(state3), "bad knees");
     const og = overgrowthWalk(t);
     if (og < 0.99) apply(og, "overgrown streets");
-    for (const h2 of activeHazards(state3, t)) {
-      if (!h2.walk) continue;
-      if (h2.id === "feral_dogs" && dogWarns(state3)) apply(0.96, "loose dogs, your dog warns you early");
-      else apply(h2.walk, h2.label);
+    for (const h3 of activeHazards(state3, t)) {
+      if (!h3.walk) continue;
+      if (h3.id === "feral_dogs" && dogWarns(state3)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h3.walk, h3.label);
     }
     return { mph, why };
   }
@@ -3790,8 +3790,8 @@
     const energy = minutes / 60 * 8 * (state3.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state3, "walk");
     return { miles, minutes, energy, mph, why };
   }
-  function lerp(a, b, f) {
-    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+  function lerp(a, b2, f) {
+    return { lat: a.lat + (b2.lat - a.lat) * f, lon: a.lon + (b2.lon - a.lon) * f };
   }
   function travel(state3, dest, destLabel) {
     const start2 = { ...state3.pos };
@@ -3882,9 +3882,9 @@
     } else {
       const found = rollZone(state3, `road${state3.time}`, "house", 0.9, 0, 1);
       const names = [];
-      for (const [id, q] of Object.entries(found)) {
-        addItem(state3.carried, id, q);
-        names.push(`${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
+      for (const [id, q2] of Object.entries(found)) {
+        addItem(state3.carried, id, q2);
+        names.push(`${itemName(id)}${q2 > 1 ? " \xD7" + q2 : ""}`);
       }
       log(state3, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
       if (!wearsPack(state3)) {
@@ -3939,12 +3939,12 @@
     ["tarp", 1.5]
   ];
   function rollTable(state3) {
-    const total = TABLE.reduce((a, [, w]) => a + w, 0);
+    const total = TABLE.reduce((a, [, w2]) => a + w2, 0);
     const n = chance(state3, 0.15) ? 0 : randInt(state3, 1, 3);
     const out = [];
     for (let i = 0; i < n; i++) {
-      let x = randInt(state3, 0, 9999) / 1e4 * total;
-      const hit = TABLE.find(([, w]) => (x -= w) < 0) || TABLE[0];
+      let x2 = randInt(state3, 0, 9999) / 1e4 * total;
+      const hit = TABLE.find(([, w2]) => (x2 -= w2) < 0) || TABLE[0];
       out.push(hit[0]);
     }
     return out;
@@ -4036,18 +4036,18 @@
     log(state3, `You pull wire from under the dash and take the mirror and its screws (${WIRE_MIN} min).`, "good");
   }
   function addCarBattery(state3, bag) {
-    const h2 = state3.home;
-    h2.carBatteries = h2.carBatteries || 0;
+    const h3 = state3.home;
+    h3.carBatteries = h3.carBatteries || 0;
     if (!((bag.car_battery || 0) >= 1)) return;
-    if (h2.carBatteries >= MAX_CAR_BATTERIES) {
+    if (h3.carBatteries >= MAX_CAR_BATTERIES) {
       log(state3, "The bank has no room for more car batteries.");
       return;
     }
     addItem(bag, "car_battery", -1);
-    h2.carBatteries += 1;
-    h2.batteryMax += CAR_BATTERY_KWH;
+    h3.carBatteries += 1;
+    h3.batteryMax += CAR_BATTERY_KWH;
     advanceTime(state3, 30, "work");
-    log(state3, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h2.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
+    log(state3, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h3.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
   }
 
   // src/data/wild.js
@@ -4092,11 +4092,11 @@
   var FISH_CLEAN = 5;
   function wildOf(state3) {
     if (!state3.wild || typeof state3.wild !== "object") state3.wild = {};
-    const w = state3.wild;
-    w.scared || (w.scared = {});
-    w.snares || (w.snares = {});
-    w.pressure || (w.pressure = {});
-    return w;
+    const w2 = state3.wild;
+    w2.scared || (w2.scared = {});
+    w2.snares || (w2.snares = {});
+    w2.pressure || (w2.pressure = {});
+    return w2;
   }
   var bags = (state3) => [state3.carried, state3.home.storage];
   var hasAll = (state3, ids) => ids.every((id) => has(state3, id));
@@ -4115,10 +4115,10 @@
     return loc && loc.kind === "wild" ? { id: loc.id, ...SPOTS[loc.id] } : null;
   }
   function waterText(state3) {
-    const w = state3.weather || {};
+    const w2 = state3.weather || {};
     const month = new Date(Date.UTC(2026, 10, 24) + Math.floor(state3.time / 1440) * 864e5).getUTCMonth();
-    if (w.type === "rain" || w.type === "heavy_rain" || w.type === "windstorm") return "The water is high and brown with rain.";
-    if (w.type === "snow" || w.low <= 28) return "Thin ice at the edges; the water is slow and dark.";
+    if (w2.type === "rain" || w2.type === "heavy_rain" || w2.type === "windstorm") return "The water is high and brown with rain.";
+    if (w2.type === "snow" || w2.low <= 28) return "Thin ice at the edges; the water is slow and dark.";
     if (month >= 6 && month <= 8) return "The water is low and clear. Fish hold in the shade.";
     if (month >= 3 && month <= 5) return "The water runs fast and green with spring melt.";
     return "The water runs cold and grey-green.";
@@ -4159,7 +4159,7 @@
     const lvl = skillLevel(state3, "fishing");
     if (lvl) mods.push(["fishing skill", lvl]);
     if (dawnOrDusk(state3.time)) mods.push(["dawn or dusk", 2]);
-    const run2 = (s.runs || []).find((x) => x.months.includes(month)) || null;
+    const run2 = (s.runs || []).find((x2) => x2.months.includes(month)) || null;
     if (run2) mods.push([`${run2.fish} run`, 3]);
     if ([11, 0, 1].includes(month)) mods.push(["cold water", -2]);
     if ((s.quality ?? 1) < 0.7) mods.push(["small creek", -2]);
@@ -4201,8 +4201,8 @@
       addItem(state3.carried, "fresh_fish", n);
       log(state3, what === f.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state3) ? "" : ", slow with no knife"}).`, "good");
     } else log(state3, "Nothing bites. You wind in the line.");
-    const w = wildOf(state3);
-    w.pressure[f.spot.id] = { p: spotPressure(state3, f.spot.id) + PRESSURE_PER_TRIP, t: state3.time };
+    const w2 = wildOf(state3);
+    w2.pressure[f.spot.id] = { p: spotPressure(state3, f.spot.id) + PRESSURE_PER_TRIP, t: state3.time };
     practice(state3, "fishing", r.success ? 4 : 2);
     return { ok: r.success, fish: n, what };
   }
@@ -4261,28 +4261,28 @@
   }
   function huntOdds(state3, method) {
     const list = gameHere(state3);
-    const g = list.length ? list.reduce((a, b) => b.w > a.w ? b : a) : GAME.rabbit;
+    const g = list.length ? list.reduce((a, b2) => b2.w > a.w ? b2 : a) : GAME.rabbit;
     const s = shotSetup(state3, method, g);
     return { find: Math.round(findChance(state3) * 100), animal: g.name, shot: odds(state3, g.dc, s.mods, { outside: true, adv: s.adv, dis: s.dis }) };
   }
   function spendShot(state3, method) {
-    const w = wildOf(state3);
+    const w2 = wildOf(state3);
     if (method === "rifle") {
-      if (!(w.rounds > 0)) {
+      if (!(w2.rounds > 0)) {
         useOne(state3, "rifle_rounds");
-        w.rounds = 20;
+        w2.rounds = 20;
       }
-      w.rounds--;
-      w.scared[state3.location.id] = state3.time + SCARED_HOURS * 60;
+      w2.rounds--;
+      w2.scared[state3.location.id] = state3.time + SCARED_HOURS * 60;
     }
   }
   function loseArrow(state3) {
-    const w = wildOf(state3);
-    if (!(w.arrows > 0)) {
+    const w2 = wildOf(state3);
+    if (!(w2.arrows > 0)) {
       useOne(state3, "arrows");
-      w.arrows = 6;
+      w2.arrows = 6;
     }
-    w.arrows--;
+    w2.arrows--;
   }
   function takeMeat(state3, g, spoil = 0) {
     const knife = hasKnife(state3);
@@ -4310,9 +4310,9 @@
       practice(state3, "hunting", 1);
       return { ok: false, seen: null };
     }
-    const total = list.reduce((a, b) => a + b.w, 0);
-    let x = randInt(state3, 0, 999) / 1e3 * total;
-    const g = list.find((e) => (x -= e.w) < 0) || list[0];
+    const total = list.reduce((a, b2) => a + b2.w, 0);
+    let x2 = randInt(state3, 0, 999) / 1e3 * total;
+    const g = list.find((e) => (x2 -= e.w) < 0) || list[0];
     const sh = shotSetup(state3, method, g);
     spendShot(state3, method);
     const r = check(state3, `Shoot the ${g.name} (${method})`, g.dc, sh.mods, { outside: true, adv: sh.adv, dis: sh.dis });
@@ -4349,8 +4349,8 @@
   }
   function checkSnare(state3) {
     const s = spotHere(state3);
-    const w = wildOf(state3);
-    const set = s ? w.snares[s.id] : null;
+    const w2 = wildOf(state3);
+    const set = s ? w2.snares[s.id] : null;
     if (set == null) {
       log(state3, "You have no snares here.");
       return { ok: false };
@@ -4365,7 +4365,7 @@
     const p = Math.min(0.8, 0.3 + 0.08 * skillLevel(state3, "hunting") + animalCover(state3.time) * 0.2);
     let caught = 0;
     for (let i = 0; i < days; i++) if (chance(state3, p)) caught++;
-    w.snares[s.id] = state3.time;
+    w2.snares[s.id] = state3.time;
     practice(state3, "hunting", caught ? 3 : 1);
     if (!caught) {
       log(state3, "The snares are empty. One is pulled loose; you set it again.");
@@ -4378,9 +4378,9 @@
   }
   function takeUpSnare(state3) {
     const s = spotHere(state3);
-    const w = wildOf(state3);
-    if (!s || w.snares[s.id] == null) return false;
-    delete w.snares[s.id];
+    const w2 = wildOf(state3);
+    if (!s || w2.snares[s.id] == null) return false;
+    delete w2.snares[s.id];
     log(state3, "You take up your snares.");
     return true;
   }
@@ -4389,20 +4389,20 @@
   var tapRuns = (state3) => state3.home.tapWorks && !decayActive(state3, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "oatmeal", "canned_food"];
   var COOK_NEEDS_WATER = /* @__PURE__ */ new Set(["dry_food", "oatmeal"]);
-  var cookWater = (h2, carried = {}) => h2.safeGal >= 0.125 ? "safeGal" : h2.rawGal >= 0.125 ? "rawGal" : h2.tankGal >= 0.125 ? "tankGal" : (h2.storage.water_bottle || 0) >= 0.125 ? "storage" : (carried.water_bottle || 0) >= 0.125 ? "carried" : null;
+  var cookWater = (h3, carried = {}) => h3.safeGal >= 0.125 ? "safeGal" : h3.rawGal >= 0.125 ? "rawGal" : h3.tankGal >= 0.125 ? "tankGal" : (h3.storage.water_bottle || 0) >= 0.125 ? "storage" : (carried.water_bottle || 0) >= 0.125 ? "carried" : null;
   function useCookWater(state3) {
-    const h2 = state3.home;
-    const w = cookWater(h2, state3.carried);
-    if (w === "storage") addItem(h2.storage, "water_bottle", -0.125);
-    else if (w === "carried") addItem(state3.carried, "water_bottle", -0.125);
-    else h2[w] -= 0.125;
+    const h3 = state3.home;
+    const w2 = cookWater(h3, state3.carried);
+    if (w2 === "storage") addItem(h3.storage, "water_bottle", -0.125);
+    else if (w2 === "carried") addItem(state3.carried, "water_bottle", -0.125);
+    else h3[w2] -= 0.125;
   }
   function cookPick(state3) {
-    const h2 = state3.home;
-    const water = cookWater(h2, state3.carried);
-    return COOK_ORDER().find((f) => ((h2.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
+    const h3 = state3.home;
+    const water = cookWater(h3, state3.carried);
+    return COOK_ORDER().find((f) => ((h3.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
   }
-  var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp3 = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
   var SCAV_XP = 0.5;
   function source2(state3, from) {
     return from === "storage" ? state3.home.storage : from === "here" ? hereBag(state3) : state3.carried;
@@ -4508,17 +4508,17 @@
     const min = salvageMinutes(state3, id);
     if (advanceTime(state3, min, "work", { stopAtDanger: true }) || state3.dead) return;
     addItem(bag, id, -1);
-    for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
+    for (const [pid, q2] of Object.entries(sv.parts)) addItem(bag, pid, q2);
     practice(state3, "tinkering", 2);
-    log(state3, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(", ")}.`, "good");
+    log(state3, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q2]) => partText(pid, q2)).join(", ")}.`, "good");
   }
   var endDot = (t) => /[.!?]$/.test(t) ? t : `${t}.`;
   var plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, "");
   var QTY_WORDS = { 0.25: "a quarter", 0.5: "half a", 0.75: "three quarters of a" };
-  function partText(pid, q) {
+  function partText(pid, q2) {
     const it = ITEMS[pid];
-    const w = QTY_WORDS[q];
-    return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+    const w2 = QTY_WORDS[q2];
+    return w2 ? `${w2} ${it.unit} of ${it.name.toLowerCase()}` : `${q2} ${it.unit} of ${it.name.toLowerCase()}`;
   }
   var sleepWhere = (state3) => sleepSpot(state3) !== "living" ? "in your bed" : state3.home.fireHours > 0 ? "by the fire" : "on the couch";
   function useItem(state3, id, verb, from = "carried") {
@@ -4639,7 +4639,7 @@
     const it = ITEMS[id];
     if (it.med === "bandage") {
       const order = ["deep_cut", "bite", "small_cut", "sprain"];
-      const open = p.injuries.filter((i) => !i.bandaged).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+      const open = p.injuries.filter((i) => !i.bandaged).sort((a, b2) => order.indexOf(a.type) - order.indexOf(b2.type));
       if (!open.length) {
         log(state3, "You have no wound that needs a bandage.");
         return;
@@ -4720,10 +4720,10 @@
     const bag = hereBag(state3);
     wearPackFrom(state3, bag, "backpack");
     const cells = (id) => {
-      const z = sizeOf(id);
-      return z.w * z.h / z.stack;
+      const z2 = sizeOf(id);
+      return z2.w * z2.h / z2.stack;
     };
-    const ids = Object.keys(bag).sort((a, b) => cells(a) - cells(b) || (a < b ? -1 : 1));
+    const ids = Object.keys(bag).sort((a, b2) => cells(a) - cells(b2) || (a < b2 ? -1 : 1));
     const took = [];
     let left = false;
     for (const id of ids) {
@@ -4754,10 +4754,10 @@
     advanceTime(state3, 1);
   }
   function storeAll(state3) {
-    for (const [id, q] of Object.entries(state3.carried)) {
+    for (const [id, q2] of Object.entries(state3.carried)) {
       if (id === "backpack" || id === "flashlight") continue;
-      addItem(state3.carried, id, -q);
-      addItem(state3.home.storage, id, q);
+      addItem(state3.carried, id, -q2);
+      addItem(state3.home.storage, id, q2);
     }
     log(state3, "You put your supplies away in the house.");
     advanceTime(state3, 5);
@@ -4774,19 +4774,19 @@
     if (!state3.dead) log(state3, "You wake up.");
   }
   function homeAction(state3, id) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     const p = state3.player;
     switch (id) {
       case "drink_tank":
-        h2.tankGal = Math.max(0, h2.tankGal - 0.25);
+        h3.tankGal = Math.max(0, h3.tankGal - 0.25);
         addWater(state3, WATER_PER_QUART);
         log(state3, "You drain water from the water heater tank and drink a quart. It is clean.");
         advanceTime(state3, 10);
         return;
       case "fill_jug": {
-        const fromSafe = h2.safeGal >= 1;
-        if (fromSafe) h2.safeGal -= 1;
-        else h2.tankGal -= 1;
+        const fromSafe = h3.safeGal >= 1;
+        if (fromSafe) h3.safeGal -= 1;
+        else h3.tankGal -= 1;
         addItem(state3.carried, "water_bottle", 1);
         log(state3, `You fill a 1-gallon jug with clean water from the ${fromSafe ? "boiled water pot" : "water heater tank"}.`);
         advanceTime(state3, 10);
@@ -4794,23 +4794,23 @@
       }
       case "collect_tap":
         if (!tapRuns(state3)) {
-          h2.tapWorks = false;
+          h3.tapWorks = false;
           log(state3, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
           return;
         }
-        h2.rawGal += 2;
+        h3.rawGal += 2;
         log(state3, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
         advanceTime(state3, 15);
         practice(state3, "survival", 1);
         return;
       case "collect_toilet":
-        h2.rawGal += h2.toiletGal;
-        log(state3, `You take the water from the toilet tanks (${h2.toiletGal} gal). Boil it before you drink it.`);
-        h2.toiletGal = 0;
+        h3.rawGal += h3.toiletGal;
+        log(state3, `You take the water from the toilet tanks (${h3.toiletGal} gal). Boil it before you drink it.`);
+        h3.toiletGal = 0;
         advanceTime(state3, 10);
         return;
       case "drink_raw":
-        h2.rawGal = Math.max(0, h2.rawGal - 0.25);
+        h3.rawGal = Math.max(0, h3.rawGal - 0.25);
         addWater(state3, WATER_PER_QUART);
         log(state3, "You drink a quart of water that you did not boil.", "warn");
         advanceTime(state3, 5);
@@ -4818,36 +4818,36 @@
         return;
       case "boil": {
         const how = useHeat(state3, 0.4);
-        const g = Math.min(1, h2.rawGal);
-        h2.rawGal -= g;
-        h2.safeGal += g;
+        const g = Math.min(1, h3.rawGal);
+        h3.rawGal -= g;
+        h3.safeGal += g;
         log(state3, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
         advanceTime(state3, Math.round(20 * boilTimeFactor(state3)));
         practice(state3, "cooking", 2);
         return;
       }
       case "purify": {
-        const bag = (state3.carried.water_tablets || 0) > 0 ? state3.carried : h2.storage;
-        const g = Math.min(1, h2.rawGal);
+        const bag = (state3.carried.water_tablets || 0) > 0 ? state3.carried : h3.storage;
+        const g = Math.min(1, h3.rawGal);
         addItem(bag, "water_tablets", -ITEMS.water_tablets.portion);
-        h2.rawGal -= g;
-        h2.safeGal += g;
+        h3.rawGal -= g;
+        h3.safeGal += g;
         log(state3, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
         advanceTime(state3, 30);
         practice(state3, "cooking", 1);
         return;
       }
       case "filter_water": {
-        const g = Math.min(2, h2.rawGal);
-        h2.rawGal -= g;
-        h2.safeGal += g;
+        const g = Math.min(2, h3.rawGal);
+        h3.rawGal -= g;
+        h3.safeGal += g;
         log(state3, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
         advanceTime(state3, 10);
         practice(state3, "survival", 1);
         return;
       }
       case "drink_safe":
-        h2.safeGal = Math.max(0, h2.safeGal - 0.25);
+        h3.safeGal = Math.max(0, h3.safeGal - 0.25);
         addWater(state3, WATER_PER_QUART);
         log(state3, "You drink a quart of boiled water.");
         advanceTime(state3, 5);
@@ -4858,7 +4858,7 @@
           log(state3, "You have nothing you can cook now.");
           return;
         }
-        const bag = (h2.storage[food] || 0) > 0 ? h2.storage : state3.carried;
+        const bag = (h3.storage[food] || 0) > 0 ? h3.storage : state3.carried;
         const it = ITEMS[food];
         if (COOK_NEEDS_WATER.has(food)) useCookWater(state3);
         const how = useHeat(state3, 0.5);
@@ -4879,19 +4879,19 @@
         return;
       }
       case "add_wood": {
-        const bag = (h2.storage.firewood || 0) > 0 ? h2.storage : state3.carried;
+        const bag = (h3.storage.firewood || 0) > 0 ? h3.storage : state3.carried;
         addItem(bag, "firewood", -1);
-        const lit = h2.fireHours > 0;
+        const lit = h3.fireHours > 0;
         const per = Math.round(fireHoursPerBundle(state3) * fireBonusFactor(state3) * 10) / 10;
         const where = built(state3, "wood_stove") ? "wood stove" : "fireplace";
-        h2.fireHours += per;
+        h3.fireHours += per;
         log(state3, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
         advanceTime(state3, lit ? 5 : 15);
         practice(state3, "survival", lit ? 1 : 2);
         return;
       }
       case "run_generator": {
-        const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state3.carried;
+        const bag = (h3.storage.gas_can || 0) > 0 ? h3.storage : state3.carried;
         if (advanceTime(state3, 120, "work", { stopAtDanger: true }) || state3.dead) return;
         addItem(bag, "gas_can", -1);
         if (!chance(state3, gasStartChance(state3))) {
@@ -4899,22 +4899,22 @@
           p.morale = clamp3(p.morale - 2, 0, 100);
           return;
         }
-        const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
-        h2.battery += kwh;
+        const kwh = Math.min(GEN_KWH_PER_GAL, h3.batteryMax - h3.battery);
+        h3.battery += kwh;
         log(state3, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
         practice(state3, "tinkering", 1);
         return;
       }
       case "break_furniture":
         if (advanceTime(state3, 60, "heavy", { stopAtDanger: true }) || state3.dead) return;
-        h2.furniture -= 1;
-        addItem(h2.storage, "firewood", 1);
+        h3.furniture -= 1;
+        addItem(h3.storage, "firewood", 1);
         log(state3, "You break up old furniture into firewood (+1 bundle). It is hard work.");
         practice(state3, "tinkering", 2);
         return;
       case "heater":
-        h2.heaterOn = !h2.heaterOn;
-        log(state3, h2.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
+        h3.heaterOn = !h3.heaterOn;
+        log(state3, h3.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
         advanceTime(state3, 1);
         return;
       case "dry_clothes":
@@ -4926,7 +4926,7 @@
         advanceTime(state3, 10);
         return;
       case "fridge":
-        h2.fridgeOpened = true;
+        h3.fridgeOpened = true;
         p.morale = clamp3(p.morale - 2, 0, 100);
         log(state3, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
         advanceTime(state3, 2);
@@ -4940,11 +4940,11 @@
   }
   function anyFood(state3) {
     const all = { ...state3.home.storage };
-    for (const [k, v] of Object.entries(state3.carried)) all[k] = (all[k] || 0) + v;
+    for (const [k, v2] of Object.entries(state3.carried)) all[k] = (all[k] || 0) + v2;
     return ["dog_food", "canned_food", "snacks", "peanut_butter", "formula"].find((f) => (all[f] || 0) > 0);
   }
   function feedStray(state3) {
-    const d = state3.dog;
+    const d2 = state3.dog;
     const day = dayIndex(state3.time);
     const food = anyFood(state3);
     if (!food) {
@@ -4953,13 +4953,13 @@
     }
     const bag = (state3.home.storage[food] || 0) > 0 ? state3.home.storage : state3.carried;
     addItem(bag, food, -ITEMS[food].portion);
-    d.feedDays.push(day);
+    d2.feedDays.push(day);
     advanceTime(state3, 10);
-    const days = new Set(d.feedDays).size;
+    const days = new Set(d2.feedDays).size;
     if (days >= 3) {
-      d.stage = "joined";
-      d.food = 70;
-      d.bond = 30 + dogBondBonus(state3);
+      d2.stage = "joined";
+      d2.food = 70;
+      d2.bond = 30 + dogBondBonus(state3);
       log(state3, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
       state3.pendingPrompt = "name_dog";
     } else if (days === 1) {
@@ -4969,13 +4969,13 @@
     }
   }
   function feedDog(state3, id, bag) {
-    const d = state3.dog;
+    const d2 = state3.dog;
     const it = ITEMS[id];
     addItem(bag, id, -it.portion);
     const points = it.kind === "dogfood" ? 100 : it.cal * it.portion / 10;
-    d.food = clamp3(d.food + points, 0, 100);
-    d.bond = clamp3(d.bond + 1, 0, 100);
-    log(state3, `You feed ${d.name}.`);
+    d2.food = clamp3(d2.food + points, 0, 100);
+    d2.bond = clamp3(d2.bond + 1, 0, 100);
+    log(state3, `You feed ${d2.name}.`);
     advanceTime(state3, 5);
   }
   function nameDog(state3, name) {
@@ -4985,23 +4985,23 @@
     log(state3, `You call the dog ${clean}. ${clean} wags once.`, "good");
   }
   function playWithDog(state3) {
-    const d = state3.dog;
+    const d2 = state3.dog;
     const p = state3.player;
     const day = dayIndex(state3.time);
     if (p.lastDogPlayDay === day) {
-      log(state3, `${d.name} is resting. You already played today.`);
+      log(state3, `${d2.name} is resting. You already played today.`);
       return;
     }
     p.lastDogPlayDay = day;
-    d.bond = clamp3(d.bond + 2, 0, 100);
+    d2.bond = clamp3(d2.bond + 2, 0, 100);
     p.morale = clamp3(p.morale + 3, 0, 100);
-    log(state3, `You play with ${d.name} for a while. For a moment, things feel normal.`, "good");
+    log(state3, `You play with ${d2.name} for a while. For a moment, things feel normal.`, "good");
     advanceTime(state3, 20);
   }
   function toggleDogFollow(state3) {
-    const d = state3.dog;
-    d.withPlayer = !d.withPlayer;
-    log(state3, d.withPlayer ? `${d.name} will come with you.` : `${d.name} will stay home and guard the house.`);
+    const d2 = state3.dog;
+    d2.withPlayer = !d2.withPlayer;
+    log(state3, d2.withPlayer ? `${d2.name} will come with you.` : `${d2.name} will stay home and guard the house.`);
   }
   function enterPlace(state3, place) {
     const ps = placeState(state3, place);
@@ -5079,12 +5079,12 @@
     }
   }
   function reportFound(state3, found, where) {
-    const names = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
+    const names = Object.entries(found).map(([id, q2]) => `${itemName(id)}${q2 > 1 ? " \xD7" + q2 : ""}`);
     if (names.length) log(state3, `You search the ${where}. You find: ${names.join(", ")}.`, "good");
     else log(state3, `You search the ${where}. You find nothing useful.`);
   }
   function zonesDoneList(ps, countKey = "zonesDone", listKey = "doneList") {
-    if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_, i) => i);
+    if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_2, i) => i);
     return ps[listKey];
   }
   function nextZone(ps, counterIdx = -1) {
@@ -5120,26 +5120,26 @@
     else ctx.holder.zonesDone = done.length;
   }
   function zoneItemList(state3, ctx, zone) {
-    const h2 = ctx.holder;
-    if (!h2.zoneItems) h2.zoneItems = {};
-    if (!h2.taken) h2.taken = [];
-    if (!h2.zoneItems[zone]) {
+    const h3 = ctx.holder;
+    if (!h3.zoneItems) h3.zoneItems = {};
+    if (!h3.taken) h3.taken = [];
+    if (!h3.zoneItems[zone]) {
       const found = rollZone(state3, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state3));
       if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
       const list = [];
-      for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
-      h2.zoneItems[zone] = list;
+      for (const [item, q2] of Object.entries(found)) for (let i = 0; i < q2; i++) list.push({ pid: `z${zone}i${list.length}`, item });
+      h3.zoneItems[zone] = list;
     }
-    return h2.zoneItems[zone];
+    return h3.zoneItems[zone];
   }
   function buildingItems(state3) {
     const ctx = zoneCtx(state3);
     if (!ctx) return [];
     const done = doneListOf(ctx);
     const out = [];
-    for (let z = 0; z < ctx.zones; z++) {
-      if (done.includes(z) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z])) continue;
-      for (const it of zoneItemList(state3, ctx, z)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z });
+    for (let z2 = 0; z2 < ctx.zones; z2++) {
+      if (done.includes(z2) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z2])) continue;
+      for (const it of zoneItemList(state3, ctx, z2)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z2 });
     }
     return out;
   }
@@ -5148,12 +5148,12 @@
     return list.filter((it) => !ctx.holder.taken.includes(it.pid));
   }
   function touchZone(state3, ctx, zone) {
-    const h2 = ctx.holder;
-    if (!h2.touched) h2.touched = [];
-    if (h2.touched.includes(zone)) return;
-    h2.touched.push(zone);
+    const h3 = ctx.holder;
+    if (!h3.touched) h3.touched = [];
+    if (h3.touched.includes(zone)) return;
+    h3.touched.push(zone);
     zoneInjuryCheck(state3);
-    if (ctx.catId === "supermarket" && h2.touched.length === 1) {
+    if (ctx.catId === "supermarket" && h3.touched.length === 1) {
       state3.player.morale = clamp3(state3.player.morale - 3, 0, 100);
       log(state3, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
@@ -5168,7 +5168,7 @@
       log(state3, "It is behind the locked counter gate. Open the gate first.", "warn");
       return false;
     }
-    const it = zoneItemList(state3, ctx, zone).find((x) => x.pid === pid);
+    const it = zoneItemList(state3, ctx, zone).find((x2) => x2.pid === pid);
     if (!it || ctx.holder.taken.includes(pid)) return false;
     const wearIt = it.item === "backpack" && !wearsPack(state3);
     if (!wearIt && roomFor(state3, it.item, 1) < 1) {
@@ -5209,13 +5209,13 @@
   function openContainer(state3, cid) {
     const ctx = zoneCtx(state3);
     if (!ctx || typeof cid !== "string" || !/^c\d+$/.test(cid)) return false;
-    const h2 = ctx.holder;
-    h2.opened || (h2.opened = []);
-    if (h2.opened.includes(cid)) return false;
+    const h3 = ctx.holder;
+    h3.opened || (h3.opened = []);
+    if (h3.opened.includes(cid)) return false;
     const env = environment(state3, "work");
     advanceTime(state3, CONTAINER_MINUTES * (env.dark && !hasLight(state3) ? 2 : 1), "work");
     if (state3.dead) return true;
-    h2.opened.push(cid);
+    h3.opened.push(cid);
     log(state3, "You open it and look inside.");
     practice(state3, "scavenging", SCAV_XP);
     return true;
@@ -5248,7 +5248,7 @@
     }
     markZoneDone(ctx, zone);
     state3.stats.zonesSearched += 1;
-    for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
+    for (const [id, q2] of Object.entries(found)) addItem(ps.leftovers, id, q2);
     practice(state3, "scavenging", 2 * SCAV_XP);
     reportFound(state3, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
     state3.lastFound = found;
@@ -5384,7 +5384,7 @@
     if (!ctx || !ctx.house) return false;
     const hs = ctx.holder;
     const done = doneListOf(ctx);
-    const room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+    const room = index == null ? HOUSE_ROOMS.findIndex((_2, i) => !done.includes(i)) : Number(index);
     if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
     const env = environment(state3, "work");
     advanceTime(state3, searchMinutes(state3, CATEGORIES.house.zoneMinutes, env.dark), "work");
@@ -5398,7 +5398,7 @@
     }
     markZoneDone(ctx, room);
     state3.stats.zonesSearched += 1;
-    for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
+    for (const [id, q2] of Object.entries(found)) addItem(hs.leftovers, id, q2);
     practice(state3, "scavenging", 2 * SCAV_XP);
     reportFound(state3, found, HOUSE_ROOMS[room]);
     state3.lastFound = found;
@@ -5429,39 +5429,39 @@
   function listActions(state3) {
     const loc = state3.location;
     const p = state3.player;
-    const h2 = state3.home;
+    const h3 = state3.home;
     const acts = [];
     const add = (id, label, opts = {}) => acts.push({ id, label, ...opts });
     if (loc.kind === "home") {
-      add("drink_tank", "Drink from the water heater tank", { disabled: h2.tankGal < 0.25 && "The tank is empty", note: `${h2.tankGal.toFixed(1)} gal left` });
-      if (h2.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h2.safeGal.toFixed(1)} gal` });
-      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h2.safeGal < 1 && h2.tankGal < 1 && "No clean water" });
+      add("drink_tank", "Drink from the water heater tank", { disabled: h3.tankGal < 0.25 && "The tank is empty", note: `${h3.tankGal.toFixed(1)} gal left` });
+      if (h3.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h3.safeGal.toFixed(1)} gal` });
+      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h3.safeGal < 1 && h3.tankGal < 1 && "No clean water" });
       if (tapRuns(state3)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
-      if (h2.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
-      if (h2.rawGal > 0) {
-        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state3, 0.4) && "Light a fire or charge the battery", note: `${h2.rawGal.toFixed(1)} gal unsafe` });
+      if (h3.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
+      if (h3.rawGal > 0) {
+        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state3, 0.4) && "Light a fire or charge the battery", note: `${h3.rawGal.toFixed(1)} gal unsafe` });
         if (built(state3, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
         if (has2(state3, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
         add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
-      const fuel = (h2.storage.firewood || 0) + (state3.carried.firewood || 0);
-      add("add_wood", h2.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state3, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      const fuel = (h3.storage.firewood || 0) + (state3.carried.firewood || 0);
+      add("add_wood", h3.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state3, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
       if (has2(state3, "generator")) {
-        const gas = (h2.storage.gas_can || 0) + (state3.carried.gas_can || 0);
+        const gas = (h3.storage.gas_can || 0) + (state3.carried.gas_can || 0);
         const startP = gasStartChance(state3);
-        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h3.batteryMax - h3.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
       add("walk_in", "Walk around your home (first person)", { note: "see what you built" });
       add("walk_out", "Step outside (3D streets)", { note: "walk the real streets near home" });
-      if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
-      add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
+      if (h3.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h3.furniture} left` });
+      add("heater", h3.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h3.heaterOn && h3.battery < 1 && "Battery too low" });
       const cookId = cookPick(state3);
       const food = !!cookId;
-      const onlyDry = !food && COOK_ORDER().some((f) => (h2.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0);
+      const onlyDry = !food && COOK_ORDER().some((f) => (h3.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0);
       const cr = cookId ? eatRisk(state3, cookId, true) : 0;
       add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: onlyDry && "Need water to cook" || !food && "No food to cook" || !canHeat(state3, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
-      if (!h2.fridgeOpened) add("fridge", "Open the fridge");
+      if (!h3.fridgeOpened) add("fridge", "Open the fridge");
       if (Object.keys(state3.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
       if (state3.dog.stage === "visiting") {
         const fedToday = state3.dog.feedDays.includes(dayIndex(state3.time));
@@ -5490,7 +5490,7 @@
     }
     if (loc.kind === "house") {
       const hs = state3.houses[loc.id];
-      const nextRoom = HOUSE_ROOMS.findIndex((_, i) => !zonesDoneList(hs, "roomsDone", "doneList").includes(i));
+      const nextRoom = HOUSE_ROOMS.findIndex((_2, i) => !zonesDoneList(hs, "roomsDone", "doneList").includes(i));
       if (nextRoom >= 0) add("room", `Search the ${HOUSE_ROOMS[nextRoom]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
       else add("room", "All rooms searched", { disabled: "Nothing left" });
       add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
@@ -5524,9 +5524,9 @@
           const why = canHunt(state3, m);
           add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game \xB7 ${o.shot.pct}% hit a ${o.animal}${m === "rifle" ? " \xB7 loud" : ""}${isScared(state3) ? " \xB7 game is wary" : ""}`, risk: m === "rifle" });
         }
-        const w = state3.wild?.snares?.[spot.id];
-        if (w != null) {
-          const hours = (state3.time - w) / 60;
+        const w2 = state3.wild?.snares?.[spot.id];
+        if (w2 != null) {
+          const hours = (state3.time - w2) / 60;
           add("check_snare", "Check your snares", { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
           add("take_snare", "Take up your snares");
         } else if (spot.game?.includes("rabbit")) {
@@ -5702,23 +5702,23 @@
   function exposure(cat, key, plan) {
     const r = mulberry32(hashString(`exposed:${key}`));
     if (r() >= (EXPOSED_CHANCE[cat] ?? 0.1)) return null;
-    const { w, d } = plan.size;
-    if (r() < 0.6) return { kind: "window", x: (r() - 0.5) * w * 0.6, z: -0.2 };
-    return { kind: "roof", x: (r() - 0.5) * w * 0.4, z: -d * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
+    const { w: w2, d: d2 } = plan.size;
+    if (r() < 0.6) return { kind: "window", x: (r() - 0.5) * w2 * 0.6, z: -0.2 };
+    return { kind: "roof", x: (r() - 0.5) * w2 * 0.4, z: -d2 * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
   }
   function wallBox(x1, z1, x2, z2) {
     return { x: (x1 + x2) / 2, z: (z1 + z2) / 2, w: Math.max(T, Math.abs(x2 - x1)), d: Math.max(T, Math.abs(z2 - z1)) };
   }
-  function outerWalls(W, D) {
-    const h2 = W / 2;
+  function outerWalls(W, D3) {
+    const h3 = W / 2;
     return [
-      wallBox(-h2, 0, -1, 0),
-      wallBox(1, 0, h2, 0),
+      wallBox(-h3, 0, -1, 0),
+      wallBox(1, 0, h3, 0),
       // front, with door gap
-      wallBox(-h2, -D, h2, -D),
+      wallBox(-h3, -D3, h3, -D3),
       // back
-      wallBox(-h2, 0, -h2, -D),
-      wallBox(h2, 0, h2, -D)
+      wallBox(-h3, 0, -h3, -D3),
+      wallBox(h3, 0, h3, -D3)
       // sides
     ];
   }
@@ -5730,14 +5730,14 @@
     const SHELF = 1;
     const W = Math.max(8, aisles * AISLE + (aisles + 1) * SHELF + 6);
     const back = counter ? 5 : 3;
-    const D = cfg.front + cfg.len + back;
-    const plan = { kind: "hall", size: { w: W, d: D, h: cat === "convenience" || cat === "gas" ? 3 : 5 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const D3 = cfg.front + cfg.len + back;
+    const plan = { kind: "hall", size: { w: W, d: D3, h: cat === "convenience" || cat === "gas" ? 3 : 5 }, walls: outerWalls(W, D3), fixtures: [], spots: [], bodies: [], debris: [] };
     const rowZ = -(cfg.front + cfg.len / 2);
     const total = aisles * AISLE + (aisles + 1) * SHELF;
     const mid = Math.floor((aisles - 1) / 2);
-    let x = -(mid * (SHELF + AISLE) + SHELF + AISLE / 2);
+    let x2 = -(mid * (SHELF + AISLE) + SHELF + AISLE / 2);
     for (let i = 0; i <= aisles; i++) {
-      const cx = x + SHELF / 2;
+      const cx = x2 + SHELF / 2;
       const tipped = cat !== "gas" && cat !== "convenience" && r() < 0.08;
       plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === "clothes" ? 1.5 : 2, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
       if (cfg.fixture === "shelf" && !tipped) plan.fixtures.push({ type: "endcap", x: cx, z: rowZ + cfg.len / 2 + 0.28, w: SHELF, d: 0.55, h: 1.7, solid: true });
@@ -5745,7 +5745,7 @@
         const ax = cx + SHELF / 2 + AISLE / 2;
         plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
       }
-      x += SHELF + AISLE;
+      x2 += SHELF + AISLE;
     }
     const nReg = Math.max(1, Math.min(4, Math.floor(W / 6)));
     for (let i = 0; i < nReg; i++) {
@@ -5754,12 +5754,12 @@
       plan.fixtures.push({ type: "checkout", x: side * (2.6 + k * 2.6), z: -cfg.front / 2, w: 0.9, d: 2.2, h: 1, solid: true });
     }
     if (cat === "supermarket") {
-      plan.fixtures.push({ type: "coolers", x: 0, z: -D + 0.7, w: W - 2, d: 1, h: 2.1, solid: true });
+      plan.fixtures.push({ type: "coolers", x: 0, z: -D3 + 0.7, w: W - 2, d: 1, h: 2.1, solid: true });
       for (let i = 0; i < 3; i++) plan.debris.push({ kind: "cart", x: (r() - 0.5) * (W - 3), z: -1.5 - r() * (cfg.front - 2.5), rot: r() * 6.28 });
     }
     if (counter) {
       const lz2 = CATEGORIES[cat].lockedZone;
-      const cz = -D + 2.2;
+      const cz = -D3 + 2.2;
       plan.fixtures.push({ type: "rx_counter", x: 0, z: cz, w: W - 4, d: 0.9, h: 1.1, solid: true });
       plan.fixtures.push({ type: "gate", x: 0, z: cz + 0.6, w: W - 4, d: 0.1, h: 2.6, zone: zones - 1, solid: false });
       plan.spots.push({ zone: zones - 1, x: 0, z: cz + 1.4, label: lz2.name, counter: true });
@@ -5777,8 +5777,8 @@
     const rows = Math.ceil(zones / 2);
     const ENTRY = house ? 2.2 : 3.4;
     const W = HALLW + 2 * RW;
-    const D = ENTRY + rows * RD;
-    const plan = { kind: "rooms", size: { w: W, d: D, h: house ? 2.6 : 3 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const D3 = ENTRY + rows * RD;
+    const plan = { kind: "rooms", size: { w: W, d: D3, h: house ? 2.6 : 3 }, walls: outerWalls(W, D3), fixtures: [], spots: [], bodies: [], debris: [] };
     const hx = HALLW / 2;
     const DOOR = 1.1;
     const names = house ? HOUSE_ROOMS : null;
@@ -5815,16 +5815,16 @@
     const wallX = xout - side * 0.55;
     const zMin = cz - RD / 2 + 0.15;
     const zMax = cz + RD / 2 - 0.15;
-    const hits = (x, z, w, d) => plan.fixtures.some((f) => f.zone === zone && f.solid && Math.abs(x - f.x) < (w + f.w) / 2 - 0.02 && Math.abs(z - f.z) < (d + f.d) / 2 - 0.02);
-    const put = (type, x, z, w, d, h2, extra = {}) => {
-      let zz = z;
-      if (hits(x, zz, w, d)) {
+    const hits = (x2, z2, w2, d2) => plan.fixtures.some((f) => f.zone === zone && f.solid && Math.abs(x2 - f.x) < (w2 + f.w) / 2 - 0.02 && Math.abs(z2 - f.z) < (d2 + f.d) / 2 - 0.02);
+    const put = (type, x2, z2, w2, d2, h3, extra = {}) => {
+      let zz = z2;
+      if (hits(x2, zz, w2, d2)) {
         const tries = [];
-        for (let k = 1; k <= 12; k++) tries.push(z + k * 0.25, z - k * 0.25);
-        zz = tries.find((t) => t - d / 2 >= zMin && t + d / 2 <= zMax && !hits(x, t, w, d));
+        for (let k = 1; k <= 12; k++) tries.push(z2 + k * 0.25, z2 - k * 0.25);
+        zz = tries.find((t) => t - d2 / 2 >= zMin && t + d2 / 2 <= zMax && !hits(x2, t, w2, d2));
         if (zz == null) return;
       }
-      plan.fixtures.push({ type, x, z: zz, w, d, h: h2, zone, solid: true, ...extra });
+      plan.fixtures.push({ type, x: x2, z: zz, w: w2, d: d2, h: h3, zone, solid: true, ...extra });
     };
     let items;
     if (cat === "house") items = HOUSE_FURNITURE[name] || ["cabinet"];
@@ -5853,14 +5853,14 @@
     }
   }
   function addDebris(plan, r) {
-    const { w, d } = plan.size;
-    const n = Math.round(w * d / (plan.kind === "hall" ? 10 : 7));
+    const { w: w2, d: d2 } = plan.size;
+    const n = Math.round(w2 * d2 / (plan.kind === "hall" ? 10 : 7));
     for (let i = 0; i < n; i++) {
-      const x = (r() - 0.5) * (w - 1);
-      const z = -0.8 - r() * (d - 1.6);
-      if (Math.abs(x) < 1.2 && z > -2.5) continue;
+      const x2 = (r() - 0.5) * (w2 - 1);
+      const z2 = -0.8 - r() * (d2 - 1.6);
+      if (Math.abs(x2) < 1.2 && z2 > -2.5) continue;
       const kind = r() < 0.5 ? "box" : r() < 0.6 ? "can" : "paper";
-      plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
+      plan.debris.push({ kind, x: x2, z: z2, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
   }
   var HOME_PROJECT_SLOTS = {
@@ -5891,24 +5891,24 @@
       const side = sp.x > 0 ? 1 : -1;
       const xin = side > 0 ? a.x1 : a.x2;
       const cx = (a.x1 + a.x2) / 2;
-      let x;
-      let z;
+      let x2;
+      let z2;
       if (s.slot === "A" || s.slot === "B") {
-        x = xin + side * (s.w / 2 + 0.15);
+        x2 = xin + side * (s.w / 2 + 0.15);
         const gap = s.y ? 0.02 : 0.15;
-        z = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
+        z2 = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
       } else if (s.slot === "W") {
-        x = cx + (s.dx || 0) * side;
-        z = a.z1 + s.d / 2 + 0.02;
+        x2 = cx + (s.dx || 0) * side;
+        z2 = a.z1 + s.d / 2 + 0.02;
       } else {
-        x = cx;
-        z = (a.z1 + a.z2) / 2;
+        x2 = cx;
+        z2 = (a.z1 + a.z2) / 2;
       }
       const isBuilt = !!built2(id);
       const flat = s.slot === "W" || s.slot === "C";
-      const f = { type: "proj", proj: id, built: isBuilt, x, z, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
+      const f = { type: "proj", proj: id, built: isBuilt, x: x2, z: z2, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
       plan.fixtures.push(f);
-      plan.projects.push({ id, x, z, room: s.room, built: isBuilt, y: f.y, h: s.h });
+      plan.projects.push({ id, x: x2, z: z2, room: s.room, built: isBuilt, y: f.y, h: s.h });
     }
     const g = roomOf("garage");
     if (g) {
@@ -5922,41 +5922,41 @@
   var QUARTS_PER_GAL = 4;
   var HEATER_KW = 1.5;
   function addBag(bag, totals) {
-    for (const [id, q] of Object.entries(bag || {})) {
+    for (const [id, q2] of Object.entries(bag || {})) {
       const it = ITEMS[id];
-      if (!it || q <= 0) continue;
-      if (it.kind === "food" && it.cal) totals.cal += it.cal * q;
-      if (it.water) totals.water += it.water * (q / (it.portion || 1));
+      if (!it || q2 <= 0) continue;
+      if (it.kind === "food" && it.cal) totals.cal += it.cal * q2;
+      if (it.water) totals.water += it.water * (q2 / (it.portion || 1));
     }
   }
   function stockSummary(state3) {
     const t = { cal: 0, water: 0 };
     addBag(state3.carried, t);
     addBag(state3.home.storage, t);
-    const h2 = state3.home;
-    t.water += (h2.tankGal + h2.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
+    const h3 = state3.home;
+    t.water += (h3.tankGal + h3.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
     const foodDayPts = FOOD_LOSS_PER_HOUR * 24;
     const waterDayPts = WATER_LOSS_PER_HOUR * 24;
     return {
       foodDays: t.cal / CAL_PER_FOOD_POINT / foodDayPts,
       waterDays: t.water / waterDayPts,
-      rawGal: h2.rawGal
+      rawGal: h3.rawGal
     };
   }
   function stockLine(state3) {
     const s = stockSummary(state3);
-    const d = (x) => x < 1 ? `${Math.round(x * 24)} h` : `${x < 10 ? x.toFixed(1) : Math.round(x)} days`;
-    return `Food: ${d(s.foodDays)} \xB7 Water: ${d(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
+    const d2 = (x2) => x2 < 1 ? `${Math.round(x2 * 24)} h` : `${x2 < 10 ? x2.toFixed(1) : Math.round(x2)} days`;
+    return `Food: ${d2(s.foodDays)} \xB7 Water: ${d2(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
   }
   function powerSummary(state3) {
-    const h2 = state3.home;
+    const h3 = state3.home;
     const inToday = solarToday(state3);
-    const outKw = h2.heaterOn ? HEATER_KW : 0;
+    const outKw = h3.heaterOn ? HEATER_KW : 0;
     return {
       inToday,
       outKw,
-      hoursLeft: outKw > 0 ? h2.battery / outKw : null,
-      heaterHoursFull: h2.battery / HEATER_KW
+      hoursLeft: outKw > 0 ? h3.battery / outKw : null,
+      heaterHoursFull: h3.battery / HEATER_KW
     };
   }
 
@@ -5974,7 +5974,7 @@
     heat_wave: { cloud: 0, precip: "none", strength: 0, fog: 0.1, haze: "#f3d9a4" },
     smoke: { cloud: 0.4, precip: "none", strength: 0, fog: 0.5, haze: "#d9822b" }
   };
-  var clamp01 = (v) => Math.max(0, Math.min(1, v));
+  var clamp01 = (v2) => Math.max(0, Math.min(1, v2));
   function sceneEnv(state3, t = state3.time) {
     const m = (t % 1440 + 1440) % 1440;
     const sun = sunFor(t);
@@ -5997,8 +5997,8 @@
     }
     const noon = (rise + set) / 2;
     const sunHeight = m <= rise || m >= set ? 0 : clamp01(Math.sin(Math.PI * (m - rise) / (set - rise)));
-    const w = state3.weather || { type: "clear", wind: 0 };
-    const look = WEATHER_LOOK[w.type] || WEATHER_LOOK.clear;
+    const w2 = state3.weather || { type: "clear", wind: 0 };
+    const look = WEATHER_LOOK[w2.type] || WEATHER_LOOK.clear;
     return {
       minuteOfDay: m,
       hour: m / 60,
@@ -6008,7 +6008,7 @@
       daylight,
       sunHeight,
       phase,
-      weather: w.type,
+      weather: w2.type,
       cloud: look.cloud,
       precip: look.precip,
       precipStrength: look.strength,
@@ -6017,7 +6017,7 @@
       // sky tint for smoke or heat (CSS color), or null
       ice: !!look.ice,
       // ice storm: glazed surfaces
-      windMph: w.wind || 0,
+      windMph: w2.wind || 0,
       airF: Math.round(airTemp(state3, t)),
       season: seasonOf(t),
       outdoorLight: daylight * (1 - 0.6 * look.cloud)
@@ -6036,32 +6036,32 @@
       return null;
     }
   }
-  function write(k, v) {
+  function write(k, v2) {
     try {
-      if (v == null) localStorage.removeItem(k);
-      else localStorage.setItem(k, v);
+      if (v2 == null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v2);
     } catch {
     }
   }
   function getQualityChoice() {
-    const v = read(KEY);
-    return QUALITY_CHOICES.includes(v) ? v : "auto";
+    const v2 = read(KEY);
+    return QUALITY_CHOICES.includes(v2) ? v2 : "auto";
   }
-  function setQualityChoice(v) {
-    write(KEY, QUALITY_CHOICES.includes(v) && v !== "auto" ? v : null);
+  function setQualityChoice(v2) {
+    write(KEY, QUALITY_CHOICES.includes(v2) && v2 !== "auto" ? v2 : null);
     write(AUTO_KEY, null);
   }
 
   // src/engine/preview.js
   var DAY_START = 300;
   function weatherEffects(state3) {
-    const w = state3.weather;
+    const w2 = state3.weather;
     const info = weatherInfo(state3);
     const p = state3.player;
     const out = [];
-    if (w.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
+    if (w2.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
     if (info.wetAfter) {
-      const perHour = wetGainPerHour(p, w.type, info.wetAfter);
+      const perHour = wetGainPerHour(p, w2.type, info.wetAfter);
       const toWet = perHour > 0 ? Math.max(0, (WET_LIMIT - (p.wetness || 0)) / perHour) * 60 : Infinity;
       if (perHour <= 0) out.push({ id: "wet", text: "You stay dry outside.", level: "ok" });
       else if (toWet === 0) out.push({ id: "wet", text: "You are wet already. Outside you get wetter.", level: "danger" });
@@ -6070,12 +6070,12 @@
     const env = environment(state3, "walk");
     const chill = Math.round(feltTemp(state3, "walk", { ...env, wind: 0 }) - feltTemp(state3, "walk", env));
     if (chill >= 3) {
-      out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
+      out.push({ id: "wind", text: `Wind ${w2.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w2.wind >= 30 ? "danger" : "warn" });
     }
-    for (const h2 of activeHazards(state3)) {
-      const left = formatDuration(h2.endsAt - state3.time);
-      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} for about another ${left}.`, level: "warn" });
-      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder for about another ${left}.`, level: "danger" });
+    for (const h3 of activeHazards(state3)) {
+      const left = formatDuration(h3.endsAt - state3.time);
+      if (h3.walk) out.push({ id: `hz_${h3.id}`, text: `Walking is slower: ${h3.label} for about another ${left}.`, level: "warn" });
+      if (h3.colder) out.push({ id: `hz_${h3.id}`, text: `Cold snap: outside is ${h3.colder} \xB0F colder for about another ${left}.`, level: "danger" });
     }
     return out;
   }
@@ -6083,21 +6083,21 @@
     return (gameDay(t) + 1) * 1440 + DAY_START;
   }
   function weatherOutlook(state3, t = state3.time) {
-    const w = state3.weather;
+    const w2 = state3.weather;
     const next2 = nextDayStart(t);
     return {
-      type: w.type,
-      label: WEATHER_TYPES[w.type].label,
+      type: w2.type,
+      label: WEATHER_TYPES[w2.type].label,
       airF: Math.round(airTemp(state3, t)),
-      windMph: w.wind,
-      highF: Math.round(w.high),
-      lowF: Math.round(w.low),
+      windMph: w2.wind,
+      highF: Math.round(w2.high),
+      lowF: Math.round(w2.low),
       night: isNight(t),
       effects: weatherEffects(state3),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
       // The low shown is the real low of the curve (with a cold snap, if one is on).
-      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow - hazardColder(state3, next2)) }
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w2.nextLow - hazardColder(state3, next2)) }
     };
   }
   function actionTiming(state3, minutes) {
@@ -6129,31 +6129,31 @@
   }
 
   // src/engine/game.js
-  function perform(state3, kind, a, b, c) {
+  function perform(state3, kind, a, b2, c) {
     if (state3.dead) return;
-    activity.begin(state3, [kind, a, b].filter((v) => v != null && typeof v !== "object").join(":"));
+    activity.begin(state3, [kind, a, b2].filter((v2) => v2 != null && typeof v2 !== "object").join(":"));
     try {
-      run(state3, kind, a, b, c);
+      run(state3, kind, a, b2, c);
     } finally {
       activity.end(state3);
     }
   }
-  function run(state3, kind, a, b, c) {
+  function run(state3, kind, a, b2, c) {
     switch (kind) {
       case "action":
-        doAction(state3, a, b);
+        doAction(state3, a, b2);
         break;
       case "use":
-        useItem(state3, a, b, c);
+        useItem(state3, a, b2, c);
         break;
       case "take":
-        takeItem(state3, a, b);
+        takeItem(state3, a, b2);
         break;
       case "takeall":
         takeAll(state3);
         break;
       case "drop":
-        dropItem(state3, a, b);
+        dropItem(state3, a, b2);
         break;
       case "namedog":
         nameDog(state3, a);
@@ -6200,15 +6200,15 @@
     let raw;
     try {
       raw = s.getItem(KEY2);
-    } catch (err) {
-      problem = String(err);
+    } catch (err2) {
+      problem = String(err2);
       return null;
     }
     if (!raw) return null;
     try {
       return parseSave(raw);
-    } catch (err) {
-      problem = err?.message || String(err);
+    } catch (err2) {
+      problem = err2?.message || String(err2);
       try {
         s.setItem(UNREADABLE_KEY, raw);
         s.removeItem(KEY2);
@@ -6243,7 +6243,7 @@
     }
     if (!runs.some((r) => r.seed === state3.seed && r.time === state3.dead.time)) {
       runs.push({ seed: state3.seed, time: state3.dead.time, days: state3.dead.days, cause: state3.dead.cause, miles: Math.round(state3.stats.miles * 10) / 10, dog: state3.dog.name });
-      runs.sort((a, b) => b.days - a.days);
+      runs.sort((a, b2) => b2.days - a.days);
       runs = runs.slice(0, 10);
       saveLegacy(addRun(loadLegacy(), state3));
       try {
@@ -6289,36 +6289,36 @@
     const s = str.trim().toLowerCase();
     if (!COLOR_RE.test(s)) return null;
     if (s[0] === "#") {
-      let h2 = s.slice(1);
-      if (h2.length === 3 || h2.length === 4) h2 = [...h2].map((c) => c + c).join("");
-      if (h2.length !== 6 && h2.length !== 8) return null;
-      const n = (i) => parseInt(h2.slice(i, i + 2), 16);
-      return { r: n(0), g: n(2), b: n(4), a: h2.length === 8 ? n(6) / 255 : 1 };
+      let h3 = s.slice(1);
+      if (h3.length === 3 || h3.length === 4) h3 = [...h3].map((c) => c + c).join("");
+      if (h3.length !== 6 && h3.length !== 8) return null;
+      const n = (i) => parseInt(h3.slice(i, i + 2), 16);
+      return { r: n(0), g: n(2), b: n(4), a: h3.length === 8 ? n(6) / 255 : 1 };
     }
-    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v) => parseFloat(v));
+    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v2) => parseFloat(v2));
     if (nums.length < 3 || nums.some(Number.isNaN)) return null;
     const a = nums.length > 3 ? nums[3] : 1;
     if (s.startsWith("rgb")) return { r: nums[0], g: nums[1], b: nums[2], a };
     return { ...hslToRgb(nums[0], nums[1] / 100, nums[2] / 100), a };
   }
-  function hslToRgb(h2, s, l) {
-    h2 = (h2 % 360 + 360) % 360;
+  function hslToRgb(h3, s, l) {
+    h3 = (h3 % 360 + 360) % 360;
     const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(h2 / 60 % 2 - 1));
+    const x2 = c * (1 - Math.abs(h3 / 60 % 2 - 1));
     const m = l - c / 2;
-    const [r, g, b] = h2 < 60 ? [c, x, 0] : h2 < 120 ? [x, c, 0] : h2 < 180 ? [0, c, x] : h2 < 240 ? [0, x, c] : h2 < 300 ? [x, 0, c] : [c, 0, x];
-    return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+    const [r, g, b2] = h3 < 60 ? [c, x2, 0] : h3 < 120 ? [x2, c, 0] : h3 < 180 ? [0, c, x2] : h3 < 240 ? [0, x2, c] : h3 < 300 ? [x2, 0, c] : [c, 0, x2];
+    return { r: (r + m) * 255, g: (g + m) * 255, b: (b2 + m) * 255 };
   }
-  function toCss({ r, g, b, a }) {
-    const k = (v) => Math.round(Math.max(0, Math.min(255, v)));
-    return `rgba(${k(r)},${k(g)},${k(b)},${Math.round(a * 1e3) / 1e3})`;
+  function toCss({ r, g, b: b2, a }) {
+    const k = (v2) => Math.round(Math.max(0, Math.min(255, v2)));
+    return `rgba(${k(r)},${k(g)},${k(b2)},${Math.round(a * 1e3) / 1e3})`;
   }
   var SNOW = { r: 222, g: 231, b: 238 };
   function coolColor(str, { desat = 0.45, toward = 0.15 } = {}) {
     const c = parseColor(str);
     if (!c) return str;
     const gray = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
-    const mix2 = (v, t) => v + (t - v) * toward;
+    const mix2 = (v2, t) => v2 + (t - v2) * toward;
     return toCss({
       r: mix2(c.r + (gray - c.r) * desat, SNOW.r),
       g: mix2(c.g + (gray - c.g) * desat, SNOW.g),
@@ -6326,13 +6326,13 @@
       a: c.a
     });
   }
-  function coolValue(v) {
-    if (typeof v === "string") return coolColor(v);
-    if (Array.isArray(v)) return v.map(coolValue);
-    if (v && typeof v === "object" && Array.isArray(v.stops)) {
-      return { ...v, stops: v.stops.map(([z, c]) => [z, coolValue(c)]) };
+  function coolValue(v2) {
+    if (typeof v2 === "string") return coolColor(v2);
+    if (Array.isArray(v2)) return v2.map(coolValue);
+    if (v2 && typeof v2 === "object" && Array.isArray(v2.stops)) {
+      return { ...v2, stops: v2.stops.map(([z2, c]) => [z2, coolValue(c)]) };
     }
-    return v;
+    return v2;
   }
   var WINTER = [
     ["background", { "background-color": "#eaeff3" }],
@@ -6367,8 +6367,8 @@
       }
       const fixed = WINTER.find(([prefix]) => layer.id === prefix || layer.id.startsWith(prefix + "_") || layer.id.startsWith(prefix + "-")) || (layer["source-layer"] === "water" && layer.type === "fill" ? WINTER.find(([p]) => p === "water") : null);
       const road = roadPaint(layer.id);
-      for (const [k, v] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
-        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v;
+      for (const [k, v2] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
+        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v2;
       }
       if (layer.type === "raster") {
         paint["raster-saturation"] = -0.6;
@@ -6383,10 +6383,10 @@
     }
     return out;
   }
-  function mix(a, b, f) {
-    const x = parseColor(a);
-    const y = parseColor(b);
-    return toCss({ r: x.r + (y.r - x.r) * f, g: x.g + (y.g - x.g) * f, b: x.b + (y.b - x.b) * f, a: x.a + (y.a - x.a) * f });
+  function mix(a, b2, f) {
+    const x2 = parseColor(a);
+    const y2 = parseColor(b2);
+    return toCss({ r: x2.r + (y2.r - x2.r) * f, g: x2.g + (y2.g - x2.g) * f, b: x2.b + (y2.b - x2.b) * f, a: x2.a + (y2.a - x2.a) * f });
   }
   var SEASON_COLORS = {
     winter: ["#eaeff3", "#d6e2da", "#dbe5de", "rgba(170,196,180,0.65)", "rgba(212,221,229,0.55)", "#ffffff"],
@@ -6441,8 +6441,8 @@
   var CAR_STYLES = 4;
   function pointNear(rng, lat, lon, minM, maxM) {
     const a = rng() * Math.PI * 2;
-    const d = minM + rng() * (maxM - minM);
-    return [lon + Math.sin(a) * d / (111320 * Math.cos(lat * Math.PI / 180)), lat + Math.cos(a) * d / 111320];
+    const d2 = minM + rng() * (maxM - minM);
+    return [lon + Math.sin(a) * d2 / (111320 * Math.cos(lat * Math.PI / 180)), lat + Math.cos(a) * d2 / 111320];
   }
   function detailFeatures(places, home) {
     const features = [];
@@ -6476,136 +6476,136 @@
     const c = document.createElement("canvas");
     c.width = size * px;
     c.height = size * px;
-    const x = c.getContext("2d");
-    x.scale(px, px);
-    draw(x, size);
-    return { data: x.getImageData(0, 0, c.width, c.height), pixelRatio: px };
+    const x2 = c.getContext("2d");
+    x2.scale(px, px);
+    draw(x2, size);
+    return { data: x2.getImageData(0, 0, c.width, c.height), pixelRatio: px };
   }
-  function rrect(x, a, b, w, h2, r) {
-    x.beginPath();
-    x.moveTo(a + r, b);
-    x.arcTo(a + w, b, a + w, b + h2, r);
-    x.arcTo(a + w, b + h2, a, b + h2, r);
-    x.arcTo(a, b + h2, a, b, r);
-    x.arcTo(a, b, a + w, b, r);
-    x.closePath();
+  function rrect(x2, a, b2, w2, h3, r) {
+    x2.beginPath();
+    x2.moveTo(a + r, b2);
+    x2.arcTo(a + w2, b2, a + w2, b2 + h3, r);
+    x2.arcTo(a + w2, b2 + h3, a, b2 + h3, r);
+    x2.arcTo(a, b2 + h3, a, b2, r);
+    x2.arcTo(a, b2, a + w2, b2, r);
+    x2.closePath();
   }
   var CAR_COLORS = ["#7d8792", "#5b6b7c", "#8a5a52", "#c9cdd2"];
   function addDetailIcons(map) {
     const icons = {};
     CAR_COLORS.forEach((col, i) => {
-      icons[`ll-car-${i}`] = canvas(16, (x) => {
-        x.fillStyle = "rgba(10,20,30,0.25)";
-        rrect(x, 5, 1.5, 7, 14, 2.2);
-        x.fill();
-        x.fillStyle = col;
-        x.strokeStyle = "#26313c";
-        x.lineWidth = 0.8;
-        rrect(x, 4.5, 1, 7, 14, 2.2);
-        x.fill();
-        x.stroke();
-        x.fillStyle = "#2f3d4a";
-        rrect(x, 5.6, 3.6, 4.8, 2.6, 0.8);
-        x.fill();
-        rrect(x, 5.6, 10.6, 4.8, 2, 0.8);
-        x.fill();
+      icons[`ll-car-${i}`] = canvas(16, (x2) => {
+        x2.fillStyle = "rgba(10,20,30,0.25)";
+        rrect(x2, 5, 1.5, 7, 14, 2.2);
+        x2.fill();
+        x2.fillStyle = col;
+        x2.strokeStyle = "#26313c";
+        x2.lineWidth = 0.8;
+        rrect(x2, 4.5, 1, 7, 14, 2.2);
+        x2.fill();
+        x2.stroke();
+        x2.fillStyle = "#2f3d4a";
+        rrect(x2, 5.6, 3.6, 4.8, 2.6, 0.8);
+        x2.fill();
+        rrect(x2, 5.6, 10.6, 4.8, 2, 0.8);
+        x2.fill();
       });
     });
-    icons["ll-debris"] = canvas(14, (x) => {
-      x.fillStyle = "#8b939b";
-      x.strokeStyle = "#4b5560";
-      x.lineWidth = 0.6;
-      for (const [a, b, w] of [[2, 3, 4], [7, 2, 3], [4, 8, 5], [9, 7, 3]]) {
-        x.beginPath();
-        x.moveTo(a, b);
-        x.lineTo(a + w, b + 1);
-        x.lineTo(a + w - 1, b + w * 0.7);
-        x.lineTo(a + 0.5, b + w * 0.6);
-        x.closePath();
-        x.fill();
-        x.stroke();
+    icons["ll-debris"] = canvas(14, (x2) => {
+      x2.fillStyle = "#8b939b";
+      x2.strokeStyle = "#4b5560";
+      x2.lineWidth = 0.6;
+      for (const [a, b2, w2] of [[2, 3, 4], [7, 2, 3], [4, 8, 5], [9, 7, 3]]) {
+        x2.beginPath();
+        x2.moveTo(a, b2);
+        x2.lineTo(a + w2, b2 + 1);
+        x2.lineTo(a + w2 - 1, b2 + w2 * 0.7);
+        x2.lineTo(a + 0.5, b2 + w2 * 0.6);
+        x2.closePath();
+        x2.fill();
+        x2.stroke();
       }
     });
-    icons["ll-barricade"] = canvas(18, (x) => {
-      x.fillStyle = "#b7bcc1";
-      x.strokeStyle = "#4b5560";
-      x.lineWidth = 0.7;
-      rrect(x, 1, 6, 16, 6, 1);
-      x.fill();
-      x.stroke();
-      x.save();
-      x.beginPath();
-      rrect(x, 1, 6, 16, 6, 1);
-      x.clip();
-      x.fillStyle = "#c23a46";
+    icons["ll-barricade"] = canvas(18, (x2) => {
+      x2.fillStyle = "#b7bcc1";
+      x2.strokeStyle = "#4b5560";
+      x2.lineWidth = 0.7;
+      rrect(x2, 1, 6, 16, 6, 1);
+      x2.fill();
+      x2.stroke();
+      x2.save();
+      x2.beginPath();
+      rrect(x2, 1, 6, 16, 6, 1);
+      x2.clip();
+      x2.fillStyle = "#c23a46";
       for (let i = -6; i < 18; i += 4) {
-        x.beginPath();
-        x.moveTo(i, 12);
-        x.lineTo(i + 2, 12);
-        x.lineTo(i + 8, 6);
-        x.lineTo(i + 6, 6);
-        x.fill();
+        x2.beginPath();
+        x2.moveTo(i, 12);
+        x2.lineTo(i + 2, 12);
+        x2.lineTo(i + 8, 6);
+        x2.lineTo(i + 6, 6);
+        x2.fill();
       }
-      x.restore();
+      x2.restore();
     });
-    icons["ll-trash"] = canvas(14, (x) => {
-      x.strokeStyle = "#0b0f13";
-      x.lineWidth = 0.6;
-      for (const [a, b, r] of [[5, 8, 3.4], [9, 6, 3], [8, 10, 2.8]]) {
-        x.fillStyle = "#1d2329";
-        x.beginPath();
-        x.arc(a, b, r, 0, Math.PI * 2);
-        x.fill();
-        x.stroke();
-      }
-    });
-    icons["ll-sign"] = canvas(16, (x) => {
-      x.fillStyle = "#f1d046";
-      x.strokeStyle = "#1a1a1a";
-      x.lineWidth = 1.2;
-      rrect(x, 2, 2, 12, 12, 1);
-      x.fill();
-      x.stroke();
-      x.fillStyle = "#1a1a1a";
-      x.fillRect(7.1, 4.2, 1.8, 5.2);
-      x.fillRect(7.1, 10.4, 1.8, 1.8);
-    });
-    icons["ll-tent"] = canvas(18, (x) => {
-      x.fillStyle = "#f4f6f8";
-      x.strokeStyle = "#5a6672";
-      x.lineWidth = 0.8;
-      rrect(x, 2, 3, 14, 12, 1.5);
-      x.fill();
-      x.stroke();
-      x.strokeStyle = "#9aa6b2";
-      x.beginPath();
-      x.moveTo(9, 3);
-      x.lineTo(9, 15);
-      x.stroke();
-      x.fillStyle = "#2f7fb8";
-      x.fillRect(2.5, 8, 13, 2);
-    });
-    icons["ll-bush"] = canvas(14, (x) => {
-      x.fillStyle = "rgba(70,120,60,0.85)";
-      for (const [a, b, r] of [[5, 7, 3.5], [8.5, 5.5, 3.2], [9, 9, 3], [5.5, 10, 2.6]]) {
-        x.beginPath();
-        x.arc(a, b, r, 0, Math.PI * 2);
-        x.fill();
+    icons["ll-trash"] = canvas(14, (x2) => {
+      x2.strokeStyle = "#0b0f13";
+      x2.lineWidth = 0.6;
+      for (const [a, b2, r] of [[5, 8, 3.4], [9, 6, 3], [8, 10, 2.8]]) {
+        x2.fillStyle = "#1d2329";
+        x2.beginPath();
+        x2.arc(a, b2, r, 0, Math.PI * 2);
+        x2.fill();
+        x2.stroke();
       }
     });
-    icons["ll-tree"] = canvas(18, (x) => {
-      x.fillStyle = "rgba(20,40,20,0.2)";
-      x.beginPath();
-      x.arc(10, 10, 7, 0, Math.PI * 2);
-      x.fill();
-      x.fillStyle = "rgba(58,110,52,0.9)";
-      x.beginPath();
-      x.arc(9, 9, 6.5, 0, Math.PI * 2);
-      x.fill();
-      x.fillStyle = "rgba(96,150,80,0.9)";
-      x.beginPath();
-      x.arc(7.5, 7.5, 3, 0, Math.PI * 2);
-      x.fill();
+    icons["ll-sign"] = canvas(16, (x2) => {
+      x2.fillStyle = "#f1d046";
+      x2.strokeStyle = "#1a1a1a";
+      x2.lineWidth = 1.2;
+      rrect(x2, 2, 2, 12, 12, 1);
+      x2.fill();
+      x2.stroke();
+      x2.fillStyle = "#1a1a1a";
+      x2.fillRect(7.1, 4.2, 1.8, 5.2);
+      x2.fillRect(7.1, 10.4, 1.8, 1.8);
+    });
+    icons["ll-tent"] = canvas(18, (x2) => {
+      x2.fillStyle = "#f4f6f8";
+      x2.strokeStyle = "#5a6672";
+      x2.lineWidth = 0.8;
+      rrect(x2, 2, 3, 14, 12, 1.5);
+      x2.fill();
+      x2.stroke();
+      x2.strokeStyle = "#9aa6b2";
+      x2.beginPath();
+      x2.moveTo(9, 3);
+      x2.lineTo(9, 15);
+      x2.stroke();
+      x2.fillStyle = "#2f7fb8";
+      x2.fillRect(2.5, 8, 13, 2);
+    });
+    icons["ll-bush"] = canvas(14, (x2) => {
+      x2.fillStyle = "rgba(70,120,60,0.85)";
+      for (const [a, b2, r] of [[5, 7, 3.5], [8.5, 5.5, 3.2], [9, 9, 3], [5.5, 10, 2.6]]) {
+        x2.beginPath();
+        x2.arc(a, b2, r, 0, Math.PI * 2);
+        x2.fill();
+      }
+    });
+    icons["ll-tree"] = canvas(18, (x2) => {
+      x2.fillStyle = "rgba(20,40,20,0.2)";
+      x2.beginPath();
+      x2.arc(10, 10, 7, 0, Math.PI * 2);
+      x2.fill();
+      x2.fillStyle = "rgba(58,110,52,0.9)";
+      x2.beginPath();
+      x2.arc(9, 9, 6.5, 0, Math.PI * 2);
+      x2.fill();
+      x2.fillStyle = "rgba(96,150,80,0.9)";
+      x2.beginPath();
+      x2.arc(7.5, 7.5, 3, 0, Math.PI * 2);
+      x2.fill();
     });
     for (const [id, img] of Object.entries(icons)) {
       if (!map.hasImage(id)) map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
@@ -6654,7 +6654,7 @@
       steps: [
         { id: "books_1", text: "Bring a book home", check: (s) => storedAny(s, BOOKS) >= 1 },
         { id: "books_4", text: "Have 4 books on the shelf at home", check: (s) => storedAny(s, BOOKS) >= 4 },
-        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b) => stored(s, b) >= 1) },
+        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b2) => stored(s, b2) >= 1) },
         { id: "dry_room", text: "Insulate the living room to keep the shelf dry", check: (s) => built(s, "insulate_living") },
         { id: "books_more", text: "Bring home 6 more books after you choose this", check: (s, c) => booksAt(s) - c.since.books >= 6 }
       ],
@@ -6819,10 +6819,10 @@
   var STEP_MORALE = 3;
   var byId2 = new Map(GOALS.map((g) => [g.id, g]));
   function ensureGoals(state3) {
-    var _a;
+    var _a2;
     const p = state3.player;
     if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null, since: {} };
-    (_a = p.goals).since || (_a.since = {});
+    (_a2 = p.goals).since || (_a2.since = {});
     return p.goals;
   }
   var boardOpen = (state3) => gameDay(state3.time) >= BOARD_OPENS_DAY;
@@ -6831,14 +6831,14 @@
     return g.changedDay == null || gameDay(state3.time) - g.changedDay >= CHANGE_GAP_DAYS;
   }
   function pickGoal(state3, id) {
-    var _a;
+    var _a2;
     const g = ensureGoals(state3);
     if (!boardOpen(state3)) return `The board opens on day ${BOARD_OPENS_DAY + 1}. First, stay alive.`;
     if (!byId2.has(id)) return "Unknown goal.";
     if (g.picked.includes(id)) return "You already work on this.";
     if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
     g.picked.push(id);
-    (_a = g.done)[id] || (_a[id] = []);
+    (_a2 = g.done)[id] || (_a2[id] = []);
     g.since[id] = { day: gameDay(state3.time), ...goalCounters(state3) };
     log(state3, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
     checkGoals(state3);
@@ -6848,13 +6848,13 @@
     const g = ensureGoals(state3);
     if (!g.picked.includes(id)) return "You do not work on this.";
     if (!canChange(state3)) return `You can change a goal again in ${CHANGE_GAP_DAYS - (gameDay(state3.time) - g.changedDay)} days.`;
-    g.picked = g.picked.filter((x) => x !== id);
+    g.picked = g.picked.filter((x2) => x2 !== id);
     g.changedDay = gameDay(state3.time);
     log(state3, `You put the goal aside: ${byId2.get(id).title}.`);
     return null;
   }
   function checkGoals(state3) {
-    var _a;
+    var _a2;
     const g = state3.player.goals;
     if (!g || !g.picked.length || state3.dead) return [];
     paintSign(state3);
@@ -6862,7 +6862,7 @@
     for (const id of g.picked) {
       const goal = byId2.get(id);
       if (!goal) continue;
-      const done = (_a = g.done)[id] || (_a[id] = []);
+      const done = (_a2 = g.done)[id] || (_a2[id] = []);
       const since = g.since?.[id] || { day: gameDay(state3.time), ...goalCounters(state3) };
       const c = { days: gameDay(state3.time) - since.day, since };
       for (const st of goal.steps) {
@@ -6919,6 +6919,875 @@
     });
   }
 
+  // node_modules/fflate/esm/browser.js
+  var u8 = Uint8Array;
+  var u16 = Uint16Array;
+  var i32 = Int32Array;
+  var fleb = new u8([
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    5,
+    0,
+    /* unused */
+    0,
+    0,
+    /* impossible */
+    0
+  ]);
+  var fdeb = new u8([
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4,
+    5,
+    5,
+    6,
+    6,
+    7,
+    7,
+    8,
+    8,
+    9,
+    9,
+    10,
+    10,
+    11,
+    11,
+    12,
+    12,
+    13,
+    13,
+    /* unused */
+    0,
+    0
+  ]);
+  var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+  var freb = function(eb, start2) {
+    var b2 = new u16(31);
+    for (var i = 0; i < 31; ++i) {
+      b2[i] = start2 += 1 << eb[i - 1];
+    }
+    var r = new i32(b2[30]);
+    for (var i = 1; i < 30; ++i) {
+      for (var j2 = b2[i]; j2 < b2[i + 1]; ++j2) {
+        r[j2] = j2 - b2[i] << 5 | i;
+      }
+    }
+    return { b: b2, r };
+  };
+  var _a = freb(fleb, 2);
+  var fl = _a.b;
+  var revfl = _a.r;
+  fl[28] = 258, revfl[258] = 28;
+  var _b = freb(fdeb, 0);
+  var fd = _b.b;
+  var revfd = _b.r;
+  var rev = new u16(32768);
+  for (i = 0; i < 32768; ++i) {
+    x2 = (i & 43690) >> 1 | (i & 21845) << 1;
+    x2 = (x2 & 52428) >> 2 | (x2 & 13107) << 2;
+    x2 = (x2 & 61680) >> 4 | (x2 & 3855) << 4;
+    rev[i] = ((x2 & 65280) >> 8 | (x2 & 255) << 8) >> 1;
+  }
+  var x2;
+  var i;
+  var hMap = function(cd, mb, r) {
+    var s = cd.length;
+    var i = 0;
+    var l = new u16(mb);
+    for (; i < s; ++i) {
+      if (cd[i])
+        ++l[cd[i] - 1];
+    }
+    var le = new u16(mb);
+    for (i = 1; i < mb; ++i) {
+      le[i] = le[i - 1] + l[i - 1] << 1;
+    }
+    var co;
+    if (r) {
+      co = new u16(1 << mb);
+      var rvb = 15 - mb;
+      for (i = 0; i < s; ++i) {
+        if (cd[i]) {
+          var sv = i << 4 | cd[i];
+          var r_1 = mb - cd[i];
+          var v2 = le[cd[i] - 1]++ << r_1;
+          for (var m = v2 | (1 << r_1) - 1; v2 <= m; ++v2) {
+            co[rev[v2] >> rvb] = sv;
+          }
+        }
+      }
+    } else {
+      co = new u16(s);
+      for (i = 0; i < s; ++i) {
+        if (cd[i]) {
+          co[i] = rev[le[cd[i] - 1]++] >> 15 - cd[i];
+        }
+      }
+    }
+    return co;
+  };
+  var flt = new u8(288);
+  for (i = 0; i < 144; ++i)
+    flt[i] = 8;
+  var i;
+  for (i = 144; i < 256; ++i)
+    flt[i] = 9;
+  var i;
+  for (i = 256; i < 280; ++i)
+    flt[i] = 7;
+  var i;
+  for (i = 280; i < 288; ++i)
+    flt[i] = 8;
+  var i;
+  var fdt = new u8(32);
+  for (i = 0; i < 32; ++i)
+    fdt[i] = 5;
+  var i;
+  var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+  var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
+  var max = function(a) {
+    var m = a[0];
+    for (var i = 1; i < a.length; ++i) {
+      if (a[i] > m)
+        m = a[i];
+    }
+    return m;
+  };
+  var bits = function(d2, p, m) {
+    var o = p / 8 | 0;
+    return (d2[o] | d2[o + 1] << 8) >> (p & 7) & m;
+  };
+  var bits16 = function(d2, p) {
+    var o = p / 8 | 0;
+    return (d2[o] | d2[o + 1] << 8 | d2[o + 2] << 16) >> (p & 7);
+  };
+  var shft = function(p) {
+    return (p + 7) / 8 | 0;
+  };
+  var slc = function(v2, s, e) {
+    if (s == null || s < 0)
+      s = 0;
+    if (e == null || e > v2.length)
+      e = v2.length;
+    return new u8(v2.subarray(s, e));
+  };
+  var ec = [
+    "unexpected EOF",
+    "invalid block type",
+    "invalid length/literal",
+    "invalid distance",
+    "stream finished",
+    "no stream handler",
+    ,
+    // determined by compression function
+    "no callback",
+    "invalid UTF-8 data",
+    "extra field too long",
+    "date not in range 1980-2099",
+    "filename too long",
+    "stream finishing",
+    "invalid zip data"
+    // determined by unknown compression method
+  ];
+  var err = function(ind, msg, nt) {
+    var e = new Error(msg || ec[ind]);
+    e.code = ind;
+    if (Error.captureStackTrace)
+      Error.captureStackTrace(e, err);
+    if (!nt)
+      throw e;
+    return e;
+  };
+  var inflt = function(dat, st, buf, dict) {
+    var sl = dat.length, dl = dict ? dict.length : 0;
+    if (!sl || st.f && !st.l)
+      return buf || new u8(0);
+    var noBuf = !buf;
+    var resize = noBuf || st.i != 2;
+    var noSt = st.i;
+    if (noBuf)
+      buf = new u8(sl * 3);
+    var cbuf = function(l2) {
+      var bl = buf.length;
+      if (l2 > bl) {
+        var nbuf = new u8(Math.max(bl * 2, l2));
+        nbuf.set(buf);
+        buf = nbuf;
+      }
+    };
+    var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
+    var tbts = sl * 8;
+    do {
+      if (!lm) {
+        final = bits(dat, pos, 1);
+        var type = bits(dat, pos + 1, 3);
+        pos += 3;
+        if (!type) {
+          var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t = s + l;
+          if (t > sl) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + l);
+          buf.set(dat.subarray(s, t), bt);
+          st.b = bt += l, st.p = pos = t * 8, st.f = final;
+          continue;
+        } else if (type == 1)
+          lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
+        else if (type == 2) {
+          var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
+          var tl = hLit + bits(dat, pos + 5, 31) + 1;
+          pos += 14;
+          var ldt = new u8(tl);
+          var clt = new u8(19);
+          for (var i = 0; i < hcLen; ++i) {
+            clt[clim[i]] = bits(dat, pos + i * 3, 7);
+          }
+          pos += hcLen * 3;
+          var clb = max(clt), clbmsk = (1 << clb) - 1;
+          var clm = hMap(clt, clb, 1);
+          for (var i = 0; i < tl; ) {
+            var r = clm[bits(dat, pos, clbmsk)];
+            pos += r & 15;
+            var s = r >> 4;
+            if (s < 16) {
+              ldt[i++] = s;
+            } else {
+              var c = 0, n = 0;
+              if (s == 16)
+                n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i - 1];
+              else if (s == 17)
+                n = 3 + bits(dat, pos, 7), pos += 3;
+              else if (s == 18)
+                n = 11 + bits(dat, pos, 127), pos += 7;
+              while (n--)
+                ldt[i++] = c;
+            }
+          }
+          var lt = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
+          lbt = max(lt);
+          dbt = max(dt);
+          lm = hMap(lt, lbt, 1);
+          dm = hMap(dt, dbt, 1);
+        } else
+          err(1);
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+      }
+      if (resize)
+        cbuf(bt + 131072);
+      var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
+      var lpos = pos;
+      for (; ; lpos = pos) {
+        var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
+        pos += c & 15;
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+        if (!c)
+          err(2);
+        if (sym < 256)
+          buf[bt++] = sym;
+        else if (sym == 256) {
+          lpos = pos, lm = null;
+          break;
+        } else {
+          var add = sym - 254;
+          if (sym > 264) {
+            var i = sym - 257, b2 = fleb[i];
+            add = bits(dat, pos, (1 << b2) - 1) + fl[i];
+            pos += b2;
+          }
+          var d2 = dm[bits16(dat, pos) & dms], dsym = d2 >> 4;
+          if (!d2)
+            err(3);
+          pos += d2 & 15;
+          var dt = fd[dsym];
+          if (dsym > 3) {
+            var b2 = fdeb[dsym];
+            dt += bits16(dat, pos) & (1 << b2) - 1, pos += b2;
+          }
+          if (pos > tbts) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + 131072);
+          var end = bt + add;
+          if (bt < dt) {
+            var shift = dl - dt, dend = Math.min(dt, end);
+            if (shift + bt < 0)
+              err(3);
+            for (; bt < dend; ++bt)
+              buf[bt] = dict[shift + bt];
+          }
+          for (; bt < end; ++bt)
+            buf[bt] = buf[bt - dt];
+        }
+      }
+      st.l = lm, st.p = lpos, st.b = bt, st.f = final;
+      if (lm)
+        final = 1, st.m = lbt, st.d = dm, st.n = dbt;
+    } while (!final);
+    return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
+  };
+  var et = /* @__PURE__ */ new u8(0);
+  var gzs = function(d2) {
+    if (d2[0] != 31 || d2[1] != 139 || d2[2] != 8)
+      err(6, "invalid gzip data");
+    var flg = d2[3];
+    var st = 10;
+    if (flg & 4)
+      st += (d2[10] | d2[11] << 8) + 2;
+    for (var zs = (flg >> 3 & 1) + (flg >> 4 & 1); zs > 0; zs -= !d2[st++])
+      ;
+    return st + (flg & 2);
+  };
+  var gzl = function(d2) {
+    var l = d2.length;
+    return (d2[l - 4] | d2[l - 3] << 8 | d2[l - 2] << 16 | d2[l - 1] << 24) >>> 0;
+  };
+  var zls = function(d2, dict) {
+    if ((d2[0] & 15) != 8 || d2[0] >> 4 > 7 || (d2[0] << 8 | d2[1]) % 31)
+      err(6, "invalid zlib data");
+    if ((d2[1] >> 5 & 1) == +!dict)
+      err(6, "invalid zlib data: " + (d2[1] & 32 ? "need" : "unexpected") + " dictionary");
+    return (d2[1] >> 3 & 4) + 2;
+  };
+  function inflateSync(data, opts) {
+    return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function gunzipSync(data, opts) {
+    var st = gzs(data);
+    if (st + 8 > data.length)
+      err(6, "invalid gzip data");
+    return inflt(data.subarray(st, -8), { i: 2 }, opts && opts.out || new u8(gzl(data)), opts && opts.dictionary);
+  }
+  function unzlibSync(data, opts) {
+    return inflt(data.subarray(zls(data, opts && opts.dictionary), -4), { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function decompressSync(data, opts) {
+    return data[0] == 31 && data[1] == 139 && data[2] == 8 ? gunzipSync(data, opts) : (data[0] & 15) != 8 || data[0] >> 4 > 7 || (data[0] << 8 | data[1]) % 31 ? inflateSync(data, opts) : unzlibSync(data, opts);
+  }
+  var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+  var tds = 0;
+  try {
+    td.decode(et, { stream: true });
+    tds = 1;
+  } catch (e) {
+  }
+
+  // node_modules/pmtiles/dist/esm/index.js
+  var j = Object.defineProperty;
+  var S = Math.pow;
+  var d = (o, t) => j(o, "name", { value: t, configurable: true });
+  var h2 = (o, t, e) => new Promise((r, n) => {
+    var s = (c) => {
+      try {
+        a(e.next(c));
+      } catch (l) {
+        n(l);
+      }
+    }, i = (c) => {
+      try {
+        a(e.throw(c));
+      } catch (l) {
+        n(l);
+      }
+    }, a = (c) => c.done ? r(c.value) : Promise.resolve(c.value).then(s, i);
+    a((e = e.apply(o, t)).next());
+  });
+  var re = d((o, t) => {
+    let e = false, r = "", n = L.GridLayer.extend({ createTile: d((s, i) => {
+      let a = document.createElement("img"), c = new AbortController(), l = c.signal;
+      return a.cancel = () => {
+        c.abort();
+      }, e || (o.getHeader().then((u) => {
+        u.tileType === 1 || u.tileType === 6 ? console.error("Error: archive contains vector tiles, but leafletRasterLayer is for displaying raster tiles. See https://github.com/protomaps/PMTiles/tree/main/js for details.") : u.tileType === 2 ? r = "image/png" : u.tileType === 3 ? r = "image/jpeg" : u.tileType === 4 ? r = "image/webp" : u.tileType === 5 && (r = "image/avif");
+      }), e = true), o.getZxy(s.z, s.x, s.y, l).then((u) => {
+        if (u) {
+          let m = new Blob([u.data], { type: r }), g = window.URL.createObjectURL(m);
+          a.src = g;
+        } else a.style.display = "none";
+        a.cancel = void 0, i(void 0, a);
+      }).catch((u) => {
+        if (u.name !== "AbortError") throw u;
+      }), a;
+    }, "createTile"), _removeTile: d(function(s) {
+      let i = this._tiles[s];
+      i && (i.el.cancel && i.el.cancel(), i.el.src && window.URL.revokeObjectURL(i.el.src), i.el.width = 0, i.el.height = 0, i.el.deleted = true, L.DomUtil.remove(i.el), delete this._tiles[s], this.fire("tileunload", { tile: i.el, coords: this._keyToTileCoords(s) }));
+    }, "_removeTile") });
+    return new n(t);
+  }, "leafletRasterLayer");
+  var z = d((o) => (t, e) => {
+    if (e instanceof AbortController) return o(t, e);
+    let r = new AbortController();
+    return o(t, r).then((n) => e(void 0, n.data, n.cacheControl || "", n.expires || ""), (n) => e(n)).catch((n) => e(n)), { cancel: d(() => r.abort(), "cancel") };
+  }, "v3compat");
+  var A = class A2 {
+    constructor(t) {
+      this.tilev4 = d((t2, e) => h2(this, null, function* () {
+        if (t2.type === "json") {
+          let g = t2.url.substr(10), p = this.tiles.get(g);
+          if (p || (p = new w(g), this.tiles.set(g, p)), this.metadata) {
+            let K = yield p.getTileJson(t2.url);
+            return e.signal.throwIfAborted(), { data: K };
+          }
+          let f = yield p.getHeader();
+          return e.signal.throwIfAborted(), (f.minLon >= f.maxLon || f.minLat >= f.maxLat) && console.error(`Bounds of PMTiles archive ${f.minLon},${f.minLat},${f.maxLon},${f.maxLat} are not valid.`), { data: { tiles: [`${t2.url}/{z}/{x}/{y}`], minzoom: f.minZoom, maxzoom: f.maxZoom, bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat] } };
+        }
+        let r = new RegExp(/pmtiles:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/), n = t2.url.match(r);
+        if (!n) throw new Error("Invalid PMTiles protocol URL");
+        let s = n[1], i = this.tiles.get(s);
+        i || (i = new w(s), this.tiles.set(s, i));
+        let a = n[2], c = n[3], l = n[4], u = yield i == null ? void 0 : i.getZxy(+a, +c, +l, e.signal);
+        if (e.signal.throwIfAborted(), u) return { data: new Uint8Array(u.data), cacheControl: u.cacheControl, expires: u.expires };
+        let m = yield i.getHeader();
+        if (m.tileType === 1 || m.tileType === 6) {
+          if (this.errorOnMissingTile) throw new Error("Tile not found.");
+          return { data: new Uint8Array() };
+        }
+        return { data: null };
+      }), "tilev4");
+      this.tile = z(this.tilev4);
+      this.tiles = /* @__PURE__ */ new Map(), this.metadata = (t == null ? void 0 : t.metadata) || false, this.errorOnMissingTile = (t == null ? void 0 : t.errorOnMissingTile) || false;
+    }
+    add(t) {
+      this.tiles.set(t.source.getKey(), t);
+    }
+    get(t) {
+      return this.tiles.get(t);
+    }
+  };
+  d(A, "Protocol");
+  var B = A;
+  function b(o, t) {
+    return (t >>> 0) * 4294967296 + (o >>> 0);
+  }
+  d(b, "toNum");
+  function N(o, t) {
+    let e = t.buf, r = e[t.pos++], n = (r & 112) >> 4;
+    if (r < 128 || (r = e[t.pos++], n |= (r & 127) << 3, r < 128) || (r = e[t.pos++], n |= (r & 127) << 10, r < 128) || (r = e[t.pos++], n |= (r & 127) << 17, r < 128) || (r = e[t.pos++], n |= (r & 127) << 24, r < 128) || (r = e[t.pos++], n |= (r & 1) << 31, r < 128)) return b(o, n);
+    throw new Error("Expected varint not more than 10 bytes");
+  }
+  d(N, "readVarintRemainder");
+  function x(o) {
+    let t = o.buf, e = t[o.pos++], r = e & 127;
+    return e < 128 || (e = t[o.pos++], r |= (e & 127) << 7, e < 128) || (e = t[o.pos++], r |= (e & 127) << 14, e < 128) || (e = t[o.pos++], r |= (e & 127) << 21, e < 128) ? r : (e = t[o.pos], r |= (e & 15) << 28, N(r, o));
+  }
+  d(x, "readVarint");
+  function I(o, t, e, r, n) {
+    return n === 0 ? r !== 0 ? [o - 1 - e, o - 1 - t] : [e, t] : [t, e];
+  }
+  d(I, "rotate");
+  function q(o, t, e) {
+    if (o > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
+    if (t >= 1 << o || e >= 1 << o) throw new Error("tile x/y outside zoom level bounds");
+    let r = ((1 << o) * (1 << o) - 1) / 3, n = o - 1, [s, i] = [t, e];
+    for (let a = 1 << n; a > 0; a >>= 1) {
+      let c = s & a, l = i & a;
+      r += (3 * c ^ l) * (1 << n), [s, i] = I(a, s, i, c, l), n--;
+    }
+    return r;
+  }
+  d(q, "zxyToTileId");
+  function G(o) {
+    let t = 3 * o + 1;
+    return t < 4294967296 ? 31 - Math.clz32(t) : 63 - Math.clz32(t / 4294967296);
+  }
+  d(G, "tileIdToZ");
+  function ie(o) {
+    let t = G(o) >> 1;
+    if (t > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
+    let e = ((1 << t) * (1 << t) - 1) / 3, r = o - e, n = 0, s = 0, i = 1 << t;
+    for (let a = 1; a < i; a <<= 1) {
+      let c = a & r / 2, l = a & (r ^ c);
+      [n, s] = I(a, n, s, c, l), r = r / 2, n += c, s += l;
+    }
+    return [t, n, s];
+  }
+  d(ie, "tileIdToZxy");
+  var J = ((s) => (s[s.Unknown = 0] = "Unknown", s[s.None = 1] = "None", s[s.Gzip = 2] = "Gzip", s[s.Brotli = 3] = "Brotli", s[s.Zstd = 4] = "Zstd", s))(J || {});
+  function P(o, t) {
+    return h2(this, null, function* () {
+      if (t === 1 || t === 0) return o;
+      if (t === 2) {
+        if (typeof globalThis.DecompressionStream == "undefined") return decompressSync(new Uint8Array(o));
+        let e = new Response(o).body;
+        if (!e) throw new Error("Failed to read response stream");
+        let r = e.pipeThrough(new globalThis.DecompressionStream("gzip"));
+        return new Response(r).arrayBuffer();
+      }
+      throw new Error("Compression method not supported");
+    });
+  }
+  d(P, "defaultDecompress");
+  var O = ((a) => (a[a.Unknown = 0] = "Unknown", a[a.Mvt = 1] = "Mvt", a[a.Png = 2] = "Png", a[a.Jpeg = 3] = "Jpeg", a[a.Webp = 4] = "Webp", a[a.Avif = 5] = "Avif", a[a.Mlt = 6] = "Mlt", a))(O || {});
+  function _(o) {
+    return o === 1 ? ".mvt" : o === 2 ? ".png" : o === 3 ? ".jpg" : o === 4 ? ".webp" : o === 5 ? ".avif" : o === 6 ? ".mlt" : "";
+  }
+  d(_, "tileTypeExt");
+  var Y = 127;
+  function Q(o, t) {
+    let e = 0, r = o.length - 1;
+    for (; e <= r; ) {
+      let n = r + e >> 1, s = t - o[n].tileId;
+      if (s > 0) e = n + 1;
+      else if (s < 0) r = n - 1;
+      else return o[n];
+    }
+    return r >= 0 && (o[r].runLength === 0 || t - o[r].tileId < o[r].runLength) ? o[r] : null;
+  }
+  d(Q, "findTile");
+  var T2 = class T3 {
+    constructor(t) {
+      this.file = t;
+    }
+    getKey() {
+      return this.file.name;
+    }
+    getBytes(t, e) {
+      return h2(this, null, function* () {
+        return { data: yield this.file.slice(t, t + e).arrayBuffer() };
+      });
+    }
+  };
+  d(T2, "FileSource");
+  var D = class D2 {
+    constructor(t, e = new Headers(), r = void 0) {
+      var a, c;
+      this.url = t, this.customHeaders = e, this.credentials = r, this.mustReload = false;
+      let n = "";
+      "navigator" in globalThis && (n = (c = (a = globalThis.navigator) == null ? void 0 : a.userAgent) != null ? c : "");
+      let s = n.indexOf("Windows") > -1, i = /Chrome|Chromium|Edg|OPR|Brave/.test(n);
+      this.chromeWindowsNoCache = false, s && i && (this.chromeWindowsNoCache = true);
+    }
+    getKey() {
+      return this.url;
+    }
+    setHeaders(t) {
+      this.customHeaders = t;
+    }
+    getBytes(t, e, r, n) {
+      return h2(this, null, function* () {
+        let s, i;
+        r ? i = r : (s = new AbortController(), i = s.signal);
+        let a = new Headers(this.customHeaders);
+        a.set("range", `bytes=${t}-${t + e - 1}`);
+        let c;
+        this.mustReload ? c = "reload" : this.chromeWindowsNoCache && (c = "no-store");
+        let l = yield fetch(this.url, { signal: i, cache: c, headers: a, credentials: this.credentials });
+        if (t === 0 && l.status === 416) {
+          let p = l.headers.get("Content-Range");
+          if (!p || !p.startsWith("bytes */")) throw new Error("Missing content-length on 416 response");
+          let f = +p.substr(8);
+          a.set("range", `bytes=0-${f - 1}`), l = yield fetch(this.url, { signal: i, cache: "reload", headers: a, credentials: this.credentials });
+        }
+        let u = l.headers.get("Etag");
+        if (u != null && u.startsWith("W/") && (u = null), l.status === 416 || n && u && u !== n) throw this.mustReload = true, new v(`Server returned non-matching ETag ${n} after one retry. Check browser extensions and servers for issues that may affect correct ETag headers.`);
+        if (l.status >= 300) throw new Error(`Bad response code: ${l.status}`);
+        let m = l.headers.get("Content-Length");
+        if (l.status === 200 && (!m || +m > e)) throw s && s.abort(), new Error("Server returned no content-length header or content-length exceeding request. Check that your storage backend supports HTTP Byte Serving.");
+        return { data: yield l.arrayBuffer(), etag: u || void 0, cacheControl: l.headers.get("Cache-Control") || void 0, expires: l.headers.get("Expires") || void 0 };
+      });
+    }
+  };
+  d(D, "FetchSource");
+  var E = D;
+  function y(o, t) {
+    let e = o.getUint32(t + 4, true), r = o.getUint32(t + 0, true);
+    return e * S(2, 32) + r;
+  }
+  d(y, "getUint64");
+  function X(o, t) {
+    let e = new DataView(o), r = e.getUint8(7);
+    if (r > 3) throw new Error(`Archive is spec version ${r} but this library supports up to spec version 3`);
+    return { specVersion: r, rootDirectoryOffset: y(e, 8), rootDirectoryLength: y(e, 16), jsonMetadataOffset: y(e, 24), jsonMetadataLength: y(e, 32), leafDirectoryOffset: y(e, 40), leafDirectoryLength: y(e, 48), tileDataOffset: y(e, 56), tileDataLength: y(e, 64), numAddressedTiles: y(e, 72), numTileEntries: y(e, 80), numTileContents: y(e, 88), clustered: e.getUint8(96) === 1, internalCompression: e.getUint8(97), tileCompression: e.getUint8(98), tileType: e.getUint8(99), minZoom: e.getUint8(100), maxZoom: e.getUint8(101), minLon: e.getInt32(102, true) / 1e7, minLat: e.getInt32(106, true) / 1e7, maxLon: e.getInt32(110, true) / 1e7, maxLat: e.getInt32(114, true) / 1e7, centerZoom: e.getUint8(118), centerLon: e.getInt32(119, true) / 1e7, centerLat: e.getInt32(123, true) / 1e7, etag: t };
+  }
+  d(X, "bytesToHeader");
+  function Z(o) {
+    let t = { buf: new Uint8Array(o), pos: 0 }, e = x(t), r = [], n = 0;
+    for (let s = 0; s < e; s++) {
+      let i = x(t);
+      r.push({ tileId: n + i, offset: 0, length: 0, runLength: 1 }), n += i;
+    }
+    for (let s = 0; s < e; s++) r[s].runLength = x(t);
+    for (let s = 0; s < e; s++) r[s].length = x(t);
+    for (let s = 0; s < e; s++) {
+      let i = x(t);
+      i === 0 && s > 0 ? r[s].offset = r[s - 1].offset + r[s - 1].length : r[s].offset = i - 1;
+    }
+    return r;
+  }
+  d(Z, "deserializeIndex");
+  var R = class R2 extends Error {
+  };
+  d(R, "EtagMismatch");
+  var v = R;
+  function V(o, t) {
+    return h2(this, null, function* () {
+      let e = yield o.getBytes(0, 16384);
+      if (new DataView(e.data).getUint16(0, true) !== 19792) throw new Error("Wrong magic number for PMTiles archive");
+      let n = e.data.slice(0, Y), s = X(n, e.etag), i = e.data.slice(s.rootDirectoryOffset, s.rootDirectoryOffset + s.rootDirectoryLength), a = `${o.getKey()}|${s.etag || ""}|${s.rootDirectoryOffset}|${s.rootDirectoryLength}`, c = Z(yield t(i, s.internalCompression));
+      return [s, [a, c.length, c]];
+    });
+  }
+  d(V, "getHeaderAndRoot");
+  function F(o, t, e, r, n, s) {
+    return h2(this, null, function* () {
+      let i = yield o.getBytes(e, r, s, n.etag), a = yield t(i.data, n.internalCompression), c = Z(a);
+      if (c.length === 0) throw new Error("Empty directory is invalid");
+      return c;
+    });
+  }
+  d(F, "getDirectory");
+  var U = class U2 {
+    constructor(t = 100, e = true, r = P) {
+      this.cache = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+    }
+    getHeader(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey(), r = this.cache.get(e);
+        if (r) return r.lastUsed = this.counter++, r.data;
+        let n = yield V(t, this.decompress);
+        return n[1] && this.cache.set(n[1][0], { lastUsed: this.counter++, data: n[1][2] }), this.cache.set(e, { lastUsed: this.counter++, data: n[0] }), this.prune(), n[0];
+      });
+    }
+    getDirectory(t, e, r, n, s) {
+      return h2(this, null, function* () {
+        let i = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i);
+        if (a) return a.lastUsed = this.counter++, a.data;
+        let c = yield F(t, this.decompress, e, r, n, s);
+        return this.cache.set(i, { lastUsed: this.counter++, data: c }), this.prune(), c;
+      });
+    }
+    prune() {
+      if (this.cache.size > this.maxCacheEntries) {
+        let t = 1 / 0, e;
+        this.cache.forEach((r, n) => {
+          r.lastUsed < t && (t = r.lastUsed, e = n);
+        }), e && this.cache.delete(e);
+      }
+    }
+    invalidate(t) {
+      return h2(this, null, function* () {
+        this.cache.delete(t.getKey());
+      });
+    }
+  };
+  d(U, "ResolvedValueCache");
+  var M = class M2 {
+    constructor(t = 100, e = true, r = P) {
+      this.cache = /* @__PURE__ */ new Map(), this.invalidations = /* @__PURE__ */ new Map(), this.pendingFetches = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+    }
+    getHeader(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey(), r = this.cache.get(e);
+        if (r) return r.lastUsed = this.counter++, yield r.data;
+        let n = new Promise((s, i) => {
+          V(t, this.decompress).then((a) => {
+            a[1] && this.cache.set(a[1][0], { lastUsed: this.counter++, data: Promise.resolve(a[1][2]) }), s(a[0]), this.prune();
+          }).catch((a) => {
+            i(a);
+          });
+        });
+        return this.cache.set(e, { lastUsed: this.counter++, data: n }), n;
+      });
+    }
+    trackSignal(t, e, r) {
+      e.refs++, r.addEventListener("abort", () => {
+        --e.refs <= 0 && this.pendingFetches.get(t) === e && (e.controller.abort(), this.cache.delete(t), this.pendingFetches.delete(t));
+      }, { once: true });
+    }
+    getDirectory(t, e, r, n, s) {
+      return h2(this, null, function* () {
+        let i = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i);
+        if (a) {
+          a.lastUsed = this.counter++;
+          let m = this.pendingFetches.get(i);
+          return m && this.trackSignal(i, m, s != null ? s : new AbortController().signal), yield a.data;
+        }
+        let c = new AbortController(), l = { controller: c, refs: 0 };
+        this.trackSignal(i, l, s != null ? s : new AbortController().signal), this.pendingFetches.set(i, l);
+        let u = new Promise((m, g) => {
+          F(t, this.decompress, e, r, n, c.signal).then((p) => {
+            this.pendingFetches.delete(i), m(p), this.prune();
+          }).catch((p) => {
+            g(p);
+          });
+        });
+        return this.cache.set(i, { lastUsed: this.counter++, data: u }), u;
+      });
+    }
+    prune() {
+      if (this.cache.size >= this.maxCacheEntries) {
+        let t = 1 / 0, e;
+        this.cache.forEach((r, n) => {
+          r.lastUsed < t && (t = r.lastUsed, e = n);
+        }), e && this.cache.delete(e);
+      }
+    }
+    invalidate(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey();
+        if (this.invalidations.get(e)) return yield this.invalidations.get(e);
+        this.cache.delete(t.getKey());
+        let r = new Promise((n, s) => {
+          this.getHeader(t).then((i) => {
+            n(), this.invalidations.delete(e);
+          }).catch((i) => {
+            s(i);
+          });
+        });
+        this.invalidations.set(e, r);
+      });
+    }
+  };
+  d(M, "SharedPromiseCache");
+  var C = M;
+  var H = class H2 {
+    constructor(t, e, r) {
+      typeof t == "string" ? this.source = new E(t) : this.source = t, r ? this.decompress = r : this.decompress = P, e ? this.cache = e : this.cache = new C();
+    }
+    getHeader() {
+      return h2(this, null, function* () {
+        return yield this.cache.getHeader(this.source);
+      });
+    }
+    getZxyAttempt(t, e, r, n) {
+      return h2(this, null, function* () {
+        let s = q(t, e, r), i = yield this.cache.getHeader(this.source);
+        if (n == null || n.throwIfAborted(), t < i.minZoom || t > i.maxZoom) return;
+        let a = i.rootDirectoryOffset, c = i.rootDirectoryLength;
+        for (let l = 0; l <= 3; l++) {
+          let u = yield this.cache.getDirectory(this.source, a, c, i, n);
+          n == null || n.throwIfAborted();
+          let m = Q(u, s);
+          if (m) {
+            if (m.runLength > 0) {
+              let g = yield this.source.getBytes(i.tileDataOffset + m.offset, m.length, n, i.etag);
+              return { data: yield this.decompress(g.data, i.tileCompression), cacheControl: g.cacheControl, expires: g.expires };
+            }
+            a = i.leafDirectoryOffset + m.offset, c = m.length;
+          } else return;
+        }
+        throw new Error("Maximum directory depth exceeded");
+      });
+    }
+    getZxy(t, e, r, n) {
+      return h2(this, null, function* () {
+        try {
+          return yield this.getZxyAttempt(t, e, r, n);
+        } catch (s) {
+          if (s instanceof v) return this.cache.invalidate(this.source), yield this.getZxyAttempt(t, e, r, n);
+          throw s;
+        }
+      });
+    }
+    getMetadataAttempt() {
+      return h2(this, null, function* () {
+        let t = yield this.cache.getHeader(this.source), e = yield this.source.getBytes(t.jsonMetadataOffset, t.jsonMetadataLength, void 0, t.etag), r = yield this.decompress(e.data, t.internalCompression), n = new TextDecoder("utf-8");
+        return JSON.parse(n.decode(r));
+      });
+    }
+    getMetadata() {
+      return h2(this, null, function* () {
+        try {
+          return yield this.getMetadataAttempt();
+        } catch (t) {
+          if (t instanceof v) return this.cache.invalidate(this.source), yield this.getMetadataAttempt();
+          throw t;
+        }
+      });
+    }
+    getTileJson(t) {
+      return h2(this, null, function* () {
+        let e = yield this.getHeader(), r = yield this.getMetadata(), n = _(e.tileType);
+        return { tilejson: "3.0.0", scheme: "xyz", tiles: [`${t}/{z}/{x}/{y}${n}`], vector_layers: r.vector_layers, attribution: r.attribution, description: r.description, name: r.name, version: r.version, bounds: [e.minLon, e.minLat, e.maxLon, e.maxLat], center: [e.centerLon, e.centerLat, e.centerZoom], minzoom: e.minZoom, maxzoom: e.maxZoom };
+      });
+    }
+  };
+  d(H, "PMTiles");
+  var w = H;
+
+  // src/map/local-map.js
+  var DIR = "map/";
+  var protocol = null;
+  function absolutize(style, baseHref) {
+    const base2 = new URL(DIR, baseHref).href;
+    const abs = (u) => u.startsWith("./") ? base2 + u.slice(2) : u;
+    const s = JSON.parse(JSON.stringify(style));
+    if (s.sprite) s.sprite = abs(s.sprite);
+    if (s.glyphs) s.glyphs = abs(s.glyphs);
+    for (const src of Object.values(s.sources || {})) {
+      if (src.url && src.url.startsWith("pmtiles://./")) src.url = "pmtiles://" + base2 + src.url.slice("pmtiles://./".length);
+    }
+    return s;
+  }
+  async function localStyle(maplibregl, { timeoutMs = 5e3, baseHref = location.href } = {}) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), timeoutMs);
+      const res = await fetch(new URL(DIR + "style.json", baseHref), { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const style = absolutize(await res.json(), baseHref);
+      const url = style.sources.openmaptiles.url.slice("pmtiles://".length);
+      const file = new w(url);
+      await Promise.race([file.getHeader(), new Promise((_2, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs))]);
+      if (!protocol) {
+        protocol = new B();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+      }
+      protocol.add(file);
+      return style;
+    } catch {
+      return null;
+    }
+  }
+
   // src/ui/map.js
   var STYLE_URLS = [
     "https://tiles.openfreemap.org/styles/liberty",
@@ -6931,6 +7800,8 @@
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
   };
   async function pickStyle() {
+    const local = await localStyle(window.maplibregl);
+    if (local) return { style: winterizeStyle(local), online: true, local: true };
     for (const url of STYLE_URLS) {
       try {
         const ctl = new AbortController();
@@ -7133,8 +8004,8 @@
         applySeason(state3.time);
         map.getSource("places").setData(placesGeo(list, state3.places));
         you.setLngLat([state3.pos.lon, state3.pos.lat]);
-        const h2 = state3.homePos || HOME;
-        homeMarker.setLngLat([h2.lon, h2.lat]);
+        const h3 = state3.homePos || HOME;
+        homeMarker.setLngLat([h3.lon, h3.lat]);
         youEl.classList.toggle("at-home", state3.location.kind === "home");
         homeEl.classList.toggle("here", state3.location.kind === "home");
         applyMarks(state3, list);
@@ -7149,7 +8020,7 @@
       type: "FeatureCollection",
       features: list.map((p) => {
         const ps = placeStates[p.id];
-        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q2) => q2 > 0);
         const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
         return {
           type: "Feature",
@@ -7174,8 +8045,8 @@
     }
     return memo[which] || (memo[which] = {});
   }
-  function setPos(which, key, x, y, rot) {
-    savedPos(which)[key] = [x, y, rot ? 1 : 0];
+  function setPos(which, key, x2, y2, rot) {
+    savedPos(which)[key] = [x2, y2, rot ? 1 : 0];
     try {
       localStorage.setItem(LS, JSON.stringify(memo));
     } catch {
@@ -7184,24 +8055,24 @@
   var esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   var KIND_ICON = { food: "\u{1F96B}", dogfood: "\u{1F9B4}", drink: "\u{1F4A7}", med: "\u271A", tool: "\u{1F527}", batteries: "\u{1F50B}", wear: "\u{1F9E5}", fuel: "\u26FD", part: "\u2699", junk: "\u2699", book: "\u{1F4D5}", misc: "\u25C6", comfort: "\u2665", warm: "\u2668" };
   function gridHtml(which, opts) {
-    const L = opts.layout;
-    const tiles = L.tiles.map((t) => {
+    const L2 = opts.layout;
+    const tiles = L2.tiles.map((t) => {
       const url = opts.icon?.(t.id);
       const img = url ? `<img src="${url}" alt="" draggable="false"${t.h >= t.w * 3 ? ' class="tall"' : t.w >= t.h * 3 ? ' class="wide"' : ""}>` : `<span class="ig">${KIND_ICON[opts.kind(t.id)] || "\u25C6"}</span>`;
-      const over = t.y + t.h > L.rows ? " over" : "";
+      const over = t.y + t.h > L2.rows ? " over" : "";
       const sel = opts.selected === `${which}:${t.key}` ? " sel" : "";
       const qty = opts.qtyText(t.q, t.id);
       return `<div class="itile k-${esc(opts.kind(t.id))}${over}${sel}" data-gw="${which}" data-gk="${esc(t.key)}" data-gid="${esc(t.id)}" data-gq="${t.q}"
       style="--x:${t.x};--y:${t.y};--w:${t.w};--h:${t.h}" title="${esc(opts.name(t.id))} \xB7 ${esc(qty)}">${img}
       <span class="in">${esc(opts.name(t.id))}</span>${qty ? `<b class="iq">${esc(qty)}</b>` : ""}</div>`;
     }).join("");
-    return `<div class="igrid igrid-${which}" data-grid="${which}" style="--cols:${L.cols};--rows:${L.height};--real:${L.rows}">
-    ${L.height > L.rows ? `<div class="ig-over" style="--top:${L.rows}"><span>Over the edge: no room</span></div>` : ""}${tiles}</div>`;
+    return `<div class="igrid igrid-${which}" data-grid="${which}" style="--cols:${L2.cols};--rows:${L2.height};--real:${L2.rows}">
+    ${L2.height > L2.rows ? `<div class="ig-over" style="--top:${L2.rows}"><span>Over the edge: no room</span></div>` : ""}${tiles}</div>`;
   }
-  var H = null;
+  var H3 = null;
   var bound = false;
-  function setGridHandlers(h2) {
-    H = h2;
+  function setGridHandlers(h3) {
+    H3 = h3;
     if (bound || typeof document === "undefined") return;
     bound = true;
     let drag = null;
@@ -7230,17 +8101,17 @@
     });
     const end = (e) => {
       if (!drag) return;
-      const d = drag;
+      const d2 = drag;
       drag = null;
       clearDrop();
-      if (!d.ghost) return;
+      if (!d2.ghost) return;
       justDragged = performance.now();
-      d.ghost.remove();
-      d.el.classList.remove("lifted");
-      const hit = dropTarget(e, d);
+      d2.ghost.remove();
+      d2.el.classList.remove("lifted");
+      const hit = dropTarget(e, d2);
       if (!hit) return;
-      if (hit.which === d.which) H?.move(d.which, d.key, hit.x, hit.y, hit.rot);
-      else H?.transfer(d.which, hit.which, d.id, d.q, hit);
+      if (hit.which === d2.which) H3?.move(d2.which, d2.key, hit.x, hit.y, hit.rot);
+      else H3?.transfer(d2.which, hit.which, d2.id, d2.q, hit);
     };
     document.addEventListener("pointerup", end);
     let justDragged = 0;
@@ -7248,7 +8119,7 @@
       const t = e.target.closest?.(".itile");
       if (!t || performance.now() - justDragged < 300) return;
       e.stopPropagation();
-      setTimeout(() => H?.select(t.dataset.gw, t.dataset.gk), 0);
+      setTimeout(() => H3?.select(t.dataset.gw, t.dataset.gk), 0);
     }, true);
     document.addEventListener("pointercancel", () => {
       if (drag?.ghost) drag.ghost.remove();
@@ -7267,8 +8138,8 @@
       e.preventDefault();
       e.stopPropagation();
     }, true);
-    function dropTarget(e, d) {
-      const g = d.ghost;
+    function dropTarget(e, d2) {
+      const g = d2.ghost;
       g.style.display = "none";
       const under = document.elementFromPoint(e.clientX, e.clientY);
       g.style.display = "";
@@ -7278,11 +8149,11 @@
       const r = grid.getBoundingClientRect();
       const cols = Number(grid.style.getPropertyValue("--cols"));
       const cell = r.width / cols;
-      const x = Math.round((e.clientX - d.ox - r.left) / cell);
-      const y = Math.round((e.clientY - d.oy - r.top) / cell);
-      const L = H?.layout?.(which);
-      const ok = L ? fitsAt(L, which === d.which ? d.key : null, x, y, d.w, d.h) : true;
-      return { which, x, y, rot: d.rot !== !!L?.tiles.find((t) => t.key === d.key)?.rot, ok, grid, cell };
+      const x2 = Math.round((e.clientX - d2.ox - r.left) / cell);
+      const y2 = Math.round((e.clientY - d2.oy - r.top) / cell);
+      const L2 = H3?.layout?.(which);
+      const ok = L2 ? fitsAt(L2, which === d2.which ? d2.key : null, x2, y2, d2.w, d2.h) : true;
+      return { which, x: x2, y: y2, rot: d2.rot !== !!L2?.tiles.find((t) => t.key === d2.key)?.rot, ok, grid, cell };
     }
     let mark = null;
     function showDrop(e) {
@@ -7305,8 +8176,8 @@
   var FX_KEY = "lastlight.fx";
   function fxEnabled() {
     try {
-      const v = localStorage.getItem(FX_KEY);
-      if (v !== null) return v === "1";
+      const v2 = localStorage.getItem(FX_KEY);
+      if (v2 !== null) return v2 === "1";
     } catch {
     }
     return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -7339,11 +8210,11 @@
       canvas2.style.height = `${r.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    function spawn(w, h2, anywhere) {
+    function spawn(w2, h3, anywhere) {
       const snow = kind === "snow" || kind === "leaves";
       return {
-        x: Math.random() * (w + 200) - 100,
-        y: anywhere ? Math.random() * h2 : -10,
+        x: Math.random() * (w2 + 200) - 100,
+        y: anywhere ? Math.random() * h3 : -10,
         r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
         c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
         v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
@@ -7352,12 +8223,12 @@
     }
     function frame() {
       raf = 0;
-      const w = canvas2.clientWidth;
-      const h2 = canvas2.clientHeight;
-      ctx.clearRect(0, 0, w, h2);
+      const w2 = canvas2.clientWidth;
+      const h3 = canvas2.clientHeight;
+      ctx.clearRect(0, 0, w2, h3);
       if (!enabled || kind === "none" || document.hidden) return;
-      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h2 / 6e5 + 0.3));
-      while (parts.length < want) parts.push(spawn(w, h2, true));
+      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w2 * h3 / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w2, h3, true));
       if (parts.length > want) parts.length = want;
       const drift = wind / 12;
       if (kind === "snow") {
@@ -7368,7 +8239,7 @@
           s.p += 0.02;
           s.y += s.v;
           s.x += Math.sin(s.p) * 0.4 + drift;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.beginPath();
           ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
           ctx.fill();
@@ -7379,7 +8250,7 @@
           s.p += 0.05;
           s.y += s.v * 0.9;
           s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.save();
           ctx.translate(s.x, s.y);
           ctx.rotate(s.p);
@@ -7396,7 +8267,7 @@
         for (const s of parts) {
           s.y += s.v;
           s.x += drift * 3;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.moveTo(s.x, s.y);
           ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
         }
@@ -7444,7 +8315,7 @@
 
   // src/engine/diagnostics.js
   function diagnostics(state3, { records = 20 } = {}) {
-    const w = state3.weather || {};
+    const w2 = state3.weather || {};
     let saveBytes = null;
     try {
       saveBytes = JSON.stringify(state3).length;
@@ -7454,13 +8325,13 @@
       day: dayIndex(state3.time) + 1,
       time: state3.time,
       weather: {
-        type: w.type,
-        label: weatherInfo(state3)?.label || w.type,
-        high: Math.round(w.high),
-        low: Math.round(w.low),
-        wind: w.wind,
-        spell: w.spell ? { id: w.spell.id, daysLeft: w.spell.daysLeft } : null,
-        baseType: w.baseType || w.type
+        type: w2.type,
+        label: weatherInfo(state3)?.label || w2.type,
+        high: Math.round(w2.high),
+        low: Math.round(w2.low),
+        wind: w2.wind,
+        spell: w2.spell ? { id: w2.spell.id, daysLeft: w2.spell.daysLeft } : null,
+        baseType: w2.baseType || w2.type
       },
       pacer: pacerInfo(state3),
       decay: decayInfo(state3),
@@ -7494,9 +8365,9 @@
   var MAX_STEP_M = 250;
   var EVENT_EVERY_MILES = 0.5;
   var M_PER_DEG_LAT2 = 111320;
-  function metersBetween(a, b) {
-    const dz = (a.lat - b.lat) * M_PER_DEG_LAT2;
-    const dx = (a.lon - b.lon) * M_PER_DEG_LAT2 * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+  function metersBetween(a, b2) {
+    const dz = (a.lat - b2.lat) * M_PER_DEG_LAT2;
+    const dx = (a.lon - b2.lon) * M_PER_DEG_LAT2 * Math.cos((a.lat + b2.lat) / 2 * Math.PI / 180);
     return Math.hypot(dx, dz);
   }
   function walkState(state3) {
@@ -7513,23 +8384,23 @@
   function streetMove(state3, pos) {
     if (state3.dead) return { ok: false, why: "dead" };
     if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return { ok: false, why: "bad position" };
-    const d = metersBetween(state3.pos, pos);
-    if (d > MAX_STEP_M) return { ok: false, why: "too far in one step" };
-    const w = walkState(state3);
+    const d2 = metersBetween(state3.pos, pos);
+    if (d2 > MAX_STEP_M) return { ok: false, why: "too far in one step" };
+    const w2 = walkState(state3);
     if (state3.location?.kind !== "street") enterStreet(state3);
     state3.pos = { lat: pos.lat, lon: pos.lon };
     state3.location.cell = cellKeyAt(state3.pos);
-    state3.stats.miles += d / M_PER_MILE;
-    w.m += d;
-    w.eventMiles += d / M_PER_MILE;
+    state3.stats.miles += d2 / M_PER_MILE;
+    w2.m += d2;
+    w2.eventMiles += d2 / M_PER_MILE;
     const mPerMin = walkSpeed(state3).mph * M_PER_MILE / 60;
-    const minutes = Math.floor(w.m / mPerMin);
+    const minutes = Math.floor(w2.m / mPerMin);
     if (minutes > 0) {
-      w.m -= minutes * mPerMin;
+      w2.m -= minutes * mPerMin;
       advanceTime(state3, minutes, "walk");
     }
-    if (!state3.dead && w.eventMiles >= EVENT_EVERY_MILES) {
-      w.eventMiles -= EVENT_EVERY_MILES;
+    if (!state3.dead && w2.eventMiles >= EVENT_EVERY_MILES) {
+      w2.eventMiles -= EVENT_EVERY_MILES;
       roadEvent(state3);
     }
     if (!state3.dead && state3.player.energy <= 0) {
@@ -7576,13 +8447,13 @@
     morale: { label: "Morale" }
   };
   function statRow(k, p, withEffect) {
-    const v = Math.round(p[k]);
-    const max = k === "energy" ? p.energyMax : 100;
+    const v2 = Math.round(p[k]);
+    const max2 = k === "energy" ? p.energyMax : 100;
     const st = statStage(k, p[k]);
     const cls = ["ok", "warn", "bad", "bad"][st.stage];
     return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
-      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc2(st.effect)}</span>` : ""}</div>`;
+      <span class="bar"><i style="width:${v2}%"></i>${max2 < 100 ? `<s style="left:${max2}%"></s>` : ""}</span>
+      <span class="sv">${v2}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc2(st.effect)}</span>` : ""}</div>`;
   }
   function riskChips() {
     return risks(state).map((r) => ["risk", r.text]);
@@ -7617,9 +8488,9 @@
     if (state.dead) showDeath();
     else if (state.pendingPrompt === "name_dog") showNameDog();
   }
-  function act(kind, a, b, c) {
+  function act(kind, a, b2, c) {
     const wasDead = !!state.dead;
-    perform(state, kind, a, b, c);
+    perform(state, kind, a, b2, c);
     afterAction2();
     if (!wasDead && state.dead) recordRun(state);
     commit();
@@ -7639,7 +8510,7 @@
   function renderHud() {
     const t = state.time;
     const night = isNight(t);
-    const w = state.weather;
+    const w2 = state.weather;
     const p = state.player;
     const low = needWarnings(state).map((n) => n.word);
     const rk = risks(state).length;
@@ -7651,20 +8522,20 @@
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
     ${low.length ? `<span class="h-alert">\u26A0 ${esc2(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
     $("#hud").hidden = false;
-    if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
+    if (fx) fx.update({ weather: w2.type, night, windMph: w2.wind, season: seasonOf(t) });
   }
   function renderHeader() {
     const t = state.time;
     const sun = sunFor(t);
     const night = isNight(t);
     const air = Math.round(airTemp(state, t));
-    const w = state.weather;
+    const w2 = state.weather;
     const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
     $("#clock").innerHTML = `
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc2(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc2(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w2.wind} mph \xB7 ${sunText}</div>
     ${outlookHtml()}`;
   }
   function outlookHtml() {
@@ -7739,19 +8610,19 @@
   function showGoalBoard() {
     const g = ensureGoals(state);
     const groups = Object.entries(GOAL_KINDS).map(([kind, k]) => {
-      const items = GOALS.filter((x) => x.kind === kind).map((x) => {
-        const on = g.picked.includes(x.id);
-        const pr = goalProgress(state, x.id);
-        return `<div class="gb-goal"><div><b>${esc2(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc2(x.why)}</p></div>
-        <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
+      const items = GOALS.filter((x2) => x2.kind === kind).map((x2) => {
+        const on = g.picked.includes(x2.id);
+        const pr = goalProgress(state, x2.id);
+        return `<div class="gb-goal"><div><b>${esc2(x2.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc2(x2.why)}</p></div>
+        <button data-goalpick="${x2.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
       }).join("");
       return `<h4>${esc2(k.label)} <span class="hint">${esc2(k.hint)}</span></h4>${items}`;
     }).join("");
     modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
     <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
       m.querySelector("#cancel").addEventListener("click", closeModal);
-      m.querySelectorAll("[data-goalpick]").forEach((b) => b.addEventListener("click", () => {
-        const why = pickGoal(state, b.dataset.goalpick);
+      m.querySelectorAll("[data-goalpick]").forEach((b2) => b2.addEventListener("click", () => {
+        const why = pickGoal(state, b2.dataset.goalpick);
         if (why) {
           alert(why);
           return;
@@ -7819,8 +8690,8 @@
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
     $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc2(locationLabel(state))}</h2><p class="sub">${esc2(sub)}</p><div class="acts">${acts}</div>${hint}`;
   }
-  function qtyText(q) {
-    return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
+  function qtyText(q2) {
+    return Number.isInteger(q2) ? String(q2) : q2.toFixed(2).replace(/0$/, "");
   }
   function useButtons(id, from) {
     return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc2(u.note)}"` : ""}>${esc2(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc2(u.note)}</small>` : ""}</button>${u.disabled && u.note && u.verb !== "salvage" ? `<small class="need">${esc2(u.note)}</small>` : ""}`).join("");
@@ -7841,7 +8712,7 @@
     return i < 0 ? KIND_GROUPS.length - 1 : i;
   }
   function sortedIds(bag) {
-    return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
+    return Object.keys(bag).sort((a, b2) => groupOf(a) - groupOf(b2) || itemName(a).localeCompare(itemName(b2)));
   }
   var gridSel = null;
   var gridLayouts = {};
@@ -7854,13 +8725,13 @@
     const tiles = tilesFor(gb, sortedIds(gb));
     const cols = which === "pack" ? GRID_COLS : hereGridCols();
     const rows = which === "pack" ? packSize(state).rows : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
-    let L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
-    if (L.overflow) {
+    let L2 = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
+    if (L2.overflow) {
       const auto = layoutGrid(tiles, cols, rows);
-      if (auto.overflow < L.overflow) L = auto;
+      if (auto.overflow < L2.overflow) L2 = auto;
     }
-    gridLayouts[which] = L;
-    return L;
+    gridLayouts[which] = L2;
+    return L2;
   }
   function packText() {
     const u = packUse(state);
@@ -7889,7 +8760,7 @@
       layout: buildGrid(which),
       name: itemName,
       kind: (id) => ITEMS[id]?.kind || "misc",
-      qtyText: (q, id) => q === 1 && sizeOf(id).stack === 1 ? "" : qtyText(q),
+      qtyText: (q2, id) => q2 === 1 && sizeOf(id).stack === 1 ? "" : qtyText(q2),
       icon: iconUrl,
       selected: gridSel
     };
@@ -7908,7 +8779,7 @@
     const from = which === "pack" ? "carried" : "storage";
     const uses = which === "pack" || home ? useButtons(id, from) : "";
     const move = which === "pack" ? `<button data-drop="${id}">${home ? "Store" : "Drop"}</button>` : `<button class="primary" data-take="${id}">Take</button>`;
-    const w = Math.round(it.weight * bag[id] * 10) / 10;
+    const w2 = Math.round(it.weight * bag[id] * 10) / 10;
     return `<div class="isel${compact ? " compact" : ""}"><img class="isel-img" src="${iconUrl(id) || ""}" alt=""${iconUrl(id) ? "" : " hidden"}>
     <div><b>${esc2(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc2(it.unit)} \xB7 ${sizeOf(id).w}\xD7${sizeOf(id).h} cells${which === "pack" ? "" : " \xB7 not yours yet"}</small></div>
     <div class="isel-b">${uses}${move}</div></div>`;
@@ -7921,14 +8792,14 @@
         gridSel = gridSel === k ? null : k;
         refreshGrids();
       },
-      move: (which, key, x, y, rot) => {
-        const L = gridLayouts[which];
-        const t = L?.tiles.find((v) => v.key === key);
+      move: (which, key, x2, y2, rot) => {
+        const L2 = gridLayouts[which];
+        const t = L2?.tiles.find((v2) => v2.key === key);
         if (!t) return;
-        const w = rot !== t.rot ? t.h : t.w;
-        const h2 = rot !== t.rot ? t.w : t.h;
-        if (!fitsAt(L, key, x, y, w, h2)) return;
-        setPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, key, x, y, rot);
+        const w2 = rot !== t.rot ? t.h : t.w;
+        const h3 = rot !== t.rot ? t.w : t.h;
+        if (!fitsAt(L2, key, x2, y2, w2, h3)) return;
+        setPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, key, x2, y2, rot);
         refreshGrids();
       },
       transfer: (from, to, id, qty, hit) => {
@@ -7936,9 +8807,9 @@
         if (from === "here" && to === "pack") act("take", id, qty);
         else if (from === "pack" && to === "here") act("drop", id, qty);
         else return;
-        const L = buildGrid(to);
-        const t = L.tiles.find((v) => v.id === id && v.key.endsWith("#0"));
-        if (t && hit && fitsAt(L, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, t.key, hit.x, hit.y, t.rot);
+        const L2 = buildGrid(to);
+        const t = L2.tiles.find((v2) => v2.id === id && v2.key.endsWith("#0"));
+        if (t && hit && fitsAt(L2, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, t.key, hit.x, hit.y, t.rot);
         gridSel = null;
         const said = state.log.slice(n0).map((e) => e.text).join(" ");
         insideToast?.(said);
@@ -7979,25 +8850,25 @@
     </div>`;
   }
   function renderHome() {
-    const h2 = state.home;
+    const h3 = state.home;
     const atHome = state.location.kind === "home";
-    const pct = Math.round(h2.battery / h2.batteryMax * 100);
+    const pct = Math.round(h3.battery / h3.batteryMax * 100);
     const pw = powerSummary(state);
-    const hrs = (x) => x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`;
+    const hrs = (x2) => x2 >= 10 ? `${Math.round(x2)} h` : `${x2.toFixed(1)} h`;
     $("#home").innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
-      <span>Inside temp</span><b>${Math.round(h2.indoorTemp)}\xB0F</b>
-      <span>Fire</span><b>${h2.fireHours > 0 ? `burning (${formatDuration(h2.fireHours * 60)})` : "out"}</b>
-      <span>Battery</span><b>${pct}% (${h2.battery.toFixed(1)} of ${h2.batteryMax} kWh)</b>
+      <span>Inside temp</span><b>${Math.round(h3.indoorTemp)}\xB0F</b>
+      <span>Fire</span><b>${h3.fireHours > 0 ? `burning (${formatDuration(h3.fireHours * 60)})` : "out"}</b>
+      <span>Battery</span><b>${pct}% (${h3.battery.toFixed(1)} of ${h3.batteryMax} kWh)</b>
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
-      <span>Water heater tank</span><b>${h2.tankGal.toFixed(1)} gal (clean)</b>
-      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h2.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
-      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h2.rawGal.toFixed(1)} gal</b>
+      <span>Water heater tank</span><b>${h3.tankGal.toFixed(1)} gal (clean)</b>
+      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h3.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
+      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h3.rawGal.toFixed(1)} gal</b>
       ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
-      <span>Kitchen tap</span><b>${h2.tapWorks ? "weak flow" : "stopped"}</b>
+      <span>Kitchen tap</span><b>${h3.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
     ${renderHeat(atHome)}
     ${renderGarden(atHome)}
@@ -8005,18 +8876,18 @@
   }
   function renderBase() {
     const done = builtCount(state);
-    const wings = wingSummary(state).map((w) => {
-      const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
-      const cards = w.projects.map(projectCard).join("");
-      return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? "open" : ""}>
-      <summary><span class="wi">${w.icon}</span><span class="wn">${esc2(w.label)}</span><span class="pips">${pips}</span></summary>
-      <p class="hint">${esc2(w.blurb)}</p>${cards}</details>`;
+    const wings = wingSummary(state).map((w2) => {
+      const pips = w2.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
+      const cards = w2.projects.map(projectCard).join("");
+      return `<details class="wing" data-wing="${w2.id}" ${openWings.has(w2.id) ? "open" : ""}>
+      <summary><span class="wi">${w2.icon}</span><span class="wn">${esc2(w2.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc2(w2.blurb)}</p>${cards}</details>`;
     }).join("");
     const need = {};
     for (const p of PROJECTS) {
       const st = projectStatus(state, p);
       if (st.built || st.started || st.missingReq.length) continue;
-      for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
+      for (const x2 of st.parts) if (x2.have < x2.need) need[x2.id] = Math.max(need[x2.id] || 0, x2.need - x2.have);
       for (const t of st.tools) if (!t.have) need[t.id] = 1;
     }
     const leftAt = (id) => {
@@ -8025,7 +8896,7 @@
       for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || "a house");
       return at.length ? ` \xB7 left at ${at.slice(0, 2).join(", ")}${at.length > 2 ? ` +${at.length - 2}` : ""}` : "";
     };
-    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc2(itemName(id))} \xD7${q}${esc2(leftAt(id))}</span>`).join("");
+    const list = Object.entries(need).map(([id, q2]) => `<span class="chip">${esc2(itemName(id))} \xD7${q2}${esc2(leftAt(id))}</span>`).join("");
     return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
@@ -8035,7 +8906,7 @@
   }
   function projectCard(p) {
     const st = projectStatus(state, p);
-    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc2(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
+    const parts = st.parts.map((x2) => `<span class="chip ${st.started || x2.have >= x2.need ? "ok" : "bad"}">${esc2(itemName(x2.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x2.have, x2.need))}/${x2.need}`}</span>`).join("");
     const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc2(itemName(t.id))}</span>`).join("");
     let foot;
     if (st.built) foot = '<span class="built">\u2713 Built</span>';
@@ -8054,17 +8925,17 @@
   </div>`;
   }
   function renderDog() {
-    const d = state.dog;
+    const d2 = state.dog;
     let html = "";
-    if (d.stage === "joined") {
-      const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
-      html = `<h3>${esc2(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
-      ${d.sick ? `<p class="warn-line">\u26A0 ${esc2(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
+    if (d2.stage === "joined") {
+      const bar = (label, v2) => `<div class="stat ${v2 < 25 ? "bad" : v2 < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v2)}%"></i></span><span class="sv">${Math.round(v2)}</span><span class="sw"></span></div>`;
+      html = `<h3>${esc2(d2.name)} <small>${d2.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d2.food)}${bar("Health", d2.health)}${bar("Bond", d2.bond)}
+      ${d2.sick ? `<p class="warn-line">\u26A0 ${esc2(d2.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
-    } else if (d.stage === "visiting") {
+    } else if (d2.stage === "visiting") {
       html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
-    } else if (d.stage === "dead") {
-      html = `<h3>${esc2(d.name || "The dog")}</h3><p class="hint">Gone.</p>`;
+    } else if (d2.stage === "dead") {
+      html = `<h3>${esc2(d2.name || "The dog")}</h3><p class="hint">Gone.</p>`;
     }
     $("#dog").innerHTML = html;
     $("#dog").hidden = !html;
@@ -8096,7 +8967,7 @@
       pos = p;
       const cat = CATEGORIES[p.cat];
       const ps = state.places[p.id];
-      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q2) => a + (q2 > 0 ? q2 : 0), 0)) : 0;
       const status = (!ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched all of it" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`) + (left > 0 ? ` \xB7 items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ": nothing left" : "");
       const here = state.location.kind === "place" && state.location.id === id;
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
@@ -8180,11 +9051,11 @@
       });
     });
   }
-  function sleepPreview(h2) {
+  function sleepPreview(h3) {
     try {
       const copy = structuredClone(state);
       copy.log = [];
-      perform(copy, "action", "sleep", h2);
+      perform(copy, "action", "sleep", h3);
       const p = copy.player;
       return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
     } catch {
@@ -8194,19 +9065,19 @@
   function showSleep() {
     const p = state.player;
     const prev = {};
-    const opts = [1, 2, 4, 6, 8, 10].map((h2) => {
-      const a = actionTiming(state, h2 * 60);
-      const f = prev[h2] = sleepPreview(h2);
+    const opts = [1, 2, 4, 6, 8, 10].map((h3) => {
+      const a = actionTiming(state, h3 * 60);
+      const f = prev[h3] = sleepPreview(h3);
       const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
       const warn = !f ? "" : f.dead ? " \xB7 you may not wake" : low ? ` \xB7 wake ${[f.water < 15 && "very thirsty", f.food < 15 && "starving", f.warmth < 15 && "freezing"].filter(Boolean).join(", ")}` : "";
-      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc2(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc2(warn)}</small></button>`;
+      return `<button data-hours="${h3}" class="${low ? "risky" : ""}" title="${esc2(a.dayStartText || "")}">${h3} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc2(warn)}</small></button>`;
     }).join("");
     const need = [p.water < 40 && "Drink first: you are thirsty.", p.food < 40 && "Eat first: you are hungry.", p.warmth < 40 && "Get warm first: you are cold."].filter(Boolean);
     const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc2(need.join(" "))}</p>` : ""}`;
     modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
-      m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
+      m.querySelectorAll("[data-hours]").forEach((b2) => b2.addEventListener("click", () => {
         closeModal();
-        act("action", "sleep", Number(b.dataset.hours));
+        act("action", "sleep", Number(b2.dataset.hours));
       }));
       m.querySelector("#cancel").addEventListener("click", closeModal);
     });
@@ -8231,10 +9102,10 @@
     return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc2(e.title)}</b> <span class="hint">${esc2(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc2(e.line)}</li>`).join("")}</ul>`;
   }
   function showDeath() {
-    const d = state.dead;
+    const d2 = state.dead;
     const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc2(r.cause)}${r.dog ? ` \xB7 with ${esc2(r.dog)}` : ""}</li>`).join("");
     modal(`<h2>You died</h2>
-    <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc2(d.cause)}.</p>
+    <p>You lived ${d2.days} day${d2.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d2.time)} at ${formatClock(d2.time)}, of ${esc2(d2.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc2(state.dog.name) : "none"}</b></div>
     ${legacyEpilogueHtml()}
@@ -8250,8 +9121,8 @@
     </div>`;
   }
   function bindStartChoices(m) {
-    m.querySelectorAll("[data-start]").forEach((b) => b.addEventListener("click", () => {
-      const how = b.dataset.start;
+    m.querySelectorAll("[data-start]").forEach((b2) => b2.addEventListener("click", () => {
+      const how = b2.dataset.start;
       if (how === "home") return beginRun({});
       if (how === "random") {
         const home = randomStartPoint();
@@ -8264,9 +9135,9 @@
     let best = null;
     let bestD = Infinity;
     for (const p of allPlaces()) {
-      const d = straightMiles(pos, p);
-      if (d < bestD) {
-        bestD = d;
+      const d2 = straightMiles(pos, p);
+      if (d2 < bestD) {
+        bestD = d2;
         best = p;
       }
     }
@@ -8283,15 +9154,15 @@
     let legacy = earnedIds(rec).slice(0, MAX_SLOTS);
     const render2 = (m) => {
       const left = pointsLeft(traits);
-      const jobs = Object.entries(JOBS).map(([id, J]) => {
-        const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
-        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc2(J.name)}</b><small>${esc2(J.text)}</small>
-        <small class="good">${esc2(sk)} \xB7 starts with ${esc2(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc2(J.weakness)}</small></button>`;
+      const jobs = Object.entries(JOBS).map(([id, J2]) => {
+        const sk = Object.entries(J2.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
+        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc2(J2.name)}</b><small>${esc2(J2.text)}</small>
+        <small class="good">${esc2(sk)} \xB7 starts with ${esc2(itemName(J2.item[0]).toLowerCase())}${J2.item[1] > 1 ? ` \xD7${J2.item[1]}` : ""}</small><small class="bad">${esc2(J2.weakness)}</small></button>`;
       }).join("");
-      const tr = Object.entries(TRAITS).map(([id, T2]) => {
+      const tr = Object.entries(TRAITS).map(([id, T4]) => {
         const on = traits.includes(id);
-        const blocked = !on && ((T2.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
-        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc2(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc2(T2.text)}</small></button>`;
+        const blocked = !on && ((T4.not || []).some((x2) => traits.includes(x2)) || pointsLeft([...traits, id]) < 0);
+        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc2(T4.name)}</b> <span class="${T4.cost > 0 ? "bad" : "good"}">${T4.cost > 0 ? `costs ${T4.cost}` : `gives ${-T4.cost}`}</span><small>${esc2(T4.text)}</small></button>`;
       }).join("");
       m.querySelector(".box").innerHTML = `<h2>Who were you?</h2>
       <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
@@ -8301,17 +9172,17 @@
       <div class="bg-traits">${tr}</div>
       ${legacyHtml()}
       <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
-      m.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", () => {
-        job = b.dataset.job;
+      m.querySelectorAll("[data-job]").forEach((b2) => b2.addEventListener("click", () => {
+        job = b2.dataset.job;
         render2(m);
       }));
-      m.querySelectorAll("[data-trait]").forEach((b) => b.addEventListener("click", () => {
-        const id = b.dataset.trait;
-        traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+      m.querySelectorAll("[data-trait]").forEach((b2) => b2.addEventListener("click", () => {
+        const id = b2.dataset.trait;
+        traits = traits.includes(id) ? traits.filter((x2) => x2 !== id) : [...traits, id];
         while (pointsLeft(traits) < 0) {
-          const good = traits.filter((x) => TRAITS[x].cost > 0);
+          const good = traits.filter((x2) => TRAITS[x2].cost > 0);
           if (!good.length) break;
-          traits = traits.filter((x) => x !== good[good.length - 1]);
+          traits = traits.filter((x2) => x2 !== good[good.length - 1]);
         }
         render2(m);
       }));
@@ -8321,9 +9192,9 @@
         saveLegacy(rec);
         render2(m);
       });
-      m.querySelectorAll("[data-legacy]").forEach((b) => b.addEventListener("click", () => {
-        const id = b.dataset.legacy;
-        legacy = legacy.includes(id) ? legacy.filter((x) => x !== id) : [...legacy, id].slice(0, MAX_SLOTS);
+      m.querySelectorAll("[data-legacy]").forEach((b2) => b2.addEventListener("click", () => {
+        const id = b2.dataset.legacy;
+        legacy = legacy.includes(id) ? legacy.filter((x2) => x2 !== id) : [...legacy, id].slice(0, MAX_SLOTS);
         render2(m);
       }));
       m.querySelector("#bgGo").addEventListener("click", () => {
@@ -8335,11 +9206,11 @@
     };
     const legacyHtml = () => {
       const earned = earnedIds(rec);
-      const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L]) => {
+      const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L2]) => {
         const has3 = earned.includes(id);
         const on = has3 && legacy.includes(id);
-        const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
-        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc2(L.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc2(L.progress(rec))}</span><small>${esc2(L.deed)}</small><small class="good">${esc2(L.bonus)}</small></button>`;
+        const full = !on && legacy.filter((x2) => earned.includes(x2)).length >= MAX_SLOTS;
+        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc2(L2.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc2(L2.progress(rec))}</span><small>${esc2(L2.deed)}</small><small class="good">${esc2(L2.bonus)}</small></button>`;
       }).join("")}</div>` : "";
       return `<h3>Carry-over bonuses <small>(game option)</small></h3>
       <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? "checked" : ""}> Use small bonuses earned in earlier runs</label>${list}`;
@@ -8388,13 +9259,13 @@
   function showStartChoices() {
     modal(startChoicesHtml(), bindStartChoices);
   }
-  function qualityHint(q) {
+  function qualityHint(q2) {
     return {
       auto: "Auto: set from your device, and lowered if the 3D view runs slow.",
       low: "Low: fastest. No shadows of the room, no light patches. For phones and old laptops.",
       medium: "Medium: reflections and light patches, simple shadows.",
       high: "High: soft shadows and all light effects. Needs a good graphics card."
-    }[q] + " It is used the next time you go inside.";
+    }[q2] + " It is used the next time you go inside.";
   }
   function showMenu() {
     modal(`<h3>Game</h3>
@@ -8403,7 +9274,7 @@
       <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? "checked" : ""}> Weather effects on the map (snow, rain, fog, night)</label>
       <div class="qual-row" role="radiogroup" aria-label="3D quality">
         <span class="qual-label">3D quality</span>
-        ${QUALITY_CHOICES.map((q) => `<button type="button" class="qual${getQualityChoice() === q ? " on" : ""}" data-q="${q}" role="radio" aria-checked="${getQualityChoice() === q}">${QUALITY_LABELS[q]}</button>`).join("")}
+        ${QUALITY_CHOICES.map((q2) => `<button type="button" class="qual${getQualityChoice() === q2 ? " on" : ""}" data-q="${q2}" role="radio" aria-checked="${getQualityChoice() === q2}">${QUALITY_LABELS[q2]}</button>`).join("")}
       </div>
       <p class="hint" id="qualHint">${qualityHint(getQualityChoice())}</p>
       <button id="exp">Export a backup file</button>
@@ -8416,14 +9287,14 @@
       m.querySelector("#fxToggle").addEventListener("change", (e) => {
         if (fx) fx.setEnabled(e.target.checked);
       });
-      m.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
-        setQualityChoice(b.dataset.q);
-        m.querySelectorAll("[data-q]").forEach((x) => {
-          const on = x === b;
-          x.classList.toggle("on", on);
-          x.setAttribute("aria-checked", on);
+      m.querySelectorAll("[data-q]").forEach((b2) => b2.addEventListener("click", () => {
+        setQualityChoice(b2.dataset.q);
+        m.querySelectorAll("[data-q]").forEach((x2) => {
+          const on = x2 === b2;
+          x2.classList.toggle("on", on);
+          x2.setAttribute("aria-checked", on);
         });
-        m.querySelector("#qualHint").textContent = qualityHint(b.dataset.q);
+        m.querySelector("#qualHint").textContent = qualityHint(b2.dataset.q);
       }));
       m.querySelector("#exp").addEventListener("click", () => {
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
@@ -8440,7 +9311,7 @@
           state = parseSave(await f.text());
           closeModal();
           commit(true);
-        } catch (err) {
+        } catch (err2) {
           alert("This file is not a Last Light save.");
         }
       });
@@ -8570,7 +9441,7 @@
         return ok ? `Game saved (Day ${dayIndex(state.time) + 1}, ${formatClock(state.time)}).` : "The game could not save in this browser.";
       },
       canQuickLoad: () => !!loadGame(),
-      isDone: (z) => zoneList().includes(z),
+      isDone: (z2) => zoneList().includes(z2),
       isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
       isDead: () => !!state.dead,
       // F3: engine diagnostics (systems, random streams, last actions with changed paths).
@@ -8608,11 +9479,11 @@
       items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
       onPickUp: (pid) => {
         const n0 = state.log.length;
-        const it = buildingItems(state).find((x) => x.pid === pid);
+        const it = buildingItems(state).find((x2) => x2.pid === pid);
         const wasDead = !!state.dead;
         perform(state, "action", "pickup", pid);
         if (!wasDead && state.dead) recordRun(state);
-        const ok = !buildingItems(state).some((x) => x.pid === pid);
+        const ok = !buildingItems(state).some((x2) => x2.pid === pid);
         saveGame(state);
         render();
         const msgs = state.log.slice(n0).filter((e) => e.kind !== "info" || !ok).map((e) => e.text).join(" ");
@@ -8636,8 +9507,8 @@
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
         const bagFull = roomFor(state, it.item, 1) < 1;
-        const z = sizeOf(it.item);
-        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${z.w}\xD7${z.h}${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        const z2 = sizeOf(it.item);
+        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${z2.w}\xD7${z2.h}${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -8649,7 +9520,7 @@
         const found = state.lastFound || {};
         delete state.lastFound;
         commit();
-        const items = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? ` \xD7${q}` : ""}`);
+        const items = Object.entries(found).map(([id, q2]) => `${itemName(id)}${q2 > 1 ? ` \xD7${q2}` : ""}`);
         const label = plan.spots.find((s) => s.zone === zone)?.label || zoneName;
         const extra = lastLines(n0).join(" ");
         return {
@@ -8823,7 +9694,7 @@
     for (const p of PROJECTS) {
       const st = projectStatus(state, p);
       if (st.built || st.started || st.missingReq.length) continue;
-      for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+      for (const x2 of st.parts) if (x2.have < x2.need && !out[x2.id]) out[x2.id] = `${p.name} ${qtyText(Math.min(x2.have, x2.need))}/${x2.need}`;
       for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
     }
     return out;
@@ -8831,14 +9702,14 @@
   function journalHtml(maxDays) {
     const days = (state.journal || []).slice(-maxDays).reverse();
     if (!days.length) return '<p class="hint">Nothing yet.</p>';
-    return days.map((d) => {
+    return days.map((d2) => {
       const parts = [];
-      if (d.places.length) parts.push(`You went to ${d.places.join(", ")}.`);
-      if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? "s" : ""}.`);
-      if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? "s" : ""}.`);
-      if (!parts.length && !d.events.length) parts.push("You stayed close to home.");
-      const ev = d.events.map((t) => `<li>${esc2(t)}</li>`).join("");
-      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc2(formatDate(d.day * 1440))}</b><p>${esc2(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
+      if (d2.places.length) parts.push(`You went to ${d2.places.join(", ")}.`);
+      if (d2.taken) parts.push(`You picked up ${d2.taken} item${d2.taken > 1 ? "s" : ""}.`);
+      if (d2.searched) parts.push(`You searched ${d2.searched} area${d2.searched > 1 ? "s" : ""}.`);
+      if (!parts.length && !d2.events.length) parts.push("You stayed close to home.");
+      const ev = d2.events.map((t) => `<li>${esc2(t)}</li>`).join("");
+      return `<div class="jday"><b>Day ${d2.day + 1} \xB7 ${esc2(formatDate(d2.day * 1440))}</b><p>${esc2(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
     }).join("");
   }
   function insidePanel(name) {
@@ -8878,77 +9749,77 @@
   }
   function bindEvents() {
     document.body.addEventListener("click", (e) => {
-      const b = e.target.closest("button");
-      if (!b || b.disabled || !state || b.closest("#modal") || b.closest(".maplibregl-popup")) return;
-      if (!b.isConnected) return;
-      if (b.closest("#inside")) {
-        if (b.dataset.take) act("take", b.dataset.take);
-        else if (b.dataset.drop) act("drop", b.dataset.drop);
+      const b2 = e.target.closest("button");
+      if (!b2 || b2.disabled || !state || b2.closest("#modal") || b2.closest(".maplibregl-popup")) return;
+      if (!b2.isConnected) return;
+      if (b2.closest("#inside")) {
+        if (b2.dataset.take) act("take", b2.dataset.take);
+        else if (b2.dataset.drop) act("drop", b2.dataset.drop);
         else return;
         gridSel = null;
         insideRefresh?.();
         return;
       }
-      if (b.dataset.act) {
-        if (b.dataset.act === "sleep") return showSleep();
-        if (b.dataset.act === "walk_in") return walkInside2();
-        if (b.dataset.act === "walk_out") return walkOutside();
-        act("action", b.dataset.act);
-      } else if (b.dataset.use && b.dataset.verb === "take_off") act("action", "take_off", b.dataset.use);
-      else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
-      else if (b.dataset.take) act("take", b.dataset.take);
-      else if (b.dataset.takeall) act("takeall");
-      else if (b.dataset.drop) act("drop", b.dataset.drop);
-      else if (b.dataset.build) act("action", "build", b.dataset.build);
-      else if (b.dataset.goalboard) showGoalBoard();
-      else if (b.dataset.garden) {
-        const [what, crop] = b.dataset.garden.split(":");
+      if (b2.dataset.act) {
+        if (b2.dataset.act === "sleep") return showSleep();
+        if (b2.dataset.act === "walk_in") return walkInside2();
+        if (b2.dataset.act === "walk_out") return walkOutside();
+        act("action", b2.dataset.act);
+      } else if (b2.dataset.use && b2.dataset.verb === "take_off") act("action", "take_off", b2.dataset.use);
+      else if (b2.dataset.use) act("use", b2.dataset.use, b2.dataset.verb, b2.dataset.from);
+      else if (b2.dataset.take) act("take", b2.dataset.take);
+      else if (b2.dataset.takeall) act("takeall");
+      else if (b2.dataset.drop) act("drop", b2.dataset.drop);
+      else if (b2.dataset.build) act("action", "build", b2.dataset.build);
+      else if (b2.dataset.goalboard) showGoalBoard();
+      else if (b2.dataset.garden) {
+        const [what, crop] = b2.dataset.garden.split(":");
         act("action", `garden_${what}`, crop);
-      } else if (b.dataset.sleepspot) act("action", "sleep_spot", b.dataset.sleepspot);
-      else if (b.dataset.board) act("action", "board_window", b.dataset.board);
-      else if (b.dataset.door) act("action", "door", b.dataset.door);
-      else if (b.dataset.goaldrop) {
-        const why = dropGoal(state, b.dataset.goaldrop);
+      } else if (b2.dataset.sleepspot) act("action", "sleep_spot", b2.dataset.sleepspot);
+      else if (b2.dataset.board) act("action", "board_window", b2.dataset.board);
+      else if (b2.dataset.door) act("action", "door", b2.dataset.door);
+      else if (b2.dataset.goaldrop) {
+        const why = dropGoal(state, b2.dataset.goaldrop);
         if (why) alert(why);
         else commit();
-      } else if (b.id === "menuBtn") showMenu();
-      else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
+      } else if (b2.id === "menuBtn") showMenu();
+      else if (b2.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
     document.body.addEventListener("toggle", (e) => {
-      const w = e.target.dataset && e.target.dataset.wing;
-      if (!w) return;
-      if (e.target.open) openWings.add(w);
-      else openWings.delete(w);
+      const w2 = e.target.dataset && e.target.dataset.wing;
+      if (!w2) return;
+      if (e.target.open) openWings.add(w2);
+      else openWings.delete(w2);
     }, true);
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });
   }
   function diagText(state3) {
-    const d = diagnostics(state3, { records: 3 });
-    const w = d.weather;
-    const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join("  ");
-    const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(" ");
+    const d2 = diagnostics(state3, { records: 3 });
+    const w2 = d2.weather;
+    const shares = Object.entries(d2.decay.shares).filter(([, v2]) => v2 > 0).map(([k, v2]) => `${k} ${Math.round(v2 * 100)}%`).join("  ");
+    const streams = Object.entries(d2.rng.streams).map(([k, v2]) => `${k}:${(v2 >>> 0).toString(36)}`).join(" ");
     return [
-      `day ${d.day}  ${w.label} ${w.low}-${w.high}\xB0F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ""}`,
-      `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
-      `breakdown: ${shares || "none yet"}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ""}`,
-      `systems: ${d.systems.map((x) => x.id).join(" ")}`,
-      `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
-      ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
+      `day ${d2.day}  ${w2.label} ${w2.low}-${w2.high}\xB0F${w2.spell ? `  spell ${w2.spell.id} (${w2.spell.daysLeft} d)` : ""}`,
+      `pacer: month ${d2.pacer.month}  tension ${d2.pacer.tension}  ${(d2.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d2.pacer.events}`,
+      `breakdown: ${shares || "none yet"}${d2.decay.next ? `  next ${d2.decay.next.id} ~day ${d2.decay.next.day + 1}` : ""}`,
+      `systems: ${d2.systems.map((x2) => x2.id).join(" ")}`,
+      `rng ${(d2.rng.shared >>> 0).toString(36)}  ${streams}  save ${d2.saveBytes == null ? "?" : `${(d2.saveBytes / 1024).toFixed(0)} KB`}${d2.deep ? "  deep log on" : ""}`,
+      ...d2.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
     ];
   }
   function homeProjectText(state3, id, long) {
     if (id === "home_battery") {
-      const h2 = state3.home;
-      const txt = `${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels`;
+      const h3 = state3.home;
+      const txt = `${h3.battery.toFixed(1)} / ${h3.batteryMax} kWh \xB7 charged by the solar panels`;
       return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
     }
     const proj = PROJECTS.find((p) => p.id === id);
     if (!proj) return "";
     const st = projectStatus(state3, proj);
     if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc2(proj.name)} <small>built \xB7 ${esc2(proj.effect || "")}</small>`;
-    const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
+    const parts = st.parts.map((x2) => `${itemName(x2.id).toLowerCase()} ${Math.min(x2.have, x2.need)}/${x2.need}`).join(", ");
     const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
     const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
     if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
@@ -8968,10 +9839,10 @@
       const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? "" : "disabled"} title="1 scrap wood, 30 min">Board up a window</button>` : "";
       const door = r.doorClosed == null ? "" : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? "" : "disabled"}>${r.doorClosed ? "Open door" : "Close door"}</button>`;
       const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
-      const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
+      const w2 = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
       return `<div class="heat-row">
       <span class="hn">${esc2(r.label)}</span>
-      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w2}%"></i></span>
       <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
       <small>${esc2(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
       <span class="hb">${board}${door}${bed}</span>
@@ -8985,37 +9856,37 @@
   }
   var MONTHS2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function monthsText(list) {
-    const m = [...list].sort((a, b) => a - b);
+    const m = [...list].sort((a, b2) => a - b2);
     const runs = [];
-    for (const x of m) {
+    for (const x2 of m) {
       const r = runs[runs.length - 1];
-      if (r && x === r[1] + 1) r[1] = x;
-      else runs.push([x, x]);
+      if (r && x2 === r[1] + 1) r[1] = x2;
+      else runs.push([x2, x2]);
     }
-    return runs.map(([a, b]) => a === b ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b]}`).join(", ");
+    return runs.map(([a, b2]) => a === b2 ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b2]}`).join(", ");
   }
   function renderGarden(atHome) {
     const g = gardenInfo(state);
     if (!g.beds) return "";
     const beds = [];
     for (let i = 0; i < g.beds; i++) {
-      const b = g.planted[i];
-      if (!b) {
+      const b2 = g.planted[i];
+      if (!b2) {
         beds.push('<div class="bed empty"><span>Empty bed</span></div>');
         continue;
       }
-      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
-      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc2(b.name)}</b> <span>${stage}</span>
-      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? "" : `${b.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b.crop].days * (100 - b.growth) / 100))} days left if warm \xB7 `}water ${b.water}%</small></div>`);
+      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b2.stage] || b2.stage;
+      beds.push(`<div class="bed ${b2.dead ? "dead" : b2.ready ? "ready" : ""}"><b>${esc2(b2.name)}</b> <span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b2.growth}%"></i></span><small>${b2.dead || b2.ready ? "" : `${b2.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b2.crop].days * (100 - b2.growth) / 100))} days left if warm \xB7 `}water ${b2.water}%</small></div>`);
     }
     const sow = g.canSow.map((id) => {
       const why = canPlant(state, id);
       return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc2(why || "")}">Sow ${esc2(CROPS[id].name.toLowerCase())}</button>`;
     }).join("");
-    const any = g.planted.some((b) => !b.dead && !b.ready);
-    const ripe = g.planted.some((b) => b.ready);
+    const any = g.planted.some((b2) => !b2.dead && !b2.ready);
+    const ripe = g.planted.some((b2) => b2.ready);
     return `<div class="garden">
-    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <h3>Garden <small>${g.planted.filter((b2) => !b2.dead).length} / ${g.beds} beds in use</small></h3>
     <div class="beds">${beds.join("")}</div>
     <div class="row">
       ${any ? `<button class="small" data-garden="water" ${atHome ? "" : "disabled"}>Water the beds (15 min)</button>` : ""}

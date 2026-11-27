@@ -26,7 +26,15 @@ const server = createServer(async (req, res) => {
     const file = join(root, path || 'index.html');
     if (!file.startsWith(root)) throw new Error('outside');
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
+    const type = TYPES[extname(file)] || 'application/octet-stream';
+    // Byte ranges, as GitHub Pages sends them: the PMTiles map file needs them.
+    const m = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
+    if (m) {
+      const start = Number(m[1]); const end = Math.min(m[2] ? Number(m[2]) : body.length - 1, body.length - 1);
+      res.writeHead(206, { 'content-type': type, 'content-range': `bytes ${start}-${end}/${body.length}`, 'content-length': end - start + 1, 'accept-ranges': 'bytes' });
+      return res.end(body.subarray(start, end + 1));
+    }
+    res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes' });
     res.end(body);
   } catch { res.writeHead(404); res.end(); }
 });
@@ -80,6 +88,17 @@ try {
     check(play.after.weather.day > play.before.weather.day, `the weather system rolled a new day (day ${play.before.weather.day} -> ${play.after.weather.day})`);
   }
   check(errors.length === 0, `no script errors while playing${errors.length ? ': ' + errors.join(' | ') : ''}`);
+
+  // Self-hosted map: the style comes from docs/map/ and the streets from the PMTiles file.
+  const mapInfo = await page.evaluate(async () => {
+    const m = window.__llMap;
+    if (!m) return { error: 'no map' };
+    for (let i = 0; i < 100 && !m.areTilesLoaded(); i++) await new Promise((r) => setTimeout(r, 200));
+    const src = m.getStyle().sources.openmaptiles;
+    const roads = m.queryRenderedFeatures().filter((f) => f.sourceLayer === 'transportation').length;
+    return { url: src && src.url, roads };
+  });
+  check(/^pmtiles:\/\/.*\/map\/portland\.pmtiles$/.test(mapInfo.url || '') && mapInfo.roads > 0, `the map draws streets from the self-hosted map file (${JSON.stringify(mapInfo)})`);
 
   // Dev tools (stats-gl + lil-gui): never fetched in the normal load; ?dev=1 or F3 loads them.
   const devReqs = [];
