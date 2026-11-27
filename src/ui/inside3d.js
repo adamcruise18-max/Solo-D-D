@@ -13,10 +13,11 @@ import { snowFromScene } from '../render/streets/look.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
 import { TOON, sty } from './style.js';
 import { itemIcon, itemIcons, iconCache } from './icons3d.js';
-import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS } from './props3d.js';
+import { makeItemModel, makeShelfFill, makeProp, makeFixture, makeEndcap, FIXTURE_TYPES, PROP_KINDS, setAssetDetail } from './props3d.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { hashString, mulberry32 } from '../rng.js';
 import { getQualityChoice, autoStepDown } from './quality.js';
+import { addShellDetail } from './shell3d.js';
 import {
   KEYS, keyFor, STANCES, JUMP_SPEED, GRAVITY, HOLD_SEARCH_MS, moveSpeed, nextStance,
 } from './controls.js';
@@ -167,6 +168,7 @@ export function openInside(opts) {
 
   // Light, tone, fog, flashlight and room effects come from look3d.js.
   const quality = pickQuality();
+  setAssetDetail(quality);
   // Low draws fewer pixels on sharp screens; medium a little fewer.
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, quality === 'low' ? 1 : quality === 'medium' ? 1.5 : touch ? 1.5 : 2));
   const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight(), scene: opts.scene });
@@ -368,6 +370,8 @@ export function openInside(opts) {
   // after the scene is built, so hundreds of small meshes become a few draw calls.
   const statics = new Group();
   scene.add(statics);
+  // Fine shell detail (trim, outlets, vents, door frame): Medium and High only.
+  if (quality !== 'low') addShellDetail(statics, plan, { W, D, H, windows: roomWindows, seed: hashString(String(opts.title || plan.cat)) });
   // ---------- fixtures ----------
   const matCache = {};
   const mat = (type) => (matCache[type] ||= new MeshStandardMaterial({ color: FIXTURE_COLORS[type] ?? 0x888888, roughness: 0.8, metalness: (type === 'shelf' && TOON) ? 0.08 : type === 'shelf' || type === 'gate' || type === 'locker' ? 0.35 : 0.05 }));

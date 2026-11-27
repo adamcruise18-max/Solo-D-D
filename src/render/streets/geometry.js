@@ -228,7 +228,7 @@ function protos() {
   return P;
 }
 // T: tones(look) (season leaf colours, snow on firs)
-function treeGeo(list, kind, x, z, h, rnd, bare, T) {
+function treeGeo(list, kind, x, z, h, rnd, bare, T, fine = false) {
   const P = protos();
   if (kind === 1) { // fir: tall narrow cone layers
     const w = h * 0.2;
@@ -236,6 +236,10 @@ function treeGeo(list, kind, x, z, h, rnd, bare, T) {
     list.push(at(P.trunk.clone(), x, h * 0.15, z, 1.4, h * 0.3, 1.4));
     list.push(at(painted(new ConeGeometry(1, 1, 7), c1), x, h * 0.45, z, w, h * 0.55, w));
     list.push(at(painted(new ConeGeometry(1, 1, 7), c2), x, h * 0.72, z, w * 0.7, h * 0.45, w * 0.7));
+    if (fine) { // a wide low skirt, a middle tier, a thin top and a root flare
+      list.push(at(painted(new ConeGeometry(1, 1, 7), c2), x, h * 0.28, z, w * 1.15, h * 0.3, w * 1.15, 0.4));
+      list.push(at(painted(new ConeGeometry(1, 1, 6), c2), x, h * 0.9, z, w * 0.3, h * 0.2, w * 0.3));
+    }
   } else {
     const r = h * 0.32;
     list.push(at(P.trunk.clone(), x, h * 0.25, z, 1.2, h * 0.5, 1.2));
@@ -246,13 +250,29 @@ function treeGeo(list, kind, x, z, h, rnd, bare, T) {
         const len = h * (0.35 + rnd() * 0.2);
         const g = P.branch.clone().applyMatrix4(new Matrix4().makeRotationZ(0.55 + rnd() * 0.3));
         list.push(at(g, x + Math.cos(a) * len * 0.25, h * (0.55 + rnd() * 0.15), z + Math.sin(a) * len * 0.25, 1, len, 1, a));
+        if (fine) { // a twig off each branch, higher and further out (no random numbers)
+          const t = P.branch.clone().applyMatrix4(new Matrix4().makeRotationZ(0.9));
+          list.push(at(t, x + Math.cos(a) * len * 0.5, h * 0.78, z + Math.sin(a) * len * 0.5, 0.6, len * 0.5, 0.6, a + 0.5));
+        }
       }
-    } else list.push(at(painted(new IcosahedronGeometry(1, 0), T.leaf(rnd())), x, h * 0.62, z, r, r * 0.85, r, rnd() * 6));
+      if (fine) list.push(at(painted(new ConeGeometry(1, 1, 6), C.trunk), x, 0.15, z, 0.32, 0.3, 0.32));
+    } else {
+      const leaf = T.leaf(rnd());
+      list.push(at(painted(new IcosahedronGeometry(1, 0), leaf), x, h * 0.62, z, r, r * 0.85, r, rnd() * 6));
+      if (fine) { // three smaller lobes round the crown and a root flare
+        for (let i = 0; i < 3; i++) {
+          const a = i * 2.1 + h;
+          list.push(at(painted(new IcosahedronGeometry(1, 0), leaf), x + Math.cos(a) * r * 0.6, h * (0.55 + i * 0.07), z + Math.sin(a) * r * 0.6, r * 0.6, r * 0.5, r * 0.6, a));
+        }
+        list.push(at(painted(new ConeGeometry(1, 1, 6), C.trunk), x, 0.15, z, 0.32, 0.3, 0.32));
+      }
+    }
   }
 }
-function propGeo(list, type, x, z, yawDeg) {
+function propGeo(list, type, x, z, yawDeg, fine = false) {
   const P = protos();
   const ry = (yawDeg * Math.PI) / 180;
+  if (fine) propFine(list, type, x, z, ry);
   switch (type) {
     case PROP.lamp:
       list.push(at(P.metalPole.clone(), x, 3.5, z, 1, 7, 1));
@@ -285,6 +305,133 @@ function propGeo(list, type, x, z, yawDeg) {
   }
 }
 
+// Fine prop parts (Medium/High 3D quality): bases, arms, caps, insulators, lenses, slats, doors.
+function propFine(list, type, x, z, ry) {
+  const P = protos();
+  const cs = Math.cos(ry), sn = Math.sin(ry);
+  const cy = (r, h, c, seg = 8) => painted(new CylinderGeometry(r, r, h, seg), c);
+  switch (type) {
+    case PROP.lamp:
+      list.push(at(cy(0.16, 0.4, C.metal), x, 0.2, z)); // base
+      list.push(at(cy(0.1, 0.1, C.metal), x, 7.05, z)); // pole cap
+      list.push(at(P.box(C.metal), x + cs * 0.4, 6.75, z + sn * 0.4, 0.8, 0.06, 0.06, -ry - 0.0).applyMatrix4(new Matrix4())); // brace
+      list.push(at(P.box(C.white), x + cs * 1.6, 6.8, z + sn * 1.6, 0.5, 0.03, 0.24, -ry)); // lens
+      break;
+    case PROP.power_pole:
+      list.push(at(P.box(C.pole), x, 9.6, z, 1.8, 0.12, 0.12, ry)); // lower cross-arm
+      for (const k of [-1.1, -0.4, 0.4, 1.1]) list.push(at(cy(0.06, 0.22, C.white, 6), x + Math.cos(ry) * k, 10.48, z - Math.sin(ry) * k));
+      list.push(at(cy(0.32, 0.9, C.metal), x + Math.sin(ry) * 0.35, 8.4, z + Math.cos(ry) * 0.35)); // transformer can
+      list.push(at(P.box(C.metal), x, 1.6, z, 0.08, 0.5, 0.25, ry)); // tag plate
+      break;
+    case PROP.stop_sign:
+      list.push(at(painted(new CylinderGeometry(0.4, 0.4, 0.04, 8), C.white).rotateX(Math.PI / 2), x - sn * 0.01, 2.2, z + cs * 0.01, 1, 1, 1, ry));
+      list.push(at(P.box(C.metal), x, 0.05, z, 0.2, 0.1, 0.2));
+      list.push(at(P.box(C.metal), x, 2.2, z, 0.08, 0.3, 0.08)); // bracket
+      break;
+    case PROP.bus_stop:
+      list.push(at(P.box(C.metal), x, 2.72, z, 0.52, 0.04, 0.07, ry)); // frame top
+      list.push(at(P.box(C.metal), x, 2.28, z, 0.52, 0.04, 0.07, ry)); // frame bottom
+      list.push(at(P.box(C.bench), x + cs * 1.2, 0.45, z - sn * 1.2, 1.4, 0.08, 0.4, ry)); // a bench by the sign
+      for (const k of [0.6, 1.8]) list.push(at(P.box(C.metal), x + cs * k, 0.22, z - sn * k, 0.06, 0.44, 0.35, ry));
+      break;
+    case PROP.signal:
+      for (const k of [0.3, 0, -0.3]) list.push(at(cy(0.1, 0.05, k > 0.2 ? C.red : k < -0.2 ? C.hydrant : C.yellow), x + sn * 0.17, 5.6 + k, z + cs * 0.17, 1, 1, 1).applyMatrix4(new Matrix4()));
+      list.push(at(P.box(C.metal), x, 5.6, z, 0.45, 1.0, 0.05, ry)); // back plate
+      list.push(at(P.box(C.metal), x, 0.2, z, 0.35, 0.4, 0.35)); // base
+      break;
+    case PROP.bench:
+      list.push(at(P.box(C.bench), x - sn * 0.22, 0.75, z - cs * 0.22, 1.6, 0.32, 0.06, ry)); // backrest
+      for (const k of [-0.65, 0.65]) list.push(at(P.box(C.metal), x + cs * k, 0.22, z - sn * k, 0.06, 0.44, 0.42, ry));
+      break;
+    case PROP.bollard:
+      list.push(at(P.box(C.yellow), x, 0.75, z, 0.2, 0.1, 0.2));
+      list.push(at(P.box(C.metal), x, 0.93, z, 0.14, 0.06, 0.14));
+      break;
+    case PROP.bin:
+      list.push(at(P.box(C.bin), x, 1.05, z, 0.6, 0.1, 0.6, ry)); // lid
+      list.push(at(P.box(C.metal), x, 0.6, z, 0.57, 0.05, 0.57, ry)); // band
+      list.push(at(P.box(C.metal), x, 0.03, z, 0.6, 0.06, 0.6, ry)); // foot
+      break;
+    case PROP.hydrant:
+      list.push(at(cy(0.17, 0.08, C.hydrant), x, 0.84, z)); // bonnet
+      list.push(at(cy(0.06, 0.06, C.hydrant), x, 0.92, z)); // nut
+      for (const s of [-1, 1]) list.push(at(cy(0.07, 0.14, C.hydrant).rotateZ(Math.PI / 2), x + s * 0.2, 0.55, z));
+      list.push(at(cy(0.2, 0.06, C.metal), x, 0.03, z)); // flange
+      break;
+    case PROP.mailbox:
+      list.push(at(P.metalPole.clone(), x, 0.42, z, 0.7, 0.85, 0.7));
+      list.push(at(P.box(C.red), x - sn * 0.05, 1.22, z + cs * 0.05, 0.03, 0.12, 0.03, ry)); // flag
+      break;
+    case PROP.vending:
+      list.push(at(P.box(C.white), x + sn * 0.41, 1.2, z + cs * 0.41, 0.6, 0.9, 0.02, ry)); // window
+      list.push(at(P.box(C.metal), x + sn * 0.41, 0.25, z + cs * 0.41, 0.5, 0.15, 0.03, ry)); // drop slot
+      list.push(at(P.box(C.metal), x + sn * 0.42, 1.2, z + cs * 0.42 + 0.3, 0.12, 0.35, 0.03, ry)); // buttons
+      break;
+    default: break;
+  }
+}
+
+// Fine building parts (Medium/High 3D quality), with no random numbers: window sills and heads on
+// houses (one per siding tile: windows every 3 m of wall, one row per 2.8 m floor), a frame, step
+// and lamp at each door, an awning over shop doors, a coping along flat roof edges and a chimney.
+function buildingFine(list, sills, ring, rf, kind, shop, flatRoof, best) {
+  const trim = C.trim, dark = C.metal;
+  if (!shop && kind !== KIND.shed) {
+    let u = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], c = ring[(i + 1) % ring.length];
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (len < 0.05) continue;
+      const tx = (c[0] - a[0]) / len, tz = (c[1] - a[1]) / len, nx = tz, nz = -tx;
+      const ang = -Math.atan2(tz, tx);
+      for (let k = Math.ceil((u - 1.5) / 3); 3 * k + 1.5 < u + len; k++) {
+        const d = 3 * k + 1.5 - u; // distance from a to the window centre
+        if (d < 0.6 || d > len - 0.6) continue;
+        const px = a[0] + tx * d, pz = a[1] + tz * d;
+        if (best && Math.hypot(px - best.mx, pz - best.mz) < 1.3) continue; // no sill across the door
+        const top = Math.min(rf.y(a[0], a[1]), rf.y(c[0], c[1]));
+        // a sill (top and front faces only: 4 triangles) on the ground floor
+        for (let f = 0; f < 1 && f * 2.8 + 2.1 < top; f++) {
+          const y = f * 2.8 + 0.96, o = 0.1, hw = 0.7;
+          const L0 = [px - tx * hw, pz - tz * hw], R0 = [px + tx * hw, pz + tz * hw];
+          const L1 = [L0[0] + nx * o, L0[1] + nz * o], R1 = [R0[0] + nx * o, R0[1] + nz * o];
+          sills.quad([L1[0], y, L1[1]], [R1[0], y, R1[1]], [R0[0], y, R0[1]], [L0[0], y, L0[1]], trim);
+          sills.quad([R1[0], y - 0.06, R1[1]], [L1[0], y - 0.06, L1[1]], [L1[0], y, L1[1]], [R1[0], y, R1[1]], trim);
+        }
+      }
+      u += len;
+    }
+  }
+  if (best && kind !== KIND.shed) {
+    const tx = (best.c[0] - best.a[0]) / best.len, tz = (best.c[1] - best.a[1]) / best.len;
+    const ang = -Math.atan2(tz, tx);
+    const dw = shop ? 1.8 : 0.95, dh = shop ? 2.3 : 2.1;
+    const mx = best.mx, mz = best.mz, nx = best.nx, nz = best.nz;
+    for (const s of [-1, 1]) list.push(at(protos().box(shop ? dark : trim), mx + tx * s * (dw / 2 + 0.05) + nx * 0.05, dh / 2, mz + tz * s * (dw / 2 + 0.05) + nz * 0.05, 0.1, dh, 0.1, ang));
+    list.push(at(protos().box(shop ? dark : trim), mx + nx * 0.05, dh + 0.05, mz + nz * 0.05, dw + 0.2, 0.1, 0.1, ang));
+    list.push(at(protos().box(C.concrete), mx + nx * 0.35, 0.09, mz + nz * 0.35, dw + 0.6, 0.18, 0.6, ang)); // step
+    list.push(at(protos().box(C.lampHead), mx + tx * (dw / 2 + 0.3) + nx * 0.08, dh - 0.1, mz + tz * (dw / 2 + 0.3) + nz * 0.08, 0.14, 0.22, 0.12, ang)); // porch lamp
+    if (shop) list.push(at(protos().box(C.red), mx + nx * 0.6, dh + 0.35, mz + nz * 0.6, dw + 1.2, 0.08, 1.1, ang)); // awning
+  }
+  if (flatRoof) { // coping along the roof edge
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], c = ring[(i + 1) % ring.length];
+      const len = Math.hypot(c[0] - a[0], c[1] - a[1]);
+      if (len < 0.5) continue;
+      const y = rf.y((a[0] + c[0]) / 2, (a[1] + c[1]) / 2);
+      list.push(at(protos().box(C.trim), (a[0] + c[0]) / 2, y + 0.12, (a[1] + c[1]) / 2, len, 0.24, 0.22, -Math.atan2(c[1] - a[1], c[0] - a[0])));
+    }
+  } else if (!shop && kind !== KIND.shed && ring.length >= 3) { // a chimney near the first corner
+    const a = ring[0], c = ring[1];
+    const px = a[0] + (c[0] - a[0]) * 0.25, pz = a[1] + (c[1] - a[1]) * 0.25;
+    const cx = (ring.reduce((s2, p) => s2 + p[0], 0) / ring.length) * 0.3 + px * 0.7;
+    const cz = (ring.reduce((s2, p) => s2 + p[1], 0) / ring.length) * 0.3 + pz * 0.7;
+    const y = rf.y(cx, cz);
+    list.push(at(protos().box(C.wallStone), cx, y + 0.5, cz, 0.6, 1.4, 0.6));
+    list.push(at(protos().box(C.metal), cx, y + 1.25, cz, 0.7, 0.1, 0.7));
+  }
+}
+
 // ---------- the cell ----------
 // opts: { lod: 0 full | 1 no props, look: { season, growth, snow } (look.js) }
 // (old opts.bare: true = a winter look)
@@ -292,6 +439,9 @@ const NATURAL = new Set([AREA.lawn, AREA.grass, AREA.pitch, AREA.wood, AREA.scru
 const SOFT = new Set([AREA.playground, AREA.sand, AREA.track]);
 export function buildCell(data, opts = {}) {
   const lod = opts.lod ?? 0;
+  const fine = !!opts.fine && lod === 0; // Medium/High 3D quality: the small parts
+  const fineList = [];
+  const sills = new Builder();
   const T = tones(opts.look ?? { season: opts.bare ? 'winter' : 'summer' });
   const areaCol = (cls) => {
     const c = AREA_COL[cls] || C.grass;
@@ -393,6 +543,7 @@ export function buildCell(data, opts = {}) {
       wallsPlain.quad([R[0], 0.02, R[1]], [L[0], 0.02, L[1]], [L[0], dh, L[1]], [R[0], dh, R[1]], shop ? C.shopDoor : C.door, [[0, 0], [0, 0], [0, 0], [0, 0]]);
       doors.push({ x: best.mx + best.nx * 0.9, z: best.mz + best.nz * 0.9, nx: best.nx, nz: best.nz, kind, placeId: placeId || null, name: ni >= 0 ? data.n[ni] : null, bi, id: sid || `${data.k}#${bi}`, street: best.street });
     }
+    if (fine) buildingFine(fineList, sills, ring, rf, kind, shop, roofType === ROOF.flat, best);
   });
 
   // props, trees, fences (not at lod 1)
@@ -401,8 +552,11 @@ export function buildCell(data, opts = {}) {
     const list = [];
     let seed = 1;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (const [kind, x, z, h] of data.t || []) treeGeo(list, kind, x * D, z * D, h * D, rnd, T.bare && kind === 0, T);
-    for (const [type, x, z, yaw] of data.p || []) propGeo(list, type, x * D, z * D, yaw);
+    list.push(...fineList);
+    const sg = sills.geometry();
+    if (sg) list.push(sg);
+    for (const [kind, x, z, h] of data.t || []) treeGeo(list, kind, x * D, z * D, h * D, rnd, T.bare && kind === 0, T, fine);
+    for (const [type, x, z, yaw] of data.p || []) propGeo(list, type, x * D, z * D, yaw, fine);
     const fb = new Builder();
     for (const [type, flat] of data.f || []) {
       const line = pts(flat);
@@ -415,10 +569,14 @@ export function buildCell(data, opts = {}) {
         const g = protos().box(c);
         list.push(at(g, (a[0] + b[0]) / 2, h / 2, (a[1] + b[1]) / 2, L, h, w, -Math.atan2(b[1] - a[1], b[0] - a[0])));
         colliders.push([a[0], a[1], b[0], b[1]]);
+        if (fine && type === 0) { // wood fence: a post at each end and a top rail
+          list.push(at(protos().box(T.roof(C.pole)), a[0], h / 2 + 0.05, a[1], 0.14, h + 0.1, 0.14));
+          list.push(at(protos().box(c), (a[0] + b[0]) / 2, h - 0.05, (a[1] + b[1]) / 2, L, 0.08, w + 0.06, -Math.atan2(b[1] - a[1], b[0] - a[0])));
+        }
       }
     }
     // abandoned cars, trash, barricades, grass in the cracks
-    const det = streetDetails(data.k, roads, rings, T);
+    const det = streetDetails(data.k, roads, rings, T, fine);
     list.push(...det.geos);
     colliders.push(...det.colliders);
     doors.push(...det.doors);
