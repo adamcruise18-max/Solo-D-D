@@ -161,10 +161,13 @@ offline mode.
 - `src/engine/interior.js` makes the floor plans (no browser code, tested in `test/interior.test.js`).
 - `npm install`, then `npm run build` (bundle), `npm test` (engine tests), `npm run places` (rebuild the places file from `data/poi-15mi-97078.csv`).
 - Rule numbers come from the game rules doc. Change numbers in `src/data/` and `src/engine/`.
+- To find why a 3D room is slow, use [Spector.js](https://spector.babylonjs.com) (browser extension, MIT): open the room, click the extension, capture one frame, and read each draw call with its shader, textures and state. No code change is needed.
 
 ## Credits
 
 - Map data and places © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL 1.0.
 - Map tiles: [OpenFreeMap](https://openfreemap.org).
 - Map library: [MapLibre GL JS](https://maplibre.org) (BSD-3-Clause, see `docs/vendor/maplibre-LICENSE.txt`).
+- Sound: [ZzFX](https://github.com/KilledByAPixel/ZzFX) (MIT) and [howler.js](https://howlerjs.com) (MIT). All sounds are made in code.
+- 3D: [three.js](https://threejs.org) (MIT), [three-mesh-bvh](https://github.com/gkjohnson/three-mesh-bvh) (MIT), [N8AO](https://github.com/N8python/n8ao) (CC0).
 - Store names are real names from OpenStreetMap. The game uses no brand logos.

@@ -31,7 +31,9 @@
   "type": "module",
   "dependencies": {
     "howler": "^2.2.4",
+    "n8ao": "^2.1.0",
     "pmtiles": "^4.5.0",
+    "postprocessing": "^6.39.6",
     "three": "^0.170.0",
     "three-mesh-bvh": "^0.10.0",
     "zzfx": "^1.4.0"
