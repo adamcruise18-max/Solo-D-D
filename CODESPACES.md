@@ -23,6 +23,9 @@ in a browser tab). You install nothing on your own computer.
 1. At the bottom of the window, click the **PORTS** tab.
 2. Find **FreeLLMAPI dashboard (3001)**. Click the globe icon to open it in a new tab.
 3. Make your dashboard account (email and password). This account is only for this server.
+   The form also asks for a **setup code**. The terminal shows it after
+   `FreeLLMAPI: running on port 3001`. If you cannot find it, type:
+   `docker logs freellmapi 2>&1 | grep "setup code"`
 
 ### 2. Add provider keys
 
