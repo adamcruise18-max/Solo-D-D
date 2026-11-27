@@ -417,6 +417,7 @@ function gBox(w, h, d) {
   if (TOON && ROUND && Math.min(w, h, d) >= 0.04) return gRBox(w, h, d, Math.min(w, h, d) * 0.16);
   return cached(GEO, `box${w},${h},${d}`, () => new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0));
 }
+function gCylP(rt, rb, h, seg, open) { return gCyl(rt, rb, h, seg, open); }
 function gCyl(rt, rb, h, seg = 16, open = false) {
   return cached(GEO, `cyl${rt},${rb},${h},${seg},${open}`, () => new THREE.CylinderGeometry(rt, rb, h, seg, 1, open, Math.PI, TAU).translate(0, h / 2, 0));
 }
@@ -2963,9 +2964,14 @@ class Merger {
   }
 }
 
+// Far copy of shelf stock (level of detail): round products get about half the sides.
+// 0 = near (full), 1 = far. Only shelfFill sets it, around its far build.
+let PROD_LOD = 0;
 // product template: list of parts {geo, local matrix, rects per group, bucket per group}
 function productParts(kind, i) {
-  return cached(GEO, `prod|${kind}|${i}`, () => {
+  const lod = PROD_LOD;
+  return cached(GEO, `prod|${kind}|${i}|${lod}`, () => {
+    const gCyl = (rt, rb, h, seg, open) => gCylP(rt, rb, h, lod ? Math.max(6, Math.round(seg / 2)) : seg, open);
     const p = CATALOG[kind][i];
     const L = rectLabel(i), S = rectSide(i);
     const sol = (n) => rectSolid(n);
@@ -2985,12 +2991,12 @@ function productParts(kind, i) {
         parts.push({ geo: gBox(p.w, p.h, p.d), m: I, rects: [S, S, S, S, L, L], bk: [gl, gl, gl, gl, gl, gl] });
         break;
       case 'bag':
-        parts.push({ geo: gPillow(p.w, p.h, p.d, 0.06, 4, 5), m: I, rects: [S, S, S, S, L, L], bk: [gl, gl, gl, gl, gl, gl] });
+        parts.push({ geo: lod ? gPillow(p.w, p.h, p.d, 0.06, 2, 2) : gPillow(p.w, p.h, p.d, 0.06, 4, 5), m: I, rects: [S, S, S, S, L, L], bk: [gl, gl, gl, gl, gl, gl] });
         break;
       case 'bottle': {
         const b = sol(p.body || 'white');
         parts.push({ geo: gCyl(p.r, p.r, p.h * 0.55, 10), m: T(0, p.h * 0.05, 0), rects: [L, b, b], bk: [1, 1, 1] });
-        parts.push({ geo: gCyl(p.r, p.r * 0.95, p.h * 0.05, 10, true), m: I, rects: [b], bk: [1] });
+        if (!lod) parts.push({ geo: gCyl(p.r, p.r * 0.95, p.h * 0.05, 10, true), m: I, rects: [b], bk: [1] });
         parts.push({ geo: gCyl(p.r * 0.38, p.r, p.h * 0.25, 10, true), m: T(0, p.h * 0.6, 0), rects: [b], bk: [1] });
         const c = sol(p.cap || 'white');
         parts.push({ geo: gCyl(p.r * 0.42, p.r * 0.42, p.h * 0.15, 8), m: T(0, p.h * 0.85, 0), rects: [c, c, c], bk: [1, 1, 1] });
@@ -3150,11 +3156,58 @@ function stockLevels(merger, kind, r, length, levels, fill, FRONT = 0.385, BACK 
 export function makeShelfFill(kind = 'grocery', length = 2, levels = [0.1, 0.5, 0.9, 1.3], fill = 0.7, seed = 0) {
   return squareOnly(() => shelfFill(kind, length, levels, fill, seed));
 }
+// Shelf stock in pieces about 2 m long, each a THREE.LOD: full products near the camera, products
+// with fewer sides farther than SHELF_LOD_M. three.js picks the level each frame (no game code).
+// The far copy is built from the same seed, so every product is in the same place in both copies.
+export const SHELF_LOD_M = 4.5;
+const CHUNK_M = 4;
+class ChunkMerger {
+  constructor(length) {
+    this.n = Math.max(1, Math.round(length / CHUNK_M));
+    this.len = length;
+    this.ch = [];
+    for (let i = 0; i < this.n; i++) {
+      const m = new Merger(2);
+      m.zc = -length / 2 + (i + 0.5) * length / this.n;
+      m.root = new THREE.Matrix4().makeTranslation(0, 0, -m.zc);
+      this.ch.push(m);
+    }
+  }
+  add(geo, m, rects, buckets) {
+    const i = Math.min(this.n - 1, Math.max(0, Math.floor((m.elements[14] + this.len / 2) / this.len * this.n)));
+    this.ch[i].add(geo, m, rects, buckets);
+  }
+}
 function shelfFill(kind, length, levels, fill, seed) {
+  const near = shelfFillBuild(kind, length, levels, fill, seed);
+  PROD_LOD = 1;
+  let far;
+  try { far = shelfFillBuild(kind, length, levels, fill, seed); } finally { PROD_LOD = 0; }
+  const mats = shelfMats(near.kind);
+  const g = new THREE.Group();
+  g.name = 'shelfFill:' + near.kind;
+  let tris = 0, farTris = 0, calls = 0;
+  near.merger.ch.forEach((c, i) => {
+    const a = c.meshes(mats), b = far.merger.ch[i].meshes(mats);
+    if (!a.length) return;
+    const lod = new THREE.LOD();
+    lod.position.z = c.zc;
+    const A = new THREE.Group(), B = new THREE.Group();
+    for (const m of a) { A.add(m); tris += m.geometry.index.count / 3; }
+    for (const m of b) { B.add(m); farTris += m.geometry.index.count / 3; }
+    lod.addLevel(A, 0);
+    lod.addLevel(B, SHELF_LOD_M);
+    g.add(lod);
+    calls += a.length;
+  });
+  g.userData = { kind: near.kind, items: near.count, fallen: near.tipped, triangles: tris, farTriangles: farTris, drawCalls: calls, chunks: near.merger.n };
+  return g;
+}
+function shelfFillBuild(kind, length, levels, fill, seed) {
   if (!CATALOG[kind]) kind = 'grocery';
   const r = rng(hashStr(kind) ^ Math.imul((seed | 0) + 7, 2654435761));
   fill = THREE.MathUtils.clamp(fill, 0, 1);
-  const merger = new Merger(2);
+  const merger = new ChunkMerger(length);
   let { count, tipped } = stockLevels(merger, kind, r, length, levels, fill);
   const { tpls } = shelfTemplates(kind);
   // spill on the floor in front of the shelf
@@ -3165,13 +3218,7 @@ function shelfFill(kind, length, levels, fill, seed) {
     placeProduct(merger, tpl, 0.45 + r() * 0.85, 0, (r() - 0.5) * (length - 0.2), r() * TAU, r() < 0.75 ? Math.PI / 2 : 0, r() < 0.5 ? 1 : 0);
     count++; tipped++;
   }
-  const g = new THREE.Group();
-  g.name = 'shelfFill:' + kind;
-  const meshes = merger.meshes(shelfMats(kind));
-  let tris = 0;
-  for (const m of meshes) { g.add(m); tris += m.geometry.index.count / 3; }
-  g.userData = { kind, items: count, fallen: tipped, triangles: tris, drawCalls: meshes.length };
-  return g;
+  return { kind, merger, count, tipped };
 }
 
 // End-of-run display: a gondola endcap unit with 3-4 stocked shelves and a generic sign on top.

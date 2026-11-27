@@ -506,7 +506,7 @@ export function openStreets(opts) {
   }
   // test hooks (browser checks)
   window.__llStreets = {
-    pos, look: (y, p = 0) => { yaw = y; pitch = p; }, teleport: (x, z) => { pos.x = x; pos.z = z; lastSent = { x, z }; updateCells(true); },
+    scene, renderer, pos, look: (y, p = 0) => { yaw = y; pitch = p; }, teleport: (x, z) => { pos.x = x; pos.z = z; lastSent = { x, z }; updateCells(true); },
     info: () => ({ precip: precip.kind(), calls: renderer.info.render.calls, tris: renderer.info.render.triangles, fps, cells: streamer.report(), shown: [...shown.keys()] }),
     // walk in a straight line in 2 m steps (tests: game time and miles)
     walk: (dx, dz) => { const n = Math.ceil(Math.hypot(dx, dz) / 2); for (let i = 0; i < n; i++) { pos.x += dx / n; pos.z += dz / n; flushMove(false); } flushMove(true); },
