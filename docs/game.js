@@ -78,7 +78,7 @@
         },
         // build an array of samples
         buildSamples: function(volume = 1, randomness = 0.05, frequency = 220, attack = 0, sustain = 0, release = 0.1, shape = 0, shapeCurve = 1, slide = 0, deltaSlide = 0, pitchJump = 0, pitchJumpTime = 0, repeatTime = 0, noise = 0, modulation = 0, bitCrush = 0, delay = 0, sustainVolume = 1, decay = 0, tremolo = 0, filter = 0) {
-          let sampleRate = this.sampleRate, PI2 = Math.PI * 2, abs = Math.abs, sign = (v) => v < 0 ? -1 : 1, startSlide = slide *= 500 * PI2 / sampleRate / sampleRate, startFrequency = frequency *= (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate, modOffset = 0, repeat = 0, crush = 0, jump = 1, length, b, t = 0, i = 0, s = 0, f, quality = 2, w = PI2 * abs(filter) * 2 / sampleRate, cos = Math.cos(w), alpha = Math.sin(w) / 2 / quality, a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0, b0 = (1 + sign(filter) * cos) / 2 / a0, b1 = -(sign(filter) + cos) / a0, b2 = b0, x2 = 0, x1 = 0, y2 = 0, y1 = 0;
+          let sampleRate = this.sampleRate, PI2 = Math.PI * 2, abs = Math.abs, sign = (v2) => v2 < 0 ? -1 : 1, startSlide = slide *= 500 * PI2 / sampleRate / sampleRate, startFrequency = frequency *= (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate, modOffset = 0, repeat = 0, crush = 0, jump = 1, length, b2, t = 0, i = 0, s = 0, f, quality = 2, w2 = PI2 * abs(filter) * 2 / sampleRate, cos = Math.cos(w2), alpha = Math.sin(w2) / 2 / quality, a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0, b0 = (1 + sign(filter) * cos) / 2 / a0, b1 = -(sign(filter) + cos) / a0, b22 = b0, x2 = 0, x1 = 0, y2 = 0, y1 = 0;
           const minAttack = 9;
           attack = attack * sampleRate || minAttack;
           decay *= sampleRate;
@@ -91,8 +91,8 @@
           pitchJumpTime *= sampleRate;
           repeatTime = repeatTime * sampleRate | 0;
           length = attack + decay + sustain + release + delay | 0;
-          b = new Float32Array(length > 0 ? length : 0);
-          for (; i < length; b[i++] = s * volume) {
+          b2 = new Float32Array(length > 0 ? length : 0);
+          for (; i < length; b2[i++] = s * volume) {
             if (!(++crush % (bitCrush * 100 | 0))) {
               s = shape ? shape > 1 ? shape > 2 ? shape > 3 ? shape > 4 ? (
                 // wave shape
@@ -140,10 +140,10 @@
               s = delay ? s / 2 + (delay > i ? 0 : (
                 // delay
                 (i < length - delay ? 1 : (length - i) / delay) * // release delay 
-                b[i - delay | 0] / 2 / volume
+                b2[i - delay | 0] / 2 / volume
               )) : s;
               if (filter)
-                s = y1 = b2 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
+                s = y1 = b22 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
             }
             f = (frequency += slide += deltaSlide) * // frequency
             Math.cos(modulation * modOffset++);
@@ -159,7 +159,7 @@
               jump || (jump = 1);
             }
           }
-          return b;
+          return b2;
         },
         // get frequency of a musical note on a diatonic scale
         getNote: function(semitoneOffset = 0, rootNoteFrequency = 440) {
@@ -238,8 +238,8 @@
               for (var i = 0; i < self._howls.length; i++) {
                 if (!self._howls[i]._webAudio) {
                   var ids = self._howls[i]._getSoundIds();
-                  for (var j = 0; j < ids.length; j++) {
-                    var sound = self._howls[i]._soundById(ids[j]);
+                  for (var j2 = 0; j2 < ids.length; j2++) {
+                    var sound = self._howls[i]._soundById(ids[j2]);
                     if (sound && sound._node) {
                       sound._node.volume = sound._volume * vol;
                     }
@@ -266,8 +266,8 @@
             for (var i = 0; i < self._howls.length; i++) {
               if (!self._howls[i]._webAudio) {
                 var ids = self._howls[i]._getSoundIds();
-                for (var j = 0; j < ids.length; j++) {
-                  var sound = self._howls[i]._soundById(ids[j]);
+                for (var j2 = 0; j2 < ids.length; j2++) {
+                  var sound = self._howls[i]._soundById(ids[j2]);
                   if (sound && sound._node) {
                     sound._node.muted = muted ? true : sound._muted;
                   }
@@ -353,7 +353,7 @@
             var audioTest = null;
             try {
               audioTest = typeof Audio !== "undefined" ? new Audio() : null;
-            } catch (err) {
+            } catch (err2) {
               return self;
             }
             if (!audioTest || typeof audioTest.canPlayType !== "function") {
@@ -417,8 +417,8 @@
               for (var i = 0; i < self._howls.length; i++) {
                 if (!self._howls[i]._webAudio) {
                   var ids = self._howls[i]._getSoundIds();
-                  for (var j = 0; j < ids.length; j++) {
-                    var sound = self._howls[i]._soundById(ids[j]);
+                  for (var j2 = 0; j2 < ids.length; j2++) {
+                    var sound = self._howls[i]._soundById(ids[j2]);
                     if (sound && sound._node && !sound._node._unlocked) {
                       sound._node._unlocked = true;
                       sound._node.load();
@@ -497,8 +497,8 @@
             }
             for (var i = 0; i < self._howls.length; i++) {
               if (self._howls[i]._webAudio) {
-                for (var j = 0; j < self._howls[i]._sounds.length; j++) {
-                  if (!self._howls[i]._sounds[j]._paused) {
+                for (var j2 = 0; j2 < self._howls[i]._sounds.length; j2++) {
+                  if (!self._howls[i]._sounds[j2]._paused) {
                     return self;
                   }
                 }
@@ -835,8 +835,8 @@
                     };
                     node.addEventListener("ended", self._endTimers[sound._id], false);
                   }
-                } catch (err) {
-                  self._emit("playerror", sound._id, err);
+                } catch (err2) {
+                  self._emit("playerror", sound._id, err2);
                 }
               };
               if (node.src === "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA") {
@@ -2014,15 +2014,15 @@
           }
           return self;
         };
-        HowlerGlobal.prototype.pos = function(x, y, z) {
+        HowlerGlobal.prototype.pos = function(x2, y2, z2) {
           var self = this;
           if (!self.ctx || !self.ctx.listener) {
             return self;
           }
-          y = typeof y !== "number" ? self._pos[1] : y;
-          z = typeof z !== "number" ? self._pos[2] : z;
-          if (typeof x === "number") {
-            self._pos = [x, y, z];
+          y2 = typeof y2 !== "number" ? self._pos[1] : y2;
+          z2 = typeof z2 !== "number" ? self._pos[2] : z2;
+          if (typeof x2 === "number") {
+            self._pos = [x2, y2, z2];
             if (typeof self.ctx.listener.positionX !== "undefined") {
               self.ctx.listener.positionX.setTargetAtTime(self._pos[0], Howler.ctx.currentTime, 0.1);
               self.ctx.listener.positionY.setTargetAtTime(self._pos[1], Howler.ctx.currentTime, 0.1);
@@ -2035,28 +2035,28 @@
           }
           return self;
         };
-        HowlerGlobal.prototype.orientation = function(x, y, z, xUp, yUp, zUp) {
+        HowlerGlobal.prototype.orientation = function(x2, y2, z2, xUp, yUp, zUp) {
           var self = this;
           if (!self.ctx || !self.ctx.listener) {
             return self;
           }
           var or = self._orientation;
-          y = typeof y !== "number" ? or[1] : y;
-          z = typeof z !== "number" ? or[2] : z;
+          y2 = typeof y2 !== "number" ? or[1] : y2;
+          z2 = typeof z2 !== "number" ? or[2] : z2;
           xUp = typeof xUp !== "number" ? or[3] : xUp;
           yUp = typeof yUp !== "number" ? or[4] : yUp;
           zUp = typeof zUp !== "number" ? or[5] : zUp;
-          if (typeof x === "number") {
-            self._orientation = [x, y, z, xUp, yUp, zUp];
+          if (typeof x2 === "number") {
+            self._orientation = [x2, y2, z2, xUp, yUp, zUp];
             if (typeof self.ctx.listener.forwardX !== "undefined") {
-              self.ctx.listener.forwardX.setTargetAtTime(x, Howler.ctx.currentTime, 0.1);
-              self.ctx.listener.forwardY.setTargetAtTime(y, Howler.ctx.currentTime, 0.1);
-              self.ctx.listener.forwardZ.setTargetAtTime(z, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardX.setTargetAtTime(x2, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardY.setTargetAtTime(y2, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardZ.setTargetAtTime(z2, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upX.setTargetAtTime(xUp, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upY.setTargetAtTime(yUp, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upZ.setTargetAtTime(zUp, Howler.ctx.currentTime, 0.1);
             } else {
-              self.ctx.listener.setOrientation(x, y, z, xUp, yUp, zUp);
+              self.ctx.listener.setOrientation(x2, y2, z2, xUp, yUp, zUp);
             }
           } else {
             return or;
@@ -2140,7 +2140,7 @@
           }
           return self;
         };
-        Howl.prototype.pos = function(x, y, z, id) {
+        Howl.prototype.pos = function(x2, y2, z2, id) {
           var self = this;
           if (!self._webAudio) {
             return self;
@@ -2149,16 +2149,16 @@
             self._queue.push({
               event: "pos",
               action: function() {
-                self.pos(x, y, z, id);
+                self.pos(x2, y2, z2, id);
               }
             });
             return self;
           }
-          y = typeof y !== "number" ? 0 : y;
-          z = typeof z !== "number" ? -0.5 : z;
+          y2 = typeof y2 !== "number" ? 0 : y2;
+          z2 = typeof z2 !== "number" ? -0.5 : z2;
           if (typeof id === "undefined") {
-            if (typeof x === "number") {
-              self._pos = [x, y, z];
+            if (typeof x2 === "number") {
+              self._pos = [x2, y2, z2];
             } else {
               return self._pos;
             }
@@ -2167,18 +2167,18 @@
           for (var i = 0; i < ids.length; i++) {
             var sound = self._soundById(ids[i]);
             if (sound) {
-              if (typeof x === "number") {
-                sound._pos = [x, y, z];
+              if (typeof x2 === "number") {
+                sound._pos = [x2, y2, z2];
                 if (sound._node) {
                   if (!sound._panner || sound._panner.pan) {
                     setupPanner(sound, "spatial");
                   }
                   if (typeof sound._panner.positionX !== "undefined") {
-                    sound._panner.positionX.setValueAtTime(x, Howler.ctx.currentTime);
-                    sound._panner.positionY.setValueAtTime(y, Howler.ctx.currentTime);
-                    sound._panner.positionZ.setValueAtTime(z, Howler.ctx.currentTime);
+                    sound._panner.positionX.setValueAtTime(x2, Howler.ctx.currentTime);
+                    sound._panner.positionY.setValueAtTime(y2, Howler.ctx.currentTime);
+                    sound._panner.positionZ.setValueAtTime(z2, Howler.ctx.currentTime);
                   } else {
-                    sound._panner.setPosition(x, y, z);
+                    sound._panner.setPosition(x2, y2, z2);
                   }
                 }
                 self._emit("pos", sound._id);
@@ -2189,7 +2189,7 @@
           }
           return self;
         };
-        Howl.prototype.orientation = function(x, y, z, id) {
+        Howl.prototype.orientation = function(x2, y2, z2, id) {
           var self = this;
           if (!self._webAudio) {
             return self;
@@ -2198,16 +2198,16 @@
             self._queue.push({
               event: "orientation",
               action: function() {
-                self.orientation(x, y, z, id);
+                self.orientation(x2, y2, z2, id);
               }
             });
             return self;
           }
-          y = typeof y !== "number" ? self._orientation[1] : y;
-          z = typeof z !== "number" ? self._orientation[2] : z;
+          y2 = typeof y2 !== "number" ? self._orientation[1] : y2;
+          z2 = typeof z2 !== "number" ? self._orientation[2] : z2;
           if (typeof id === "undefined") {
-            if (typeof x === "number") {
-              self._orientation = [x, y, z];
+            if (typeof x2 === "number") {
+              self._orientation = [x2, y2, z2];
             } else {
               return self._orientation;
             }
@@ -2216,8 +2216,8 @@
           for (var i = 0; i < ids.length; i++) {
             var sound = self._soundById(ids[i]);
             if (sound) {
-              if (typeof x === "number") {
-                sound._orientation = [x, y, z];
+              if (typeof x2 === "number") {
+                sound._orientation = [x2, y2, z2];
                 if (sound._node) {
                   if (!sound._panner) {
                     if (!sound._pos) {
@@ -2226,11 +2226,11 @@
                     setupPanner(sound, "spatial");
                   }
                   if (typeof sound._panner.orientationX !== "undefined") {
-                    sound._panner.orientationX.setValueAtTime(x, Howler.ctx.currentTime);
-                    sound._panner.orientationY.setValueAtTime(y, Howler.ctx.currentTime);
-                    sound._panner.orientationZ.setValueAtTime(z, Howler.ctx.currentTime);
+                    sound._panner.orientationX.setValueAtTime(x2, Howler.ctx.currentTime);
+                    sound._panner.orientationY.setValueAtTime(y2, Howler.ctx.currentTime);
+                    sound._panner.orientationZ.setValueAtTime(z2, Howler.ctx.currentTime);
                   } else {
-                    sound._panner.setOrientation(x, y, z);
+                    sound._panner.setOrientation(x2, y2, z2);
                   }
                 }
                 self._emit("orientation", sound._id);
@@ -8514,11 +8514,11 @@
     sleep_spot: "drop"
   };
   var USE_SFX = { eat: "eat", drink: "drink", boil: "drink", wear: "drop" };
-  function sfxFor(kind, a, b) {
+  function sfxFor(kind, a, b2) {
     if (kind === "take") return "pickup";
     if (kind === "takeall") return "takeall";
     if (kind === "drop") return "drop";
-    if (kind === "use") return USE_SFX[b] || "click";
+    if (kind === "use") return USE_SFX[b2] || "click";
     if (kind === "action") return ACTION_SFX[a] || null;
     return null;
   }
@@ -8543,8 +8543,8 @@
   }
   var SOUND_DEFAULTS = { volume: 0.7, mute: false };
   function cleanSettings(s) {
-    const v = Number(s?.volume);
-    return { volume: Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : SOUND_DEFAULTS.volume, mute: !!s?.mute };
+    const v2 = Number(s?.volume);
+    return { volume: Number.isFinite(v2) ? Math.min(1, Math.max(0, v2)) : SOUND_DEFAULTS.volume, mute: !!s?.mute };
   }
 
   // src/ui/sound.js
@@ -8622,23 +8622,23 @@
     }
     const p = SFX[name];
     if (!p) return;
-    let v = variants[name];
-    if (!v) v = variants[name] = [];
-    if (v.length < 3) {
+    let v2 = variants[name];
+    if (!v2) v2 = variants[name] = [];
+    if (v2.length < 3) {
       const s = A.ZZFX.buildSamples(...p);
-      const b = A.ctx.createBuffer(1, s.length, A.ctx.sampleRate);
-      b.getChannelData(0).set(s);
-      v.push(b);
+      const b2 = A.ctx.createBuffer(1, s.length, A.ctx.sampleRate);
+      b2.getChannelData(0).set(s);
+      v2.push(b2);
     }
     const src = A.ctx.createBufferSource();
-    src.buffer = v[Math.floor(Math.random() * v.length)];
+    src.buffer = v2[Math.floor(Math.random() * v2.length)];
     const g = A.ctx.createGain();
     g.gain.value = 0.6 * gain;
     src.connect(g).connect(A.Howler.masterGain);
     src.start();
   }
-  function soundForAction(kind, a, b) {
-    const n = sfxFor(kind, a, b);
+  function soundForAction(kind, a, b2) {
+    const n = sfxFor(kind, a, b2);
     if (n) playSfx(n);
   }
   var hitTimer = null;
@@ -8648,12 +8648,12 @@
     if (!A) return;
     const lv = ambience(scene, where);
     for (const name of LOOPS) {
-      const L = A.loops[name];
+      const L2 = A.loops[name];
       const to = lv[name] || 0;
-      if (Math.abs(to - L.level) < 0.01) continue;
-      if (to > 0 && !L.howl.playing()) L.howl.play();
-      L.howl.fade(L.level, to, 1500);
-      L.level = to;
+      if (Math.abs(to - L2.level) < 0.01) continue;
+      if (to > 0 && !L2.howl.playing()) L2.howl.play();
+      L2.howl.fade(L2.level, to, 1500);
+      L2.level = to;
     }
     const every = rainHitEvery(scene, where.inside);
     clearTimeout(hitTimer);
@@ -8669,86 +8669,86 @@
     const sec = { rain: 6, wind: 8, fire: 6, hum: 2, crows: 12 }[name];
     const n = Math.round(rate * sec);
     const fade = Math.round(rate * 0.5);
-    const x = new Float32Array(n + fade);
+    const x2 = new Float32Array(n + fade);
     let r = 12345 + name.length * 77;
     const rnd = () => {
       r = r * 1103515245 + 12345 & 2147483647;
       return r / 2147483647;
     };
-    const L = x.length;
+    const L2 = x2.length;
     if (name === "rain") {
       let lp = 0;
-      for (let i = 0; i < L; i++) {
+      for (let i = 0; i < L2; i++) {
         lp += 0.45 * (rnd() * 2 - 1 - lp);
-        x[i] = lp * 0.45;
+        x2[i] = lp * 0.45;
       }
       for (let k = 0; k < sec * 40; k++) {
-        const at = Math.floor(rnd() * (L - 400));
+        const at = Math.floor(rnd() * (L2 - 400));
         const amp = 0.1 + rnd() * 0.2;
-        for (let j = 0; j < 300; j++) x[at + j] += (rnd() * 2 - 1) * amp * Math.exp(-j / 50);
+        for (let j2 = 0; j2 < 300; j2++) x2[at + j2] += (rnd() * 2 - 1) * amp * Math.exp(-j2 / 50);
       }
     } else if (name === "wind") {
-      let b = 0;
-      for (let i = 0; i < L; i++) {
-        b = 0.995 * b + 0.05 * (rnd() * 2 - 1);
+      let b2 = 0;
+      for (let i = 0; i < L2; i++) {
+        b2 = 0.995 * b2 + 0.05 * (rnd() * 2 - 1);
         const t = i / n;
         const gust = 0.45 + 0.3 * Math.sin(2 * Math.PI * t) + 0.2 * Math.sin(2 * Math.PI * 3 * t + 1);
-        x[i] = b * gust * 1.6;
+        x2[i] = b2 * gust * 1.6;
       }
     } else if (name === "fire") {
-      let b = 0;
-      for (let i = 0; i < L; i++) {
-        b = 0.99 * b + 0.03 * (rnd() * 2 - 1);
-        x[i] = b * 0.9;
+      let b2 = 0;
+      for (let i = 0; i < L2; i++) {
+        b2 = 0.99 * b2 + 0.03 * (rnd() * 2 - 1);
+        x2[i] = b2 * 0.9;
       }
       for (let k = 0; k < sec * 9; k++) {
-        const at = Math.floor(rnd() * (L - 900));
+        const at = Math.floor(rnd() * (L2 - 900));
         const amp = 0.15 + rnd() * 0.35;
-        for (let j = 0; j < 800; j++) x[at + j] += (rnd() * 2 - 1) * amp * Math.exp(-j / (40 + rnd() * 80));
+        for (let j2 = 0; j2 < 800; j2++) x2[at + j2] += (rnd() * 2 - 1) * amp * Math.exp(-j2 / (40 + rnd() * 80));
       }
     } else if (name === "hum") {
-      for (let i = 0; i < L; i++) {
+      for (let i = 0; i < L2; i++) {
         const t = i / rate;
-        x[i] = 0.35 * Math.sin(2 * Math.PI * 60 * t) + 0.18 * Math.sin(2 * Math.PI * 120 * t) + 0.06 * Math.sin(2 * Math.PI * 180 * t) + 0.01 * (rnd() * 2 - 1);
+        x2[i] = 0.35 * Math.sin(2 * Math.PI * 60 * t) + 0.18 * Math.sin(2 * Math.PI * 120 * t) + 0.06 * Math.sin(2 * Math.PI * 180 * t) + 0.01 * (rnd() * 2 - 1);
       }
     } else if (name === "crows") {
       const caw = [0.5, 0.1, 520, 0.02, 0.12, 0.12, 2, 3, -6, 0, 0, 0, 0, 0.8, 0, 0.15, 0, 0.6, 0.03, 0, 1600];
       for (const at of [0.8, 1.4, 6.5, 7, 7.5]) {
         const s = ZZFX2.buildSamples(...caw);
         const o = Math.floor(at * rate);
-        for (let j = 0; j < s.length && o + j < L; j++) x[o + j] += s[j] * 0.6;
+        for (let j2 = 0; j2 < s.length && o + j2 < L2; j2++) x2[o + j2] += s[j2] * 0.6;
       }
     }
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       if (i < fade) {
         const t = i / fade;
-        out[i] = x[i] * t + x[n + i] * (1 - t);
-      } else out[i] = x[i];
+        out[i] = x2[i] * t + x2[n + i] * (1 - t);
+      } else out[i] = x2[i];
     }
     for (let i = 0; i < n; i++) out[i] = Math.max(-1, Math.min(1, out[i]));
     return out;
   }
   function wavUrl(s, rate) {
     const buf = new ArrayBuffer(44 + s.length * 2);
-    const d = new DataView(buf);
+    const d2 = new DataView(buf);
     const str = (o, t) => {
-      for (let i = 0; i < t.length; i++) d.setUint8(o + i, t.charCodeAt(i));
+      for (let i = 0; i < t.length; i++) d2.setUint8(o + i, t.charCodeAt(i));
     };
     str(0, "RIFF");
-    d.setUint32(4, 36 + s.length * 2, true);
+    d2.setUint32(4, 36 + s.length * 2, true);
     str(8, "WAVE");
     str(12, "fmt ");
-    d.setUint32(16, 16, true);
-    d.setUint16(20, 1, true);
-    d.setUint16(22, 1, true);
-    d.setUint32(24, rate, true);
-    d.setUint32(28, rate * 2, true);
-    d.setUint16(32, 2, true);
-    d.setUint16(34, 16, true);
+    d2.setUint32(16, 16, true);
+    d2.setUint16(20, 1, true);
+    d2.setUint16(22, 1, true);
+    d2.setUint32(24, rate, true);
+    d2.setUint32(28, rate * 2, true);
+    d2.setUint16(32, 2, true);
+    d2.setUint16(34, 16, true);
     str(36, "data");
-    d.setUint32(40, s.length * 2, true);
-    for (let i = 0; i < s.length; i++) d.setInt16(44 + i * 2, Math.round(s[i] * 32767), true);
+    d2.setUint32(40, s.length * 2, true);
+    for (let i = 0; i < s.length; i++) d2.setInt16(44 + i * 2, Math.round(s[i] * 32767), true);
     return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
 
@@ -10066,7 +10066,7 @@
     let r = new AbortController();
     return o(t, r).then((n) => e(void 0, n.data, n.cacheControl || "", n.expires || ""), (n) => e(n)).catch((n) => e(n)), { cancel: d(() => r.abort(), "cancel") };
   }, "v3compat");
-  var A = class A2 {
+  var A2 = class A3 {
     constructor(t) {
       this.tilev4 = d((t2, e) => h2(this, null, function* () {
         if (t2.type === "json") {
@@ -10101,8 +10101,8 @@
       return this.tiles.get(t);
     }
   };
-  d(A, "Protocol");
-  var B = A;
+  d(A2, "Protocol");
+  var B = A2;
   function b(o, t) {
     return (t >>> 0) * 4294967296 + (o >>> 0);
   }
@@ -11192,6 +11192,7 @@
   function act(kind, a, b2, c) {
     const wasDead = !!state.dead;
     perform(state, kind, a, b2, c);
+    soundForAction(kind, a, b2);
     afterAction2();
     if (!wasDead && state.dead) recordRun(state);
     commit();
@@ -11212,13 +11213,13 @@
   function updateSound() {
     const loc = state.location || {};
     const home = loc.kind === "home";
-    const h2 = state.home || {};
+    const h3 = state.home || {};
     const scene = sceneEnv(state);
     setAmbience(scene, {
       inside: home || document.body.classList.contains("inside-open"),
       home,
-      fire: (h2.fireHours || 0) > 0,
-      electric: !!h2.heaterOn || built(state, "led_lights") && scene.daylight < 0.3 && (h2.battery || 0) > 0.2
+      fire: (h3.fireHours || 0) > 0,
+      electric: !!h3.heaterOn || built(state, "led_lights") && scene.daylight < 0.3 && (h3.battery || 0) > 0.2
     });
   }
   function renderHud() {
@@ -12005,6 +12006,9 @@
       m.querySelector("#fxToggle").addEventListener("change", (e) => {
         if (fx) fx.setEnabled(e.target.checked);
       });
+      m.querySelector("#sndMute").addEventListener("change", (e) => setSoundSettings({ mute: e.target.checked }));
+      m.querySelector("#sndVol").addEventListener("input", (e) => setSoundSettings({ volume: Number(e.target.value) / 100 }));
+      m.querySelector("#sndVol").addEventListener("change", () => playSfx("pickup"));
       m.querySelectorAll("[data-q]").forEach((b2) => b2.addEventListener("click", () => {
         setQualityChoice(b2.dataset.q);
         m.querySelectorAll("[data-q]").forEach((x2) => {
@@ -12204,6 +12208,7 @@
         perform(state, "action", "pickup", pid);
         if (!wasDead && state.dead) recordRun(state);
         const ok = !buildingItems(state).some((x2) => x2.pid === pid);
+        if (ok) playSfx("pickup");
         saveGame(state);
         render();
         const msgs = state.log.slice(n0).filter((e) => e.kind !== "info" || !ok).map((e) => e.text).join(" ");
@@ -12622,7 +12627,7 @@
 
   // src/dev/loader.js
   var state2 = "off";
-  function load() {
+  function load2() {
     if (state2 !== "off") return;
     state2 = "loading";
     const s = document.createElement("script");
@@ -12638,10 +12643,10 @@
   }
   function initDevLoader() {
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(location.search).get("dev") === "1") load();
+    if (new URLSearchParams(location.search).get("dev") === "1") load2();
     window.addEventListener("keydown", (e) => {
       if (e.code !== "F3" && e.code !== "Backquote") return;
-      if (state2 === "off") load();
+      if (state2 === "off") load2();
       else if (state2 === "on" && window.LLDev) window.LLDev.toggle();
     }, true);
   }
