@@ -1208,6 +1208,25 @@ const ITEM_BUILDERS = {
     const color = pick(r, ['#e8b81b', '#d8501c', '#1d5fa8', '#2f6a3a']);
     const shell = tmat(texNylon(color, 'rain'), 0.3, 0.05);
     jacketLaid(g, shell, tmat(texNylon(shade(color, -0.3), 'raincuff'), 0.4), { th: 0.035, sleeveR: 0.05, color, rain: true });
+    if (FINE) {
+      const th = 0.035, cuffM = tmat(texNylon(shade(color, -0.3), 'raincuff'), 0.4);
+      // storm flap over the zipper, with snaps
+      add(g, gBox(0.035, 0.003, 0.5), shell, 0.025, th, 0.03);
+      for (let i = 0; i < 8; i++) add(g, gCyl(0.006, 0.006, 0.003, 8), M.steel, 0.025, th + 0.003, -0.18 + i * 0.065);
+      for (const s of [-1, 1]) {
+        add(g, gBox(0.13, 0.004, 0.035), shell, s * 0.11, th, 0.1, 0, s * 0.5, 0); // pocket flap
+        add(g, gBox(0.008, 0.003, 0.02), M.blackPl, s * 0.15, th + 0.004, 0.13); // pocket zip pull
+        add(g, gBox(0.03, 0.004, 0.022), cuffM, s * 0.43, th * 0.95, 0.19); // cuff tab
+        add(g, gBox(0.09, 0.002, 0.012), M.whitePl, s * 0.38, th * 0.98, 0.0, 0, s * -0.4, 0); // reflective strip
+        add(g, gBox(0.16, 0.002, 0.006), cuffM, s * 0.13, th + 0.0005, -0.19, 0, s * 0.25, 0); // shoulder seam
+        add(g, gCyl(0.008, 0.008, 0.014, 8), M.blackPl, s * 0.16, th * 0.6, 0.31); // hem cord toggle
+        add(g, gBox(0.07, 0.002, 0.06), shell, s * 0.4, th * 0.98, -0.05, 0, s * -0.3, 0); // elbow patch
+      }
+      add(g, gBox(0.42, 0.006, 0.02), cuffM, 0, th * 0.9, 0.29); // hem band
+      add(g, gBox(0.2, 0.004, 0.03), cuffM, 0, th * 1.05, -0.375); // hood brim
+      add(g, gTorus(0.012, 0.002, 4, 8), cuffM, 0, th, -0.15, Math.PI / 2); // hanger loop
+      add(g, gBox(0.04, 0.002, 0.03), cuffM, -0.1, th + 0.001, -0.08); // chest patch
+    }
   },
   firewood(g, r) {
     const bark = tmat(texBark(), 0.95);
@@ -1216,15 +1235,29 @@ const ITEM_BUILDERS = {
     const L = 0.4;
     const rows = [3, 3, 2];
     let k = 0;
+    const logs = [];
     rows.forEach((n, row) => {
       for (let c = 0; c < n; c++, k++) {
         const rad = 0.048 + r() * 0.012;
         const x = (c - (n - 1) / 2) * 0.095 + (r() - 0.5) * 0.012;
-        add(g, gCyl(rad, rad, L + (r() - 0.5) * 0.04, r() < 0.5 ? 3 : 4), [r() < 0.45 ? split : bark, end, end], x, 0.045 + row * 0.078, -L / 2 + (r() - 0.5) * 0.03, Math.PI / 2, r() * TAU, 0);
+        logs.push(add(g, gCyl(rad, rad, L + (r() - 0.5) * 0.04, r() < 0.5 ? 3 : 4), [r() < 0.45 ? split : bark, end, end], x, 0.045 + row * 0.078, -L / 2 + (r() - 0.5) * 0.03, Math.PI / 2, r() * TAU, 0));
       }
     });
     for (const z of [-0.12, 0.12]) add(g, gTorus(0.16, 0.004, 4, 20), col(0xc8b080, 0.9), 0, 0.12, z, 0, 0, 0, 1, 0.85, 1);
     add(g, gBox(0.1, 0.001, 0.07), tmat(sleeveTex({ t: 'FIREWOOD', s: 'KILN DRIED  0.75 CU FT', b: '#f4f1ea', f: '#5a2a0a', a: '#2f7a32' }), 0.8), 0, 0.255, 0);
+    if (FINE) {
+      // radial splits on both log ends, a twine knot and loose ends
+      const crack = col(0x4a3020, 0.9);
+      logs.forEach((m) => {
+        const p = m.position, len = m.geometry.parameters.height, rad = m.geometry.parameters.radiusTop;
+        for (const zz of [p.z - 0.0006, p.z + len + 0.0006]) add(g, gBox(rad * 1.3, 0.003, 0.002), crack, p.x, p.y - 0.0015, zz, 0, 0, m.rotation.y);
+      });
+      const tw = col(0xc8b080, 0.9);
+      for (const z of [-0.12, 0.12]) {
+        add(g, gSphere(0.012, 6, 4), tw, 0, 0.257, z, 0, 0, 0, 1.3, 0.8, 1);
+        add(g, gCyl(0.003, 0.003, 0.05, 4), tw, 0.008, 0.255, z, 0, 0, -1.1);
+      }
+    }
   },
   propane_1lb(g) {
     const green = col(0x2f7a32, 0.4, 0.2);
@@ -1233,6 +1266,15 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.014, 0.016, 0.02, 12), M.brass, 0, 0.205, 0);
     add(g, gCyl(0.008, 0.008, 0.012, 8), M.brass, 0, 0.225, 0);
     add(g, gCyl(0.052, 0.052, 0.012, 18, true), col(0x1d4a20, 0.6), 0, 0, 0);
+    if (FINE) {
+      for (let i = 0; i < 3; i++) add(g, gTorus(0.0145, 0.0015, 4, 12), M.brass, 0, 0.208 + i * 0.004, 0, Math.PI / 2); // valve threads
+      add(g, gTorus(0.0545, 0.0025, 3, 16), green, 0, 0.163, 0, Math.PI / 2); // shoulder seam
+      add(g, gTorus(0.0555, 0.002, 3, 16), green, 0, 0.012, 0, Math.PI / 2); // bottom seam
+      add(g, gTorus(0.053, 0.002, 3, 16), green, 0, 0.004, 0, Math.PI / 2); // foot crimp
+      add(g, gCyl(0.004, 0.004, 0.008, 8), M.brass, 0.022, 0.194, 0, 0, 0, -0.9); // relief valve
+      add(g, gCyl(0.003, 0.003, 0.004, 6), M.steel, 0, 0.237, 0); // valve pin
+      add(g, gBox(0.002, 0.13, 0.003), green, 0, 0.025, -0.0565); // weld seam
+    }
   },
   waxed_cheese(g, r) {
     // a round of hard cheese in red wax, one wedge cut (stylized)
@@ -1240,6 +1282,13 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.07, 0.07, 0.06, 20), wax, 0, 0, 0);
     add(g, gCyl(0.071, 0.071, 0.004, 20), col(0x7a1410, 0.4), 0, 0.058, 0);
     add(g, gBox(0.07, 0.003, 0.05), tmat(frontTex({ t: 'AGED CHEDDAR', s: 'WAXED  KEEP COOL', b: '#f4ecd2', f: '#7a1410', a: '#c4221c' }, 256, 160), 0.7), 0, 0.062, 0);
+    if (FINE) {
+      for (let i = 0; i < 3; i++) { const a = 0.8 + i * 2.1; add(g, gSphere(0.008, 6, 4), wax, Math.cos(a) * 0.069, 0.05, Math.sin(a) * 0.069, 0, -a, 0, 0.6, 1.6, 1); } // wax drips
+      const str = col(0xe8e2d0, 0.9);
+      add(g, gTorus(0.0712, 0.0012, 3, 16), str, 0, 0.03, 0, Math.PI / 2); // pull string
+      add(g, gBox(0.002, 0.02, 0.012), str, 0.072, 0.012, 0); // pull tab
+      add(g, gTorus(0.068, 0.002, 3, 16), wax, 0, 0.0585, 0, Math.PI / 2); // rim bead
+    }
   },
   gas_can(g) {
     // red plastic 1 gal can with a spout
@@ -1249,6 +1298,13 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.014, 0.018, 0.12, 10), col(0x1d1e20, 0.5), 0.06, 0.21, 0, 0, 0, -0.7);
     add(g, gCyl(0.022, 0.022, 0.02, 12), M.blackPl, 0.06, 0.205, 0);
     add(g, gBox(0.12, 0.09, 0.002), tmat(frontTex({ t: 'GASOLINE', s: '1 GAL  SAFETY CAN', n: 'FLAMMABLE  KEEP AWAY FROM FLAME', b: '#f1c21b', f: '#111', a: '#c8281e', p: 'flame' }, 256, 192), 0.6), 0, 0.06, 0.061);
+    if (FINE) {
+      for (const t of [0.03, 0.06, 0.09]) add(g, gCyl(0.02, 0.02, 0.006, 10), col(0x1d1e20, 0.5), 0.06 + 0.644 * t, 0.21 + 0.765 * t, 0, 0, 0, -0.7); // spout ribs
+      add(g, gCyl(0.01, 0.01, 0.012, 10), M.blackPl, -0.07, 0.22, 0); // vent cap
+      add(g, gTube('dBcantether', [[0.04, 0.21, 0.02], [0.02, 0.225, 0.035], [-0.01, 0.222, 0.03]], 0.002, 8, 4), M.blackPl);
+      for (const y of [0.165, 0.185]) add(g, gBox(0.16, 0.006, 0.004), red, 0, y, 0.06); // molded ribs
+      for (const y of [0.08, 0.14]) add(g, gBox(0.16, 0.006, 0.004), red, 0, y, -0.06);
+    }
   },
   broken_radio(g) {
     // clock radio with a cracked face and a cut cord
@@ -1256,22 +1312,51 @@ const ITEM_BUILDERS = {
     add(g, gBox(0.08, 0.035, 0.002), col(0x3a1010, 0.3), -0.04, 0.025, 0.051);
     add(g, gCyl(0.025, 0.025, 0.004, 14), col(0x55585c, 0.6), 0.05, 0.04, 0.051, Math.PI / 2, 0, 0);
     add(g, gCyl(0.003, 0.003, 0.25, 4), col(0x111111, 0.6), -0.2, 0.004, -0.03, 0, 0, Math.PI / 2);
+    if (FINE) {
+      for (let i = 0; i < 4; i++) add(g, gBox(0.025, 0.006, 0.015), col(0x55585c, 0.6), -0.075 + i * 0.03, 0.078, -0.02); // top buttons
+      add(g, gTorus(0.025, 0.003, 4, 14), col(0x55585c, 0.6), 0.05, 0.04, 0.053); // speaker ring
+      add(g, gCyl(0.012, 0.012, 0.008, 10), col(0x55585c, 0.6), 0.098, 0.04, 0, 0, 0, -Math.PI / 2); // tuning knob
+      for (let i = 0; i < 3; i++) add(g, gCyl(0.0012, 0.0012, 0.012, 4), M.brass, -0.448, 0.004, -0.03, 0, (i - 1) * 0.5, Math.PI / 2 + (i - 1) * 0.3); // frayed wires
+    }
   },
   old_toaster(g) {
     add(g, gRBox(0.26, 0.17, 0.14, 0.04), M.chrome);
     for (const z of [-0.025, 0.025]) add(g, gBox(0.18, 0.004, 0.022), col(0x111111, 0.6), 0, 0.17, z);
     add(g, gBox(0.02, 0.04, 0.02), col(0x1d1d1d, 0.5), 0.14, 0.09, 0);
+    if (FINE) {
+      for (const x of [-0.1, 0.1]) for (const z of [-0.05, 0.05]) add(g, gCyl(0.012, 0.014, 0.01, 8), col(0x1d1d1d, 0.5), x, -0.008, z); // feet
+      add(g, gCyl(0.012, 0.012, 0.012, 10), col(0x1d1d1d, 0.5), 0.13, 0.04, 0.035, 0, 0, -Math.PI / 2); // shade dial
+      add(g, gBox(0.004, 0.1, 0.012), col(0x111111, 0.6), 0.131, 0.045, 0); // lever slot
+      add(g, gBox(0.06, 0.008, 0.012), col(0x1d1d1d, 0.5), 0, 0.01, 0.068); // crumb tray tab
+      for (const z of [-0.025, 0.025]) add(g, gBox(0.19, 0.003, 0.032), M.chrome, 0, 0.1695, z); // slot rims
+    }
   },
   desk_lamp(g) {
     const c = col(0x2e5f8a, 0.45, 0.2);
     add(g, gCyl(0.07, 0.08, 0.02, 16), c);
     add(g, gCyl(0.008, 0.008, 0.28, 8), M.chrome, 0, 0.02, 0, 0, 0, 0.35);
     add(g, gCyl(0.035, 0.07, 0.09, 14, true), c, -0.12, 0.2, 0, 0, 0, -1.2);
+    if (FINE) {
+      add(g, gSphere(0.014, 6, 4), c, -0.096, 0.283, 0); // elbow joint
+      add(g, gSphere(0.014, 6, 4), c, 0, 0.025, 0); // base joint
+      add(g, gCyl(0.004, 0.004, 0.034, 6), c, -0.096, 0.283, -0.017, Math.PI / 2); // joint screw
+      add(g, gSphere(0.025, 6, 5), col(0xfff4d0, 0.3), -0.101, 0.207, 0); // bulb
+      dB_orient(add(g, gTorus(0.07, 0.004, 4, 16), c, -0.12, 0.2, 0), [0.932, 0.362, 0], [0, 0, 1]); // shade rim
+      add(g, gBox(0.02, 0.008, 0.012), c, 0.04, 0.02, 0); // switch
+      add(g, gTube('dBlampcord', [[0, 0.01, -0.07], [0.02, 0.005, -0.12], [0.08, 0.004, -0.15]], 0.003, 8, 4), c);
+    }
   },
   extension_cord(g) {
     const o = col(0xe08a1e, 0.6);
     for (let i = 0; i < 3; i++) add(g, gTorus(0.09 - i * 0.004, 0.008, 6, 20), o, 0, 0.008 + i * 0.012, 0, Math.PI / 2, 0, 0);
     add(g, gBox(0.04, 0.025, 0.03), o, 0.11, 0, 0.02);
+    if (FINE) {
+      for (let i = 0; i < 3; i++) add(g, gBox(0.004, 0.001, 0.008), M.brass, 0.098 + i * 0.012, 0.025, 0.02); // outlet slots
+      add(g, gTube('dBcordtail', [[-0.09, 0.01, 0.0], [-0.13, 0.006, 0.05], [-0.15, 0.006, 0.1]], 0.008, 8, 5), o);
+      add(g, gBox(0.03, 0.02, 0.035), o, -0.15, 0, 0.115); // plug
+      for (const x of [-0.156, -0.144]) add(g, gBox(0.002, 0.012, 0.012), M.brass, x, 0.004, 0.138); // prongs
+      add(g, gCyl(0.009, 0.011, 0.02, 8), o, 0.09, 0.0125, 0.02, 0, 0, Math.PI / 2); // strain relief
+    }
   },
   wooden_chair(g) {
     const w = col(0x8a5a32, 0.65);
@@ -1279,11 +1364,30 @@ const ITEM_BUILDERS = {
     for (const x of [-0.18, 0.18]) for (const z of [-0.17, 0.17]) add(g, gBox(0.035, 0.44, 0.035), w, x, 0, z);
     for (const x of [-0.18, 0.18]) add(g, gBox(0.035, 0.46, 0.035), w, x, 0.48, -0.17);
     add(g, gBox(0.4, 0.12, 0.025), w, 0, 0.78, -0.17);
+    if (FINE) {
+      for (const x of [-0.18, 0.18]) add(g, gBox(0.02, 0.025, 0.32), w, x, 0.12, 0); // side stretchers
+      add(g, gBox(0.33, 0.025, 0.02), w, 0, 0.18, 0.17); // front stretcher
+      add(g, gBox(0.33, 0.025, 0.02), w, 0, 0.12, -0.17); // back stretcher
+      for (const x of [-0.08, 0, 0.08]) add(g, gCyl(0.009, 0.009, 0.3, 8), w, x, 0.48, -0.17); // spindles
+      add(g, gBox(0.33, 0.03, 0.02), w, 0, 0.48, -0.17); // lower back rail
+      add(g, gBox(0.38, 0.05, 0.02), w, 0, 0.39, 0.18); // seat apron
+      for (const x of [-0.18, 0.18]) for (const z of [-0.17, 0.17]) add(g, gCyl(0.02, 0.02, 0.006, 8), M.rubber, x, 0, z); // felt pads
+    }
   },
   garden_hose(g) {
     const gr = col(0x2f7a3a, 0.55);
     for (let i = 0; i < 4; i++) add(g, gTorus(0.16 - i * 0.012, 0.012, 6, 24), gr, 0, 0.012 + i * 0.014, 0, Math.PI / 2, 0, 0);
     add(g, gCyl(0.016, 0.016, 0.04, 10), col(0xc9a23a, 0.35, 0.6), 0.17, 0.01, 0, 0, 0, Math.PI / 2);
+    if (FINE) {
+      for (const x of [0.145, 0.16]) add(g, gTorus(0.017, 0.002, 4, 10), col(0xc9a23a, 0.35, 0.6), x, 0.01, 0, 0, Math.PI / 2); // knurl rings
+      add(g, gTube('dBhosetail', [[-0.16, 0.012, 0], [-0.22, 0.012, 0.08], [-0.2, 0.016, 0.18]], 0.012, 10, 6), gr);
+      add(g, gTorus(0.014, 0.003, 4, 10), col(0xc9a23a, 0.35, 0.6), -0.2, 0.016, 0.175); // clamp
+      add(g, gCyl(0.014, 0.018, 0.06, 10), M.blackPl, -0.2, 0.016, 0.18, Math.PI / 2); // nozzle
+      add(g, gCyl(0.008, 0.01, 0.015, 8), col(0xc9a23a, 0.35, 0.6), -0.2, 0.016, 0.24, Math.PI / 2); // nozzle tip
+      add(g, gBox(0.02, 0.012, 0.05), M.blackPl, -0.2, 0.0, 0.15); // grip
+      add(g, gBox(0.012, 0.008, 0.02), M.blackPl, -0.2, 0.012, 0.16); // trigger
+      add(g, gTorus(0.018, 0.003, 4, 10), col(0xc9a23a, 0.35, 0.6), -0.2, 0.016, 0.24); // nozzle washer
+    }
   },
   broken_bike(g) {
     // lying on its side: two wheels, a frame, bent handlebars
@@ -1292,6 +1396,17 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.018, 0.018, 0.75, 8), frame, 0.38, 0.05, 0, 0, 0, Math.PI / 2);
     add(g, gCyl(0.018, 0.018, 0.5, 8), frame, 0.1, 0.05, 0.05, 0, 0.6, Math.PI / 2);
     add(g, gCyl(0.012, 0.012, 0.45, 8), M.chrome, 0.5, 0.06, 0.2, Math.PI / 2, 0, 0.3);
+    if (FINE) {
+      for (const x of [-0.5, 0.5]) {
+        add(g, gCyl(0.03, 0.03, 0.04, 10), M.chrome, x, 0.0, 0); // hub
+        for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3 + (x > 0 ? 0.3 : 0); const d = [Math.cos(a), 0, Math.sin(a)]; dB_orient(add(g, gCyl(0.003, 0.003, 0.64, 4), M.chrome, x - d[0] * 0.32, 0.02, -d[2] * 0.32), d); } // spokes
+      }
+      add(g, gRBox(0.12, 0.04, 0.06, 0.015), col(0x1b1b1b, 0.7), -0.3, 0.02, 0.14); // seat
+      add(g, gCyl(0.01, 0.01, 0.12, 8), M.chrome, -0.3, 0.05, 0.0, Math.PI / 2); // seat post
+      add(g, gCyl(0.05, 0.05, 0.01, 12), M.chrome, -0.05, 0.04, 0); // chain ring
+      add(g, gBox(0.015, 0.01, 0.12), M.chrome, -0.05, 0.03, 0.06); // crank arm
+      add(g, gBox(0.08, 0.015, 0.04), col(0x1b1b1b, 0.7), -0.05, 0.0, 0.12); // pedal
+    }
   },
   fishing_rod(g) {
     // two-piece rod lying down: cork grip, reel, thin blank, tip guide
@@ -1301,12 +1416,29 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.028, 0.028, 0.03, 14), col(0x2b2d30, 0.4, 0.4), 0.31, 0.03, 0, 0, 0, 0);
     add(g, gCyl(0.02, 0.02, 0.032, 12), M.chrome, 0.31, 0.03, 0, 0, 0, 0);
     for (const x of [0.05, -0.15, -0.33]) add(g, gTorus(0.008, 0.0015, 4, 10), M.chrome, x, 0.026, 0, 0, H, 0);
+    if (FINE) {
+      const thread = col(0xc9a23a, 0.5);
+      for (const x of [0.15, -0.24, -0.43]) add(g, gTorus(0.008, 0.0015, 4, 10), M.chrome, x, 0.026, 0, 0, H, 0); // more guides
+      for (const x of [0.15, 0.05, -0.15, -0.24, -0.33, -0.43]) { const rr = 0.004 + 0.005 * (x + 0.5) / 0.72; add(g, gCyl(rr + 0.0015, rr + 0.0015, 0.012, 6), thread, x + 0.006, 0.014, 0, 0, 0, H); } // guide wraps
+      add(g, gBox(0.006, 0.006, 0.03), col(0x2b2d30, 0.4, 0.4), 0.31, 0.045, 0.028); // crank arm
+      add(g, gCyl(0.005, 0.005, 0.012, 8), col(0x2b2d30, 0.4, 0.4), 0.31, 0.042, 0.052, Math.PI / 2); // crank knob
+      add(g, gBox(0.03, 0.016, 0.008), col(0x2b2d30, 0.4, 0.4), 0.31, 0.014, 0); // reel foot
+      add(g, gCyl(0.0145, 0.0145, 0.012, 10), col(0x2b2d30, 0.4, 0.4), 0.432, 0.014, 0, 0, 0, H); // butt cap
+      add(g, gTorus(0.004, 0.001, 3, 8), M.chrome, 0.2, 0.02, 0, 0, H, 0); // hook keeper
+    }
   },
   fishing_line(g) {
     // small clear tackle box with a spool of line and a card of hooks
     add(g, gRBox(0.12, 0.03, 0.08, 0.008), mat('tackle', { color: 0x9fc6d8, roughness: 0.2, transparent: true, opacity: 0.55 }));
     add(g, gCyl(0.025, 0.025, 0.02, 14), col(0x3fae6a, 0.4), -0.025, 0.004, 0);
     add(g, gBox(0.035, 0.002, 0.05), col(0xe8e4da, 0.8), 0.03, 0.006, 0);
+    if (FINE) {
+      add(g, gCyl(0.008, 0.008, 0.021, 10), col(0xe8e4da, 0.8), -0.025, 0.004, 0); // spool hub
+      add(g, gBox(0.002, 0.026, 0.076), mat('tackle', { color: 0x9fc6d8, roughness: 0.2, transparent: true, opacity: 0.55 }), 0.005, 0.002, 0); // divider
+      add(g, gBox(0.02, 0.012, 0.004), col(0xe8e4da, 0.8), 0, 0.012, 0.041); // latch
+      add(g, gCyl(0.003, 0.003, 0.11, 6), col(0xe8e4da, 0.8), 0.055, 0.03, -0.04, 0, 0, Math.PI / 2); // hinge
+      for (let i = 0; i < 3; i++) add(g, gTorus(0.005, 0.0008, 3, 8, Math.PI * 1.4), M.steel, 0.02 + i * 0.01, 0.009, 0, Math.PI / 2); // hooks
+    }
   },
   bow(g) {
     // recurve bow lying flat, with its string (built upright, then laid down)
@@ -1319,6 +1451,13 @@ const ITEM_BUILDERS = {
     b.rotation.x = -Math.PI / 2;
     b.position.set(0, 0.012, (R + ey) / 2);
     g.add(b);
+    if (FINE) {
+      const dk = col(0x2b2b2b, 0.8);
+      for (const s of [-1, 1]) add(b, gSphere(0.014, 6, 4), dk, s * ex, ey, 0); // limb tip nocks
+      add(b, gCyl(0.0025, 0.0025, 0.08, 6), dk, 0.04, ey, 0, 0, 0, Math.PI / 2); // string serving
+      add(b, gBox(0.015, 0.008, 0.02), dk, 0.005, R + 0.012, 0); // arrow rest
+      for (const a of [Math.PI / 2 - 0.25, Math.PI / 2 + 0.25]) dB_orient(add(b, gTorus(0.014, 0.004, 4, 8), dk, R * Math.cos(a), R * Math.sin(a), 0), [-Math.sin(a), Math.cos(a), 0], [0, 0, 1]); // limb bands
+    }
   },
   arrows(g) {
     // six arrows in a bundle, with a band
@@ -1329,6 +1468,18 @@ const ITEM_BUILDERS = {
       add(g, gCyl(0.0, 0.006, 0.03, 6), M.steel, -0.35, 0.005 + (i % 2) * 0.006, z, 0, 0, Math.PI / 2);
     }
     add(g, gBox(0.012, 0.02, 0.08), col(0x2b2b2b, 0.8), 0, 0, 0);
+    if (FINE) {
+      const dk = col(0x2b2b2b, 0.8);
+      for (let i = 0; i < 6; i++) {
+        const z = (i - 2.5) * 0.012, y = 0.005 + (i % 2) * 0.006;
+        add(g, gCyl(0.005, 0.005, 0.012, 6), dk, 0.362, y, z, 0, 0, Math.PI / 2); // nock
+        add(g, gBox(0.07, 0.002, 0.012), col(i % 3 ? 0xe2c23a : 0xd8d8d8, 0.8), 0.31, y - 0.001, z); // cross vane
+        add(g, gCyl(0.0048, 0.0048, 0.004, 6), dk, 0.26, y, z, 0, 0, Math.PI / 2); // cresting
+        add(g, gCyl(0.0048, 0.0048, 0.004, 6), col(i % 3 ? 0xe2c23a : 0xd8d8d8, 0.8), 0.252, y, z, 0, 0, Math.PI / 2);
+        add(g, gCyl(0.0048, 0.0048, 0.012, 6), M.steel, -0.338, y, z, 0, 0, Math.PI / 2); // ferrule
+      }
+      add(g, gBox(0.012, 0.02, 0.08), dk, 0.15, 0, 0); // second band
+    }
   },
   rifle(g) {
     // stylized hunting rifle lying on its side: wood stock, dark barrel and scope
@@ -1337,16 +1488,43 @@ const ITEM_BUILDERS = {
     add(g, gRBox(0.24, 0.03, 0.05, 0.012), wood, -0.12, 0.005, 0.02);
     add(g, gCyl(0.011, 0.011, 0.55, 10), col(0x232528, 0.35, 0.5), 0.0, 0.03, 0.035, 0, 0, Math.PI / 2);
     add(g, gCyl(0.018, 0.018, 0.24, 12), col(0x1a1b1d, 0.35, 0.4), 0.18, 0.03, 0.0, 0, 0, Math.PI / 2);
+    if (FINE) {
+      const sc = col(0x1a1b1d, 0.35, 0.4);
+      add(g, gBox(0.012, 0.035, 0.11), sc, 0.416, 0, 0); // butt pad
+      add(g, gCyl(0.02, 0.02, 0.012, 12), sc, 0.18, 0.03, 0, 0, 0, Math.PI / 2); // scope caps
+      add(g, gCyl(0.02, 0.02, 0.012, 12), sc, -0.048, 0.03, 0, 0, 0, Math.PI / 2);
+      for (const x of [0.1, 0.0]) add(g, gTorus(0.019, 0.003, 4, 12), col(0x232528, 0.35, 0.5), x, 0.03, 0, 0, Math.PI / 2, 0); // scope rings
+      add(g, gTorus(0.008, 0.0015, 3, 8), col(0x232528, 0.35, 0.5), 0.3, 0.017, 0.058); // sling swivels
+      add(g, gTorus(0.008, 0.0015, 3, 8), col(0x232528, 0.35, 0.5), -0.35, 0.03, 0.05);
+      add(g, gTube('dBsling', [[0.3, 0.012, 0.065], [0.0, 0.006, 0.1], [-0.35, 0.012, 0.06]], 0.006, 12, 4), col(0x5a4a2a, 0.8));
+      add(g, gTorus(0.015, 0.002, 4, 10, Math.PI), col(0x232528, 0.35, 0.5), 0.0, 0.036, 0.06, Math.PI / 2); // trigger guard
+      add(g, gCyl(0.003, 0.003, 0.03, 6), col(0x232528, 0.35, 0.5), 0.02, 0.04, 0.035, Math.PI / 2); // bolt handle
+      add(g, gSphere(0.007, 6, 4), col(0x232528, 0.35, 0.5), 0.02, 0.04, 0.068);
+    }
   },
   rifle_rounds(g) {
     // small card box of rounds (made-up label)
     add(g, gBox(0.1, 0.035, 0.07), col(0x3d5a2a, 0.75));
     add(g, gBox(0.08, 0.002, 0.05), tmat(frontTex({ t: 'RIFLE ROUNDS', s: '20 CT  HUNTING', n: 'KEEP AWAY FROM CHILDREN', b: '#e9dfc2', f: '#2a2a2a', a: '#3d5a2a' }, 256, 160), 0.7), 0, 0.035, 0);
+    if (FINE) {
+      const cu = col(0xb8733a, 0.4, 0.5);
+      for (let i = 0; i < 2; i++) { add(g, gCyl(0.0045, 0.0045, 0.03, 8), cu, 0.1, 0.0045, 0.02 + i * 0.012, 0, 0, Math.PI / 2); add(g, gCyl(0, 0.0045, 0.012, 8), cu, 0.07, 0.0045, 0.02 + i * 0.012, 0, 0, Math.PI / 2); } // loose rounds
+      add(g, gCyl(0.0045, 0.0045, 0.03, 8), cu, 0.08, 0, -0.02); // standing round
+      add(g, gCyl(0, 0.0045, 0.012, 8), cu, 0.08, 0.03, -0.02);
+    }
   },
   snare_wire(g) {
     // a coil of thin wire
     const wire = col(0xa9a39a, 0.35, 0.6);
     for (let i = 0; i < 4; i++) add(g, gTorus(0.05 - i * 0.002, 0.0018, 4, 20), wire, 0, 0.003 + i * 0.003, 0, Math.PI / 2, 0, 0);
+    if (FINE) {
+      for (let i = 4; i < 6; i++) add(g, gTorus(0.05 - i * 0.002, 0.0018, 4, 20), wire, 0, 0.003 + i * 0.003, 0, Math.PI / 2, 0, 0); // more turns
+      add(g, gTube('dBsnare1', [[0.05, 0.004, 0], [0.08, 0.004, 0.03], [0.1, 0.004, 0.0]], 0.0018, 10, 4), wire);
+      add(g, gTube('dBsnare2', [[-0.048, 0.01, 0.01], [-0.07, 0.006, 0.05], [-0.05, 0.004, 0.08]], 0.0018, 10, 4), wire);
+      add(g, gCyl(0.004, 0.004, 0.012, 6), wire, 0.1, 0.004, 0.0, 0, 0, Math.PI / 2); // crimp sleeve
+      add(g, gTorus(0.006, 0.0015, 4, 8), wire, -0.05, 0.004, 0.08, Math.PI / 2); // lock washer
+      add(g, gBox(0.03, 0.002, 0.02), M.paper, 0, 0.02, 0.04); // tag
+    }
   },
   generator(g) {
     // small open-frame generator: tube frame, tank, engine, panel
@@ -1359,6 +1537,22 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.05, 0.05, 0.08, 14), M.steel, 0.2, 0.1, 0.05, 0, 0, Math.PI / 2);
     add(g, gBox(0.12, 0.12, 0.004), tmat(frontTex({ t: 'GENERATOR', s: '2000 W  120 V', n: 'OUTDOOR USE ONLY  CARBON MONOXIDE', b: '#f4f1ea', f: '#111', a: '#e0a41e' }, 256, 256), 0.5), 0.12, 0.06, 0.12);
     add(g, gBox(0.14, 0.14, 0.05), M.greyPl, 0.12, 0.055, 0.07);
+    if (FINE) {
+      for (const x of [-0.25, 0.25]) for (const z of [-0.18, 0.18]) add(g, gCyl(0.02, 0.02, 0.015, 8), M.blackPl, x, -0.012, z); // feet
+      for (const x of [-0.25, 0.25]) add(g, gCyl(0.014, 0.014, 0.36, 8), frame, x, 0.42, -0.18, Math.PI / 2); // top crossbars
+      add(g, gCyl(0.015, 0.015, 0.004, 10), M.greyPl, -0.05, 0.41, 0.05); // fuel gauge
+      add(g, gCyl(0.07, 0.07, 0.02, 14), M.darkMetal, -0.18, 0.12, 0, 0, 0, Math.PI / 2); // recoil housing
+      add(g, gCyl(0.002, 0.002, 0.015, 4), M.greyPl, -0.2, 0.12, 0, 0, 0, Math.PI / 2); // pull rope
+      add(g, gBox(0.012, 0.016, 0.06), M.blackPl, -0.221, 0.112, 0); // pull handle
+      add(g, gBox(0.09, 0.004, 0.11), M.steel, 0.16, 0.152, 0.05); // heat shield
+      add(g, gCyl(0.012, 0.012, 0.03, 8), M.darkMetal, 0.12, 0.1, 0.05, 0, 0, Math.PI / 2); // exhaust tip
+      add(g, gCyl(0.01, 0.012, 0.03, 8), M.blackPl, -0.12, 0.21, 0.07); // plug boot
+      for (const x of [0.09, 0.15]) add(g, gBox(0.03, 0.004, 0.02), M.blackPl, x, 0.195, 0.07); // outlets
+      add(g, gBox(0.012, 0.012, 0.008), M.greyPl, 0.12, 0.195, 0.05); // switch
+      add(g, gCyl(0.008, 0.008, 0.012, 8), M.greyPl, 0.07, 0.195, 0.06); // choke
+      add(g, gRBox(0.08, 0.1, 0.04, 0.01), M.blackPl, -0.08, 0.06, 0.1); // air filter cover
+      for (let i = 0; i < 4; i++) add(g, gBox(0.16, 0.004, 0.16), M.darkMetal, -0.08, 0.215 + i * 0.016, 0); // cooling fins
+    }
   },
   tarp(g, r) {
     const color = pick(r, ['#2a5ab8', '#6a7a3a', '#a85a1a']);
@@ -1369,6 +1563,13 @@ const ITEM_BUILDERS = {
     for (let i = 0; i < 4; i++) add(g, gTorus(0.008, 0.003, 4, 10), M.alu, -0.14 + i * 0.09, 0.085, 0.115, Math.PI / 2);
     const lab = tmat(frontTex({ t: 'TARP', s: 'ALL PURPOSE 8 x 10 FT', n: 'WATERPROOF', b: '#f4f1ea', f: '#1d4f9a', a: '#1d4f9a' }, 256, 192), 0.7);
     add(g, gBox(0.12, 0.002, 0.09), [M.paper, M.paper, lab, M.paper, M.paper, M.paper], 0.03, 0.084, -0.03);
+    if (FINE) {
+      for (let i = 0; i < 4; i++) add(g, gTorus(0.008, 0.003, 4, 10), M.alu, -0.14 + i * 0.09, 0.085, -0.115, Math.PI / 2); // back grommets
+      [[0.017, 0.141], [0.045, 0.136], [0.07, 0.126]].forEach(([y, z]) => add(g, gBox(0.34, 0.004, 0.002), t, 0, y, z)); // hem lines
+      add(g, gTube('dBbungee', [[0.1, 0.0, 0.141], [0.1, 0.09, 0.12], [0.1, 0.09, -0.12], [0.1, 0.0, -0.141]], 0.005, 16, 5), col(0xc4221c, 0.5));
+      for (const s of [-1, 1]) add(g, gTorus(0.008, 0.002, 4, 8, Math.PI), M.alu, 0.1, 0.005, s * 0.143, 0, Math.PI / 2, 0); // hooks
+      for (const s of [-1, 1]) add(g, gBox(0.04, 0.002, 0.04), t, s * 0.13, 0.084, -0.1); // corner patches
+    }
   },
   bleach(g) {
     const white = col(0xf2f2ee, 0.35);
@@ -1379,6 +1580,14 @@ const ITEM_BUILDERS = {
     const L = { t: 'BLEACH', s: 'REGULAR  UNSCENTED', n: '121 FL OZ (3.57 L)', b: '#f4f6fa', f: '#1d5fa8', a: '#1d5fa8', p: 'drop', top: 'DISINFECTS' };
     add(g, gBox(0.12, 0.15, 0.001), tmat(frontTex(L, 256, 320), 0.4), 0, 0.03, 0.0505);
     add(g, gBox(0.12, 0.15, 0.001), tmat(ctex('bleachback', 256, 320, (c, w, h, rr) => { c.fillStyle = '#f4f6fa'; c.fillRect(0, 0, w, h); txt(c, 'DANGER', w / 2, 30, 30, { color: '#c41e1e' }); finePrint(c, 20, 60, w - 40, 18, 12, rr, '#333'); barcode(c, 60, h - 60, 130, 40, rr); }), 0.4), 0, 0.03, -0.0505, 0, Math.PI, 0);
+    if (FINE) {
+      const cm = capMat('#1d5fa8');
+      for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + 0.4; add(g, gBox(0.003, 0.02, 0.004), cm, 0.035 + 0.025 * Math.cos(a), 0.264, 0.025 * Math.sin(a), 0, -a, 0); } // cap grips
+      add(g, gTorus(0.023, 0.002, 4, 12), cm, 0.035, 0.286, 0, Math.PI / 2); // cap top ring
+      add(g, gTorus(0.026, 0.002, 4, 12), white, 0.035, 0.25, 0, Math.PI / 2); // neck ring
+      for (const s of [-1, 1]) add(g, gBox(0.003, 0.18, 0.06), white, s * 0.0765, 0.03, 0); // side panels
+      for (let i = 0; i < 3; i++) add(g, gBox(0.002, 0.002, 0.02), cm, 0.0785, 0.08 + i * 0.05, 0.02); // fill marks
+    }
   },
   water_filter(g) {
     const blue = col(0x2a6fd6, 0.4);
@@ -1394,6 +1603,16 @@ const ITEM_BUILDERS = {
     pouch(p, 0.12, 0.22, 0.012, { t: 'SQUEEZE POUCH', s: '1 L  REUSABLE', b: '#cfe3ef', f: '#1d5fa8', a: '#2a6fd6', p: 'drop' }, 0.25, 0, 0.04);
     p.rotation.x = -Math.PI / 2; p.position.set(0, 0.006, -0.03); p.rotation.z = 0.2;
     g.add(p);
+    if (FINE) {
+      for (const y of [0.085, 0.09, 0.095]) add(f, gTorus(0.0205, 0.0015, 4, 12), blue, 0, y, 0, Math.PI / 2); // grip rings
+      add(f, gTorus(0.021, 0.0018, 4, 12), M.rubber, 0, 0.1, 0, Math.PI / 2); // o-ring
+      add(f, gCyl(0.006, 0.008, 0.008, 8), blue, 0, 0.155, 0); // push-pull tip
+      add(f, gTorus(0.006, 0.0015, 4, 8), M.whitePl, 0.012, 0.14, 0); // cap loop
+      add(f, gTorus(0.0225, 0.0015, 4, 12), M.whitePl, 0, 0.0, 0, Math.PI / 2); // thread ring
+      add(p, gCyl(0.015, 0.015, 0.02, 10), M.whitePl, 0, 0.215, 0); // pouch spout
+      add(p, gCyl(0.017, 0.017, 0.012, 10), blue, 0, 0.235, 0); // spout cap
+      add(p, gTorus(0.008, 0.002, 4, 8), M.whitePl, 0.045, 0.2, 0); // hang grommet
+    }
   },
   flea_spray(g) {
     const prof = [[0, 0], [0.03, 0], [0.033, 0.008], [0.033, 0.16], [0.028, 0.18], [0.014, 0.19], [0.012, 0.195]];
@@ -1401,6 +1620,16 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.0333, 0.0333, 0.145, 18, true), tmat(wrapTex({ t: 'FLEA & TICK', s: 'HOME SPRAY  KILLS ON CONTACT', n: 'NET WT 16 OZ (454g)', b: '#f4f1ea', f: '#2a5a1a', a: '#2a5a1a', p: 'bug' }, 512, 340), 0.45, 0.1), 0, 0.012, 0);
     add(g, gCyl(0.031, 0.033, 0.045, 16), col(0x2a5a1a, 0.4), 0, 0.17, 0);
     add(g, gBox(0.012, 0.01, 0.01), M.whitePl, 0, 0.215, 0.02);
+    if (FINE) {
+      const gr = col(0x2a5a1a, 0.4);
+      add(g, gCyl(0.002, 0.002, 0.006, 6), M.blackPl, 0, 0.22, 0.025, Math.PI / 2); // nozzle
+      add(g, gTorus(0.032, 0.002, 4, 16), gr, 0, 0.215, 0, Math.PI / 2); // cap rim
+      add(g, gTorus(0.0335, 0.002, 4, 16), gr, 0, 0.171, 0, Math.PI / 2); // cap base
+      add(g, gTorus(0.031, 0.0025, 4, 16), M.tin, 0, 0.006, 0, Math.PI / 2); // bottom rim
+      add(g, gTorus(0.033, 0.002, 4, 16), M.tin, 0, 0.158, 0, Math.PI / 2); // dome seam
+      add(g, gBox(0.012, 0.003, 0.012), M.whitePl, 0, 0.225, 0.02); // finger pad
+      add(g, gBox(0.006, 0.008, 0.004), M.whitePl, 0.009, 0.215, 0.026); // safety tab
+    }
   },
   seeds(g, r) {
     const kinds = [
@@ -1416,6 +1645,10 @@ const ITEM_BUILDERS = {
       p.position.set((i - 1) * 0.04, i * 0.0032, (i - 1) * 0.015); p.rotation.y = (i - 1) * 0.35;
       g.add(p);
     }
+    if (FINE) {
+      const sd = col(0xd8c8a0, 0.8);
+      for (let i = 0; i < 6; i++) add(g, gBox(0.004, 0.003, 0.006), sd, -0.05 + i * 0.02 + (r() - 0.5) * 0.01, 0, 0.09 + r() * 0.02, 0, r() * TAU, 0); // loose seeds
+    }
   },
   lighter(g, r) {
     const c = pick(r, [0xd6283a, 0x2a6fd6, 0x2f8a3a, 0xf2c21b, 0x7a2a9a]);
@@ -1427,6 +1660,12 @@ const ITEM_BUILDERS = {
     add(l, gBox(0.009, 0.006, 0.01), M.blackPl, 0.007, 0.077, 0);
     l.rotation.x = -Math.PI / 2; l.position.set(0, 0.0065, 0.04);
     g.add(l);
+    if (FINE) {
+      for (let k = 0; k < 3; k++) add(l, gBox(0.003, 0.003, 0.001), M.blackPl, -0.007 + k * 0.007, 0.066, 0.0065); // guard holes
+      for (const z of [-0.0015, 0.009]) add(l, gCyl(0.0055, 0.0055, 0.0015, 10), M.darkMetal, -0.004, 0.08, z, Math.PI / 2); // wheel sides
+      add(l, gBox(0.025, 0.003, 0.013), M.darkMetal, 0, -0.003, 0); // bottom plate
+      for (const s of [-1, 1]) add(l, gBox(0.003, 0.008, 0.012), M.chrome, s * 0.0115, 0.074, 0); // fork tabs
+    }
   },
   comfort(g, r) {
     if (r() < 0.6) {
@@ -1455,6 +1694,16 @@ const ITEM_BUILDERS = {
       const face = tmat(ctex('cardface', 64, 96, (c, w, h) => { c.fillStyle = '#fafafa'; c.fillRect(0, 0, w, h); txt(c, 'A', 10, 14, 14, { color: '#c41e1e' }); c.fillStyle = '#c41e1e'; c.beginPath(); c.moveTo(32, 36); c.bezierCurveTo(10, 20, 10, 50, 32, 64); c.bezierCurveTo(54, 50, 54, 20, 32, 36); c.fill(); }), 0.6);
       for (let i = 0; i < 3; i++) add(g, gBox(0.063, 0.0008, 0.088), [M.paper, M.paper, face, M.paper, M.paper, M.paper], 0.07 + i * 0.012, i * 0.001, 0.01 + i * 0.01, 0, 0.3 + i * 0.4, 0);
     }
+    if (FINE) {
+      if (g.children.length === 1) { // book: spine bands and a ribbon
+        const sp = g.children[0].material[1];
+        for (const z of [-0.07, 0.07]) add(g, gBox(0.003, 0.036, 0.006), sp, -0.0765, 0, z);
+        add(g, gBox(0.01, 0.001, 0.05), col(0xc41e1e, 0.6), 0.03, 0.02, 0.125);
+      } else { // cards: tuck flap and a loose card
+        add(g, gBox(0.064, 0.002, 0.025), col(0xb8201e, 0.5), 0, 0.02, -0.05, -0.5, 0, 0);
+        add(g, gBox(0.063, 0.0008, 0.088), M.paper, -0.05, 0, 0.06, 0, -0.4, 0);
+      }
+    }
   },
   toolkit(g, r) {
     const color = pick(r, [0xc4221c, 0x1d4f9a, 0x2a2a2c]);
@@ -1465,6 +1714,14 @@ const ITEM_BUILDERS = {
     add(g, gTube('tkhandle', [[-0.11, 0.2, 0], [-0.1, 0.235, 0], [0.1, 0.235, 0], [0.11, 0.2, 0]], 0.011, 12, 6), M.blackPl);
     for (const x of [-0.17, 0.17]) { add(g, gBox(0.04, 0.05, 0.012), M.chrome, x, 0.11, 0.11); add(g, gBox(0.03, 0.02, 0.008), M.chrome, x, 0.15, 0.115); }
     add(g, gBox(0.012, 0.015, 0.03), M.steel, 0.215, 0.18, 0);
+    if (FINE) {
+      for (const x of [-0.15, 0.21]) add(g, gCyl(0.008, 0.008, 0.06, 8), M.steel, x, 0.14, -0.111, 0, 0, Math.PI / 2); // hinges
+      for (const s of [-1, 1]) add(g, gBox(0.03, 0.015, 0.03), M.blackPl, s * 0.105, 0.2, 0); // handle mounts
+      for (const x of [-0.2, 0.2]) for (const z of [-0.08, 0.08]) add(g, gBox(0.03, 0.008, 0.03), M.rubber, x, -0.006, z); // feet
+      add(g, gTorus(0.008, 0.002, 4, 8), M.chrome, 0, 0.14, 0.112); // padlock eye
+      for (const s of [-1, 1]) for (const y of [0.04, 0.09]) add(g, gBox(0.004, 0.012, 0.18), p, s * 0.231, y, 0); // side ribs
+      for (const s of [-1, 1]) add(g, gCyl(0.003, 0.003, 0.002, 6), M.steel, s * 0.17, 0.125, 0.117, Math.PI / 2); // latch rivets
+    }
   },
   scrap_wood(g, r) {
     const w = tmat(texWood('#c9a26c', '#8a6a3a', 'lumber'), 0.85);
@@ -1472,19 +1729,37 @@ const ITEM_BUILDERS = {
     const plyEdge = tmat(ctex('plyedge', 64, 16, (c, ww, hh) => { for (let i = 0; i < 5; i++) { c.fillStyle = i % 2 ? '#a67c48' : '#d2b07a'; c.fillRect(0, i * hh / 5, ww, hh / 5); } }), 0.9);
     const end = tmat(texEndGrain(), 0.9);
     add(g, gBox(0.6, 0.018, 0.45), [plyEdge, plyEdge, ply, ply, plyEdge, plyEdge], 0, 0, 0, 0, 0.1, 0);
-    for (let i = 0; i < 3; i++) add(g, gBox(1.0, 0.038, 0.089), [end, end, w, w, w, w], (r() - 0.5) * 0.1, 0.018 + i * 0.038, -0.1 + i * 0.09, 0, (r() - 0.5) * 0.2, 0);
+    const boards = [];
+    for (let i = 0; i < 3; i++) boards.push(add(g, gBox(1.0, 0.038, 0.089), [end, end, w, w, w, w], (r() - 0.5) * 0.1, 0.018 + i * 0.038, -0.1 + i * 0.09, 0, (r() - 0.5) * 0.2, 0));
+    if (FINE) {
+      const at = (b, d, dy) => [b.position.x + d * Math.cos(b.rotation.y), b.position.y + dy, b.position.z - d * Math.sin(b.rotation.y)];
+      [[2, 0.3], [2, -0.35], [1, 0.4]].forEach(([bi, d]) => {
+        const [x, y, z] = at(boards[bi], d, 0.038);
+        add(g, gCyl(0.002, 0.002, 0.03, 5), M.steel, x, y, z); // nail
+        add(g, gCyl(0.005, 0.005, 0.002, 8), M.steel, x, y + 0.03, z); // nail head
+      });
+      [[2, -0.15], [1, -0.2]].forEach(([bi, d]) => { const [x, y, z] = at(boards[bi], d, 0.038); add(g, gCyl(0.012, 0.012, 0.001, 10), end, x, y, z + 0.01); }); // knots
+    }
   },
   hardware_parts(g, r) {
     printedBox(g, 0.14, 0.09, 0.1, { t: 'WOOD SCREWS', s: '#8 x 2-1/2 IN  COARSE', n: '1 LB  APPROX 120 PCS', b: '#f2c21b', f: '#111', a: '#111', p: 'screw', top: 'ZINC PLATED' });
     const galv = col(0xa8adb2, 0.4, 0.5);
+    const brk = [], scr = [];
     for (let i = 0; i < 3; i++) {
       const b = new THREE.Group();
       add(b, gBox(0.05, 0.003, 0.03), galv, 0, 0, 0);
       add(b, gBox(0.003, 0.05, 0.03), galv, -0.0235, 0, 0);
       b.position.set(0.11 + i * 0.02, 0, -0.03 + i * 0.035); b.rotation.y = r() * TAU;
-      g.add(b);
+      g.add(b); brk.push(b);
     }
-    for (let i = 0; i < 6; i++) add(g, gCyl(0.002, 0.0005, 0.05, 6), galv, -0.05 + r() * 0.1, 0.003, 0.08 + r() * 0.04, Math.PI / 2, 0, r() * TAU);
+    for (let i = 0; i < 6; i++) scr.push(add(g, gCyl(0.002, 0.0005, 0.05, 6), galv, -0.05 + r() * 0.1, 0.003, 0.08 + r() * 0.04, Math.PI / 2, 0, r() * TAU));
+    if (FINE) {
+      scr.forEach((m) => { const t = m.rotation.z, d = [-Math.sin(t), 0, Math.cos(t)]; dB_orient(add(g, gCyl(0.004, 0.004, 0.0015, 8), galv, m.position.x + d[0] * 0.05, m.position.y, m.position.z + d[2] * 0.05), d); }); // screw heads
+      brk.forEach((b) => add(b, gBox(0.033, 0.002, 0.006), galv, -0.01, 0.013, 0, 0, 0, -0.72)); // bracket gussets
+      [[-0.03, 0.135], [0.0, 0.145], [0.04, 0.13], [0.075, 0.1]].forEach(([x, z]) => add(g, gTorus(0.007, 0.0022, 4, 10), galv, x, 0.0022, z, Math.PI / 2)); // washers
+      [[0.085, 0.13], [0.1, 0.15], [0.065, 0.16]].forEach(([x, z]) => add(g, gCyl(0.006, 0.006, 0.005, 6), galv, x, 0, z)); // nuts
+      for (let i = 0; i < 3; i++) { add(g, gCyl(0.003, 0.003, 0.04, 8), galv, -0.08, 0.003, -0.03 + i * 0.025, 0, 0, Math.PI / 2); add(g, gCyl(0.0055, 0.0055, 0.004, 6), galv, -0.08, 0.003, -0.03 + i * 0.025, 0, 0, -Math.PI / 2); } // bolts
+    }
   },
   wiring(g, r) {
     const color = pick(r, ['#e0521c', '#f2c21b', '#f4f1ea']);
@@ -1497,22 +1772,44 @@ const ITEM_BUILDERS = {
     pouch(b, 0.07, 0.1, 0.02, { t: 'WIRE NUTS', s: '25 PCS', b: '#e8eef2', f: '#c41e1e', a: '#f2c21b' }, 0.2, 0, 0.06);
     b.rotation.x = -Math.PI / 2; b.position.set(-0.17, 0.01, 0.09);
     g.add(b);
+    if (FINE) {
+      const wc = col(new THREE.Color(color).getHex(), 0.4);
+      dB_orient(add(g, gCyl(0.0035, 0.0035, 0.015, 6), M.brass, 0.22, 0.01, 0.02), [0.6, -0.3, -0.3]); // stripped tip
+      add(g, gTube('dBwiretail2', [[-0.1, 0.06, 0.02], [-0.14, 0.07, -0.05], [-0.2, 0.012, -0.08]], 0.005, 10, 4), wc);
+      dB_orient(add(g, gCyl(0.0035, 0.0035, 0.015, 6), M.brass, -0.2, 0.012, -0.08), [-0.7, -0.3, -0.3]);
+            [[0.05, 0.15], [0.08, 0.13], [0.02, 0.17]].forEach(([x, z]) => add(g, gCyl(0.004, 0.008, 0.014, 8), wc, x, 0, z)); // wire nuts
+      add(g, gTorus(0.065, 0.003, 4, 20), wc, 0, 0.035, 0, Math.PI / 2); // core band
+    }
   },
   pipe_fittings(g, r) {
     const pvc = col(0xeeeeea, 0.4);
     const inner = col(0x777777, 0.8);
+    const pipes = [];
     for (let i = 0; i < 3; i++) {
       const p = new THREE.Group();
       add(p, gCyl(0.017, 0.017, 0.5, 10, true), pvc);
       add(p, gCyl(0.015, 0.015, 0.5, 8, true), tmat(null, 0.8, 0, { color: 0x666666, side: THREE.BackSide }));
       p.rotation.z = Math.PI / 2; p.position.set(0.25, 0.017, -0.05 + i * 0.036); p.rotation.y = (r() - 0.5) * 0.05;
-      g.add(p);
+      g.add(p); pipes.push(p);
     }
     add(g, gTorus(0.03, 0.02, 8, 8, Math.PI / 2), pvc, -0.1, 0.02, 0.07, Math.PI / 2, 0, 0);
     add(g, gCyl(0.022, 0.022, 0.05, 12), pvc, -0.05, 0, 0.1);
     add(g, gTorus(0.09, 0.012, 5, 16), col(0x2f7a32, 0.5), -0.05, 0.012, -0.05, Math.PI / 2);
     add(g, gTorus(0.075, 0.012, 5, 16), col(0x2f7a32, 0.5), -0.05, 0.034, -0.05, Math.PI / 2);
     add(g, gCyl(0.016, 0.016, 0.03, 8), M.brass, 0.03, 0.016, -0.05, 0, 0, Math.PI / 2);
+    if (FINE) {
+      pipes.forEach((p) => { for (const y of [0, 0.5]) add(p, gTorus(0.017, 0.0018, 4, 12), pvc, 0, y, 0, Math.PI / 2); }); // pipe end bevels
+      dB_orient(add(g, gCyl(0.023, 0.023, 0.02, 12), pvc, -0.07, 0.02, 0.07), [0, 0, -1]); // elbow sockets
+      dB_orient(add(g, gCyl(0.023, 0.023, 0.02, 12), pvc, -0.1, 0.02, 0.1), [-1, 0, 0]);
+      for (const y of [0.002, 0.048]) add(g, gTorus(0.022, 0.002, 4, 12), pvc, -0.05, y, 0.1, Math.PI / 2); // coupling rims
+      add(g, gCyl(0.004, 0.004, 0.01, 6), M.brass, 0.015, 0.032, -0.05); // valve stem
+      add(g, gBox(0.05, 0.006, 0.012), col(0xc4221c, 0.5), 0.015, 0.042, -0.05); // valve lever
+      add(g, gCyl(0.019, 0.019, 0.008, 6), M.brass, 0.03, 0.016, -0.05, 0, 0, Math.PI / 2); // valve nut
+      for (const x of [0.0325, -0.1325]) add(g, gTorus(0.025, 0.003, 4, 8), col(0x2f7a32, 0.5), x, 0.023, -0.05); // hose ties
+      add(g, gCyl(0.022, 0.022, 0.06, 12), pvc, 0.12, 0.022, 0.13, 0, 0, Math.PI / 2); // tee
+      add(g, gCyl(0.022, 0.022, 0.03, 12), pvc, 0.09, 0.022, 0.13, Math.PI / 2);
+      add(g, gTorus(0.022, 0.002, 4, 12), pvc, 0.09, 0.022, 0.16); // tee rim
+    }
   },
   plastic_sheet(g) {
     const roll = mat('plasroll', { color: 0xe8eef0, roughness: 0.25, transparent: true, opacity: 0.85 });
@@ -1522,12 +1819,22 @@ const ITEM_BUILDERS = {
     add(rr, gCyl(0.0705, 0.0705, 0.2, 18, true), tmat(sleeveTex({ t: 'PLASTIC SHEETING', s: '6 MIL  10 x 25 FT  CLEAR', b: '#f4f1ea', f: '#111', a: '#c41e1e' }), 0.5), 0, 0.2, 0);
     rr.rotation.z = Math.PI / 2; rr.position.set(0.3, 0.07, 0);
     g.add(rr);
+    if (FINE) {
+      add(rr, gCyl(0.017, 0.017, 0.62, 10), col(0xa67c48, 0.8), 0, -0.01, 0); // cardboard core
+      add(g, gBox(0.55, 0.002, 0.15), roll, 0.0, 0, 0.12); // unrolled flap
+      for (const x of [-0.2, 0.15]) add(g, gBox(0.02, 0.002, 0.03), col(0xa67c48, 0.8), x, 0.14, 0); // tape tabs
+    }
   },
   insulation(g) {
     const foam = tmat(ctex('foam', 256, 256, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#e9a0b0', 0.08, 3000, 2); txt(c, 'RIGID FOAM  R-5', w / 2, h * 0.3, 26, { color: 'rgba(30,60,140,0.8)', maxW: w * 0.9 }); txt(c, '1 IN x 2 FT x 4 FT', w / 2, h * 0.45, 18, { color: 'rgba(30,60,140,0.8)' }); finePrint(c, 30, h * 0.6, w - 60, 4, 10, rr, 'rgba(30,60,140,0.5)'); grime(c, w, h, rr, 0.6); }), 0.9);
     const edge = col(0xe9a0b0, 0.95);
     for (let i = 0; i < 4; i++) add(g, gBox(0.6, 0.025, 0.3), [edge, edge, foam, foam, edge, edge], (i % 2) * 0.01, i * 0.025, (i % 2) * -0.008);
     add(g, gBox(0.08, 0.104, 0.304), mat('shrink', { color: 0xffffff, roughness: 0.1, transparent: true, opacity: 0.25 }), 0.18, -0.002, 0);
+    if (FINE) {
+      for (let i = 0; i < 4; i++) add(g, gBox(0.6, 0.008, 0.006), edge, (i % 2) * 0.01, i * 0.025 + 0.0085, 0.152 + (i % 2) * -0.008); // tongue edges
+      const strap = col(0x2a6fd6, 0.5);
+      for (const x of [-0.15, 0.05]) { add(g, gBox(0.02, 0.106, 0.31), strap, x, -0.002, 0); add(g, gBox(0.025, 0.004, 0.02), strap, x, 0.104, 0.05); } // straps, buckles
+    }
   },
   metal_bin(g) {
     const galv = tmat(ctex('galv', 256, 256, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#a9aeb2', 0.12, 2500, 3); for (let i = 0; i < 30; i++) { c.fillStyle = `rgba(255,255,255,${0.05 + rr() * 0.1})`; c.beginPath(); c.ellipse(rr() * w, rr() * h, 8 + rr() * 20, 6 + rr() * 14, rr() * 3, 0, TAU); c.fill(); } grime(c, w, h, rr, 1.2); }), 0.5, 0.45);
@@ -1536,6 +1843,14 @@ const ITEM_BUILDERS = {
     add(g, gLathe('trashlid', [[0.245, 0], [0.24, 0.015], [0.2, 0.04], [0.1, 0.06], [0, 0.065]], 16), galv, 0, 0.595, 0);
     add(g, gTube('binlidh', [[-0.05, 0.66, 0], [-0.04, 0.69, 0], [0.04, 0.69, 0], [0.05, 0.66, 0]], 0.008, 6, 5), M.steel);
     for (const s of [-1, 1]) add(g, gTube('binsideh', [[0, 0.5, -0.05], [0.035, 0.49, -0.04], [0.035, 0.49, 0.04], [0, 0.5, 0.05]], 0.007, 6, 4), M.steel, s * 0.22, 0, 0, 0, s < 0 ? Math.PI : 0, 0);
+    if (FINE) {
+      for (const s of [-1, 1]) add(g, gCyl(0.008, 0.008, 0.004, 8), M.steel, s * 0.05, 0.655, 0); // handle rivets
+      for (const s of [-1, 1]) add(g, gBox(0.004, 0.03, 0.11), M.steel, s * 0.224, 0.475, 0); // handle plates
+      add(g, gTorus(0.2, 0.008, 4, 20), M.steel, 0, 0.008, 0, Math.PI / 2); // foot ring
+      for (const s of [-1, 1]) add(g, gBox(0.004, 0.02, 0.03), M.steel, s * 0.247, 0.575, 0); // lid clips
+      add(g, gCyl(0.03, 0.03, 0.006, 12), M.steel, 0, 0.658, 0); // lid boss
+      add(g, gTorus(0.24, 0.003, 4, 24), M.steel, 0, 0.6, 0, Math.PI / 2); // lid bead
+    }
   },
   rain_barrel(g) {
     const blue = col(0x1d4f9a, 0.45);
@@ -1545,6 +1860,16 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.015, 0.015, 0.06, 10), M.brass, 0, 0.12, 0.31, Math.PI / 2);
     add(g, gBox(0.02, 0.04, 0.01), M.brass, 0, 0.12, 0.345);
     add(g, gBox(0.24, 0.12, 0.002), tmat(frontTex({ t: 'RAIN BARREL', s: '55 GAL  NOT FOR DRINKING', b: '#f4f1ea', f: '#1d4f9a', a: '#1d4f9a' }, 256, 128), 0.6), 0, 0.5, 0.303);
+    if (FINE) {
+      const dk = col(0x123a72, 0.5);
+      add(g, gCyl(0.1, 0.1, 0.004, 16), dk, 0, 0.9, 0); // inlet screen
+      for (const x of [-0.18, 0.18]) add(g, gTorus(0.03, 0.004, 4, 12), dk, x, 0.91, 0, Math.PI / 2); // bung rings
+      add(g, gBox(0.035, 0.006, 0.012), M.brass, 0, 0.16, 0.35); // spigot handle
+      add(g, gCyl(0.022, 0.022, 0.01, 6), M.brass, 0, 0.12, 0.305, Math.PI / 2); // spigot nut
+      dB_orient(add(g, gCyl(0.018, 0.018, 0.05, 10), dk, 0.212, 0.8, 0.212), [0.707, 0, 0.707]); // overflow port
+      add(g, gTube('dBoverflow', [[0.25, 0.8, 0.25], [0.29, 0.7, 0.29], [0.3, 0.5, 0.29]], 0.014, 12, 6), dk);
+      for (const z of [-0.22, 0.22]) add(g, gBox(0.08, 0.015, 0.02), dk, 0, 0.895, z); // molded handholds
+    }
   },
   stove_kit(g) {
     const blk = tmat(ctex('stoveblk', 128, 128, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#26272a', 0.12, 2000, 2); grime(c, w, h, rr, 1); }), 0.7, 0.35);
@@ -1558,6 +1883,20 @@ const ITEM_BUILDERS = {
     // pipe sections lying beside
     for (let i = 0; i < 2; i++) add(g, gCyl(0.075, 0.075, 0.6, 16, true), tmat(texBrushed('#4a4c50', 'pipe'), 0.6, 0.4), 0.38 + i * 0.16, 0.075, 0, Math.PI / 2, 0, 0);
     add(g, gBox(0.2, 0.1, 0.002), tmat(frontTex({ t: 'WOOD STOVE', s: 'EPA CERTIFIED  60,000 BTU', b: '#f4f1ea', f: '#111', a: '#c4221c' }, 256, 128), 0.6), 0, 0.42, 0.251);
+    if (FINE) {
+      for (const y of [0.22, 0.36]) add(g, gCyl(0.01, 0.01, 0.05, 8), M.darkMetal, -0.15, y, 0.262); // door hinges
+      for (const x of [-0.19, 0.19]) for (const z of [-0.21, 0.21]) add(g, gCyl(0.02, 0.02, 0.008, 8), M.darkMetal, x, 0, z); // leveling feet
+      for (const y of [0.235, 0.375]) add(g, gBox(0.22, 0.01, 0.006), blk, 0, y, 0.262); // glass frame
+      for (const s of [-1, 1]) add(g, gBox(0.01, 0.15, 0.006), blk, s * 0.105, 0.235, 0.262);
+      add(g, gBox(0.16, 0.02, 0.01), M.darkMetal, 0, 0.14, 0.255); // air slider
+      add(g, gCyl(0.008, 0.008, 0.02, 8), M.chrome, 0.05, 0.15, 0.26, Math.PI / 2);
+      add(g, gBox(0.32, 0.008, 0.04), blk, 0, 0.12, 0.27); // ash lip
+      for (const s of [-1, 1]) add(g, gBox(0.006, 0.3, 0.42), M.darkMetal, s * 0.232, 0.16, 0); // heat shields
+      add(g, gBox(0.3, 0.006, 0.25), M.darkMetal, 0, 0.52, 0.1); // cook plate
+      for (let i = 0; i < 2; i++) add(g, gTorus(0.076, 0.004, 4, 16), M.darkMetal, 0.38 + i * 0.16, 0.075, 0.55); // pipe crimps
+      add(g, gCyl(0.004, 0.004, 0.18, 6), M.darkMetal, -0.09, 0.56, -0.08, 0, 0, -Math.PI / 2); // damper rod
+      add(g, gCyl(0.008, 0.008, 0.03, 8), M.chrome, 0.09, 0.56, -0.08, 0, 0, -Math.PI / 2); // damper handle
+    }
   },
   battery_module(g) {
     const w = col(0xe8e8e4, 0.4);
@@ -1568,14 +1907,37 @@ const ITEM_BUILDERS = {
     add(g, gBox(0.36, 0.14, 0.003), vent, 0, 0.08, 0.08);
     add(g, gBox(0.2, 0.12, 0.002), tmat(frontTex({ t: 'HOME BATTERY', s: 'LiFePO4  5 kWh  48 V DC', n: 'CAUTION  HIGH VOLTAGE', b: '#f4f1ea', f: '#111', a: '#2a6fd6' }, 256, 160), 0.5), 0, 0.35, 0.081);
     for (const x of [-0.06, 0.06]) add(g, gCyl(0.012, 0.012, 0.03, 10), x < 0 ? col(0x1a1a1a, 0.5) : col(0xc41e1e, 0.5), x, 0.7, 0);
+    if (FINE) {
+      for (const x of [-0.06, 0.06]) add(g, gCyl(0.016, 0.016, 0.008, 6), M.steel, x, 0.705, 0); // terminal nuts
+      for (const x of [-0.17, 0.17]) add(g, gCyl(0.014, 0.014, 0.02, 8), col(0x1a1a1a, 0.5), x, 0.7, 0); // cable glands
+      for (const x of [-0.2, 0.2]) add(g, gBox(0.06, 0.04, 0.006), M.steel, x, 0.66, -0.083); // wall brackets
+      for (const x of [-0.21, 0.21]) for (const y of [0.04, 0.66]) add(g, gCyl(0.005, 0.005, 0.003, 8), M.steel, x, y, 0.08, Math.PI / 2); // screws
+      for (const s of [-1, 1]) add(g, gBox(0.006, 0.03, 0.1), col(0x2a2a2c, 0.3), s * 0.253, 0.5, 0); // side handles
+      add(g, gCyl(0.018, 0.018, 0.006, 12), col(0x2a2a2c, 0.3), 0.15, 0.28, 0.08, Math.PI / 2); // power button
+      add(g, gTorus(0.02, 0.002, 4, 12), M.steel, 0.15, 0.28, 0.084); // button ring
+      for (const z of [-0.05, 0.05]) add(g, gBox(0.46, 0.015, 0.03), col(0x1a1a1a, 0.5), 0, -0.012, z); // feet rails
+      add(g, gBox(0.45, 0.07, 0.002), col(0x1a1a1a, 0.5), 0, 0.575, 0.079); // display bezel
+      add(g, gCyl(0.006, 0.006, 0.004, 8), M.steel, 0.2, 0.7, 0.05); // ground screw
+    }
   },
   candles(g, r) {
     printedBox(g, 0.12, 0.16, 0.06, { t: 'EMERGENCY', t2: 'CANDLES', s: 'UNSCENTED  9 HR BURN', n: '6 CANDLES', b: '#f4f1ea', f: '#c41e1e', a: '#2a2a2c', p: 'flame', top: 'POWER OUTAGE' });
     const wax = mat('wax', { color: 0xf3eedc, roughness: 0.55, emissive: 0x141210 });
+    const hs = [];
     for (let i = 0; i < 2; i++) {
       const h = 0.1 + r() * 0.04;
+      hs.push(h);
       add(g, gCyl(0.025, 0.025, h, 14), wax, 0.11 + i * 0.06, 0, 0.02 - i * 0.03);
       add(g, gCyl(0.0015, 0.0015, 0.01, 4), col(0x111111, 0.9), 0.11 + i * 0.06, h, 0.02 - i * 0.03);
+    }
+    if (FINE) {
+      hs.forEach((h, i) => { for (const a of [0.5, 2.4]) add(g, gSphere(0.006, 6, 4), wax, 0.11 + i * 0.06 + 0.025 * Math.cos(a), h - 0.012, 0.02 - i * 0.03 + 0.025 * Math.sin(a), 0, 0, 0, 0.7, 1.8, 0.7); }); // drips
+      add(g, gBox(0.118, 0.035, 0.002), col(0x2a2a2c, 0.65), 0, 0.16, 0.03, -0.4, 0, 0); // tuck flap
+      add(g, gCyl(0.025, 0.025, 0.12, 14), wax, 0.0, 0.025, 0.06, 0, 0, Math.PI / 2); // candle lying
+      add(g, gCyl(0.0015, 0.0015, 0.01, 4), col(0x111111, 0.9), -0.12, 0.025, 0.06, 0, 0, Math.PI / 2);
+      add(g, gCyl(0.019, 0.019, 0.015, 14, true), M.alu, -0.03, 0, -0.08); // tea light
+      add(g, gCyl(0.017, 0.017, 0.012, 14), wax, -0.03, 0, -0.08);
+      add(g, gCyl(0.0015, 0.0015, 0.006, 4), col(0x111111, 0.9), -0.03, 0.012, -0.08);
     }
   },
   matches(g, r) {
@@ -1594,12 +1956,38 @@ const ITEM_BUILDERS = {
       m.position.set(-0.03 + i * 0.02, 0, 0.06 + r() * 0.02); m.rotation.y = r() * 2 - 1;
       g.add(m);
     }
+    if (FINE) {
+      const stick = col(0xd8b88a, 0.8), burnt = col(0x1a1a1a, 0.9);
+      add(g, gBox(0.006, 0.012, 0.02), col(0xe8e0cc, 0.8), 0.1, 0.006, 0); // drawer tab
+      for (let i = 0; i < 3; i++) { // more loose matches
+        const m = new THREE.Group();
+        add(m, gBox(0.003, 0.003, 0.06), stick);
+        add(m, gSphere(0.003, 6, 4), col(0xb81d18, 0.6), 0, 0.0015, 0.03, 0, 0, 0, 1, 1, 1.4);
+        m.position.set(0.04 + i * 0.025, 0, 0.07 + r() * 0.02); m.rotation.y = r() * 2 - 1;
+        g.add(m);
+      }
+      for (let i = 0; i < 2; i++) { // spent matches
+        const m = new THREE.Group();
+        add(m, gBox(0.003, 0.003, 0.045), stick);
+        add(m, gBox(0.0035, 0.0035, 0.012), burnt, 0, 0, 0.026);
+        m.position.set(-0.03 + i * 0.03, 0, -0.065); m.rotation.y = r() * 2 - 1;
+        g.add(m);
+      }
+      add(g, gTube('dBmatchcurl', [[-0.06, 0.0015, -0.05], [-0.05, 0.003, -0.04], [-0.04, 0.0015, -0.025]], 0.0015, 6, 4), burnt);
+    }
   },
   duct_tape(g) {
     const silver = tmat(texBrushed('#9ea3a8', 'tape'), 0.5, 0.25);
     add(g, gLathe('ducttape', [[0.038, 0], [0.056, 0], [0.057, 0.002], [0.057, 0.046], [0.056, 0.048], [0.038, 0.048]], 20), silver);
         add(g, gCyl(0.0375, 0.0375, 0.048, 16, true), tmat(sleeveTex({ t: 'DUCT TAPE', s: '1.88 IN x 60 YD', b: '#b99868', f: '#2a2a2c', a: '#b99868' }), 0.9, 0, { side: THREE.DoubleSide }), 0, 0, 0);
     add(g, gBox(0.002, 0.046, 0.05), silver, 0.058, 0.001, 0.025, 0, 0.3, 0);
+    if (FINE) {
+      for (const y of [0.002, 0.046]) add(g, gTorus(0.0565, 0.0015, 3, 16), silver, 0, y, 0, Math.PI / 2); // roll edges
+      const core = col(0xb99868, 0.9);
+      for (const y of [0.0, 0.048]) add(g, gTorus(0.0375, 0.0012, 3, 12), core, 0, y, 0, Math.PI / 2); // core rims
+      add(g, gTube('dBtapecurl', [[0.058, 0.025, 0.05], [0.07, 0.03, 0.07], [0.065, 0.035, 0.085]], 0.0015, 6, 4), silver); // torn curl
+      add(g, gBox(0.04, 0.0005, 0.012), silver, 0.0, 0.048, 0.045, 0, 0.3, 0); // stuck strip
+    }
   },
   rope(g, r) {
     const color = pick(r, ['#c8b080', '#2a6fd6', '#d6283a', '#3a5a2a']);
@@ -1609,6 +1997,16 @@ const ITEM_BUILDERS = {
     for (let i = 0; i < 2; i++) add(g, gTorus(0.03, 0.009, 4, 8), t, 0.115, 0.028, -0.008 + i * 0.016, 0, Math.PI / 2, 0, 1, 1.4, 1);
     add(g, gTube('ropetail', [[-0.1, 0.012, 0.03], [-0.16, 0.01, 0.1], [-0.12, 0.012, 0.18], [-0.05, 0.012, 0.2]], 0.012, 10, 5), t);
     add(g, gCyl(0.124, 0.124, 0.03, 16, true), tmat(sleeveTex({ t: 'UTILITY ROPE', s: '3/8 IN x 50 FT', b: '#f4f1ea', f: '#111', a: '#c41e1e' }), 0.8), 0, 0.02, 0, 0, 0, 0, 1, 1, 1);
+    if (FINE) {
+      for (const z of [0.024, -0.024]) add(g, gTorus(0.03, 0.009, 4, 8), t, 0.115, 0.028, z, 0, Math.PI / 2, 0, 1, 1.4, 1); // more binding turns
+      add(g, gTorus(0.113, 0.013, 4, 20), t, 0.004, 0.06, 0.002, Math.PI / 2, 0, 2.1); // top coil
+      dB_orient(add(g, gCyl(0.0135, 0.0135, 0.02, 8), M.blackPl, -0.05, 0.012, 0.2), [0.96, 0, 0.27]); // whipping
+      for (let k = 0; k < 3; k++) dB_orient(add(g, gCyl(0, 0.006, 0.02, 5), t, -0.03, 0.012 + (k - 1) * 0.006, 0.205 + (k - 1) * 0.004), [0.96, (k - 1) * 0.3, 0.27]); // frayed end
+      add(g, gTube('dBropetail2', [[0.12, 0.044, 0.0], [0.16, 0.03, -0.06], [0.2, 0.012, -0.1]], 0.012, 10, 5), t);
+      dB_orient(add(g, gCyl(0.0135, 0.0135, 0.02, 8), M.blackPl, 0.2, 0.012, -0.1), [0.66, -0.33, -0.66]);
+      for (let k = 0; k < 2; k++) dB_orient(add(g, gCyl(0, 0.006, 0.02, 5), t, 0.213, 0.006 + k * 0.006, -0.113), [0.66, -0.1 + k * 0.2, -0.66]);
+      add(g, gSphere(0.02, 8, 6), t, 0.13, 0.045, 0.0); // knot
+    }
   },
   knife(g) {
     const blade = tmat(texBrushed('#c8ccd0', 'blade'), 0.22, 0.55);
@@ -1628,6 +2026,18 @@ const ITEM_BUILDERS = {
     const sheath = tmat(ctex('sheath', 128, 64, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#5a3a22', 0.15, 900, 2); c.strokeStyle = 'rgba(230,210,170,0.6)'; c.setLineDash([4, 3]); c.lineWidth = 2; c.strokeRect(5, 5, w - 10, h - 10); grime(c, w, h, rr, 1); }), 0.8);
     add(g, gRBox(0.19, 0.014, 0.05, 0.006), sheath, 0.03, 0, 0.065, 0, 0.12, 0);
     add(g, gBox(0.03, 0.016, 0.05), sheath, -0.07, 0, 0.078, 0, 0.12, 0);
+    if (FINE) {
+      for (let k = 0; k < 4; k++) add(g, gBox(0.002, 0.004, 0.002), M.steel, 0.01 + k * 0.006, 0.0095, -0.0165); // thumb ridges
+      for (let k = 0; k < 3; k++) add(g, gBox(0.004, 0.0015, 0.026), M.steel, -0.045 - k * 0.01, 0.0205, 0); // grip grooves
+      const cord = col(0xc41e1e, 0.6);
+      add(g, gTube('dBlanyard', [[-0.122, 0.011, 0], [-0.14, 0.008, 0.02], [-0.155, 0.004, 0.0], [-0.17, 0.003, 0.03]], 0.0018, 12, 4), cord);
+      add(g, gSphere(0.004, 6, 4), cord, -0.17, 0.003, 0.03);
+      const sh = (lx, lz) => [0.03 + lx * Math.cos(0.12) + lz * Math.sin(0.12), 0.065 - lx * Math.sin(0.12) + lz * Math.cos(0.12)];
+      let [x, z] = sh(-0.06, 0.012); add(g, gBox(0.025, 0.003, 0.05), sheath, x, 0.014, z, 0, 0.12, 0); // snap strap
+      add(g, gCyl(0.006, 0.006, 0.003, 8), M.steel, x, 0.017, z);
+      [x, z] = sh(0.0, 0.0); add(g, gBox(0.03, 0.003, 0.054), sheath, x, 0.014, z, 0, 0.12, 0); // belt loop
+      for (const lx of [0.03, 0.06, 0.09]) { [x, z] = sh(lx, -0.018); add(g, gCyl(0.003, 0.003, 0.002, 6), M.brass, x, 0.014, z); } // rivets
+    }
   },
   multitool(g) {
     const h = tmat(texBrushed('#b8bcc0', 'mt'), 0.3, 0.5);
@@ -1637,6 +2047,16 @@ const ITEM_BUILDERS = {
     for (let i = 0; i < 3; i++) add(g, gBox(0.06, 0.001, 0.003), M.darkMetal, -0.01 + i * 0.01, 0.012, -0.012 + i * 0.012);
     add(g, gTorus(0.008, 0.002, 4, 10), M.steel, -0.055, 0.006, 0, Math.PI / 2);
     add(g, gRBox(0.08, 0.025, 0.04, 0.008), col(0x1d1e20, 0.85), 0.02, 0, 0.06, 0, 0.3, 0);
+    if (FINE) {
+      for (const x of [0.045, -0.045]) add(g, gCyl(0.004, 0.004, 0.036, 8), M.steel, x, 0.006, -0.018, Math.PI / 2); // pivot pins
+      for (const z of [-0.013, -0.005, 0.005, 0.013]) add(g, gBox(0.05, 0.001, 0.002), M.darkMetal, 0, 0.012, z); // grip grooves
+      for (const z of [-0.004, 0.004]) add(g, gBox(0.015, 0.006, 0.006), M.darkMetal, 0.082, 0.003, z); // plier jaws
+      const pc = col(0x1d1e20, 0.85);
+      add(g, gBox(0.07, 0.004, 0.035), pc, 0.02, 0.025, 0.06, 0, 0.3, 0); // pouch flap
+      add(g, gCyl(0.005, 0.005, 0.003, 8), M.chrome, 0.0235, 0.029, 0.0715); // snap
+      add(g, gBox(0.03, 0.02, 0.004), pc, 0.0138, 0.003, 0.038, 0, 0.3, 0); // belt loop
+      add(g, gBox(0.008, 0.001, 0.003), M.steel, 0.024, 0.012, -0.012); // bit tip
+    }
   },
   can_opener(g) {
     const red = col(0xc4221c, 0.5);
@@ -1649,6 +2069,13 @@ const ITEM_BUILDERS = {
     add(o, gRBox(0.03, 0.02, 0.02, 0.006), red, 0.07, 0.025, 0, 0, 0, Math.PI / 2);
     o.position.y = 0.011;
     g.add(o);
+    if (FINE) {
+      for (const s of [-1, 1]) for (const x of [-0.1, -0.12]) add(o, gBox(0.004, 0.002, 0.02), red, x, 0.016, s * 0.016); // grip ridges
+      add(o, gTorus(0.012, 0.0015, 3, 12), M.steel, 0.02, -0.0005, 0, Math.PI / 2); // cutter teeth
+      add(o, gCyl(0.01, 0.01, 0.004, 8), M.steel, 0.0, 0.019, 0); // gear
+      add(o, gCyl(0.005, 0.005, 0.004, 8), M.steel, -0.008, 0.016, 0.012); // pivot screw
+      for (const s of [-1, 1]) add(o, gTorus(0.006, 0.0015, 3, 8), M.steel, -0.128, 0.008, s * 0.02, Math.PI / 2); // hang rings
+    }
   },
   cooking_pot(g) {
     const ss = tmat(texBrushed('#bfc3c7', 'pot'), 0.3, 0.55);
@@ -1656,6 +2083,14 @@ const ITEM_BUILDERS = {
     add(g, gLathe('potlid', [[0.104, 0], [0.1, 0.006], [0.06, 0.02], [0, 0.026]], 16), ss, 0, 0.122, 0);
     add(g, gCyl(0.012, 0.018, 0.018, 10), M.blackPl, 0, 0.148, 0);
     for (const s of [-1, 1]) add(g, gTube('pothandle' + s, [[s * 0.098, 0.105, -0.035], [s * 0.128, 0.105, -0.025], [s * 0.128, 0.105, 0.025], [s * 0.098, 0.105, 0.035]], 0.006, 8, 5), M.blackPl);
+    if (FINE) {
+      for (const s of [-1, 1]) for (const z of [-0.032, 0.032]) add(g, gCyl(0.004, 0.004, 0.004, 8), M.steel, s * 0.098, 0.105, z, 0, 0, -s * Math.PI / 2); // rivets
+      add(g, gTorus(0.1, 0.0025, 4, 20), ss, 0, 0.124, 0, Math.PI / 2); // lid bead
+      add(g, gTorus(0.096, 0.003, 4, 20), ss, 0, 0.004, 0, Math.PI / 2); // base ring
+      add(g, gCyl(0.004, 0.004, 0.002, 8), M.blackPl, 0.05, 0.143, 0); // steam vent
+      add(g, gCyl(0.02, 0.02, 0.002, 12), M.steel, 0, 0.147, 0); // knob washer
+      add(g, gCyl(0.003, 0.003, 0.002, 6), M.steel, 0, 0.166, 0); // knob screw
+    }
   },
   blanket(g, r) {
     const p = pick(r, [['#7a1d1a', '#22304a', '#e8d8a0'], ['#2f4a2a', '#1a1a1a', '#c8a24a'], ['#4a5a7a', '#e8e8e0', '#1a2a4a']]);
@@ -1664,6 +2099,13 @@ const ITEM_BUILDERS = {
     add(g, gRBox(0.4, 0.04, 0.3, 0.02), t, 0.003, 0.038, 0.003, 0, 0.02, 0);
     add(g, gRBox(0.4, 0.04, 0.3, 0.02), t, -0.004, 0.076, -0.002, 0, -0.015, 0);
     add(g, gCyl(0.02, 0.02, 0.3, 10), t, 0.2, 0.06, -0.15, Math.PI / 2, 0, 0, 1, 1, 2.6);
+    if (FINE) {
+      const bind = col(new THREE.Color(p[2]).getHex(), 0.6);
+      [[0, 0], [0.003, 0.038], [-0.004, 0.076]].forEach(([dx, y]) => add(g, gBox(0.38, 0.012, 0.004), bind, dx, y + 0.014, 0.151)); // satin binding
+      for (const x of [-0.12, 0.12]) add(g, gBox(0.02, 0.002, 0.31), bind, x, 0.116, 0); // ribbon ties
+      add(g, gSphere(0.012, 8, 6), bind, 0.12, 0.118, 0.02, 0, 0, 0, 1.4, 0.6, 1); // bow
+      add(g, gBox(0.03, 0.002, 0.04), bind, 0.15, 0.116, 0.1); // tag
+    }
   },
   sleeping_bag(g, r) {
     const color = pick(r, ['#2a5ab8', '#c8521c', '#3a5a2a']);
@@ -1676,6 +2118,18 @@ const ITEM_BUILDERS = {
     add(s, gCyl(0.008, 0.008, 0.02, 8), col(0x2a2a2a, 0.5), 0.03, 0.45, 0);
     s.rotation.z = Math.PI / 2; s.position.set(0.2, 0.13, 0);
     g.add(s);
+    if (FINE) {
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2;
+        add(s, gBox(0.035, 0.025, 0.006), M.blackPl, Math.sin(a) * 0.136, 0.2, Math.cos(a) * 0.136, 0, a, 0); // buckles
+        add(s, gBox(0.025, 0.04, 0.003), M.blackPl, Math.sin(a) * 0.14, 0.15, Math.cos(a) * 0.14, 0, a, 0); // strap tails
+      }
+      for (const y of [0.16, 0.24]) add(s, gTorus(0.131, 0.003, 3, 16), n, 0, y, 0, Math.PI / 2); // quilt lines
+      for (const y of [0.002, 0.398]) add(s, gTorus(0.128, 0.004, 3, 16), n, 0, y, 0, Math.PI / 2); // end seams
+      add(s, gTorus(0.02, 0.003, 4, 8), M.blackPl, 0.03, 0.47, 0); // cord loop
+      add(s, gTube('dBsbhandle', [[0, 0.4, -0.07], [0, 0.43, -0.06], [0, 0.44, 0], [0, 0.43, 0.06], [0, 0.4, 0.07]], 0.006, 12, 5), M.blackPl);
+      add(s, gBox(0.06, 0.04, 0.003), M.paper, 0.094, 0.12, 0.094, 0, Math.PI / 4, 0); // label patch
+    }
   },
   hand_warmers(g) {
     for (let i = 0; i < 2; i++) {
@@ -1683,6 +2137,12 @@ const ITEM_BUILDERS = {
       pouch(p, 0.09, 0.13, 0.012, { t: 'HAND', t2: 'WARMERS', s: 'UP TO 10 HRS', n: '1 PAIR', b: '#e0521c', f: '#fff', a: '#2a2a2c', p: 'flame' }, 0.45, 0.1, 0.06);
       p.rotation.set(-Math.PI / 2, 0, i * 0.5 - 0.2); p.position.set(i * 0.06, 0.006 + i * 0.008, i * 0.02);
       g.add(p);
+    }
+    if (FINE) {
+      g.children.slice(0, 2).forEach((p) => add(p, gBox(0.07, 0.002, 0.014), col(0xe8e2d2, 0.9), 0, 0.115, 0)); // tear strips
+      const pad = col(0xe8e2d2, 0.9);
+      add(g, gRBox(0.08, 0.008, 0.1, 0.003), pad, 0.14, 0, -0.02, 0, 0.3, 0); // heat pads
+      add(g, gRBox(0.08, 0.008, 0.1, 0.003), pad, 0.17, 0.008, 0.02, 0, -0.2, 0);
     }
   },
   wool_socks(g, r) {
@@ -1711,13 +2171,27 @@ const ITEM_BUILDERS = {
     };
     const geo = gExtrude('sock', shape, 0.012, 0.006);
     const side = tmat(texKnit(color, 'sockside'), 0.95);
-    for (let i = 0; i < 2; i++) add(g, geo, [tmat(face, 0.95), side], i * 0.025 - 0.1, 0.009 + i * 0.024, -0.13 + i * 0.012, -Math.PI / 2, 0, i * 0.08);
+    const socks = [];
+    for (let i = 0; i < 2; i++) socks.push(add(g, geo, [tmat(face, 0.95), side], i * 0.025 - 0.1, 0.009 + i * 0.024, -0.13 + i * 0.012, -Math.PI / 2, 0, i * 0.08));
     add(g, gBox(0.105, 0.05, 0.003), tmat(sleeveTex({ t: 'WOOL SOCKS', s: 'MERINO BLEND  1 PAIR', b: '#f4f1ea', f: '#3a2a1f', a: accent }), 0.8), -0.065, 0.005, -0.03, -Math.PI / 2, 0, 0);
+    if (FINE) {
+      socks.forEach((m) => {
+        add(m, gCyl(0.008, 0.008, 0.088, 8), side, 0, 0.27, 0, 0, 0, -Math.PI / 2); // cuff roll
+        add(m, gBox(0.003, 0.075, 0.002), side, 0.19, 0.003, 0.0125); // toe seam
+      });
+      add(g, gTorus(0.012, 0.002, 4, 10), M.whitePl, -0.065, 0.006, -0.088, Math.PI / 2); // hanger ring
+      add(g, gBox(0.02, 0.002, 0.012), M.whitePl, -0.065, 0.005, -0.1); // hanger hook
+    }
   },
   trash_bags(g) {
     const L = { t: 'TRASH BAGS', s: 'LARGE 30 GAL  DRAWSTRING', n: '40 BAGS', b: '#1a1a1c', f: '#f2c21b', a: '#2f7a32', p: 'bolt', top: 'HEAVY DUTY' };
     printedBox(g, 0.26, 0.12, 0.13, L, { tw: 384, th: 180 });
     add(g, gBox(0.12, 0.002, 0.04), col(0x0a0a0a, 0.3), 0, 0.12, 0);
+    if (FINE) {
+      for (const z of [-0.022, 0.022]) add(g, gBox(0.13, 0.0025, 0.004), col(0xf2c21b, 0.5), 0, 0.12, z); // tear outline
+      add(g, gRBox(0.08, 0.04, 0.02, 0.008), col(0x0a0a0a, 0.3), 0, 0.11, 0); // bag poking out
+      add(g, gTube('dBbagtie', [[-0.03, 0.15, 0.0], [0, 0.16, 0.012], [0.03, 0.15, 0.0]], 0.002, 8, 4), col(0xf2c21b, 0.5));
+    }
   },
   radio(g) {
     const body = col(0xe0521c, 0.5);
@@ -1739,6 +2213,18 @@ const ITEM_BUILDERS = {
     add(g, gCyl(0.012, 0.012, 0.012, 12), grey, 0.06, 0.07, 0.04, Math.PI / 2);
     add(g, gBox(0.012, 0.06, 0.012), grey, 0.1, 0.04, 0.0);
     add(g, gCyl(0.006, 0.006, 0.03, 8), grey, 0.12, 0.015, 0.0, 0, 0, Math.PI / 2);
+    if (FINE) {
+      add(g, gCyl(0.015, 0.015, 0.008, 10), grey, 0.095, 0.07, 0, 0, 0, -Math.PI / 2); // crank hub
+      const d = [Math.sin(0.25), Math.cos(0.25), 0];
+      add(g, gSphere(0.005, 6, 4), M.chrome, 0.08 + d[0] * 0.22, 0.11 + d[1] * 0.22, -0.02); // antenna tip
+      add(g, gCyl(0.008, 0.008, 0.012, 8), M.chrome, 0.08, 0.104, -0.02); // antenna swivel
+      for (const t of [0.07, 0.14]) add(g, gCyl(0.0045, 0.0045, 0.006, 6), M.chrome, 0.08 + d[0] * t, 0.11 + d[1] * t, -0.02, 0, 0, -0.25); // joints
+      add(g, gTube('dBradiohandle', [[-0.088, 0.095, 0], [-0.088, 0.135, 0], [-0.06, 0.15, 0], [-0.03, 0.135, 0], [-0.03, 0.11, 0]], 0.006, 12, 5), grey);
+      for (const s of [-1, 1]) add(g, gBox(0.02, 0.02, 0.074), grey, s * 0.088, 0, 0); // bumpers
+      add(g, gCyl(0.02, 0.02, 0.006, 12), grey, -0.095, 0.055, 0, 0, 0, Math.PI / 2); // flashlight bezel
+      add(g, gCyl(0.015, 0.015, 0.007, 12), M.whitePl, -0.095, 0.055, 0, 0, 0, Math.PI / 2); // lens
+      add(g, gBox(0.104, 0.003, 0.054), grey, -0.03, 0.109, 0); // solar frame
+    }
   },
   paper_map(g, r) {
     const cover = tmat(ctex('mapcover', 256, 448, (c, w, h, rr) => {
@@ -1755,7 +2241,11 @@ const ITEM_BUILDERS = {
       txt(c, 'FOLD HERE', w / 2, h * 0.9, 12, { color: '#666' });
       grime(c, w, h, rr, 1.2);
     }), 0.85);
-    add(g, gBox(0.12, 0.008, 0.21), [M.paper, M.paper, cover, M.paper, M.paper, M.paper], 0, 0, 0, 0, r() * 0.6, 0);
+    const mp = add(g, gBox(0.12, 0.008, 0.21), [M.paper, M.paper, cover, M.paper, M.paper, M.paper], 0, 0, 0, 0, r() * 0.6, 0);
+    if (FINE) {
+      add(mp, gBox(0.12, 0.002, 0.1), M.paper, 0, 0.008, 0.105, -0.3, 0, 0); // half-open fold
+      for (const z of [-0.035, 0.035]) add(mp, gBox(0.12, 0.001, 0.002), M.paper, 0, 0.008, z); // creases
+    }
   },
   toilet_paper(g) {
     const roll = tmat(ctex('tproll', 128, 64, (c, w, h, rr) => { noiseFill(c, w, h, rr, '#f6f4ee', 0.05, 500, 1); c.strokeStyle = 'rgba(0,0,0,0.06)'; for (let x = 0; x < w; x += 8) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); } }), 0.95);
@@ -1764,10 +2254,23 @@ const ITEM_BUILDERS = {
     const wrap = mat('tpwrap', { color: 0xffffff, roughness: 0.15, transparent: true, opacity: 0.2, depthWrite: false });
     add(g, gRBox(0.23, 0.105, 0.23, 0.03), wrap);
     add(g, gBox(0.2, 0.06, 0.002), tmat(sleeveTex({ t: 'BATH TISSUE', s: '4 DOUBLE ROLLS  2-PLY', b: '#f4f6fa', f: '#2a4f9a', a: '#7fa8d6' }), 0.5), 0, 0.02, 0.116);
+    if (FINE) {
+      const core = col(0xa67c48, 0.8);
+      for (let i = 0; i < 4; i++) add(g, gTorus(0.02, 0.002, 4, 10), core, (i % 2 - 0.5) * 0.112, 0.1, (Math.floor(i / 2) - 0.5) * 0.112, Math.PI / 2); // core rims
+      for (const z of [-0.08, 0.08]) add(g, gBox(0.23, 0.004, 0.01), wrap, 0, 0.105, z); // wrap seals
+      add(g, gTube('dBtphandle', [[-0.04, 0.105, 0], [-0.03, 0.13, 0], [0.03, 0.13, 0], [0.04, 0.105, 0]], 0.006, 10, 5), wrap);
+      add(g, gCyl(0.055, 0.055, 0.1, 18), [roll, top, top], 0.25, 0.055, 0.0, 0, 0, Math.PI / 2); // spare roll
+      add(g, gBox(0.1, 0.0015, 0.12), roll, 0.2, 0, 0.11); // loose sheet
+    }
   },
   soap(g, r) {
     printedBox(g, 0.095, 0.035, 0.065, { t: 'BAR SOAP', s: 'GENTLE  UNSCENTED', n: '4 OZ (113g)', b: '#f4f6fa', f: '#2a6fd6', a: '#7fc4d6', p: 'bubble' }, { tw: 256, th: 96 });
-    add(g, gRBox(0.085, 0.03, 0.055, 0.012), col(pick(r, [0xf4f0e6, 0xe8d8f0, 0xd8f0e0]), 0.4), 0.11, 0, 0.02, 0, 0.4, 0);
+    const bar = add(g, gRBox(0.085, 0.03, 0.055, 0.012), col(pick(r, [0xf4f0e6, 0xe8d8f0, 0xd8f0e0]), 0.4), 0.11, 0, 0.02, 0, 0.4, 0);
+    if (FINE) {
+      add(bar, gCyl(0.025, 0.025, 0.003, 16), bar.material, 0, 0.03, 0, 0, 0, 0, 1.3, 1, 0.8); // embossed oval
+      add(g, gRBox(0.1, 0.008, 0.075, 0.003), M.whitePl, 0.11, 0, 0.02, 0, 0.4, 0); // soap dish
+      add(g, gBox(0.093, 0.002, 0.02), M.whitePl, 0, 0.035, -0.0325, -0.5, 0, 0); // box flap
+    }
   },
   toothpaste(g) {
     const L = { t: 'TOOTHPASTE', s: 'FLUORIDE  COOL MINT', n: 'NET WT 6 OZ (170g)', b: '#2a6fd6', f: '#fff', a: '#d6283a', p: 'tooth' };
@@ -1782,12 +2285,25 @@ const ITEM_BUILDERS = {
     add(tube, gBox(0.04, 0.012, 0.003), col(0xffffff, 0.5), 0, 0.168, 0);
     tube.rotation.z = Math.PI / 2; tube.position.set(0.0, 0.013, 0.07);
     g.add(tube);
+    if (FINE) {
+      for (const y of [-0.006, -0.012]) add(tube, gTorus(0.013, 0.0012, 4, 12), M.whitePl, 0, y, 0, Math.PI / 2); // cap ridges
+      for (const y of [0.172, 0.176]) add(tube, gBox(0.04, 0.0008, 0.001), col(0xffffff, 0.5), 0, y, 0.002); // crimp lines
+      add(tube, gTorus(0.013, 0.0015, 4, 12), M.whitePl, 0, 0.002, 0, Math.PI / 2); // shoulder ring
+      add(box, gBox(0.045, 0.002, 0.03), M.paper, 0, 0.2, 0.0, 0.4, 0, 0); // end flap
+      add(box, gBox(0.03, 0.025, 0.002), M.paper, 0, -0.025, 0); // hang tab
+    }
   },
 };
 delete ITEM_BUILDERS.first_aid_kit;
 
 
 // paperback guide books: cover art is a plain pictogram plus a generic title
+// Items part B helpers: point a part's axis (default +y) along a direction.
+function dB_orient(mesh, dir, from = [0, 1, 0]) {
+  const d = new THREE.Vector3(dir[0], dir[1], dir[2]).normalize();
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(from[0], from[1], from[2]), d);
+  return mesh;
+}
 const BOOKS = {
   book_first_aid: { title: ['FIRST-AID', 'HANDBOOK'], sub: 'EMERGENCY CARE AT HOME', bg: '#c4221c', band: '#f4f2ec', ink: '#f4f2ec', icon: 'cross' },
   book_repair: { title: ['HOME REPAIR', 'MANUAL'], sub: 'FIX IT YOURSELF', bg: '#e8701c', band: '#5a5e62', ink: '#2a2c2e', icon: 'wrench' },
