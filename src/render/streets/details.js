@@ -69,8 +69,8 @@ const cyl8 = (c) => painted(new CylinderGeometry(1, 1, 1, 8), c);
 // side skirts, door seams, wipers; a bed with sides on pickups. Placed along the car (u) and across (v).
 function carFine(list, P, ry, t, y0, body, flat, type) {
   const put = (g, u, v, y, sx, sy, sz, extra = 0) => { const [px, pz] = P(u, v); list.push(at(g, px, y, pz, sx, sy, sz, ry + extra)); };
-  for (const [u, v] of [[0.32, 0.5], [0.32, -0.5], [-0.32, 0.5], [-0.32, -0.5]]) { // hubcaps facing out
-    const [wx, wz] = P(t.L * u, t.W * v);
+  for (const [u, v] of [[0.32, 0.45], [0.32, -0.45], [-0.32, 0.45], [-0.32, -0.45]]) { // hubcaps on the outer tyre face
+    const [wx, wz] = P(t.L * u, t.W * v + Math.sign(v) * 0.13);
     list.push(cyl8(CHROME).applyMatrix4(new Matrix4().makeRotationX(Math.PI / 2)).applyMatrix4(new Matrix4().makeTranslation(wx, 0.33 - flat / 2, wz).multiply(new Matrix4().makeRotationY(ry)).multiply(new Matrix4().makeScale(0.17, 0.17, 0.02))));
   }
   for (const s of [1, -1]) { // bumpers front and back, lights at each corner, side skirts

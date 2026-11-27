@@ -388,6 +388,7 @@ function buildingFine(list, sills, ring, rf, kind, shop, flatRoof, best) {
         const d = 3 * k + 1.5 - u; // distance from a to the window centre
         if (d < 0.6 || d > len - 0.6) continue;
         const px = a[0] + tx * d, pz = a[1] + tz * d;
+        if (best && Math.hypot(px - best.mx, pz - best.mz) < 1.3) continue; // no sill across the door
         const top = Math.min(rf.y(a[0], a[1]), rf.y(c[0], c[1]));
         // a sill (top and front faces only: 4 triangles) on the ground floor
         for (let f = 0; f < 1 && f * 2.8 + 2.1 < top; f++) {
