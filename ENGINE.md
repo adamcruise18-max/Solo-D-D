@@ -408,3 +408,11 @@ the `buildInterior` plan format, `makeItemModel` / `makeShelfFill` / `makeProp`,
 - `enterStreet(state)`: location `{ kind: 'street', cell }` at the player's position. A street is outside (environment, pacer).
 - `streetMove(state, { lat, lon })`: at most 250 m a call. Adds miles, turns distance into game minutes at `walkSpeed()` (whole minutes; the rest waits in `state.streetWalk.m`), rolls `roadEvent` each 0.5 mi, and makes the player rest at 0 energy. Returns `{ ok, minutes, cell }`.
 - `enterPlaceFromStreet(state, placeId)`: go in through a place door within 80 m; same place as a map trip.
+
+## Dev tools (stats-gl, lil-gui)
+
+- `src/dev/devtools.js` builds to `docs/devtools.js`. `src/dev/loader.js` (called from `src/main.js`) fetches it only with `?dev=1` or the first F3 (or `) press; the normal player load never fetches it. Later F3 presses toggle it (`window.LLDev.toggle()`).
+- stats-gl (bottom left): FPS, CPU and GPU frame time of the open 3D view. Draw calls stay in the F3 text overlay.
+- lil-gui (top right): exposure, fog, background, and each light's intensity and color in the open 3D view. It finds the view by `window.__llInside` or `window.__llStreets` with `{ scene, renderer }`. A "Game values" folder shows when the game sets `window.__llGame = { state, render }`.
+- Sliders change only the live scene or live state, never the rule files. Copy a good value into the source by hand.
+- `npm run check:browser` checks: no fetch in the normal load, F3 loads once and toggles, `?dev=1` shows it, no script errors.
