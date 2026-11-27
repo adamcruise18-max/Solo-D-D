@@ -42,6 +42,12 @@ fi
 for _ in $(seq 1 60); do
   if curl -fsS http://127.0.0.1:3001/api/ping >/dev/null 2>&1; then
     echo "FreeLLMAPI: running on port 3001. Open the PORTS tab to see the dashboard."
+    # Before the first account exists, the server prints a one-time setup code.
+    # The dashboard asks for it when you make the account.
+    CODE_LINE="$(docker logs "$NAME" 2>&1 | grep 'First-run setup code' | tail -n 1 || true)"
+    if [ -n "$CODE_LINE" ]; then
+      echo "FreeLLMAPI:${CODE_LINE#*:}  <- enter this setup code when you make your dashboard account"
+    fi
     exit 0
   fi
   sleep 2
