@@ -40,14 +40,14 @@ jobs:
 
       - name: Commit the fresh build if main had a stale one
         run: |
-          if git diff --quiet -- docs/game.js docs/inside3d.js; then
+          if git diff --quiet -- docs/game.js docs/inside3d.js docs/devtools.js; then
             echo "The bundle on main is fresh."
             exit 0
           fi
-          git diff --stat -- docs/game.js docs/inside3d.js
+          git diff --stat -- docs/game.js docs/inside3d.js docs/devtools.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/game.js docs/inside3d.js
+          git add docs/game.js docs/inside3d.js docs/devtools.js
           git commit -m "Rebuild docs bundle after merge (automatic)"
           for i in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0

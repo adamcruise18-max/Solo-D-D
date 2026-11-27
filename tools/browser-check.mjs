@@ -26,7 +26,15 @@ const server = createServer(async (req, res) => {
     const file = join(root, path || 'index.html');
     if (!file.startsWith(root)) throw new Error('outside');
     const body = await readFile(file);
-    res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
+    const type = TYPES[extname(file)] || 'application/octet-stream';
+    // Byte ranges, as GitHub Pages sends them: the PMTiles map file needs them.
+    const m = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || '');
+    if (m) {
+      const start = Number(m[1]); const end = Math.min(m[2] ? Number(m[2]) : body.length - 1, body.length - 1);
+      res.writeHead(206, { 'content-type': type, 'content-range': `bytes ${start}-${end}/${body.length}`, 'content-length': end - start + 1, 'accept-ranges': 'bytes' });
+      return res.end(body.subarray(start, end + 1));
+    }
+    res.writeHead(200, { 'content-type': type, 'accept-ranges': 'bytes' });
     res.end(body);
   } catch { res.writeHead(404); res.end(); }
 });
@@ -80,6 +88,34 @@ try {
     check(play.after.weather.day > play.before.weather.day, `the weather system rolled a new day (day ${play.before.weather.day} -> ${play.after.weather.day})`);
   }
   check(errors.length === 0, `no script errors while playing${errors.length ? ': ' + errors.join(' | ') : ''}`);
+
+  // Self-hosted map: the style comes from docs/map/ and the streets from the PMTiles file.
+  const mapInfo = await page.evaluate(async () => {
+    const m = window.__llMap;
+    if (!m) return { error: 'no map' };
+    for (let i = 0; i < 100 && !m.areTilesLoaded(); i++) await new Promise((r) => setTimeout(r, 200));
+    const src = m.getStyle().sources.openmaptiles;
+    const roads = m.queryRenderedFeatures().filter((f) => f.sourceLayer === 'transportation').length;
+    return { url: src && src.url, roads };
+  });
+  check(/^pmtiles:\/\/.*\/map\/portland\.pmtiles$/.test(mapInfo.url || '') && mapInfo.roads > 0, `the map draws streets from the self-hosted map file (${JSON.stringify(mapInfo)})`);
+
+  // Dev tools (stats-gl + lil-gui): never fetched in the normal load; ?dev=1 or F3 loads them.
+  const devReqs = [];
+  page.on('request', (q) => { if (q.url().includes('devtools.js')) devReqs.push(q.url()); });
+  await page.goto(base, { waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  check(devReqs.length === 0, 'the normal player load does not fetch the dev tools');
+  await page.keyboard.press('F3');
+  await page.waitForFunction(() => window.LLDev && window.LLDev.loaded, null, { timeout: 5000 }).catch(() => {});
+  const dev1 = await page.evaluate(() => window.LLDev && window.LLDev.status());
+  await page.keyboard.press('F3');
+  const dev2 = await page.evaluate(() => window.LLDev && window.LLDev.status());
+  check(devReqs.length === 1 && dev1?.shown && dev1?.gui && dev2 && !dev2.shown, `F3 loads the dev tools once and toggles them (${JSON.stringify([devReqs.length, dev1, dev2])})`);
+  await page.goto(base + '?dev=1', { waitUntil: 'load' });
+  await page.waitForFunction(() => window.LLDev && window.LLDev.loaded, null, { timeout: 5000 }).catch(() => {});
+  check(await page.evaluate(() => !!(window.LLDev && window.LLDev.status().shown && document.querySelector('[data-dev=gui]'))), '?dev=1 loads and shows the dev tools');
+  check(errors.length === 0, `no script errors with the dev tools${errors.length ? ': ' + errors.join(' | ') : ''}`);
 
   await page.addScriptTag({ url: '__core.js' });
   const r = await page.evaluate(async () => {

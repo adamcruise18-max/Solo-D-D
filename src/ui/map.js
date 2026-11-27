@@ -7,6 +7,7 @@ import { detailFeatures, addDetailIcons, DETAIL_INFO } from './details.js';
 import { seasonOf, overgrowth } from '../engine/season.js';
 import { legacyMarks } from '../engine/goals.js';
 import { SPOTS } from '../data/wild.js';
+import { localStyle } from '../map/local-map.js';
 
 // "liberty" is the full-color OpenFreeMap style (streets, parks, water, buildings).
 // Do not use "dark": its colors are almost black, so the map looks empty.
@@ -23,6 +24,9 @@ const OFFLINE_STYLE = {
 };
 
 async function pickStyle() {
+  // First the self-hosted map file on GitHub Pages (docs/map/), then OpenFreeMap.
+  const local = await localStyle(window.maplibregl);
+  if (local) return { style: winterizeStyle(local), online: true, local: true };
   for (const url of STYLE_URLS) {
     try {
       const ctl = new AbortController();
