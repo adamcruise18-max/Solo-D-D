@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { collideBoxes, nearestSpot, solidBoxes } from '../engine/interior.js';
 import { roomBVH, blockedBVH, boxesNear } from './roombvh.js';
+import { makeAO } from './ao3d.js';
 import { openStreets } from '../render/streets/view.js';
 import { snowFromScene } from '../render/streets/look.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
@@ -175,6 +176,8 @@ export function openInside(opts) {
   const lk = setupLook(renderer, scene, camera, { dark, night: !!opts.night, quality, flashlight: opts.hasFlashlight(), scene: opts.scene });
   const daySky = lk.sky; // daylight color and strength from the game clock and weather
   const flash = lk.flashlight; // null without a flashlight
+  // Soft contact shadows (N8AO, src/ui/ao3d.js): none on Low.
+  const aoFx = makeAO(renderer, scene, camera, quality);
   const lrnd = mulberry32(hashString(`look:${opts.title}`));
   // The flashlight beam follows the game: on, off, or weak batteries.
   function applyLight() {
@@ -1136,6 +1139,7 @@ export function openInside(opts) {
     const w = root.clientWidth;
     const h = root.clientHeight;
     renderer.setSize(w, h, false);
+    aoFx?.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -1450,6 +1454,7 @@ export function openInside(opts) {
     window.removeEventListener('keyup', onKeyUp, true);
     window.removeEventListener('blur', onBlur);
     document.removeEventListener('pointerlockchange', onLockChange);
+    aoFx?.dispose();
     renderer.dispose();
     root.remove();
     opts.onLeave(!!died, why);
@@ -1773,7 +1778,7 @@ export function openInside(opts) {
     }
     for (const o of itemObjs.values()) o.obj.visible = Math.hypot(o.x - camera.position.x, o.z - camera.position.z) < CULL_M;
     const tCull = performance.now();
-    renderer.render(scene, camera);
+    if (aoFx) aoFx.render(); else renderer.render(scene, camera);
     const tEnd = performance.now();
     if (debugOn) diag.sample(dt, { game: tLogic - tFrame, look: tLook - tLogic, cull: tCull - tLook, render: tEnd - tCull });
     requestAnimationFrame(frame);
