@@ -112,6 +112,8 @@ This is the **first playable version**: a small part of the full game.
   (Settings → Pages → Deploy from a branch → `main`, folder `/docs`).
   The game is then at `https://adamcruise18-max.github.io/Solo-D-D/`.
 - **On your computer:** `npm run serve`, then open http://localhost:8080.
+- **In a GitHub Codespace (browser only, with the OpenCode coding agent):** see
+  [CODESPACES.md](CODESPACES.md).
   (Opening `docs/index.html` with a double-click also works, but the map tiles may not load.)
 
 ## What is in this version
