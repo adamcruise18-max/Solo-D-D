@@ -45,9 +45,9 @@ jobs:
       - name: Bundle is fresh (pull requests)
         if: github.event_name == 'pull_request'
         run: |
-          git diff --stat -- docs/game.js docs/inside3d.js
-          if ! git diff --quiet -- docs/game.js docs/inside3d.js; then
-            echo "::error::docs/game.js or docs/inside3d.js differ from a fresh build. Run npm run build and commit the result."
+          git diff --stat -- docs/game.js docs/inside3d.js docs/devtools.js
+          if ! git diff --quiet -- docs/game.js docs/inside3d.js docs/devtools.js; then
+            echo "::error::docs/game.js, docs/inside3d.js or docs/devtools.js differ from a fresh build. Run npm run build and commit the result."
             exit 1
           fi
 

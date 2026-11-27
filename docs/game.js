@@ -78,7 +78,7 @@
         },
         // build an array of samples
         buildSamples: function(volume = 1, randomness = 0.05, frequency = 220, attack = 0, sustain = 0, release = 0.1, shape = 0, shapeCurve = 1, slide = 0, deltaSlide = 0, pitchJump = 0, pitchJumpTime = 0, repeatTime = 0, noise = 0, modulation = 0, bitCrush = 0, delay = 0, sustainVolume = 1, decay = 0, tremolo = 0, filter = 0) {
-          let sampleRate = this.sampleRate, PI2 = Math.PI * 2, abs = Math.abs, sign = (v) => v < 0 ? -1 : 1, startSlide = slide *= 500 * PI2 / sampleRate / sampleRate, startFrequency = frequency *= (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate, modOffset = 0, repeat = 0, crush = 0, jump = 1, length, b, t = 0, i = 0, s = 0, f, quality = 2, w = PI2 * abs(filter) * 2 / sampleRate, cos = Math.cos(w), alpha = Math.sin(w) / 2 / quality, a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0, b0 = (1 + sign(filter) * cos) / 2 / a0, b1 = -(sign(filter) + cos) / a0, b2 = b0, x2 = 0, x1 = 0, y2 = 0, y1 = 0;
+          let sampleRate = this.sampleRate, PI2 = Math.PI * 2, abs = Math.abs, sign = (v2) => v2 < 0 ? -1 : 1, startSlide = slide *= 500 * PI2 / sampleRate / sampleRate, startFrequency = frequency *= (1 + randomness * 2 * Math.random() - randomness) * PI2 / sampleRate, modOffset = 0, repeat = 0, crush = 0, jump = 1, length, b2, t = 0, i = 0, s = 0, f, quality = 2, w2 = PI2 * abs(filter) * 2 / sampleRate, cos = Math.cos(w2), alpha = Math.sin(w2) / 2 / quality, a0 = 1 + alpha, a1 = -2 * cos / a0, a2 = (1 - alpha) / a0, b0 = (1 + sign(filter) * cos) / 2 / a0, b1 = -(sign(filter) + cos) / a0, b22 = b0, x2 = 0, x1 = 0, y2 = 0, y1 = 0;
           const minAttack = 9;
           attack = attack * sampleRate || minAttack;
           decay *= sampleRate;
@@ -91,8 +91,8 @@
           pitchJumpTime *= sampleRate;
           repeatTime = repeatTime * sampleRate | 0;
           length = attack + decay + sustain + release + delay | 0;
-          b = new Float32Array(length > 0 ? length : 0);
-          for (; i < length; b[i++] = s * volume) {
+          b2 = new Float32Array(length > 0 ? length : 0);
+          for (; i < length; b2[i++] = s * volume) {
             if (!(++crush % (bitCrush * 100 | 0))) {
               s = shape ? shape > 1 ? shape > 2 ? shape > 3 ? shape > 4 ? (
                 // wave shape
@@ -140,10 +140,10 @@
               s = delay ? s / 2 + (delay > i ? 0 : (
                 // delay
                 (i < length - delay ? 1 : (length - i) / delay) * // release delay 
-                b[i - delay | 0] / 2 / volume
+                b2[i - delay | 0] / 2 / volume
               )) : s;
               if (filter)
-                s = y1 = b2 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
+                s = y1 = b22 * x2 + b1 * (x2 = x1) + b0 * (x1 = s) - a2 * y2 - a1 * (y2 = y1);
             }
             f = (frequency += slide += deltaSlide) * // frequency
             Math.cos(modulation * modOffset++);
@@ -159,7 +159,7 @@
               jump || (jump = 1);
             }
           }
-          return b;
+          return b2;
         },
         // get frequency of a musical note on a diatonic scale
         getNote: function(semitoneOffset = 0, rootNoteFrequency = 440) {
@@ -238,8 +238,8 @@
               for (var i = 0; i < self._howls.length; i++) {
                 if (!self._howls[i]._webAudio) {
                   var ids = self._howls[i]._getSoundIds();
-                  for (var j = 0; j < ids.length; j++) {
-                    var sound = self._howls[i]._soundById(ids[j]);
+                  for (var j2 = 0; j2 < ids.length; j2++) {
+                    var sound = self._howls[i]._soundById(ids[j2]);
                     if (sound && sound._node) {
                       sound._node.volume = sound._volume * vol;
                     }
@@ -266,8 +266,8 @@
             for (var i = 0; i < self._howls.length; i++) {
               if (!self._howls[i]._webAudio) {
                 var ids = self._howls[i]._getSoundIds();
-                for (var j = 0; j < ids.length; j++) {
-                  var sound = self._howls[i]._soundById(ids[j]);
+                for (var j2 = 0; j2 < ids.length; j2++) {
+                  var sound = self._howls[i]._soundById(ids[j2]);
                   if (sound && sound._node) {
                     sound._node.muted = muted ? true : sound._muted;
                   }
@@ -353,7 +353,7 @@
             var audioTest = null;
             try {
               audioTest = typeof Audio !== "undefined" ? new Audio() : null;
-            } catch (err) {
+            } catch (err2) {
               return self;
             }
             if (!audioTest || typeof audioTest.canPlayType !== "function") {
@@ -417,8 +417,8 @@
               for (var i = 0; i < self._howls.length; i++) {
                 if (!self._howls[i]._webAudio) {
                   var ids = self._howls[i]._getSoundIds();
-                  for (var j = 0; j < ids.length; j++) {
-                    var sound = self._howls[i]._soundById(ids[j]);
+                  for (var j2 = 0; j2 < ids.length; j2++) {
+                    var sound = self._howls[i]._soundById(ids[j2]);
                     if (sound && sound._node && !sound._node._unlocked) {
                       sound._node._unlocked = true;
                       sound._node.load();
@@ -497,8 +497,8 @@
             }
             for (var i = 0; i < self._howls.length; i++) {
               if (self._howls[i]._webAudio) {
-                for (var j = 0; j < self._howls[i]._sounds.length; j++) {
-                  if (!self._howls[i]._sounds[j]._paused) {
+                for (var j2 = 0; j2 < self._howls[i]._sounds.length; j2++) {
+                  if (!self._howls[i]._sounds[j2]._paused) {
                     return self;
                   }
                 }
@@ -835,8 +835,8 @@
                     };
                     node.addEventListener("ended", self._endTimers[sound._id], false);
                   }
-                } catch (err) {
-                  self._emit("playerror", sound._id, err);
+                } catch (err2) {
+                  self._emit("playerror", sound._id, err2);
                 }
               };
               if (node.src === "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA") {
@@ -2014,15 +2014,15 @@
           }
           return self;
         };
-        HowlerGlobal.prototype.pos = function(x, y, z) {
+        HowlerGlobal.prototype.pos = function(x2, y2, z2) {
           var self = this;
           if (!self.ctx || !self.ctx.listener) {
             return self;
           }
-          y = typeof y !== "number" ? self._pos[1] : y;
-          z = typeof z !== "number" ? self._pos[2] : z;
-          if (typeof x === "number") {
-            self._pos = [x, y, z];
+          y2 = typeof y2 !== "number" ? self._pos[1] : y2;
+          z2 = typeof z2 !== "number" ? self._pos[2] : z2;
+          if (typeof x2 === "number") {
+            self._pos = [x2, y2, z2];
             if (typeof self.ctx.listener.positionX !== "undefined") {
               self.ctx.listener.positionX.setTargetAtTime(self._pos[0], Howler.ctx.currentTime, 0.1);
               self.ctx.listener.positionY.setTargetAtTime(self._pos[1], Howler.ctx.currentTime, 0.1);
@@ -2035,28 +2035,28 @@
           }
           return self;
         };
-        HowlerGlobal.prototype.orientation = function(x, y, z, xUp, yUp, zUp) {
+        HowlerGlobal.prototype.orientation = function(x2, y2, z2, xUp, yUp, zUp) {
           var self = this;
           if (!self.ctx || !self.ctx.listener) {
             return self;
           }
           var or = self._orientation;
-          y = typeof y !== "number" ? or[1] : y;
-          z = typeof z !== "number" ? or[2] : z;
+          y2 = typeof y2 !== "number" ? or[1] : y2;
+          z2 = typeof z2 !== "number" ? or[2] : z2;
           xUp = typeof xUp !== "number" ? or[3] : xUp;
           yUp = typeof yUp !== "number" ? or[4] : yUp;
           zUp = typeof zUp !== "number" ? or[5] : zUp;
-          if (typeof x === "number") {
-            self._orientation = [x, y, z, xUp, yUp, zUp];
+          if (typeof x2 === "number") {
+            self._orientation = [x2, y2, z2, xUp, yUp, zUp];
             if (typeof self.ctx.listener.forwardX !== "undefined") {
-              self.ctx.listener.forwardX.setTargetAtTime(x, Howler.ctx.currentTime, 0.1);
-              self.ctx.listener.forwardY.setTargetAtTime(y, Howler.ctx.currentTime, 0.1);
-              self.ctx.listener.forwardZ.setTargetAtTime(z, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardX.setTargetAtTime(x2, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardY.setTargetAtTime(y2, Howler.ctx.currentTime, 0.1);
+              self.ctx.listener.forwardZ.setTargetAtTime(z2, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upX.setTargetAtTime(xUp, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upY.setTargetAtTime(yUp, Howler.ctx.currentTime, 0.1);
               self.ctx.listener.upZ.setTargetAtTime(zUp, Howler.ctx.currentTime, 0.1);
             } else {
-              self.ctx.listener.setOrientation(x, y, z, xUp, yUp, zUp);
+              self.ctx.listener.setOrientation(x2, y2, z2, xUp, yUp, zUp);
             }
           } else {
             return or;
@@ -2140,7 +2140,7 @@
           }
           return self;
         };
-        Howl.prototype.pos = function(x, y, z, id) {
+        Howl.prototype.pos = function(x2, y2, z2, id) {
           var self = this;
           if (!self._webAudio) {
             return self;
@@ -2149,16 +2149,16 @@
             self._queue.push({
               event: "pos",
               action: function() {
-                self.pos(x, y, z, id);
+                self.pos(x2, y2, z2, id);
               }
             });
             return self;
           }
-          y = typeof y !== "number" ? 0 : y;
-          z = typeof z !== "number" ? -0.5 : z;
+          y2 = typeof y2 !== "number" ? 0 : y2;
+          z2 = typeof z2 !== "number" ? -0.5 : z2;
           if (typeof id === "undefined") {
-            if (typeof x === "number") {
-              self._pos = [x, y, z];
+            if (typeof x2 === "number") {
+              self._pos = [x2, y2, z2];
             } else {
               return self._pos;
             }
@@ -2167,18 +2167,18 @@
           for (var i = 0; i < ids.length; i++) {
             var sound = self._soundById(ids[i]);
             if (sound) {
-              if (typeof x === "number") {
-                sound._pos = [x, y, z];
+              if (typeof x2 === "number") {
+                sound._pos = [x2, y2, z2];
                 if (sound._node) {
                   if (!sound._panner || sound._panner.pan) {
                     setupPanner(sound, "spatial");
                   }
                   if (typeof sound._panner.positionX !== "undefined") {
-                    sound._panner.positionX.setValueAtTime(x, Howler.ctx.currentTime);
-                    sound._panner.positionY.setValueAtTime(y, Howler.ctx.currentTime);
-                    sound._panner.positionZ.setValueAtTime(z, Howler.ctx.currentTime);
+                    sound._panner.positionX.setValueAtTime(x2, Howler.ctx.currentTime);
+                    sound._panner.positionY.setValueAtTime(y2, Howler.ctx.currentTime);
+                    sound._panner.positionZ.setValueAtTime(z2, Howler.ctx.currentTime);
                   } else {
-                    sound._panner.setPosition(x, y, z);
+                    sound._panner.setPosition(x2, y2, z2);
                   }
                 }
                 self._emit("pos", sound._id);
@@ -2189,7 +2189,7 @@
           }
           return self;
         };
-        Howl.prototype.orientation = function(x, y, z, id) {
+        Howl.prototype.orientation = function(x2, y2, z2, id) {
           var self = this;
           if (!self._webAudio) {
             return self;
@@ -2198,16 +2198,16 @@
             self._queue.push({
               event: "orientation",
               action: function() {
-                self.orientation(x, y, z, id);
+                self.orientation(x2, y2, z2, id);
               }
             });
             return self;
           }
-          y = typeof y !== "number" ? self._orientation[1] : y;
-          z = typeof z !== "number" ? self._orientation[2] : z;
+          y2 = typeof y2 !== "number" ? self._orientation[1] : y2;
+          z2 = typeof z2 !== "number" ? self._orientation[2] : z2;
           if (typeof id === "undefined") {
-            if (typeof x === "number") {
-              self._orientation = [x, y, z];
+            if (typeof x2 === "number") {
+              self._orientation = [x2, y2, z2];
             } else {
               return self._orientation;
             }
@@ -2216,8 +2216,8 @@
           for (var i = 0; i < ids.length; i++) {
             var sound = self._soundById(ids[i]);
             if (sound) {
-              if (typeof x === "number") {
-                sound._orientation = [x, y, z];
+              if (typeof x2 === "number") {
+                sound._orientation = [x2, y2, z2];
                 if (sound._node) {
                   if (!sound._panner) {
                     if (!sound._pos) {
@@ -2226,11 +2226,11 @@
                     setupPanner(sound, "spatial");
                   }
                   if (typeof sound._panner.orientationX !== "undefined") {
-                    sound._panner.orientationX.setValueAtTime(x, Howler.ctx.currentTime);
-                    sound._panner.orientationY.setValueAtTime(y, Howler.ctx.currentTime);
-                    sound._panner.orientationZ.setValueAtTime(z, Howler.ctx.currentTime);
+                    sound._panner.orientationX.setValueAtTime(x2, Howler.ctx.currentTime);
+                    sound._panner.orientationY.setValueAtTime(y2, Howler.ctx.currentTime);
+                    sound._panner.orientationZ.setValueAtTime(z2, Howler.ctx.currentTime);
                   } else {
-                    sound._panner.setOrientation(x, y, z);
+                    sound._panner.setOrientation(x2, y2, z2);
                   }
                 }
                 self._emit("orientation", sound._id);
@@ -2915,26 +2915,26 @@
     };
   }
   function hashString(str) {
-    let h2 = 2166136261 >>> 0;
+    let h3 = 2166136261 >>> 0;
     for (let i = 0; i < str.length; i++) {
-      h2 ^= str.charCodeAt(i);
-      h2 = Math.imul(h2, 16777619);
+      h3 ^= str.charCodeAt(i);
+      h3 = Math.imul(h3, 16777619);
     }
-    return h2 >>> 0;
+    return h3 >>> 0;
   }
-  function rand(state2) {
-    let a = state2.rngState | 0;
+  function rand(state3) {
+    let a = state3.rngState | 0;
     a = a + 1831565813 | 0;
-    state2.rngState = a;
+    state3.rngState = a;
     let t = Math.imul(a ^ a >>> 15, 1 | a);
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   }
-  function randInt(state2, min, max) {
-    return min + Math.floor(rand(state2) * (max - min + 1));
+  function randInt(state3, min, max2) {
+    return min + Math.floor(rand(state3) * (max2 - min + 1));
   }
-  function chance(state2, p) {
-    return rand(state2) < p;
+  function chance(state3, p) {
+    return rand(state3) < p;
   }
   function weightedPick(rng, entries) {
     const total = entries.reduce((s, e) => s + e.w, 0);
@@ -2956,16 +2956,16 @@
     const jd = localNoonMs / 864e5 + 24405875e-1;
     const n = Math.round(jd - 2451545 + 8e-4);
     const jStar = n - lon / 360;
-    const M = (357.5291 + 0.98560028 * jStar) % 360;
-    const C = 1.9148 * Math.sin(M * RAD) + 0.02 * Math.sin(2 * M * RAD) + 3e-4 * Math.sin(3 * M * RAD);
-    const lambda = (M + C + 180 + 102.9372) % 360;
-    const jTransit = 2451545 + jStar + 53e-4 * Math.sin(M * RAD) - 69e-4 * Math.sin(2 * lambda * RAD);
+    const M3 = (357.5291 + 0.98560028 * jStar) % 360;
+    const C2 = 1.9148 * Math.sin(M3 * RAD) + 0.02 * Math.sin(2 * M3 * RAD) + 3e-4 * Math.sin(3 * M3 * RAD);
+    const lambda = (M3 + C2 + 180 + 102.9372) % 360;
+    const jTransit = 2451545 + jStar + 53e-4 * Math.sin(M3 * RAD) - 69e-4 * Math.sin(2 * lambda * RAD);
     const sinDec = Math.sin(lambda * RAD) * Math.sin(23.44 * RAD);
     const cosDec = Math.cos(Math.asin(sinDec));
     const cosW = (Math.sin(-0.833 * RAD) - Math.sin(lat * RAD) * sinDec) / (Math.cos(lat * RAD) * cosDec);
-    const w = Math.acos(Math.max(-1, Math.min(1, cosW))) / RAD;
-    const toLocalMin = (j) => ((j - 24405875e-1) * 864e5 - (EPOCH_UTC_MS + day * 864e5)) / 6e4;
-    return { rise: toLocalMin(jTransit - w / 360), set: toLocalMin(jTransit + w / 360) };
+    const w2 = Math.acos(Math.max(-1, Math.min(1, cosW))) / RAD;
+    const toLocalMin = (j2) => ((j2 - 24405875e-1) * 864e5 - (EPOCH_UTC_MS + day * 864e5)) / 6e4;
+    return { rise: toLocalMin(jTransit - w2 / 360), set: toLocalMin(jTransit + w2 / 360) };
   }
 
   // src/data/climate.js
@@ -3005,29 +3005,29 @@
     flood: { label: "flooded low streets", walk: 0.85 },
     cold_snap: { label: "cold snap", colder: 12 }
   };
-  function startHazard(state2, id, hours) {
-    var _a;
+  function startHazard(state3, id, hours) {
+    var _a2;
     if (!HAZARDS[id]) throw new Error(`Unknown hazard "${id}"`);
-    state2.flags || (state2.flags = {});
-    clearOldHazards(state2);
-    const hz = (_a = state2.flags).hazards || (_a.hazards = {});
-    hz[id] = Math.max(hz[id] || 0, state2.time + hours * 60);
+    state3.flags || (state3.flags = {});
+    clearOldHazards(state3);
+    const hz = (_a2 = state3.flags).hazards || (_a2.hazards = {});
+    hz[id] = Math.max(hz[id] || 0, state3.time + hours * 60);
   }
-  function hazardOn(state2, id, t = state2.time) {
-    const end = state2.flags?.hazards?.[id];
+  function hazardOn(state3, id, t = state3.time) {
+    const end = state3.flags?.hazards?.[id];
     return end != null && t < end;
   }
-  function activeHazards(state2, t = state2.time) {
-    const hz = state2.flags?.hazards || {};
+  function activeHazards(state3, t = state3.time) {
+    const hz = state3.flags?.hazards || {};
     return Object.keys(hz).filter((id) => HAZARDS[id] && t < hz[id]).map((id) => ({ id, ...HAZARDS[id], endsAt: hz[id] }));
   }
-  function hazardColder(state2, t = state2.time) {
-    return activeHazards(state2, t).reduce((a, h2) => a + (h2.colder || 0), 0);
+  function hazardColder(state3, t = state3.time) {
+    return activeHazards(state3, t).reduce((a, h3) => a + (h3.colder || 0), 0);
   }
-  function clearOldHazards(state2) {
-    const hz = state2.flags?.hazards;
+  function clearOldHazards(state3) {
+    const hz = state3.flags?.hazards;
     if (!hz) return;
-    for (const id of Object.keys(hz)) if (state2.time >= hz[id]) delete hz[id];
+    for (const id of Object.keys(hz)) if (state3.time >= hz[id]) delete hz[id];
   }
 
   // src/engine/world.js
@@ -3035,64 +3035,64 @@
   function monthOfDay(day) {
     return new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
   }
-  function rollType(state2, month, prevType) {
+  function rollType(state3, month, prevType) {
     const c = CLIMATE[month];
     const winter = month >= 10 || month <= 2;
-    if (winter && prevType && rand(state2) < 0.6) return prevType === "windstorm" ? "rain" : prevType;
-    if (winter && rand(state2) < 0.04) return "windstorm";
-    if (rand(state2) < c.rainDays / 30) return rand(state2) < 0.2 ? "heavy_rain" : "rain";
-    const r = rand(state2);
+    if (winter && prevType && rand(state3) < 0.6) return prevType === "windstorm" ? "rain" : prevType;
+    if (winter && rand(state3) < 0.04) return "windstorm";
+    if (rand(state3) < c.rainDays / 30) return rand(state3) < 0.2 ? "heavy_rain" : "rain";
+    const r = rand(state3);
     return r < 0.35 ? "clear" : r < 0.85 ? "cloudy" : "fog";
   }
-  function windFor(state2, type) {
-    if (type === "windstorm") return randInt(state2, 30, 60);
-    if (type === "rain" || type === "heavy_rain") return randInt(state2, 5, 20);
-    return randInt(state2, 0, 10);
+  function windFor(state3, type) {
+    if (type === "windstorm") return randInt(state3, 30, 60);
+    if (type === "rain" || type === "heavy_rain") return randInt(state3, 5, 20);
+    return randInt(state3, 0, 10);
   }
-  function finishDay(state2, w, month) {
-    if ((w.type === "rain" || w.type === "heavy_rain") && w.low <= 32 && (month === 11 || month <= 1)) {
-      w.type = "snow";
-      w.snowInches = randInt(state2, 1, 6);
-    } else if (w.type === "snow") {
-      if (w.low > 34 || !(month === 11 || month <= 1)) {
-        w.type = "rain";
-        delete w.snowInches;
-      } else if (w.snowInches == null) w.snowInches = randInt(state2, 1, 6);
+  function finishDay(state3, w2, month) {
+    if ((w2.type === "rain" || w2.type === "heavy_rain") && w2.low <= 32 && (month === 11 || month <= 1)) {
+      w2.type = "snow";
+      w2.snowInches = randInt(state3, 1, 6);
+    } else if (w2.type === "snow") {
+      if (w2.low > 34 || !(month === 11 || month <= 1)) {
+        w2.type = "rain";
+        delete w2.snowInches;
+      } else if (w2.snowInches == null) w2.snowInches = randInt(state3, 1, 6);
     }
-    if (w.type === "clear") w.nextLow -= 5;
-    w.nextLow = Math.min(w.nextLow, w.high - 3);
-    return w;
+    if (w2.type === "clear") w2.nextLow -= 5;
+    w2.nextLow = Math.min(w2.nextLow, w2.high - 3);
+    return w2;
   }
-  function initWeather(state2) {
+  function initWeather(state3) {
     const day = 0;
     const month = monthOfDay(day);
     const c = CLIMATE[month];
-    const delta = randInt(state2, -6, 6);
-    const type = rollType(state2, month, null);
-    state2.weather = finishDay(state2, {
+    const delta = randInt(state3, -6, 6);
+    const type = rollType(state3, month, null);
+    state3.weather = finishDay(state3, {
       day,
       type,
-      wind: windFor(state2, type),
+      wind: windFor(state3, type),
       low: c.low + delta,
       high: c.high + delta,
       prevHigh: c.high + delta,
-      nextLow: c.low + randInt(state2, -8, 8)
+      nextLow: c.low + randInt(state3, -8, 8)
     }, month);
   }
-  function rollWeather(state2, day) {
+  function rollWeather(state3, day) {
     const month = monthOfDay(day);
     const c = CLIMATE[month];
-    const old = state2.weather;
-    const type = rollType(state2, month, old.baseType || old.type);
+    const old = state3.weather;
+    const type = rollType(state3, month, old.baseType || old.type);
     const low = old.nextLow;
-    state2.weather = finishDay(state2, {
+    state3.weather = finishDay(state3, {
       day,
       type,
-      wind: windFor(state2, type),
+      wind: windFor(state3, type),
       low,
-      high: low + (c.high - c.low) + randInt(state2, -3, 3),
+      high: low + (c.high - c.low) + randInt(state3, -3, 3),
       prevHigh: old.high,
-      nextLow: c.low + randInt(state2, -8, 8)
+      nextLow: c.low + randInt(state3, -8, 8)
     }, month);
   }
   function sunFor(t) {
@@ -3103,33 +3103,33 @@
     const s = sunFor(t);
     return m < s.rise || m > s.set;
   }
-  function airTemp(state2, t) {
-    return baseAirTemp(state2, t) - hazardColder(state2, t);
+  function airTemp(state3, t) {
+    return baseAirTemp(state3, t) - hazardColder(state3, t);
   }
-  function baseAirTemp(state2, t) {
-    const w = state2.weather;
+  function baseAirTemp(state3, t) {
+    const w2 = state3.weather;
     const m = (t % 1440 + 1440) % 1440;
     const s = sunFor(t);
     const peak = 15 * 60;
-    const ease = (a, b, f) => a + (b - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
+    const ease = (a, b2, f) => a + (b2 - a) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, f)))) / 2;
     if (m < s.rise) {
       const span2 = 1440 - peak + s.rise;
       const f = (m + 1440 - peak) / span2;
-      return Math.floor(t / 1440) === w.day ? ease(w.prevHigh, w.low, f) : ease(w.high, w.nextLow, f);
+      return Math.floor(t / 1440) === w2.day ? ease(w2.prevHigh, w2.low, f) : ease(w2.high, w2.nextLow, f);
     }
-    if (m <= peak) return ease(w.low, w.high, (m - s.rise) / (peak - s.rise));
+    if (m <= peak) return ease(w2.low, w2.high, (m - s.rise) / (peak - s.rise));
     const span = 1440 - peak + s.rise;
-    return ease(w.high, w.nextLow, (m - peak) / span);
+    return ease(w2.high, w2.nextLow, (m - peak) / span);
   }
-  function weatherInfo(state2) {
-    return WEATHER_TYPES[state2.weather.type];
+  function weatherInfo(state3) {
+    return WEATHER_TYPES[state3.weather.type];
   }
-  function isBadWeather(state2) {
-    return ["heavy_rain", "windstorm", "snow", "ice_storm", "smoke"].includes(state2.weather.type);
+  function isBadWeather(state3) {
+    return ["heavy_rain", "windstorm", "snow", "ice_storm", "smoke"].includes(state3.weather.type);
   }
-  function solarToday(state2) {
-    const month = monthOfDay(state2.weather.day);
-    return CLIMATE[month].solar * WEATHER_TYPES[state2.weather.type].solar;
+  function solarToday(state3) {
+    const month = monthOfDay(state3.weather.day);
+    return CLIMATE[month].solar * WEATHER_TYPES[state3.weather.type].solar;
   }
 
   // src/engine/skills.js
@@ -3181,9 +3181,9 @@
   var MAX_LEVEL = 5;
   var BOOK_XP = 25;
   var READ_MINUTES = 120;
-  function skillsOf(state2) {
-    if (!state2.skills || typeof state2.skills !== "object") state2.skills = {};
-    const s = state2.skills;
+  function skillsOf(state3) {
+    if (!state3.skills || typeof state3.skills !== "object") state3.skills = {};
+    const s = state3.skills;
     if (!s.xp || typeof s.xp !== "object") s.xp = {};
     if (!Array.isArray(s.books)) s.books = [];
     return s;
@@ -3193,73 +3193,73 @@
     for (let i = 1; i <= MAX_LEVEL; i++) if (xp >= LEVEL_XP[i]) lvl = i;
     return lvl;
   }
-  function skillLevel(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+  function skillLevel(state3, key) {
+    const xp = state3.skills && state3.skills.xp ? state3.skills.xp[key] || 0 : 0;
     return levelFor(xp);
   }
   var DAILY_FULL = 20;
-  function practice(state2, key, amount = 1, { book = false } = {}) {
-    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state2, key);
-    const s = skillsOf(state2);
+  function practice(state3, key, amount = 1, { book = false } = {}) {
+    if (!SKILLS[key] || !(amount > 0)) return skillLevel(state3, key);
+    const s = skillsOf(state3);
     if (!book) {
-      const day = dayIndex(state2.time);
+      const day = dayIndex(state3.time);
       if (!s.today || s.today.day !== day) s.today = { day, uses: {} };
       const n = (s.today.uses[key] || 0) + 1;
       s.today.uses[key] = n;
       if (n > DAILY_FULL) amount /= 2;
     }
-    amount *= xpFactor(state2);
+    amount *= xpFactor(state3);
     const before = levelFor(s.xp[key] || 0);
     s.xp[key] = (s.xp[key] || 0) + amount;
     const after = levelFor(s.xp[key]);
     if (after > before) {
       const sk = SKILLS[key];
       const extra = sk.notice[after] ? ` ${sk.notice[after]}` : "";
-      log(state2, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
+      log(state3, `${sk.name} skill is now level ${after}. ${sk.perLevel}${extra}`, "good");
     }
     return after;
   }
-  function skillProgress(state2, key) {
-    const xp = state2.skills && state2.skills.xp ? state2.skills.xp[key] || 0 : 0;
+  function skillProgress(state3, key) {
+    const xp = state3.skills && state3.skills.xp ? state3.skills.xp[key] || 0 : 0;
     const lvl = levelFor(xp);
     if (lvl >= MAX_LEVEL) return { key, name: SKILLS[key].name, level: lvl, xp, next: null, frac: 1 };
     const lo = LEVEL_XP[lvl];
     const hi = LEVEL_XP[lvl + 1];
     return { key, name: SKILLS[key].name, level: lvl, xp, next: hi - xp, frac: (xp - lo) / (hi - lo) };
   }
-  function allSkills(state2) {
-    return Object.keys(SKILLS).map((k) => skillProgress(state2, k));
+  function allSkills(state3) {
+    return Object.keys(SKILLS).map((k) => skillProgress(state3, k));
   }
-  function hasRead(state2, bookId) {
-    return !!(state2.skills && Array.isArray(state2.skills.books) && state2.skills.books.includes(bookId));
+  function hasRead(state3, bookId) {
+    return !!(state3.skills && Array.isArray(state3.skills.books) && state3.skills.books.includes(bookId));
   }
-  function searchTimeFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "scavenging");
+  function searchTimeFactor(state3) {
+    return 1 - 0.08 * skillLevel(state3, "scavenging");
   }
-  function forceBonus(state2) {
-    const l = skillLevel(state2, "tinkering");
+  function forceBonus(state3) {
+    const l = skillLevel(state3, "tinkering");
     return l ? [["tinkering", l]] : [];
   }
-  function bandageHealFactor(state2) {
-    return 1 - 0.08 * skillLevel(state2, "first_aid");
+  function bandageHealFactor(state3) {
+    return 1 - 0.08 * skillLevel(state3, "first_aid");
   }
-  function infectRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "first_aid");
+  function infectRiskFactor(state3) {
+    return 1 - 0.1 * skillLevel(state3, "first_aid");
   }
-  function cookMoraleBonus(state2) {
-    return skillLevel(state2, "cooking");
+  function cookMoraleBonus(state3) {
+    return skillLevel(state3, "cooking");
   }
-  function boilTimeFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "cooking");
+  function boilTimeFactor(state3) {
+    return 1 - 0.1 * skillLevel(state3, "cooking");
   }
-  function fireBonusFactor(state2) {
-    return 1 + 0.06 * skillLevel(state2, "survival");
+  function fireBonusFactor(state3) {
+    return 1 + 0.06 * skillLevel(state3, "survival");
   }
-  function rawWaterRiskFactor(state2) {
-    return 1 - 0.1 * skillLevel(state2, "survival");
+  function rawWaterRiskFactor(state3) {
+    return 1 - 0.1 * skillLevel(state3, "survival");
   }
-  function noticeOf(state2) {
-    const l = skillLevel(state2, "scavenging");
+  function noticeOf(state3) {
+    const l = skillLevel(state3, "scavenging");
     return {
       level: l,
       countRadius: l >= 1 ? l >= 3 ? 8 : 5 : 0,
@@ -3397,12 +3397,12 @@
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
     return { pos: a, value: ((t ^ t >>> 14) >>> 0) / 4294967296 };
   }
-  function stream(state2, name) {
+  function stream(state3, name) {
     if (!name || typeof name !== "string") throw new Error("A random stream needs a name");
-    if (state2.seed == null) throw new Error("A random stream needs a game seed");
-    const start2 = () => hashString(`${state2.seed}:stream:${name}`) | 0;
+    if (state3.seed == null) throw new Error("A random stream needs a game seed");
+    const start2 = () => hashString(`${state3.seed}:stream:${name}`) | 0;
     return function rng() {
-      const all = state2.rngStreams = state2.rngStreams || {};
+      const all = state3.rngStreams = state3.rngStreams || {};
       const r = next(all[name] ?? start2());
       all[name] = r.pos;
       return r.value;
@@ -3429,59 +3429,59 @@
   var SPELLS = {
     ice_storm: {
       months: [11, 0, 1],
-      fits: (w) => ["rain", "heavy_rain", "snow"].includes(w.type) && w.low <= 34,
+      fits: (w2) => ["rain", "heavy_rain", "snow"].includes(w2.type) && w2.low <= 34,
       chance: 0.02,
       days: [1, 2],
-      shape: (w, r) => {
-        w.high = Math.min(w.high, 33);
-        w.nextLow = Math.min(w.nextLow, 28);
-        w.wind = 15 + Math.floor(r() * 21);
-        delete w.snowInches;
+      shape: (w2, r) => {
+        w2.high = Math.min(w2.high, 33);
+        w2.nextLow = Math.min(w2.nextLow, 28);
+        w2.wind = 15 + Math.floor(r() * 21);
+        delete w2.snowInches;
       },
       start: "Freezing rain. Every branch and wire wears a coat of ice. Trees and power lines will come down, and the roads are glass."
     },
     heat_wave: {
       months: [6, 7],
-      fits: (w) => ["clear", "cloudy"].includes(w.type),
+      fits: (w2) => ["clear", "cloudy"].includes(w2.type),
       chance: 0.012,
       days: [3, 5],
-      shape: (w, r) => {
-        w.high = 98 + Math.floor(r() * 9);
-        w.nextLow = Math.max(w.nextLow, 64);
-        w.wind = Math.floor(r() * 6);
+      shape: (w2, r) => {
+        w2.high = 98 + Math.floor(r() * 9);
+        w2.nextLow = Math.max(w2.nextLow, 64);
+        w2.wind = Math.floor(r() * 6);
       },
       start: "A heat wave. It will be over 100\xB0F in the afternoon. Drink more, and stay in the shade from noon to evening."
     },
     smoke: {
       months: [7, 8],
-      fits: (w) => ["clear", "cloudy", "fog"].includes(w.type),
+      fits: (w2) => ["clear", "cloudy", "fog"].includes(w2.type),
       chance: 0.012,
       days: [3, 7],
-      shape: (w) => {
-        w.high -= 4;
+      shape: (w2) => {
+        w2.high -= 4;
       },
       start: "Wildfire smoke. The sky is orange and the sun is a red disc. The air burns your throat outside; an N95 mask helps."
     }
   };
-  var pickInt = (r, [a, b]) => a + Math.floor(r() * (b - a + 1));
+  var pickInt = (r, [a, b2]) => a + Math.floor(r() * (b2 - a + 1));
   var SNOW_KEEP = 0.28;
-  function rollSpell(state2, day, old = {}) {
+  function rollSpell(state3, day, old = {}) {
     const prev = old.spell;
-    const w = state2.weather;
-    const r = stream(state2, "weather-rare");
+    const w2 = state3.weather;
+    const r = stream(state3, "weather-rare");
     const month = monthOfDay2(day);
-    if (w.type === "snow") {
+    if (w2.type === "snow") {
       const keep = old.type === "snow" || r() < SNOW_KEEP;
       if (!keep) {
-        w.type = "rain";
-        delete w.snowInches;
+        w2.type = "rain";
+        delete w2.snowInches;
       }
     }
     let spell = null;
     if (prev && prev.daysLeft > 1) spell = { id: prev.id, daysLeft: prev.daysLeft - 1, started: false };
     else {
       for (const [id, s] of Object.entries(SPELLS)) {
-        if (!s.months.includes(month) || !s.fits(w)) continue;
+        if (!s.months.includes(month) || !s.fits(w2)) continue;
         if (r() < s.chance) {
           spell = { id, daysLeft: pickInt(r, s.days), started: true };
           break;
@@ -3489,11 +3489,11 @@
       }
     }
     if (!spell) return null;
-    w.baseType = w.type;
-    w.type = spell.id;
-    SPELLS[spell.id].shape(w, r);
-    w.nextLow = Math.min(w.nextLow, w.high - 3);
-    w.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
+    w2.baseType = w2.type;
+    w2.type = spell.id;
+    SPELLS[spell.id].shape(w2, r);
+    w2.nextLow = Math.min(w2.nextLow, w2.high - 3);
+    w2.spell = { id: spell.id, daysLeft: spell.daysLeft, first: spell.started };
     return spell;
   }
   function spellStartText(id) {
@@ -3501,44 +3501,44 @@
   }
 
   // src/engine/home.js
-  function homeStep(state2, dt, env) {
-    const h2 = state2.home;
+  function homeStep(state3, dt, env) {
+    const h3 = state3.home;
     const air = env.air;
     let heat = 0;
-    if (h2.fireHours > 0) {
-      heat += fireHeat(state2);
-      h2.fireHours = Math.max(0, h2.fireHours - dt);
-      if (h2.fireHours === 0 && state2.location.kind === "home") log(state2, "The fire in the fireplace burns out.");
+    if (h3.fireHours > 0) {
+      heat += fireHeat(state3);
+      h3.fireHours = Math.max(0, h3.fireHours - dt);
+      if (h3.fireHours === 0 && state3.location.kind === "home") log(state3, "The fire in the fireplace burns out.");
     }
-    if (h2.heaterOn) {
-      h2.battery -= 1.5 * dt;
+    if (h3.heaterOn) {
+      h3.battery -= 1.5 * dt;
       heat += 20;
-      if (h2.battery <= 0) {
-        h2.battery = 0;
-        h2.heaterOn = false;
-        log(state2, "The home battery is empty. The electric heater stops.", "warn");
+      if (h3.battery <= 0) {
+        h3.battery = 0;
+        h3.heaterOn = false;
+        log(state3, "The home battery is empty. The electric heater stops.", "warn");
       }
     }
     const passive = air + 6;
-    const lw = windowLoss(h2, "living");
+    const lw = windowLoss(h3, "living");
     const target = Math.min(75, passive + heat / lw);
-    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state2) * lw);
-    h2.indoorTemp += (target - h2.indoorTemp) * (1 - Math.pow(1 - rate, dt));
-    roomsStep(h2, passive, dt);
-    const m = (state2.time % 1440 + 1440) % 1440;
-    const s = sunFor(state2.time);
+    const rate = heat > 0 ? 0.25 : Math.min(0.9, 0.05 * heatLossFactor(state3) * lw);
+    h3.indoorTemp += (target - h3.indoorTemp) * (1 - Math.pow(1 - rate, dt));
+    roomsStep(h3, passive, dt);
+    const m = (state3.time % 1440 + 1440) % 1440;
+    const s = sunFor(state3.time);
     if (m > s.rise && m < s.set) {
       const hours = (s.set - s.rise) / 60;
-      h2.battery = Math.min(h2.batteryMax, h2.battery + solarToday(state2) / hours * dt);
+      h3.battery = Math.min(h3.batteryMax, h3.battery + solarToday(state3) / hours * dt);
     }
-    if (built(state2, "rain_barrels") && h2.rawGal < 110) {
-      const t = state2.weather.type;
+    if (built(state3, "rain_barrels") && h3.rawGal < 110) {
+      const t = state3.weather.type;
       const perH = t === "heavy_rain" ? 5 : t === "rain" || t === "windstorm" ? 2 : 0;
-      if (perH) h2.rawGal = Math.min(110, h2.rawGal + perH * dt);
+      if (perH) h3.rawGal = Math.min(110, h3.rawGal + perH * dt);
     }
-    if (h2.tapWorks && (air < 25 || dayIndex(state2.time) >= h2.tapStopDay)) {
-      h2.tapWorks = false;
-      log(state2, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
+    if (h3.tapWorks && (air < 25 || dayIndex(state3.time) >= h3.tapStopDay)) {
+      h3.tapWorks = false;
+      log(state3, air < 25 ? "Hard freeze. The water pipes are frozen. The kitchen tap stops." : "The kitchen tap coughs and stops. The city water is gone now.", "warn");
     }
   }
   var ROOMS = [
@@ -3552,90 +3552,90 @@
   var DOOR_CLOSED = 0.02;
   var BROKEN = 1.5;
   var BOARDED = 0.3;
-  function ensureRooms(h2) {
-    if (!h2.rooms) {
-      h2.rooms = {};
-      for (const r of ROOMS) if (r.id !== "living") h2.rooms[r.id] = { temp: h2.indoorTemp };
+  function ensureRooms(h3) {
+    if (!h3.rooms) {
+      h3.rooms = {};
+      for (const r of ROOMS) if (r.id !== "living") h3.rooms[r.id] = { temp: h3.indoorTemp };
     }
-    if (!h2.windows) h2.windows = {};
-    if (!h2.doorsClosed) h2.doorsClosed = {};
-    return h2;
+    if (!h3.windows) h3.windows = {};
+    if (!h3.doorsClosed) h3.doorsClosed = {};
+    return h3;
   }
-  function windowLoss(h2, room) {
-    const w = h2.windows?.[room];
-    if (!w) return 1;
-    return 1 + BROKEN * Math.max(0, (w.broken || 0) - (w.boarded || 0)) + BROKEN * BOARDED * (w.boarded || 0);
+  function windowLoss(h3, room) {
+    const w2 = h3.windows?.[room];
+    if (!w2) return 1;
+    return 1 + BROKEN * Math.max(0, (w2.broken || 0) - (w2.boarded || 0)) + BROKEN * BOARDED * (w2.boarded || 0);
   }
   var LIVING_SHARE = 1 / 3;
-  function roomsStep(h2, passive, dt) {
-    ensureRooms(h2);
-    for (const [id, r] of Object.entries(h2.rooms)) {
-      const kDoor = (h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
-      h2.indoorTemp += (r.temp - h2.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
+  function roomsStep(h3, passive, dt) {
+    ensureRooms(h3);
+    for (const [id, r] of Object.entries(h3.rooms)) {
+      const kDoor = (h3.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN) * LIVING_SHARE;
+      h3.indoorTemp += (r.temp - h3.indoorTemp) * (1 - Math.pow(1 - kDoor, dt));
     }
-    for (const [id, r] of Object.entries(h2.rooms)) {
-      const kOut = OUT_RATE * windowLoss(h2, id);
-      const kDoor = h2.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
-      const target = (kOut * passive + kDoor * h2.indoorTemp) / (kOut + kDoor);
+    for (const [id, r] of Object.entries(h3.rooms)) {
+      const kOut = OUT_RATE * windowLoss(h3, id);
+      const kDoor = h3.doorsClosed[id] ? DOOR_CLOSED : DOOR_OPEN;
+      const target = (kOut * passive + kDoor * h3.indoorTemp) / (kOut + kDoor);
       const rate = Math.min(0.9, kOut + kDoor);
       r.temp += (target - r.temp) * (1 - Math.pow(1 - rate, dt));
     }
   }
-  function roomTemp(state2, room) {
-    const h2 = state2.home;
-    if (room === "living" || !h2.rooms?.[room]) return h2.indoorTemp;
-    return h2.rooms[room].temp;
+  function roomTemp(state3, room) {
+    const h3 = state3.home;
+    if (room === "living" || !h3.rooms?.[room]) return h3.indoorTemp;
+    return h3.rooms[room].temp;
   }
-  function breakWindow(state2, room) {
-    var _a;
-    const h2 = ensureRooms(state2.home);
-    const w = (_a = h2.windows)[room] || (_a[room] = { broken: 0, boarded: 0 });
-    w.broken += 1;
+  function breakWindow(state3, room) {
+    var _a2;
+    const h3 = ensureRooms(state3.home);
+    const w2 = (_a2 = h3.windows)[room] || (_a2[room] = { broken: 0, boarded: 0 });
+    w2.broken += 1;
   }
-  function boardWindow(state2, room) {
-    const h2 = ensureRooms(state2.home);
-    const w = h2.windows[room];
-    if (!w || (w.boarded || 0) >= (w.broken || 0)) return false;
-    w.boarded = (w.boarded || 0) + 1;
+  function boardWindow(state3, room) {
+    const h3 = ensureRooms(state3.home);
+    const w2 = h3.windows[room];
+    if (!w2 || (w2.boarded || 0) >= (w2.broken || 0)) return false;
+    w2.boarded = (w2.boarded || 0) + 1;
     return true;
   }
   var SLEEP_SPOTS = { bedroom: { label: "Bedroom", bed: 10 }, living: { label: "By the fire", bed: 6 } };
-  function sleepSpot(state2) {
-    return SLEEP_SPOTS[state2.home.sleepSpot] ? state2.home.sleepSpot : "bedroom";
+  function sleepSpot(state3) {
+    return SLEEP_SPOTS[state3.home.sleepSpot] ? state3.home.sleepSpot : "bedroom";
   }
-  function setSleepSpot(state2, spot) {
+  function setSleepSpot(state3, spot) {
     if (!SLEEP_SPOTS[spot]) return false;
-    state2.home.sleepSpot = spot;
+    state3.home.sleepSpot = spot;
     return true;
   }
-  function sleepTemp(state2) {
-    const spot = sleepSpot(state2);
-    return { temp: roomTemp(state2, spot), bed: SLEEP_SPOTS[spot].bed, spot };
+  function sleepTemp(state3) {
+    const spot = sleepSpot(state3);
+    return { temp: roomTemp(state3, spot), bed: SLEEP_SPOTS[spot].bed, spot };
   }
-  function setDoor(state2, room, closed) {
-    const h2 = ensureRooms(state2.home);
-    if (!h2.rooms[room]) return false;
-    h2.doorsClosed[room] = !!closed;
+  function setDoor(state3, room, closed) {
+    const h3 = ensureRooms(state3.home);
+    if (!h3.rooms[room]) return false;
+    h3.doorsClosed[room] = !!closed;
     return true;
   }
-  function homeHeat(state2) {
-    const h2 = state2.home;
-    const air = environment(state2, "rest").air;
+  function homeHeat(state3) {
+    const h3 = state3.home;
+    const air = environment(state3, "rest").air;
     return {
       outside: Math.round(air),
-      sources: { fire: h2.fireHours > 0 ? fireHeat(state2) : 0, fireHours: h2.fireHours, heater: h2.heaterOn ? 20 : 0, stove: built(state2, "wood_stove") },
-      insulated: built(state2, "insulate_living"),
-      sleepSpot: sleepSpot(state2),
+      sources: { fire: h3.fireHours > 0 ? fireHeat(state3) : 0, fireHours: h3.fireHours, heater: h3.heaterOn ? 20 : 0, stove: built(state3, "wood_stove") },
+      insulated: built(state3, "insulate_living"),
+      sleepSpot: sleepSpot(state3),
       rooms: ROOMS.map((r) => {
-        const w = h2.windows?.[r.id] || { broken: 0, boarded: 0 };
+        const w2 = h3.windows?.[r.id] || { broken: 0, boarded: 0 };
         return {
           id: r.id,
           label: r.label,
-          temp: Math.round(roomTemp(state2, r.id) * 10) / 10,
-          brokenWindows: (w.broken || 0) - (w.boarded || 0),
-          boardedWindows: w.boarded || 0,
-          doorClosed: r.id === "living" ? null : !!h2.doorsClosed?.[r.id],
-          loss: Math.round(windowLoss(h2, r.id) * 100) / 100
+          temp: Math.round(roomTemp(state3, r.id) * 10) / 10,
+          brokenWindows: (w2.broken || 0) - (w2.boarded || 0),
+          boardedWindows: w2.boarded || 0,
+          doorClosed: r.id === "living" ? null : !!h3.doorsClosed?.[r.id],
+          loss: Math.round(windowLoss(h3, r.id) * 100) / 100
           // 1 = a whole, closed-up room
         };
       })
@@ -3643,37 +3643,37 @@
   }
   var WINDOW_BREAK = { windstorm: 0.08, ice_storm: 0.1, heavy_rain: 0.01 };
   var WINDOW_ROOMS = ["living", "kitchen", "bedroom", "bath"];
-  function stormWindows(state2) {
-    const p = WINDOW_BREAK[state2.weather?.type];
+  function stormWindows(state3) {
+    const p = WINDOW_BREAK[state3.weather?.type];
     if (!p) return null;
-    const r = stream(state2, "home");
+    const r = stream(state3, "home");
     if (r() >= p) return null;
     const room = WINDOW_ROOMS[Math.floor(r() * WINDOW_ROOMS.length)];
-    breakWindow(state2, room);
-    const label = ROOMS.find((x) => x.id === room)?.label?.toLowerCase() || room;
-    log(state2, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
+    breakWindow(state3, room);
+    const label = ROOMS.find((x2) => x2.id === room)?.label?.toLowerCase() || room;
+    log(state3, `A crash in the night: the storm broke a window in the ${label}. Cold air pours in. Board it up.`, "warn");
     return room;
   }
   var WATER_WARN = [10, 3];
-  function waterWarning(state2) {
-    const h2 = state2.home;
-    if (h2.tapWorks) return null;
-    const gal = (h2.tankGal || 0) + (h2.safeGal || 0);
-    const lvl = WATER_WARN.filter((x) => gal < x).pop() ?? null;
+  function waterWarning(state3) {
+    const h3 = state3.home;
+    if (h3.tapWorks) return null;
+    const gal = (h3.tankGal || 0) + (h3.safeGal || 0);
+    const lvl = WATER_WARN.filter((x2) => gal < x2).pop() ?? null;
     if (lvl == null) {
-      delete h2.waterWarned;
+      delete h3.waterWarned;
       return null;
     }
-    if (h2.waterWarned != null && h2.waterWarned <= lvl) return null;
-    h2.waterWarned = lvl;
-    log(state2, lvl <= 3 ? `Only ${gal.toFixed(1)} gal of clean water left. Find water today: rain, a creek to boil, or bottles in stores.` : `The stored water is getting low (${gal.toFixed(1)} gal). Rain barrels and a filter would keep it full.`, lvl <= 3 ? "danger" : "warn");
+    if (h3.waterWarned != null && h3.waterWarned <= lvl) return null;
+    h3.waterWarned = lvl;
+    log(state3, lvl <= 3 ? `Only ${gal.toFixed(1)} gal of clean water left. Find water today: rain, a creek to boil, or bottles in stores.` : `The stored water is getting low (${gal.toFixed(1)} gal). Rain barrels and a filter would keep it full.`, lvl <= 3 ? "danger" : "warn");
     return lvl;
   }
-  function homeDaily(state2) {
-    stormWindows(state2);
-    waterWarning(state2);
-    const filtered = runAutoFilter(state2);
-    if (filtered >= 0.25) log(state2, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
+  function homeDaily(state3) {
+    stormWindows(state3);
+    waterWarning(state3);
+    const filtered = runAutoFilter(state3);
+    if (filtered >= 0.25) log(state3, `The filter station cleaned ${filtered.toFixed(1)} gal of rain water overnight.`, "good");
   }
   var homeSystem = {
     id: "home",
@@ -3686,8 +3686,8 @@
     owns: ["home"],
     // The fire and the battery run out inside a day.
     catchUp: "event",
-    step: (state2, dtHours, ctx) => homeStep(state2, dtHours, environment(state2, ctx.mode)),
-    daily: (state2) => homeDaily(state2)
+    step: (state3, dtHours, ctx) => homeStep(state3, dtHours, environment(state3, ctx.mode)),
+    daily: (state3) => homeDaily(state3)
   };
 
   // src/engine/placesdb.js
@@ -3732,15 +3732,15 @@
     "Grass hides the road lines. Some side streets look like trails.",
     "Young alder trees stand in the parking lots, taller than the cars."
   ];
-  function seasonDaily(state2, day) {
+  function seasonDaily(state3, day) {
     const t = day * 1440;
-    const prev = state2.season || seasonOf(t);
+    const prev = state3.season || seasonOf(t);
     const now = seasonOf(t);
-    if (now !== prev) log(state2, SEASON_START_TEXT[now], "story");
-    state2.season = now;
+    if (now !== prev) log(state3, SEASON_START_TEXT[now], "story");
+    state3.season = now;
     if (calendar(t).date === 24 && day > 0) {
       const n = Math.round(day / 30.4) - 1;
-      log(state2, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
+      log(state3, GROWTH_TEXT[Math.min(GROWTH_TEXT.length - 1, Math.max(0, n))], "story");
     }
   }
   var LEAF = { winter: 0.4, spring: 0.8, summer: 1, fall: 0.7 };
@@ -3769,14 +3769,14 @@
   }
   var SPLIT = /* @__PURE__ */ new Set(["player", "home", "location", "dog", "weather", "stats", "places", "houses", "houseAreas", "flags", "world", "systemVersions", "rngStreams"]);
   var SKIP = /* @__PURE__ */ new Set(["log", "journal"]);
-  var h = (v) => hashString(JSON.stringify(v ?? null)).toString(36);
+  var h = (v2) => hashString(JSON.stringify(v2 ?? null)).toString(36);
   function fieldHashes(s) {
     const out = {};
-    for (const [k, v] of Object.entries(s)) {
+    for (const [k, v2] of Object.entries(s)) {
       if (SKIP.has(k)) continue;
-      if (SPLIT.has(k) && v && typeof v === "object" && !Array.isArray(v)) {
-        for (const [k2, v2] of Object.entries(v)) out[`${k}.${k2}`] = h(v2);
-      } else out[k] = h(v);
+      if (SPLIT.has(k) && v2 && typeof v2 === "object" && !Array.isArray(v2)) {
+        for (const [k2, v22] of Object.entries(v2)) out[`${k}.${k2}`] = h(v22);
+      } else out[k] = h(v2);
     }
     return out;
   }
@@ -3790,41 +3790,41 @@
     let snap = null;
     let n = 0;
     let deep = false;
-    function begin(state2, action) {
-      if (open) end(state2);
+    function begin(state3, action) {
+      if (open) end(state3);
       open = {
         n: ++n,
         action,
-        t0: state2.time,
-        t1: state2.time,
+        t0: state3.time,
+        t1: state3.time,
         minutes: 0,
         lines: [],
         rng: { shared: false, streams: [] },
         changed: null
       };
       snap = {
-        rngState: state2.rngState,
-        streams: { ...state2.rngStreams || {} },
-        fields: deep ? fieldHashes(state2) : null
+        rngState: state3.rngState,
+        streams: { ...state3.rngStreams || {} },
+        fields: deep ? fieldHashes(state3) : null
       };
       return open;
     }
-    function end(state2) {
+    function end(state3) {
       if (!open) return null;
       const r = open;
-      r.t1 = state2.time;
+      r.t1 = state3.time;
       r.minutes = r.t1 - r.t0;
-      r.rng.shared = state2.rngState !== snap.rngState;
-      const now = state2.rngStreams || {};
+      r.rng.shared = state3.rngState !== snap.rngState;
+      const now = state3.rngStreams || {};
       r.rng.streams = Object.keys(now).filter((k) => now[k] !== snap.streams[k]).sort();
-      if (snap.fields) r.changed = changedPaths(snap.fields, fieldHashes(state2));
+      if (snap.fields) r.changed = changedPaths(snap.fields, fieldHashes(state3));
       records.push(r);
       if (records.length > limit) records.splice(0, records.length - limit);
       open = null;
       snap = null;
       return r;
     }
-    function line(state2, entry) {
+    function line(state3, entry) {
       const src = currentSource();
       const l = { t: entry.t, text: entry.text, kind: entry.kind, sys: src.sys || null, hook: src.hook || null };
       if (open) open.lines.push(l);
@@ -3859,8 +3859,8 @@
     for (const k of Object.keys(sys)) {
       if (!KNOWN.has(k)) throw new Error(`System "${sys.id}": unknown field "${k}"`);
     }
-    for (const h2 of HOOKS) {
-      if (sys[h2] != null && typeof sys[h2] !== "function") throw new Error(`System "${sys.id}": ${h2} must be a function`);
+    for (const h3 of HOOKS) {
+      if (sys[h3] != null && typeof sys[h3] !== "function") throw new Error(`System "${sys.id}": ${h3} must be a function`);
     }
     const version = sys.version ?? 1;
     if (!Number.isInteger(version) || version < 1) throw new Error(`System "${sys.id}": version must be a whole number from 1`);
@@ -3871,8 +3871,8 @@
       throw new Error(`System "${sys.id}": catchUp must be one of ${CATCH_UP.join(", ")}`);
     }
     const migrations = sys.migrations || {};
-    for (let v = 2; v <= version; v++) {
-      if (typeof migrations[v] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v}`);
+    for (let v2 = 2; v2 <= version; v2++) {
+      if (typeof migrations[v2] !== "function") throw new Error(`System "${sys.id}": no migration to version ${v2}`);
     }
     return Object.freeze({ order: 100, ...sys, version, migrations });
   }
@@ -3888,28 +3888,28 @@
       }
       for (const f of s.owns || []) owner.set(f, s.id);
       byId3.set(s.id, s);
-      ordered = [...byId3.values()].sort((a, b) => a.order - b.order);
+      ordered = [...byId3.values()].sort((a, b2) => a.order - b2.order);
       return s;
     }
     for (const s of list) add(s);
-    const snapOthers = (state2, id) => {
+    const snapOthers = (state3, id) => {
       const allowed = new Set(byId3.get(id)?.effects || []);
       const out = {};
-      for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state2[f] ?? null);
+      for (const [f, who] of owner) if (who !== id && !allowed.has(f)) out[f] = JSON.stringify(state3[f] ?? null);
       return out;
     };
-    function run2(hook, state2, arg, ctx) {
+    function run2(hook, state3, arg, ctx) {
       for (const s of ordered) {
         if (!s[hook]) continue;
-        const call = () => s[hook](state2, arg, ctx);
+        const call = () => s[hook](state3, arg, ctx);
         if (!dev || !owner.size) {
           withSource({ sys: s.id, hook }, call);
           continue;
         }
-        const before = snapOthers(state2, s.id);
+        const before = snapOthers(state3, s.id);
         withSource({ sys: s.id, hook }, call);
-        for (const [f, v] of Object.entries(before)) {
-          if (JSON.stringify(state2[f] ?? null) !== v) {
+        for (const [f, v2] of Object.entries(before)) {
+          if (JSON.stringify(state3[f] ?? null) !== v2) {
             throw new Error(`Dual write: system "${s.id}" changed "${f}" in ${hook}(), but "${owner.get(f)}" owns it`);
           }
         }
@@ -3924,12 +3924,12 @@
       // simulation must not skip time for these.
       missingCatchUp: () => ordered.filter((s) => !s.catchUp).map((s) => s.id),
       list: () => ordered.slice(),
-      init: (state2, ctx) => {
-        run2("init", state2, void 0, ctx);
-        state2.systemVersions = Object.fromEntries(ordered.map((s) => [s.id, s.version]));
+      init: (state3, ctx) => {
+        run2("init", state3, void 0, ctx);
+        state3.systemVersions = Object.fromEntries(ordered.map((s) => [s.id, s.version]));
       },
-      step: (state2, dtHours, ctx) => run2("step", state2, dtHours, ctx),
-      daily: (state2, day, ctx) => run2("daily", state2, day, ctx)
+      step: (state3, dtHours, ctx) => run2("step", state3, dtHours, ctx),
+      daily: (state3, day, ctx) => run2("daily", state3, day, ctx)
     };
   }
 
@@ -3938,57 +3938,57 @@
   var DAY_START_MINUTE = 5 * 60;
   var dayIndex2 = (t) => Math.floor(t / 1440);
   var gameDay = (t) => dayIndex2(t - DAY_START_MINUTE);
-  function sendDeath(state2, events) {
-    if (!state2.dead || !events || state2.deathSent) return;
-    state2.deathSent = true;
-    events.emit("player.died", { cause: state2.dead.cause, days: state2.dead.days, time: state2.time });
+  function sendDeath(state3, events) {
+    if (!state3.dead || !events || state3.deathSent) return;
+    state3.deathSent = true;
+    events.emit("player.died", { cause: state3.dead.cause, days: state3.dead.days, time: state3.time });
   }
   function createClock({ systems, events = null, stepMinutes = STEP_MINUTES } = {}) {
     if (!systems) throw new Error("The clock needs a systems list");
     let running = false;
-    function advance(state2, minutes, mode = "rest") {
+    function advance(state3, minutes, mode = "rest") {
       if (!(minutes >= 0)) throw new Error(`Bad number of minutes: ${minutes}`);
       if (running) throw new Error("Time was moved inside a clock step (time charged twice)");
       running = true;
       try {
-        return run2(state2, minutes, mode);
+        return run2(state3, minutes, mode);
       } finally {
         running = false;
       }
     }
-    function run2(state2, minutes, mode) {
+    function run2(state3, minutes, mode) {
       let left = minutes;
       const ctx = { mode, events, clock: api };
-      while (left > 1e-4 && !state2.dead) {
+      while (left > 1e-4 && !state3.dead) {
         const step = Math.min(stepMinutes, left);
-        const before = state2.time;
-        state2.time += step;
+        const before = state3.time;
+        state3.time += step;
         left -= step;
         const dBefore = gameDay(before);
-        const dAfter = gameDay(state2.time);
-        for (let d = dBefore + 1; d <= dAfter; d++) {
-          systems.daily(state2, d, ctx);
-          events?.emit("day.start", { day: d, time: state2.time });
+        const dAfter = gameDay(state3.time);
+        for (let d2 = dBefore + 1; d2 <= dAfter; d2++) {
+          systems.daily(state3, d2, ctx);
+          events?.emit("day.start", { day: d2, time: state3.time });
         }
-        systems.step(state2, step / 60, ctx);
-        if (state2._stop) {
-          delete state2._stop;
+        systems.step(state3, step / 60, ctx);
+        if (state3._stop) {
+          delete state3._stop;
           break;
         }
       }
-      sendDeath(state2, events);
-      return state2;
+      sendDeath(state3, events);
+      return state3;
     }
     const api = { advance, stepMinutes };
     return api;
   }
 
   // src/core/save.js
-  function migrate(state2, { version, gameMigrations = {}, systems = null } = {}) {
-    let s = structuredCloneSafe(state2);
+  function migrate(state3, { version, gameMigrations = {}, systems = null } = {}) {
+    let s = structuredCloneSafe(state3);
     if (s.version == null) s.version = 1;
     s.version = Number(s.version);
-    if (!Number.isInteger(s.version) || s.version < 1) throw new Error(`Bad save version: ${state2.version}`);
+    if (!Number.isInteger(s.version) || s.version < 1) throw new Error(`Bad save version: ${state3.version}`);
     if (version != null) {
       if (s.version > version) throw new Error(`This save is from a newer game (v${s.version}). Update the game first.`);
       while (s.version < version) {
@@ -4004,18 +4004,18 @@
         s.systemVersions = Object.fromEntries(systems.list().filter((sys) => sys.legacy).map((sys) => [sys.id, 1]));
       }
       for (const sys of systems.list()) {
-        let v = s.systemVersions[sys.id];
-        if (v == null) {
+        let v2 = s.systemVersions[sys.id];
+        if (v2 == null) {
           if (sys.init) sys.init(s, {});
           s.systemVersions[sys.id] = sys.version;
           continue;
         }
-        if (v > sys.version) throw new Error(`Save has ${sys.id} v${v}, game has v${sys.version}`);
-        while (v < sys.version) {
-          v += 1;
-          s = sys.migrations[v](s) || s;
+        if (v2 > sys.version) throw new Error(`Save has ${sys.id} v${v2}, game has v${sys.version}`);
+        while (v2 < sys.version) {
+          v2 += 1;
+          s = sys.migrations[v2](s) || s;
         }
-        s.systemVersions[sys.id] = v;
+        s.systemVersions[sys.id] = v2;
       }
     }
     return s;
@@ -4037,7 +4037,7 @@
     const radiusM = radiusMiles * 1609.344;
     const maxCell = Math.ceil(radiusM / cellMeters);
     const toMeters = ({ lat, lon }) => ({ x: (lon - origin.lon) * mPerDegLon, z: (origin.lat - lat) * M_PER_DEG_LAT });
-    const toLatLon = ({ x, z }) => ({ lat: origin.lat - z / M_PER_DEG_LAT, lon: origin.lon + x / mPerDegLon });
+    const toLatLon = ({ x: x2, z: z2 }) => ({ lat: origin.lat - z2 / M_PER_DEG_LAT, lon: origin.lon + x2 / mPerDegLon });
     const keyOf = (cx, cz) => `${cx},${cz}`;
     const parse = (key) => {
       const [cx, cz] = key.split(",").map(Number);
@@ -4055,9 +4055,9 @@
     }
     function inArea(key) {
       const { cx, cz } = parse(key);
-      const x = (cx + 0.5) * cellMeters;
-      const z = (cz + 0.5) * cellMeters;
-      return Math.hypot(x, z) <= radiusM + cellMeters;
+      const x2 = (cx + 0.5) * cellMeters;
+      const z2 = (cz + 0.5) * cellMeters;
+      return Math.hypot(x2, z2) <= radiusM + cellMeters;
     }
     function bucket(list) {
       const out = /* @__PURE__ */ new Map();
@@ -4073,19 +4073,19 @@
 
   // src/core/changes.js
   var CHANGE_KINDS = ["taken", "opened", "closed", "emptied", "moved", "damaged", "discovered", "set"];
-  function log2(state2) {
-    state2.world = state2.world || {};
-    state2.world.changes = state2.world.changes || {};
-    return state2.world.changes;
+  function log2(state3) {
+    state3.world = state3.world || {};
+    state3.world.changes = state3.world.changes || {};
+    return state3.world.changes;
   }
-  function recordChange(state2, locKey, change) {
+  function recordChange(state3, locKey, change) {
     if (!locKey) throw new Error("A change needs a location key");
     if (!change || !change.o) throw new Error("A change needs an object id (o)");
     if (!CHANGE_KINDS.includes(change.k)) throw new Error(`Unknown change kind "${change.k}"`);
-    const list = log2(state2)[locKey] = log2(state2)[locKey] || [];
+    const list = log2(state3)[locKey] = log2(state3)[locKey] || [];
     const rec = { o: String(change.o), k: change.k };
     if (change.v !== void 0) rec.v = change.v;
-    if (state2.time != null) rec.t = Math.round(state2.time);
+    if (state3.time != null) rec.t = Math.round(state3.time);
     const same = (r) => r.o === rec.o && (r.k === rec.k || ["opened", "closed"].includes(r.k) && ["opened", "closed"].includes(rec.k));
     const i = list.findIndex(same);
     if (i >= 0) {
@@ -4095,8 +4095,8 @@
     list.push(rec);
     return rec;
   }
-  var changesFor = (state2, locKey) => state2.world?.changes?.[locKey] || [];
-  var hasChange = (state2, locKey, o, k) => changesFor(state2, locKey).some((r) => r.o === String(o) && r.k === k);
+  var changesFor = (state3, locKey) => state3.world?.changes?.[locKey] || [];
+  var hasChange = (state3, locKey, o, k) => changesFor(state3, locKey).some((r) => r.o === String(o) && r.k === k);
 
   // src/data/events.js
   var raining = (s) => ["rain", "heavy_rain", "windstorm", "ice_storm"].includes(s.weather?.type);
@@ -4184,32 +4184,32 @@
       [0, "Despair", "\u22122 on d20 rolls. Sleep rests you less."]
     ]
   };
-  function statStage(key, v) {
+  function statStage(key, v2) {
     const rows = STAGES[key];
-    for (let i = 0; i < rows.length; i++) if (v >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
+    for (let i = 0; i < rows.length; i++) if (v2 >= rows[i][0]) return { stage: i, word: rows[i][1], effect: rows[i][2] };
     const last = rows.length - 1;
     return { stage: last, word: rows[last][1], effect: rows[last][2] };
   }
-  function needWarnings(state2) {
-    const p = state2.player;
-    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b) => b.stage - a.stage);
+  function needWarnings(state3) {
+    const p = state3.player;
+    return Object.keys(STAGES).map((key) => ({ key, ...statStage(key, p[key]) })).filter((s) => s.stage > 0 && s.word).sort((a, b2) => b2.stage - a.stage);
   }
-  function risks(state2) {
-    const p = state2.player;
+  function risks(state3) {
+    const p = state3.player;
     const out = [];
     if (!p.illness.infection) {
       const open = p.injuries.filter((i) => !i.bandaged && i.infectRisk);
       if (open.length) {
-        const pct = Math.round((1 - open.reduce((q, i) => q * (1 - i.infectRisk), 1)) * 100);
+        const pct = Math.round((1 - open.reduce((q2, i) => q2 * (1 - i.infectRisk), 1)) * 100);
         out.push({ id: "infection", text: `Infection risk ${pct}% a day: bandage the open wound${open.length > 1 ? "s" : ""}` });
       }
     }
-    const rate = warmthRate(feltTemp(state2, "rest"));
+    const rate = warmthRate(feltTemp(state3, "rest"));
     if (p.warmth >= 25 && p.warmth < 60 && rate < 0) {
-      const h2 = (p.warmth - 25) / -rate;
-      out.push({ id: "hypothermia", text: `Hypothermia in about ${h2 < 1 ? `${Math.max(5, Math.round(h2 * 60 / 5) * 5)} min` : `${Math.round(h2)} h`} here: get warm` });
+      const h3 = (p.warmth - 25) / -rate;
+      out.push({ id: "hypothermia", text: `Hypothermia in about ${h3 < 1 ? `${Math.max(5, Math.round(h3 * 60 / 5) * 5)} min` : `${Math.round(h3)} h`} here: get warm` });
     }
-    if (p.wetness >= 50 && feltTemp(state2, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
+    if (p.wetness >= 50 && feltTemp(state3, "rest") < 60) out.push({ id: "wet", text: `Wet clothes (${Math.round(p.wetness)}%): you lose heat fast. Dry them inside, best by a fire` });
     if (p.water >= 25 && p.water < 40) out.push({ id: "dehydration", text: "Water is low: drink soon" });
     if (p.food >= 25 && p.food < 35) out.push({ id: "hunger", text: "Food is low: eat soon" });
     return out;
@@ -4228,12 +4228,12 @@
   var REPEAT_GAP_DAYS = 2;
   var MAX_SMALL_CHANCE = 0.12;
   var monthOf = (t) => START_MONTH + Math.floor(Math.max(0, gameDay(t)) / 30);
-  function initPacer(state2) {
-    state2.pacer = { tension: 0, hourAcc: 0, quietHours: 0, lastEventDay: null, lastBigDay: null, recent: [], count: 0 };
+  function initPacer(state3) {
+    state3.pacer = { tension: 0, hourAcc: 0, quietHours: 0, lastEventDay: null, lastBigDay: null, recent: [], count: 0 };
   }
-  function whereNow(state2, mode) {
+  function whereNow(state3, mode) {
     if (mode === "sleep") return "asleep";
-    const k = state2.location?.kind;
+    const k = state3.location?.kind;
     if (mode === "walk" || k === "wild" || k === "street") return "outside";
     if (k === "home") return "home";
     return "inside";
@@ -4241,40 +4241,40 @@
   function eventChance(tension) {
     return Math.max(0, Math.min(MAX_SMALL_CHANCE, (tension - THRESHOLD) / SLOPE));
   }
-  function inTrouble(state2) {
-    const fresh = (state2.player.injuries || []).some((i) => (i.ageH ?? 99) < 24);
-    return fresh || needWarnings(state2).length >= 2;
+  function inTrouble(state3) {
+    const fresh = (state3.player.injuries || []).some((i) => (i.ageH ?? 99) < 24);
+    return fresh || needWarnings(state3).length >= 2;
   }
-  function candidates(state2, mode, events = EVENTS) {
-    const p = state2.pacer;
-    const day = gameDay(state2.time);
-    const month = monthOf(state2.time);
-    const where = whereNow(state2, mode);
+  function candidates(state3, mode, events = EVENTS) {
+    const p = state3.pacer;
+    const day = gameDay(state3.time);
+    const month = monthOf(state3.time);
+    const where = whereNow(state3, mode);
     return events.filter((e) => {
       if (e.where !== where && !(e.where === "any" && where !== "asleep")) return false;
       if (e.months && (month < e.months[0] || month > e.months[1])) return false;
       if (p.recent.some((r) => r.id === e.id && day - r.day < REPEAT_GAP_DAYS)) return false;
       if (e.size === "big" && p.lastBigDay != null && day - p.lastBigDay < BIG_GAP_DAYS) return false;
-      if (e.when && !e.when(state2, { mode })) return false;
+      if (e.when && !e.when(state3, { mode })) return false;
       return true;
     });
   }
-  function pick(state2, list, rng) {
-    const mercy = inTrouble(state2);
-    const w = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
-    const total = list.reduce((a, e) => a + w(e), 0);
+  function pick(state3, list, rng) {
+    const mercy = inTrouble(state3);
+    const w2 = (e) => (e.size === "big" ? mercy ? 0.5 : 1 : e.size === "medium" ? 3 : 8) * (e.w ?? 1);
+    const total = list.reduce((a, e) => a + w2(e), 0);
     let r = rng() * total;
     for (const e of list) {
-      r -= w(e);
+      r -= w2(e);
       if (r < 0) return e;
     }
     return list[list.length - 1];
   }
-  function fire(state2, e, rng, mode) {
-    const p = state2.pacer;
-    const day = gameDay(state2.time);
-    if (e.apply) e.apply(state2, { rng, mode });
-    log(state2, e.text, e.kind || (e.size === "big" ? "warn" : "story"));
+  function fire(state3, e, rng, mode) {
+    const p = state3.pacer;
+    const day = gameDay(state3.time);
+    if (e.apply) e.apply(state3, { rng, mode });
+    log(state3, e.text, e.kind || (e.size === "big" ? "warn" : "story"));
     p.tension = Math.max(0, p.tension - WEIGHT[e.size]);
     p.lastEventDay = day;
     if (e.size === "big") p.lastBigDay = day;
@@ -4284,30 +4284,30 @@
     p.quietHours = 0;
   }
   var ASLEEP_RATE = 0.4;
-  function pacerHour(state2, mode, events = EVENTS) {
-    const p = state2.pacer;
+  function pacerHour(state3, mode, events = EVENTS) {
+    const p = state3.pacer;
     p.tension = Math.min(100, p.tension + RISE_PER_HOUR + (mode === "walk" ? RISE_OUTSIDE : 0));
     p.quietHours = (p.quietHours || 0) + 1;
-    const rng = stream(state2, "pacer");
+    const rng = stream(state3, "pacer");
     const overdue = p.quietHours >= QUIET_LIMIT_HOURS;
     const rate = mode === "sleep" ? ASLEEP_RATE : 1;
     if (rng() >= eventChance(p.tension) * rate && !overdue) return null;
-    let list = candidates(state2, mode, events);
+    let list = candidates(state3, mode, events);
     if (overdue) list = list.filter((e2) => e2.size === "small");
     if (!list.length) return null;
-    const e = pick(state2, list, rng);
-    fire(state2, e, rng, mode);
+    const e = pick(state3, list, rng);
+    fire(state3, e, rng, mode);
     return e;
   }
-  function pacerInfo(state2) {
-    const p = state2.pacer || {};
+  function pacerInfo(state3) {
+    const p = state3.pacer || {};
     return {
       tension: Math.round(p.tension || 0),
       chancePerHour: eventChance(p.tension || 0),
       lastEventDay: p.lastEventDay ?? null,
       lastBigDay: p.lastBigDay ?? null,
       events: p.count || 0,
-      month: monthOf(state2.time)
+      month: monthOf(state3.time)
     };
   }
   var pacerSystem = {
@@ -4322,14 +4322,14 @@
     effects: ["home", "dog"],
     // Hour by hour with thresholds: time must be played, not skipped.
     catchUp: "event",
-    init: (state2) => initPacer(state2),
-    step: (state2, dtHours, ctx) => {
-      if (!state2.pacer) initPacer(state2);
-      const p = state2.pacer;
+    init: (state3) => initPacer(state3),
+    step: (state3, dtHours, ctx) => {
+      if (!state3.pacer) initPacer(state3);
+      const p = state3.pacer;
       p.hourAcc += dtHours;
-      while (p.hourAcc >= 1 - 1e-9 && !state2.dead) {
+      while (p.hourAcc >= 1 - 1e-9 && !state3.dead) {
         p.hourAcc -= 1;
-        pacerHour(state2, ctx.mode);
+        pacerHour(state3, ctx.mode);
       }
     }
   };
@@ -4349,48 +4349,48 @@
   // src/engine/decay.js
   var byId = new Map(DECAY.map((r) => [r.id, r]));
   var monthStartDay = (m) => (m - START_MONTH) * 30;
-  function failDay(state2, row, area) {
-    const u = ((hashString(`${state2.seed}:decay:${row.id}:${area}`) >>> 0) + 0.5) / 4294967296;
+  function failDay(state3, row, area) {
+    const u = ((hashString(`${state3.seed}:decay:${row.id}:${area}`) >>> 0) + 0.5) / 4294967296;
     const wait = row.chanceByDay >= 1 ? 0 : Math.floor(Math.log(u) / Math.log(1 - row.chanceByDay));
     return Math.max(0, monthStartDay(row.month)) + wait;
   }
-  function decayActive(state2, id, area, t = state2.time) {
+  function decayActive(state3, id, area, t = state3.time) {
     const row = byId.get(id);
     if (!row) throw new Error(`Unknown decay row "${id}"`);
-    return gameDay(t) >= failDay(state2, row, area);
+    return gameDay(t) >= failDay(state3, row, area);
   }
-  function decayShare(state2, id, t = state2.time) {
+  function decayShare(state3, id, t = state3.time) {
     const row = byId.get(id);
     if (!row) throw new Error(`Unknown decay row "${id}"`);
     const days = gameDay(t) - monthStartDay(row.month) + 1;
     return days <= 0 ? 0 : 1 - (1 - row.chanceByDay) ** days;
   }
-  function initDecay(state2) {
-    state2.decay = { started: {} };
+  function initDecay(state3) {
+    state3.decay = { started: {} };
   }
-  function decayDaily(state2, day, rows = DECAY) {
-    if (!state2.decay) initDecay(state2);
-    const st = state2.decay.started;
+  function decayDaily(state3, day, rows = DECAY) {
+    if (!state3.decay) initDecay(state3);
+    const st = state3.decay.started;
     for (const row of rows) {
       if (st[row.id] != null) continue;
       const days = day - monthStartDay(row.month) + 1;
       if (days <= 0) continue;
       if (1 - (1 - row.chanceByDay) ** days < 0.02) continue;
       st[row.id] = day;
-      log(state2, row.text, row.kind || "story");
+      log(state3, row.text, row.kind || "story");
     }
   }
-  function decayInfo(state2, t = state2.time) {
+  function decayInfo(state3, t = state3.time) {
     const day = gameDay(t);
-    const started = state2.decay?.started || {};
+    const started = state3.decay?.started || {};
     const next2 = DECAY.filter((r) => started[r.id] == null).map((r) => {
       const k = r.chanceByDay >= 0.02 ? 1 : Math.ceil(Math.log(0.98) / Math.log(1 - r.chanceByDay));
       return { id: r.id, day: Math.max(day, monthStartDay(r.month) + k - 1) };
-    }).sort((a, b) => a.day - b.day)[0] || null;
+    }).sort((a, b2) => a.day - b2.day)[0] || null;
     return {
       shown: Object.keys(started),
       next: next2,
-      shares: Object.fromEntries(DECAY.map((r) => [r.id, Math.round(decayShare(state2, r.id, t) * 100) / 100]))
+      shares: Object.fromEntries(DECAY.map((r) => [r.id, Math.round(decayShare(state3, r.id, t) * 100) / 100]))
     };
   }
   var decaySystem = {
@@ -4402,38 +4402,38 @@
     owns: ["decay"],
     catchUp: "exact",
     // fail days come from a hash: skipping days changes nothing
-    init: (state2) => initDecay(state2),
-    daily: (state2, day) => decayDaily(state2, day)
+    init: (state3) => initDecay(state3),
+    daily: (state3, day) => decayDaily(state3, day)
   };
 
   // src/engine/dog.js
-  var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  function dogStep(state2, dt, sleeping) {
-    const d = state2.dog;
-    if (d.stage !== "joined") return;
-    d.food = clamp(d.food - 4 * dt, 0, 100);
-    d.water = 80;
-    if (d.food <= 0) d.health -= 1 * dt;
-    else if (sleeping && !d.sick) d.health = Math.min(100, d.health + 1 * dt);
-    if (d.sick) d.health -= SICK_PER_HOUR * dt;
-    if (!sleeping && d.health > 0) {
-      feralWarning(state2, d);
-      sniff(state2, d, dt);
+  var clamp = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
+  function dogStep(state3, dt, sleeping) {
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
+    d2.food = clamp(d2.food - 4 * dt, 0, 100);
+    d2.water = 80;
+    if (d2.food <= 0) d2.health -= 1 * dt;
+    else if (sleeping && !d2.sick) d2.health = Math.min(100, d2.health + 1 * dt);
+    if (d2.sick) d2.health -= SICK_PER_HOUR * dt;
+    if (!sleeping && d2.health > 0) {
+      feralWarning(state3, d2);
+      sniff(state3, d2, dt);
     }
-    if (d.health <= 50 && d.warned < 1) {
-      d.warned = 1;
-      log(state2, `${d.name} is weak. Feed ${d.name} and let ${d.name} rest.`, "warn");
+    if (d2.health <= 50 && d2.warned < 1) {
+      d2.warned = 1;
+      log(state3, `${d2.name} is weak. Feed ${d2.name} and let ${d2.name} rest.`, "warn");
     }
-    if (d.health <= 25 && d.warned < 2) {
-      d.warned = 2;
-      log(state2, `${d.name} is very sick. ${d.name} needs food or medicine now.`, "danger");
+    if (d2.health <= 25 && d2.warned < 2) {
+      d2.warned = 2;
+      log(state3, `${d2.name} is very sick. ${d2.name} needs food or medicine now.`, "danger");
     }
-    if (d.health > 60) d.warned = 0;
-    if (d.health <= 0) {
-      d.health = 0;
-      d.stage = "dead";
-      log(state2, `${d.name} lies down and does not get up again. ${d.name} is gone.`, "danger");
-      state2.player.morale = Math.max(0, state2.player.morale - 25);
+    if (d2.health > 60) d2.warned = 0;
+    if (d2.health <= 0) {
+      d2.health = 0;
+      d2.stage = "dead";
+      log(state3, `${d2.name} lies down and does not get up again. ${d2.name} is gone.`, "danger");
+      state3.player.morale = Math.max(0, state3.player.morale - 25);
     }
   }
   var SICK_PER_HOUR = 0.25;
@@ -4449,106 +4449,106 @@
     ["batteries", 1],
     ["raw_meat", 1]
   ];
-  var able = (d) => d.stage === "joined" && !d.sick && d.health > 50;
-  function dogWarns(state2) {
-    const d = state2.dog;
-    return !!d && d.stage === "joined" && d.bond >= 30 && d.health > 25;
+  var able = (d2) => d2.stage === "joined" && !d2.sick && d2.health > 50;
+  function dogWarns(state3) {
+    const d2 = state3.dog;
+    return !!d2 && d2.stage === "joined" && d2.bond >= 30 && d2.health > 25;
   }
-  function feralWarning(state2, d) {
-    if (!dogWarns(state2) || !hazardOn(state2, "feral_dogs")) return;
-    const end = state2.flags.hazards.feral_dogs;
-    if (d.feralWarned === end) return;
-    d.feralWarned = end;
-    log(state2, `${d.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
+  function feralWarning(state3, d2) {
+    if (!dogWarns(state3) || !hazardOn(state3, "feral_dogs")) return;
+    const end = state3.flags.hazards.feral_dogs;
+    if (d2.feralWarned === end) return;
+    d2.feralWarned = end;
+    log(state3, `${d2.name} stops and growls low at the street ahead. Loose dogs. You turn early and keep to the side streets.`, "warn");
   }
-  function sniff(state2, d, dt) {
-    const loc = state2.location;
-    if (!able(d) || d.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
-    const key = `${loc.kind}:${loc.id}:${Math.floor(state2.time / 1440)}`;
-    if (d.foundAt === key) return;
-    const r = stream(state2, "dog");
-    if (r() >= 0.12 * (d.bond / 100) * dt) return;
-    d.foundAt = key;
-    const total = FINDS.reduce((a, [, w]) => a + w, 0);
-    let x = r() * total;
-    const [id] = FINDS.find(([, w]) => (x -= w) < 0) || FINDS[0];
-    addItem(state2.carried, id, 1);
-    d.finds = (d.finds || 0) + 1;
-    log(state2, `${d.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
+  function sniff(state3, d2, dt) {
+    const loc = state3.location;
+    if (!able(d2) || d2.bond < FIND_BOND || !loc || loc.kind !== "place" && loc.kind !== "house") return;
+    const key = `${loc.kind}:${loc.id}:${Math.floor(state3.time / 1440)}`;
+    if (d2.foundAt === key) return;
+    const r = stream(state3, "dog");
+    if (r() >= 0.12 * (d2.bond / 100) * dt) return;
+    d2.foundAt = key;
+    const total = FINDS.reduce((a, [, w2]) => a + w2, 0);
+    let x2 = r() * total;
+    const [id] = FINDS.find(([, w2]) => (x2 -= w2) < 0) || FINDS[0];
+    addItem(state3.carried, id, 1);
+    d2.finds = (d2.finds || 0) + 1;
+    log(state3, `${d2.name} digs under a shelf and comes back with something: ${id.replace(/_/g, " ")}. Good dog.`, "good");
   }
-  function dogSickDaily(state2, day) {
-    const d = state2.dog;
-    if (d.stage !== "joined") return;
-    const r = stream(state2, "dog");
-    if (d.sick) {
-      if (day - d.sick.since >= 4 && d.food >= 25 && r() < 0.4) {
-        d.sick = null;
-        log(state2, `${d.name} eats with interest again. The sickness is over.`, "good");
+  function dogSickDaily(state3, day) {
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
+    const r = stream(state3, "dog");
+    if (d2.sick) {
+      if (day - d2.sick.since >= 4 && d2.food >= 25 && r() < 0.4) {
+        d2.sick = null;
+        log(state3, `${d2.name} eats with interest again. The sickness is over.`, "good");
       }
       return;
     }
-    const w = state2.weather || {};
+    const w2 = state3.weather || {};
     let p = 0.012;
-    if (d.food < 25) p += 0.03;
-    if (w.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w.type)) p += 0.015;
+    if (d2.food < 25) p += 0.03;
+    if (w2.low <= 35 && ["rain", "heavy_rain", "snow", "ice_storm"].includes(w2.type)) p += 0.015;
     if (r() < p) {
-      d.sick = { since: day };
-      log(state2, `${d.name} will not eat this morning and lies by the door, shaking. ${d.name} is sick.`, "warn");
+      d2.sick = { since: day };
+      log(state3, `${d2.name} will not eat this morning and lies by the door, shaking. ${d2.name} is sick.`, "warn");
     }
   }
-  function canTreatDog(state2) {
-    const d = state2.dog;
-    if (!d || d.stage !== "joined") return "No dog";
-    if (!d.sick) return `${d.name} is not sick`;
-    if (!has(state2, "antibiotics")) return "You need antibiotics";
+  function canTreatDog(state3) {
+    const d2 = state3.dog;
+    if (!d2 || d2.stage !== "joined") return "No dog";
+    if (!d2.sick) return `${d2.name} is not sick`;
+    if (!has(state3, "antibiotics")) return "You need antibiotics";
     return null;
   }
-  function treatDog(state2) {
-    const why = canTreatDog(state2);
+  function treatDog(state3) {
+    const why = canTreatDog(state3);
     if (why) {
-      log(state2, why + ".");
+      log(state3, why + ".");
       return false;
     }
-    const d = state2.dog;
-    const bag = (state2.carried.antibiotics || 0) > 0 ? state2.carried : state2.home.storage;
+    const d2 = state3.dog;
+    const bag = (state3.carried.antibiotics || 0) > 0 ? state3.carried : state3.home.storage;
     addItem(bag, "antibiotics", -1);
-    d.sick = null;
-    d.health = Math.min(100, d.health + 10);
-    log(state2, `You push the pills into a bit of food. ${d.name} swallows them. By evening ${d.name} looks better.`, "good");
+    d2.sick = null;
+    d2.health = Math.min(100, d2.health + 10);
+    log(state3, `You push the pills into a bit of food. ${d2.name} swallows them. By evening ${d2.name} looks better.`, "good");
     return true;
   }
-  function dogBondDaily(state2) {
-    const d = state2.dog;
-    if (d.stage !== "joined") return;
-    if (d.food >= 25) d.bond += 3;
-    else d.bond -= 10;
-    d.bond = clamp(d.bond, 0, 100);
+  function dogBondDaily(state3) {
+    const d2 = state3.dog;
+    if (d2.stage !== "joined") return;
+    if (d2.food >= 25) d2.bond += 3;
+    else d2.bond -= 10;
+    d2.bond = clamp(d2.bond, 0, 100);
   }
-  function dogDaily(state2, day) {
-    const d = state2.dog;
-    const lastFed = d.feedDays.length ? d.feedDays[d.feedDays.length - 1] : null;
-    if (d.stage === "none" && day >= d.arriveDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      log(state2, "A thin dog watches the house from the street. It does not come near.", "story");
-    } else if (d.stage === "visiting") {
-      const since = lastFed == null ? day - d.visitStart : day - lastFed;
+  function dogDaily(state3, day) {
+    const d2 = state3.dog;
+    const lastFed = d2.feedDays.length ? d2.feedDays[d2.feedDays.length - 1] : null;
+    if (d2.stage === "none" && day >= d2.arriveDay) {
+      d2.stage = "visiting";
+      d2.visitStart = day;
+      log(state3, "A thin dog watches the house from the street. It does not come near.", "story");
+    } else if (d2.stage === "visiting") {
+      const since = lastFed == null ? day - d2.visitStart : day - lastFed;
       if (since > 3) {
-        if (!d.revisitUsed) {
-          d.stage = "away";
-          d.revisitUsed = true;
-          d.revisitDay = day + randInt(state2, 5, 8);
-          log(state2, "The dog is not in the street today.");
+        if (!d2.revisitUsed) {
+          d2.stage = "away";
+          d2.revisitUsed = true;
+          d2.revisitDay = day + randInt(state3, 5, 8);
+          log(state3, "The dog is not in the street today.");
         } else {
-          d.stage = "gone";
-          log(state2, "The dog does not come back.");
+          d2.stage = "gone";
+          log(state3, "The dog does not come back.");
         }
       }
-    } else if (d.stage === "away" && day >= d.revisitDay) {
-      d.stage = "visiting";
-      d.visitStart = day;
-      d.feedDays = [];
-      log(state2, "The thin dog is back in the street. It looks at your door.", "story");
+    } else if (d2.stage === "away" && day >= d2.revisitDay) {
+      d2.stage = "visiting";
+      d2.visitStart = day;
+      d2.feedDays = [];
+      log(state3, "The thin dog is back in the street. It looks at your door.", "story");
     }
   }
   var dogSystem = {
@@ -4562,11 +4562,11 @@
     owns: ["dog"],
     // Thresholds (weak, sick, death) happen inside a day; the stray's visits are days.
     catchUp: "event",
-    step: (state2, dtHours, ctx) => dogStep(state2, dtHours, ctx.mode === "sleep"),
-    daily: (state2, day) => {
-      dogBondDaily(state2);
-      dogDaily(state2, day);
-      dogSickDaily(state2, day);
+    step: (state3, dtHours, ctx) => dogStep(state3, dtHours, ctx.mode === "sleep"),
+    daily: (state3, day) => {
+      dogBondDaily(state3);
+      dogDaily(state3, day);
+      dogSickDaily(state3, day);
     }
   };
 
@@ -4599,27 +4599,27 @@
     if (tempF >= 65) return 1 + (tempF - 65) * 0.05;
     return 0.14 + (tempF - 34) / (65 - 34) * 0.86;
   }
-  function freshOf(state2) {
-    if (!state2.fresh || typeof state2.fresh !== "object") state2.fresh = {};
-    return state2.fresh;
+  function freshOf(state3) {
+    if (!state3.fresh || typeof state3.fresh !== "object") state3.fresh = {};
+    return state3.fresh;
   }
-  function stageOf(state2, id) {
+  function stageOf(state3, id) {
     if (!isPerishable(id)) return "keeps";
-    const s = freshOf(state2)[id] || 0;
+    const s = freshOf(state3)[id] || 0;
     return s >= 1 ? "spoiled" : s >= STALE_AT ? "stale" : "fresh";
   }
-  function addFresh(state2, bags2, id, qty, spoil = 0) {
+  function addFresh(state3, bags2, id, qty, spoil = 0) {
     if (!isPerishable(id)) return;
-    const f = freshOf(state2);
-    const have = bags2.reduce((n, b) => n + (b[id] || 0), 0);
+    const f = freshOf(state3);
+    const have = bags2.reduce((n, b2) => n + (b2[id] || 0), 0);
     f[id] = have + qty > 0 ? ((f[id] || 0) * have + spoil * qty) / (have + qty) : spoil;
   }
-  function ageFood(state2, dt, tempAt) {
-    const f = freshOf(state2);
+  function ageFood(state3, dt, tempAt) {
+    const f = freshOf(state3);
     for (const id of Object.keys(ITEMS)) {
       if (!isPerishable(id)) continue;
-      const c = state2.carried[id] || 0;
-      const st = state2.home && state2.home.storage[id] || 0;
+      const c = state3.carried[id] || 0;
+      const st = state3.home && state3.home.storage[id] || 0;
       if (c + st <= 0) {
         delete f[id];
         continue;
@@ -4628,12 +4628,12 @@
       f[id] = (f[id] || 0) + dt / 24 / ITEMS[id].perish * spoilRate(temp);
     }
   }
-  function eatRisk(state2, id, cooked = false) {
-    const r = RISK[stageOf(state2, id)] || 0;
+  function eatRisk(state3, id, cooked = false) {
+    const r = RISK[stageOf(state3, id)] || 0;
     return cooked ? r / 2 : r;
   }
-  function stageLabel(state2, id) {
-    const st = stageOf(state2, id);
+  function stageLabel(state3, id) {
+    const st = stageOf(state3, id);
     return st === "keeps" ? "" : st === "fresh" ? "Fresh" : st === "stale" ? "Stale" : "Spoiled";
   }
 
@@ -4644,15 +4644,15 @@
   var DRY_PER_DAY = 0.35;
   var RAIN = /* @__PURE__ */ new Set(["rain", "heavy_rain", "windstorm", "snow", "ice_storm"]);
   var monthOfDay3 = (day) => new Date(Date.UTC(2026, 10, 24) + day * 864e5).getUTCMonth();
-  function initGarden(state2) {
-    state2.garden = { beds: [] };
+  function initGarden(state3) {
+    state3.garden = { beds: [] };
   }
-  function garden(state2) {
-    if (!state2.garden) initGarden(state2);
-    return state2.garden;
+  function garden(state3) {
+    if (!state3.garden) initGarden(state3);
+    return state3.garden;
   }
-  function bedCount(state2) {
-    return built(state2, "garden_beds") ? BEDS : 0;
+  function bedCount(state3) {
+    return built(state3, "garden_beds") ? BEDS : 0;
   }
   function dayGrowth(crop, meanF, water) {
     const c = CROPS[crop];
@@ -4663,122 +4663,122 @@
     const wet = water > 0.2 ? 1 : 0.2;
     return warm * wet / c.days;
   }
-  function gardenDaily(state2, day) {
-    const g = garden(state2);
+  function gardenDaily(state3, day) {
+    const g = garden(state3);
     if (!g.beds.length) return;
-    const w = state2.weather;
-    const mean = (w.high + w.low) / 2;
-    const rained = RAIN.has(w.type);
-    for (const b of g.beds) {
-      if (!b.crop || b.dead) continue;
-      const c = CROPS[b.crop];
-      if (c.frostF != null && w.low <= c.frostF) {
-        b.dead = true;
-        log(state2, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
+    const w2 = state3.weather;
+    const mean = (w2.high + w2.low) / 2;
+    const rained = RAIN.has(w2.type);
+    for (const b2 of g.beds) {
+      if (!b2.crop || b2.dead) continue;
+      const c = CROPS[b2.crop];
+      if (c.frostF != null && w2.low <= c.frostF) {
+        b2.dead = true;
+        log(state3, `Frost in the night. The ${c.name.toLowerCase()} in the garden is dead.`, "warn");
         continue;
       }
-      b.water = rained ? 1 : Math.max(0, b.water - DRY_PER_DAY * (w.type === "heat_wave" ? 1.7 : 1));
-      if (b.growth < 1) {
-        b.growth = Math.min(1, b.growth + dayGrowth(b.crop, mean, b.water));
-        if (b.growth >= 1 - 1e-9) {
-          b.growth = 1;
-          b.ripeDay = day;
-          log(state2, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
+      b2.water = rained ? 1 : Math.max(0, b2.water - DRY_PER_DAY * (w2.type === "heat_wave" ? 1.7 : 1));
+      if (b2.growth < 1) {
+        b2.growth = Math.min(1, b2.growth + dayGrowth(b2.crop, mean, b2.water));
+        if (b2.growth >= 1 - 1e-9) {
+          b2.growth = 1;
+          b2.ripeDay = day;
+          log(state3, `The ${c.name.toLowerCase()} in the garden is ready to harvest.`, "good");
         }
-      } else if (b.ripeDay != null && day - b.ripeDay >= ROT_DAYS) {
-        b.dead = true;
-        log(state2, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
+      } else if (b2.ripeDay != null && day - b2.ripeDay >= ROT_DAYS) {
+        b2.dead = true;
+        log(state3, `The ${c.name.toLowerCase()} was left too long and has gone bad.`, "warn");
       }
     }
   }
-  function canPlant(state2, cropId) {
+  function canPlant(state3, cropId) {
     const c = CROPS[cropId];
     if (!c) return "No such crop";
-    if (!bedCount(state2)) return "Build the garden beds first";
-    if (!has(state2, "seeds")) return "You need a seed packet";
-    const g = garden(state2);
-    const free = g.beds.filter((b) => b.crop && !b.dead).length < bedCount(state2);
+    if (!bedCount(state3)) return "Build the garden beds first";
+    if (!has(state3, "seeds")) return "You need a seed packet";
+    const g = garden(state3);
+    const free = g.beds.filter((b2) => b2.crop && !b2.dead).length < bedCount(state3);
     if (!free) return "All beds are in use";
-    if (!c.plant.includes(monthOfDay3(dayIndex(state2.time)))) return `Not the season to sow ${c.name.toLowerCase()}`;
+    if (!c.plant.includes(monthOfDay3(dayIndex(state3.time)))) return `Not the season to sow ${c.name.toLowerCase()}`;
     return null;
   }
-  function plant(state2, cropId) {
-    const why = canPlant(state2, cropId);
+  function plant(state3, cropId) {
+    const why = canPlant(state3, cropId);
     if (why) {
-      log(state2, why + ".");
+      log(state3, why + ".");
       return false;
     }
-    const g = garden(state2);
-    g.beds = g.beds.filter((b) => b.crop && !b.dead);
-    g.beds.push({ crop: cropId, day: dayIndex(state2.time), growth: 0, water: 0.6, ripeDay: null, dead: false });
-    const bag = (state2.carried.seeds || 0) > 0 ? state2.carried : state2.home.storage;
+    const g = garden(state3);
+    g.beds = g.beds.filter((b2) => b2.crop && !b2.dead);
+    g.beds.push({ crop: cropId, day: dayIndex(state3.time), growth: 0, water: 0.6, ripeDay: null, dead: false });
+    const bag = (state3.carried.seeds || 0) > 0 ? state3.carried : state3.home.storage;
     addItem(bag, "seeds", -1);
-    log(state2, `You sow ${CROPS[cropId].name.toLowerCase()} in a garden bed.`, "good");
+    log(state3, `You sow ${CROPS[cropId].name.toLowerCase()} in a garden bed.`, "good");
     return true;
   }
-  function waterGarden(state2) {
-    const g = garden(state2);
-    const beds = g.beds.filter((b) => b.crop && !b.dead && b.growth < 1 && b.water < 1);
+  function waterGarden(state3) {
+    const g = garden(state3);
+    const beds = g.beds.filter((b2) => b2.crop && !b2.dead && b2.growth < 1 && b2.water < 1);
     if (!beds.length) {
-      log(state2, "The beds do not need water.");
+      log(state3, "The beds do not need water.");
       return 0;
     }
-    const h2 = state2.home;
+    const h3 = state3.home;
     let n = 0;
-    for (const b of beds) {
-      if (h2.rawGal >= WATER_GAL) h2.rawGal -= WATER_GAL;
-      else if (h2.tankGal >= WATER_GAL) h2.tankGal -= WATER_GAL;
+    for (const b2 of beds) {
+      if (h3.rawGal >= WATER_GAL) h3.rawGal -= WATER_GAL;
+      else if (h3.tankGal >= WATER_GAL) h3.tankGal -= WATER_GAL;
       else break;
-      b.water = 1;
+      b2.water = 1;
       n++;
     }
-    log(state2, n ? `You water ${n} garden bed${n > 1 ? "s" : ""} (${n * WATER_GAL} gal).` : "You have no water to spare for the garden.");
+    log(state3, n ? `You water ${n} garden bed${n > 1 ? "s" : ""} (${n * WATER_GAL} gal).` : "You have no water to spare for the garden.");
     return n;
   }
-  function harvest(state2) {
-    const g = garden(state2);
-    const ripe = g.beds.filter((b) => b.crop && !b.dead && b.growth >= 1);
+  function harvest(state3) {
+    const g = garden(state3);
+    const ripe = g.beds.filter((b2) => b2.crop && !b2.dead && b2.growth >= 1);
     if (!ripe.length) {
-      log(state2, "Nothing in the garden is ready.");
+      log(state3, "Nothing in the garden is ready.");
       return {};
     }
     const got = {};
-    for (const b of ripe) {
-      const [id, qty] = CROPS[b.crop].yield;
-      addFresh(state2, [state2.home.storage, state2.carried], id, qty, 0);
-      addItem(state2.home.storage, id, qty);
+    for (const b2 of ripe) {
+      const [id, qty] = CROPS[b2.crop].yield;
+      addFresh(state3, [state3.home.storage, state3.carried], id, qty, 0);
+      addItem(state3.home.storage, id, qty);
       got[id] = (got[id] || 0) + qty;
-      const c = CROPS[b.crop];
-      b.cuts = (b.cuts || 0) + 1;
-      if (c.regrow && b.cuts < (c.cuts || 1)) {
-        b.growth = c.regrow;
-        b.ripeDay = null;
-      } else b.dead = true;
+      const c = CROPS[b2.crop];
+      b2.cuts = (b2.cuts || 0) + 1;
+      if (c.regrow && b2.cuts < (c.cuts || 1)) {
+        b2.growth = c.regrow;
+        b2.ripeDay = null;
+      } else b2.dead = true;
     }
-    g.beds = g.beds.filter((b) => !b.dead);
-    log(state2, `You harvest the garden: ${Object.entries(got).map(([id, q]) => `${q} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
+    g.beds = g.beds.filter((b2) => !b2.dead);
+    log(state3, `You harvest the garden: ${Object.entries(got).map(([id, q2]) => `${q2} ${id.replace("_", " ")}`).join(", ")}. It goes into storage.`, "good");
     return got;
   }
-  function stageOf2(b) {
-    if (b.dead) return "dead";
-    if (b.growth >= 1) return "ready";
-    if (b.growth >= 0.6) return "nearly";
-    if (b.growth >= 0.2) return "growing";
+  function stageOf2(b2) {
+    if (b2.dead) return "dead";
+    if (b2.growth >= 1) return "ready";
+    if (b2.growth >= 0.6) return "nearly";
+    if (b2.growth >= 0.2) return "growing";
     return "seedling";
   }
-  function gardenInfo(state2) {
-    const g = garden(state2);
-    const month = monthOfDay3(dayIndex(state2.time));
+  function gardenInfo(state3) {
+    const g = garden(state3);
+    const month = monthOfDay3(dayIndex(state3.time));
     return {
-      beds: bedCount(state2),
-      planted: g.beds.map((b) => ({
-        crop: b.crop,
-        name: CROPS[b.crop]?.name,
-        growth: Math.round(b.growth * 100),
-        water: Math.round(b.water * 100),
-        ready: b.growth >= 1 && !b.dead,
-        dead: b.dead,
-        stage: stageOf2(b)
+      beds: bedCount(state3),
+      planted: g.beds.map((b2) => ({
+        crop: b2.crop,
+        name: CROPS[b2.crop]?.name,
+        growth: Math.round(b2.growth * 100),
+        water: Math.round(b2.water * 100),
+        ready: b2.growth >= 1 && !b2.dead,
+        dead: b2.dead,
+        stage: stageOf2(b2)
       })),
       canSow: Object.entries(CROPS).filter(([, c]) => c.plant.includes(month)).map(([id]) => id)
     };
@@ -4792,8 +4792,8 @@
     owns: ["garden"],
     // One step per day, in order: skipping days must run each day (exact).
     catchUp: "exact",
-    init: (state2) => initGarden(state2),
-    daily: (state2, day) => gardenDaily(state2, day)
+    init: (state3) => initGarden(state3),
+    daily: (state3, day) => gardenDaily(state3, day)
   };
 
   // src/engine/systems.js
@@ -4810,11 +4810,11 @@
     // (src/engine/rareweather.js). Skipping days must still roll each day in order,
     // so the result is exact.
     catchUp: "exact",
-    init: (state2) => initWeather(state2),
-    daily: (state2, day) => {
-      const old = state2.weather;
-      rollWeather(state2, day);
-      rollSpell(state2, day, old);
+    init: (state3) => initWeather(state3),
+    daily: (state3, day) => {
+      const old = state3.weather;
+      rollWeather(state3, day);
+      rollSpell(state3, day, old);
     }
   };
   var legacySystem = {
@@ -4825,8 +4825,8 @@
     legacy: true,
     // Death checks, wounds and illness thresholds happen inside a day.
     catchUp: "event",
-    step: (state2, dtHours, ctx) => tickStep(state2, dtHours, ctx.mode),
-    daily: (state2, day) => dailyRollover(state2, day)
+    step: (state3, dtHours, ctx) => tickStep(state3, dtHours, ctx.mode),
+    daily: (state3, day) => dailyRollover(state3, day)
   };
   var GAME_SYSTEMS = [weatherSystem, decaySystem, legacySystem, homeSystem, gardenSystem, dogSystem, pacerSystem];
   var devChecks = false;
@@ -4845,8 +4845,8 @@
   function systemVersions() {
     return Object.fromEntries(gameSystems().list().map((s) => [s.id, s.version]));
   }
-  function initNewSystems(state2) {
-    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state2, {});
+  function initNewSystems(state3) {
+    for (const sys of gameSystems().list()) if (!sys.legacy && sys.init) sys.init(state3, {});
   }
 
   // src/engine/clothes.js
@@ -4856,20 +4856,20 @@
   var OLD = { coat: ["mid", "winter_coat"], rain: ["shell", "rain_jacket"], hat: ["hat", "winter_hat"], gloves: ["gloves", "gloves"], boots: ["boots", "boots"], socks: ["socks", "wool_socks"] };
   var WET_LIMIT = 50;
   function normalizeWorn(p) {
-    const w = p.worn || {};
-    if (!w._v) {
+    const w2 = p.worn || {};
+    if (!w2._v) {
       const next2 = { _v: 2 };
       for (const s of SLOTS) next2[s] = false;
-      for (const [old, [slot, id]] of Object.entries(OLD)) if (w[old] === true) next2[slot] = id;
-      for (const s of SLOTS) if (typeof w[s] === "string" && ITEMS[w[s]]) next2[s] = w[s];
+      for (const [old, [slot, id]] of Object.entries(OLD)) if (w2[old] === true) next2[slot] = id;
+      for (const s of SLOTS) if (typeof w2[s] === "string" && ITEMS[w2[s]]) next2[s] = w2[s];
       p.worn = next2;
     }
     if (typeof p.wetness !== "number") p.wetness = p.wet ? 80 : 0;
     return p.worn;
   }
   function wornItems(p) {
-    const w = normalizeWorn(p);
-    return SLOTS.filter((s) => w[s]).map((s) => ({ slot: s, id: w[s], it: ITEMS[w[s]] }));
+    const w2 = normalizeWorn(p);
+    return SLOTS.filter((s) => w2[s]).map((s) => ({ slot: s, id: w2[s], it: ITEMS[w2[s]] }));
   }
   function clothingWarmth(p) {
     const wet = Math.min(1, (p.wetness ?? (p.wet ? 80 : 0)) / 100);
@@ -4897,15 +4897,15 @@
   function putOn(p, id) {
     const it = ITEMS[id];
     if (!it || it.kind !== "wear" || !SLOTS.includes(it.slot)) return null;
-    const w = normalizeWorn(p);
-    const old = w[it.slot] || null;
-    w[it.slot] = id;
+    const w2 = normalizeWorn(p);
+    const old = w2[it.slot] || null;
+    w2[it.slot] = id;
     return old;
   }
   function takeOff(p, slot) {
-    const w = normalizeWorn(p);
-    const old = w[slot] || null;
-    w[slot] = false;
+    const w2 = normalizeWorn(p);
+    const old = w2[slot] || null;
+    w2[slot] = false;
     return old;
   }
   function wornText(p) {
@@ -4914,39 +4914,39 @@
   }
 
   // src/engine/tick.js
-  var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  function clothingRating(state2) {
-    return clothingWarmth(state2.player);
+  var clamp2 = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
+  function clothingRating(state3) {
+    return clothingWarmth(state3.player);
   }
-  function environment(state2, mode, t = state2.time) {
-    const air = airTemp(state2, t);
+  function environment(state3, mode, t = state3.time) {
+    const air = airTemp(state3, t);
     const night = isNight(t);
-    if (mode === "walk" || state2.location.kind === "wild" || state2.location.kind === "street") {
-      return { outside: true, temp: air, wind: state2.weather.wind, precip: !!weatherInfo(state2).wetAfter, dark: night, air };
+    if (mode === "walk" || state3.location.kind === "wild" || state3.location.kind === "street") {
+      return { outside: true, temp: air, wind: state3.weather.wind, precip: !!weatherInfo(state3).wetAfter, dark: night, air };
     }
-    if (state2.location.kind === "home") {
-      return { outside: false, temp: state2.home.indoorTemp, wind: 0, precip: false, dark: night && !built(state2, "led_lights"), air, home: true };
+    if (state3.location.kind === "home") {
+      return { outside: false, temp: state3.home.indoorTemp, wind: 0, precip: false, dark: night && !built(state3, "led_lights"), air, home: true };
     }
     let dark = night;
-    if (state2.location.kind === "place") {
-      const p = getPlace(state2.location.id);
+    if (state3.location.kind === "place") {
+      const p = getPlace(state3.location.id);
       if (p && CATEGORIES[p.cat]?.dark) dark = true;
     }
-    const key = state2.location.kind === "place" || state2.location.kind === "house" ? state2.location.id : null;
-    const leak = !!(key && weatherInfo(state2).wetAfter && decayActive(state2, "roof_leaks", key, t));
+    const key = state3.location.kind === "place" || state3.location.kind === "house" ? state3.location.id : null;
+    const leak = !!(key && weatherInfo(state3).wetAfter && decayActive(state3, "roof_leaks", key, t));
     return { outside: false, temp: air + (leak ? 1 : 5), wind: 0, precip: false, dark, air, leak };
   }
-  function feltTemp(state2, mode, env = environment(state2, mode)) {
-    const sleepHome = mode === "sleep" && env.home ? sleepTemp(state2) : null;
-    let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state2);
-    if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state2.player));
-    if (env.outside && (state2.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
+  function feltTemp(state3, mode, env = environment(state3, mode)) {
+    const sleepHome = mode === "sleep" && env.home ? sleepTemp(state3) : null;
+    let felt = (sleepHome ? sleepHome.temp : env.temp) + CLOTHES_SHARE * clothingRating(state3);
+    if (env.outside) felt -= env.wind / 10 * 7 * (1 - windBlock(state3.player));
+    if (env.outside && (state3.player.wetness || 0) >= 50) felt -= WET_OUTSIDE;
     felt += ACTIVITY_HEAT[mode] || 0;
     if (mode === "sleep") {
       if (sleepHome) felt += sleepHome.bed;
-      felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state2, id)).map((id) => ITEMS[id].sleepWarm));
-      const d = state2.dog;
-      if (d.stage === "joined" && d.bond >= 80) felt += 5;
+      felt += Math.max(0, ...Object.keys(ITEMS).filter((id) => ITEMS[id].sleepWarm && has(state3, id)).map((id) => ITEMS[id].sleepWarm));
+      const d2 = state3.dog;
+      if (d2.stage === "joined" && d2.bond >= 80) felt += 5;
     }
     return felt;
   }
@@ -4968,29 +4968,29 @@
     }
     return 0;
   }
-  function damage(state2, amount, cause) {
+  function damage(state3, amount, cause) {
     if (amount <= 0) return;
-    state2.player.health -= amount;
-    state2._damage = state2._damage || {};
-    state2._damage[cause] = (state2._damage[cause] || 0) + amount;
+    state3.player.health -= amount;
+    state3._damage = state3._damage || {};
+    state3._damage[cause] = (state3._damage[cause] || 0) + amount;
   }
-  function advanceTime(state2, minutes, mode = "rest", opts = {}) {
+  function advanceTime(state3, minutes, mode = "rest", opts = {}) {
     if (!(minutes > 0)) return false;
     if (mode === "walk" || mode !== "sleep" && !opts.stopAtDanger) {
-      gameClock().advance(state2, minutes, mode);
+      gameClock().advance(state3, minutes, mode);
       return false;
     }
-    const p = state2.player;
-    state2._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
-    if (opts.restPerHour) state2._restPerHour = opts.restPerHour;
-    const t0 = state2.time;
+    const p = state3.player;
+    state3._sleepFrom = { food: p.food, water: p.water, warmth: p.warmth, health: p.health, energy: p.energy, mode };
+    if (opts.restPerHour) state3._restPerHour = opts.restPerHour;
+    const t0 = state3.time;
     try {
-      gameClock().advance(state2, minutes, mode);
+      gameClock().advance(state3, minutes, mode);
     } finally {
-      delete state2._sleepFrom;
-      delete state2._restPerHour;
+      delete state3._sleepFrom;
+      delete state3._restPerHour;
     }
-    return !state2.dead && state2.time - t0 < minutes - 0.01;
+    return !state3.dead && state3.time - t0 < minutes - 0.01;
   }
   var WAKE_AT = { water: 15, food: 10, warmth: 30, health: 30 };
   var STOP_AT = { water: 15, food: 10, warmth: 25, health: 30, energy: 10 };
@@ -5007,48 +5007,48 @@
     warmth: "You wake up shivering hard. You are too cold to sleep.",
     health: "You wake in pain. Something is wrong; you feel worse."
   };
-  function checkWake(state2) {
-    const from = state2._sleepFrom;
-    if (!from || state2.dead) return;
-    const p = state2.player;
+  function checkWake(state3) {
+    const from = state3._sleepFrom;
+    if (!from || state3.dead) return;
+    const p = state3.player;
     const asleep = from.mode === "sleep";
     const lines = asleep ? WAKE_AT : STOP_AT;
     for (const k of Object.keys(lines)) {
       if (from[k] >= lines[k] && p[k] < lines[k]) {
-        log(state2, (asleep ? WAKE_TEXT : STOP_TEXT)[k], "danger");
-        state2._stop = true;
-        delete state2._sleepFrom;
+        log(state3, (asleep ? WAKE_TEXT : STOP_TEXT)[k], "danger");
+        state3._stop = true;
+        delete state3._sleepFrom;
         return;
       }
     }
   }
-  function tickStep(state2, dt, mode) {
-    const p = state2.player;
-    const env = environment(state2, mode);
+  function tickStep(state3, dt, mode) {
+    const p = state3.player;
+    const env = environment(state3, mode);
     const sleeping = mode === "sleep";
     const working = mode === "walk" || mode === "work" || mode === "heavy";
-    const wx = weatherInfo(state2);
+    const wx = weatherInfo(state3);
     normalizeWorn(p);
     const wasWet = p.wetness >= WET_LIMIT;
-    if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state2.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
-    else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state2.home.fireHours > 0) * dt, 0, 100);
+    if ((env.outside || env.leak) && wx.wetAfter) p.wetness = clamp2(p.wetness + wetGainPerHour(p, state3.weather.type, wx.wetAfter) * dt * (env.outside ? 1 : LEAK_WET), 0, 100);
+    else if (!env.outside) p.wetness = clamp2(p.wetness - dryPerHour(env.temp, env.home && state3.home.fireHours > 0) * dt, 0, 100);
     p.wet = p.wetness >= WET_LIMIT;
-    if (p.wet && !wasWet) log(state2, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
-    if (!p.wet && wasWet) log(state2, "Your clothes are dry again.");
-    const felt = feltTemp(state2, mode, env);
+    if (p.wet && !wasWet) log(state3, "Your clothes are wet through. Cotton and down keep little heat when wet; wool and fleece keep most.", "warn");
+    if (!p.wet && wasWet) log(state3, "Your clothes are dry again.");
+    const felt = feltTemp(state3, mode, env);
     let wr = warmthRate(felt);
     if (p.warmFedH > 0) {
       if (wr < 0) wr *= 0.5;
       p.warmFedH = Math.max(0, p.warmFedH - dt);
     }
     p.warmth = clamp2(p.warmth + wr * dt, 0, 100);
-    ageFood(state2, dt, (where) => where === "storage" ? state2.home.indoorTemp : env.temp);
+    ageFood(state3, dt, (where) => where === "storage" ? state3.home.indoorTemp : env.temp);
     const cold = p.warmth < 50;
     const pace = working ? WORK_FACTOR : sleeping ? SLEEP_FACTOR : 1;
-    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state2);
+    let foodLoss = FOOD_LOSS_PER_HOUR * pace * (cold ? 1.3 : 1) * foodLossFactor(state3);
     let waterLoss = WATER_LOSS_PER_HOUR * pace * (p.illness.stomachH > 0 ? 2 : 1);
     if (felt > 90 && working) waterLoss *= 2;
-    if (state2.weather.type === "heat_wave" && env.outside && !env.dark) waterLoss *= 1.5;
+    if (state3.weather.type === "heat_wave" && env.outside && !env.dark) waterLoss *= 1.5;
     p.food = clamp2(p.food - foodLoss * dt, 0, 100);
     p.water = clamp2(p.water - waterLoss * dt, 0, 100);
     if (sleeping) {
@@ -5056,100 +5056,100 @@
       if (p.morale < 50) gain *= 0.75;
       if (p.health < 50) gain *= 0.75;
       if (p.food < 25) gain *= 0.75;
-      gain *= sleepGainFactor(state2);
+      gain *= sleepGainFactor(state3);
       p.energy = clamp2(p.energy + gain * dt, 0, p.energyMax);
-    } else if (mode === "rest" && state2._restPerHour) {
-      p.energy = clamp2(p.energy + state2._restPerHour * p.energyMax * dt, 0, p.energyMax);
+    } else if (mode === "rest" && state3._restPerHour) {
+      p.energy = clamp2(p.energy + state3._restPerHour * p.energyMax * dt, 0, p.energyMax);
     } else {
       let loss = ENERGY_LOSS[mode] || ENERGY_LOSS.rest;
       if (cold) loss *= 1.5;
-      loss *= energyUseFactor(state2, mode);
+      loss *= energyUseFactor(state3, mode);
       p.energy = clamp2(p.energy - loss * dt, 0, p.energyMax);
     }
-    if (p.food <= 0) damage(state2, STARVING_DAMAGE * dt, "starvation");
-    if (p.water <= 0) damage(state2, DEHYDRATED_DAMAGE * dt, "dehydration");
-    if (p.warmth <= 0) damage(state2, 5 * dt, "hypothermia");
-    if (state2.weather.type === "smoke" && env.outside && !has(state2, "n95")) damage(state2, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
+    if (p.food <= 0) damage(state3, STARVING_DAMAGE * dt, "starvation");
+    if (p.water <= 0) damage(state3, DEHYDRATED_DAMAGE * dt, "dehydration");
+    if (p.warmth <= 0) damage(state3, 5 * dt, "hypothermia");
+    if (state3.weather.type === "smoke" && env.outside && !has(state3, "n95")) damage(state3, SMOKE_DAMAGE_PER_HOUR * dt, "smoke");
     for (const inj of p.injuries) {
-      if (inj.type === "deep_cut" && !inj.bandaged) damage(state2, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), "bleeding");
+      if (inj.type === "deep_cut" && !inj.bandaged) damage(state3, Math.min(2 * dt, Math.max(0, p.health - BLEED_FLOOR)), "bleeding");
       inj.ageH += dt;
       let slow = p.food < 25 || p.water < 25 ? 0.5 : 1;
-      if (sleeping && state2.location.kind === "home" && built(state2, "sick_room")) slow *= 1.5;
+      if (sleeping && state3.location.kind === "home" && built(state3, "sick_room")) slow *= 1.5;
       inj.healH -= dt * slow;
       if (!inj.infectRolled && inj.ageH >= 6 && inj.infectRisk) {
         inj.infectRolled = true;
-        const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state2) : inj.infectRisk;
-        if (risk > 0 && chance(state2, risk)) startInfection(state2, inj.type);
+        const risk = inj.bandaged ? (INJURY_DATA[inj.type]?.bandagedRisk || 0) * infectRiskFactor(state3) : inj.infectRisk;
+        if (risk > 0 && chance(state3, risk)) startInfection(state3, inj.type);
       }
     }
     const healed = p.injuries.filter((i) => i.healH <= 0);
-    for (const i of healed) log(state2, `Your ${injuryName(i).toLowerCase()} has healed.`, "good");
+    for (const i of healed) log(state3, `Your ${injuryName(i).toLowerCase()} has healed.`, "good");
     p.injuries = p.injuries.filter((i) => i.healH > 0);
     const inf = p.illness.infection;
     if (inf) {
       inf.ageH += dt;
-      if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state2, 1 * dt, "infection");
+      if (inf.ageH >= 48 && !CUTS.has(inf.from) && inf.abxH == null) damage(state3, 1 * dt, "infection");
       if (inf.abxH != null) {
         inf.abxH += dt;
         if (inf.abxH >= 72) {
           p.illness.infection = null;
-          log(state2, "The fever is gone. The antibiotics worked.", "good");
+          log(state3, "The fever is gone. The antibiotics worked.", "good");
         }
       }
     }
     if (p.illness.stomachH > 0) {
       p.illness.stomachH = Math.max(0, p.illness.stomachH - dt);
-      if (p.illness.stomachH === 0) log(state2, "Your stomach is better now.", "good");
+      if (p.illness.stomachH === 0) log(state3, "Your stomach is better now.", "good");
     }
     if (p.painH > 0) p.painH = Math.max(0, p.painH - dt);
     const treated = !p.illness.infection || p.illness.infection.abxH != null;
     const ok = p.food >= 25 && p.water >= 25 && p.warmth >= 25 && treated && p.illness.stomachH <= 0;
-    const sickRoom = sleeping && state2.location.kind === "home" && built(state2, "sick_room");
+    const sickRoom = sleeping && state3.location.kind === "home" && built(state3, "sick_room");
     if (ok) p.health += (sleeping ? sickRoom ? 1.5 : 1 : 0.25) * dt;
     p.health = Math.min(100, p.health);
     if (p.weak && p.food > 50 && p.water > 50) p.weakGoodHours += dt;
-    if (env.dark && !sleeping && hasLight(state2) && (mode === "walk" || state2.location.kind !== "home")) {
+    if (env.dark && !sleeping && hasLight(state3) && (mode === "walk" || state3.location.kind !== "home")) {
       p.lightHours = Math.max(0, p.lightHours - dt);
-      if (p.lightHours === 0) log(state2, "The flashlight goes dark. The batteries are empty.", "warn");
+      if (p.lightHours === 0) log(state3, "The flashlight goes dark. The batteries are empty.", "warn");
     }
-    checkWake(state2);
+    checkWake(state3);
     if (p.health <= 0) {
       p.health = 0;
-      const causes = Object.entries(state2._damage || {}).sort((a, b) => b[1] - a[1]);
-      die(state2, causes.length ? causes[0][0] : "unknown");
+      const causes = Object.entries(state3._damage || {}).sort((a, b2) => b2[1] - a[1]);
+      die(state3, causes.length ? causes[0][0] : "unknown");
     }
-    state2._damage = {};
+    state3._damage = {};
   }
-  function dailyRollover(state2, day) {
-    const p = state2.player;
-    seasonDaily(state2, day);
-    log(state2, `A new day. Weather: ${weatherInfo(state2).label}, high ${Math.round(state2.weather.high)}\xB0F, low ${Math.round(state2.weather.low)}\xB0F.`, "day");
-    if (state2.weather.type === "snow") log(state2, `Snow: ${state2.weather.snowInches} inches. Walking is slow today.`, "warn");
-    if (state2.weather.type === "windstorm") log(state2, `Windstorm. Wind ${state2.weather.wind} mph. Stay inside if you can.`, "warn");
-    const spell = state2.weather.spell;
-    if (spell?.first) log(state2, spellStartText(spell.id), "warn");
-    else if (spell) log(state2, `${weatherInfo(state2).label} again today.`, "warn");
+  function dailyRollover(state3, day) {
+    const p = state3.player;
+    seasonDaily(state3, day);
+    log(state3, `A new day. Weather: ${weatherInfo(state3).label}, high ${Math.round(state3.weather.high)}\xB0F, low ${Math.round(state3.weather.low)}\xB0F.`, "day");
+    if (state3.weather.type === "snow") log(state3, `Snow: ${state3.weather.snowInches} inches. Walking is slow today.`, "warn");
+    if (state3.weather.type === "windstorm") log(state3, `Windstorm. Wind ${state3.weather.wind} mph. Stay inside if you can.`, "warn");
+    const spell = state3.weather.spell;
+    if (spell?.first) log(state3, spellStartText(spell.id), "warn");
+    else if (spell) log(state3, `${weatherInfo(state3).label} again today.`, "warn");
     p.morale -= 2;
     if (p.food < 50) p.morale -= 5;
-    if (state2.location.kind === "home" && state2.home.indoorTemp < 50) p.morale -= 5;
-    if (built(state2, "led_lights")) p.morale += 3;
-    if (built(state2, "sealed_store") && foodItemsStored(state2) >= 10) p.morale += 2;
-    if (state2.dog.stage === "joined") p.morale += 8;
+    if (state3.location.kind === "home" && state3.home.indoorTemp < 50) p.morale -= 5;
+    if (built(state3, "led_lights")) p.morale += 3;
+    if (built(state3, "sealed_store") && foodItemsStored(state3) >= 10) p.morale += 2;
+    if (state3.dog.stage === "joined") p.morale += 8;
     p.morale = clamp2(p.morale, 0, 100);
     if (p.weak) {
       if (p.weakGoodHours >= 12) {
         const before = p.energyMax;
         p.energyMax = Math.min(100, p.energyMax + 2);
-        if (Math.floor(p.energyMax / 10) > Math.floor(before / 10) && p.energyMax < 100) log(state2, `Your body is stronger: you can do more before you tire (${p.energyMax} of 100).`, "good");
+        if (Math.floor(p.energyMax / 10) > Math.floor(before / 10) && p.energyMax < 100) log(state3, `Your body is stronger: you can do more before you tire (${p.energyMax} of 100).`, "good");
       }
       p.weakGoodHours = 0;
       if (p.energyMax >= 100) {
         p.weak = false;
-        log(state2, "You are strong again. The weakness from the coma is gone.", "good");
+        log(state3, "You are strong again. The weakness from the coma is gone.", "good");
       }
     }
     for (const inj of p.injuries) {
-      if (!inj.bandaged && inj.infectRisk && chance(state2, inj.infectRisk)) startInfection(state2, inj.type);
+      if (!inj.bandaged && inj.infectRisk && chance(state3, inj.infectRisk)) startInfection(state3, inj.type);
     }
   }
   var INJURY_NAMES = {
@@ -5175,9 +5175,9 @@
     const base2 = inj.type === "sprain" ? SPRAIN_PART[inj.part] || "Sprain" : INJURY_NAMES[inj.type] || inj.type;
     return inj.severity && inj.severity !== "moderate" ? `${base2} (${inj.severity})` : base2;
   }
-  function injuryFactor(state2, limb) {
+  function injuryFactor(state3, limb) {
     let f = 1;
-    for (const i of state2.player.injuries) {
+    for (const i of state3.player.injuries) {
       if (i.type !== "sprain") continue;
       const part = i.part || (limb === "leg" ? "ankle" : "wrist");
       if (limb === "leg" !== (part === "ankle")) continue;
@@ -5185,42 +5185,42 @@
     }
     return f;
   }
-  function addInjury(state2, type, opts = {}) {
-    const d = INJURY_DATA[type];
-    const r = stream(state2, "injury");
+  function addInjury(state3, type, opts = {}) {
+    const d2 = INJURY_DATA[type];
+    const r = stream(state3, "injury");
     if (!opts.always && r() >= INJURY_RATE) {
-      log(state2, type === "bite" ? "Teeth snap at you, but you pull free unhurt." : "A close call. You are not hurt.");
+      log(state3, type === "bite" ? "Teeth snap at you, but you pull free unhurt." : "A close call. You are not hurt.");
       return null;
     }
     let sev = opts.severity ? SEVERITY.find((s) => s.id === opts.severity) : null;
     if (!sev) {
-      const x = r();
+      const x2 = r();
       let acc = 0;
-      sev = SEVERITY.find((s) => (acc += s.w) > x) || SEVERITY[0];
+      sev = SEVERITY.find((s) => (acc += s.w) > x2) || SEVERITY[0];
     }
     const part = type === "sprain" ? opts.part || (r() < 0.5 ? "ankle" : "wrist") : void 0;
-    const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d.healH * sev.heal, infectRisk: d.infectRisk * infectRiskFactor(state2), infectRolled: false };
+    const inj = { type, severity: sev.id, bandaged: false, ageH: 0, healH: d2.healH * sev.heal, infectRisk: d2.infectRisk * infectRiskFactor(state3), infectRolled: false };
     if (part) inj.part = part;
-    state2.player.injuries.push(inj);
-    const full = d.hp * sev.hp;
-    const hp = CUTS.has(type) ? Math.min(full, Math.max(0, state2.player.health - 1)) : full;
-    damage(state2, hp, type === "bite" ? "an animal attack" : "an injury");
-    log(state2, `Injury: ${injuryName(inj)} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
-    if (state2.player.health <= 0) die(state2, type === "bite" ? "an animal attack" : "an injury");
+    state3.player.injuries.push(inj);
+    const full = d2.hp * sev.hp;
+    const hp = CUTS.has(type) ? Math.min(full, Math.max(0, state3.player.health - 1)) : full;
+    damage(state3, hp, type === "bite" ? "an animal attack" : "an injury");
+    log(state3, `Injury: ${injuryName(inj)} (Health \u2212${Math.round(hp)}).` + (type === "deep_cut" ? " It bleeds. Bandage it fast." : ""), "danger");
+    if (state3.player.health <= 0) die(state3, type === "bite" ? "an animal attack" : "an injury");
     return inj;
   }
   var CUTS = /* @__PURE__ */ new Set(["small_cut", "deep_cut"]);
   var BLEED_FLOOR = 10;
-  function startInfection(state2, from = null) {
-    if (state2.player.illness.infection) return;
-    state2.player.illness.infection = { ageH: 0, abxH: null, from };
-    log(state2, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
+  function startInfection(state3, from = null) {
+    if (state3.player.illness.infection) return;
+    state3.player.illness.infection = { ageH: 0, abxH: null, from };
+    log(state3, "A wound is red, hot and swollen. It is infected. You need antibiotics.", "danger");
   }
-  function startStomachBug(state2) {
-    if (state2.player.illness.stomachH > 0) return;
-    state2.player.illness.stomachH = 48;
-    state2.player.energy = Math.max(0, state2.player.energy - 20);
-    log(state2, "Stomach cramps. The water was bad. You have a stomach bug.", "danger");
+  function startStomachBug(state3) {
+    if (state3.player.illness.stomachH > 0) return;
+    state3.player.illness.stomachH = 48;
+    state3.player.energy = Math.max(0, state3.player.energy - 20);
+    log(state3, "Stomach cramps. The water was bad. You have a stomach bug.", "danger");
   }
   var SMOKE_DAMAGE_PER_HOUR = 1.5;
   var CAUSE_TEXT = {
@@ -5234,59 +5234,59 @@
     "an animal attack": "an animal attack",
     unknown: "unknown causes"
   };
-  function die(state2, cause) {
-    if (state2.dead) return;
-    const p = state2.player;
+  function die(state3, cause) {
+    if (state3.dead) return;
+    const p = state3.player;
     p.health = Math.max(0, p.health);
     if (cause === "an injury" || cause === "an animal attack") {
       if (p.water <= 0) cause = "dehydration";
       else if (p.food <= 0) cause = "starvation";
       else if (p.warmth <= 0) cause = "hypothermia";
     }
-    state2.dead = {
+    state3.dead = {
       cause: CAUSE_TEXT[cause] || cause,
-      time: state2.time,
-      days: dayIndex(state2.time) + 1
+      time: state3.time,
+      days: dayIndex(state3.time) + 1
     };
-    log(state2, `You died of ${state2.dead.cause}.`, "danger");
+    log(state3, `You died of ${state3.dead.cause}.`, "danger");
   }
 
   // src/engine/base.js
   var WORK_BLOCK_H = 2;
   var MIN_WORK_ENERGY = 15;
-  function base(state2) {
-    const h2 = state2.home;
-    if (!h2.projects) h2.projects = {};
-    if (!h2.work) h2.work = {};
-    return h2;
+  function base(state3) {
+    const h3 = state3.home;
+    if (!h3.projects) h3.projects = {};
+    if (!h3.work) h3.work = {};
+    return h3;
   }
-  function built(state2, id) {
-    return !!(state2.home.projects && state2.home.projects[id]);
+  function built(state3, id) {
+    return !!(state3.home.projects && state3.home.projects[id]);
   }
-  function builtCount(state2) {
-    return PROJECTS.filter((p) => built(state2, p.id)).length;
+  function builtCount(state3) {
+    return PROJECTS.filter((p) => built(state3, p.id)).length;
   }
-  function haveQty(state2, id) {
-    return (state2.home.storage[id] || 0) + (state2.carried[id] || 0);
+  function haveQty(state3, id) {
+    return (state3.home.storage[id] || 0) + (state3.carried[id] || 0);
   }
-  function projectStatus(state2, proj) {
-    const h2 = base(state2);
-    const started = h2.work[proj.id] != null;
-    const doneH = h2.work[proj.id] || 0;
-    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state2, id) }));
-    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state2, id) > 0 }));
-    const missingReq = (proj.requires || []).filter((r) => !built(state2, r));
-    const partsOk = started || parts.every((x) => x.have >= x.need);
+  function projectStatus(state3, proj) {
+    const h3 = base(state3);
+    const started = h3.work[proj.id] != null;
+    const doneH = h3.work[proj.id] || 0;
+    const parts = Object.entries(proj.needs).map(([id, need]) => ({ id, need, have: haveQty(state3, id) }));
+    const tools = (proj.tools || []).map((id) => ({ id, have: haveQty(state3, id) > 0 }));
+    const missingReq = (proj.requires || []).filter((r) => !built(state3, r));
+    const partsOk = started || parts.every((x2) => x2.have >= x2.need);
     const toolsOk = tools.every((t) => t.have);
     let blocked = null;
-    if (built(state2, proj.id)) blocked = "Built";
+    if (built(state3, proj.id)) blocked = "Built";
     else if (missingReq.length) blocked = `Build first: ${missingReq.map((r) => PROJECT_BY_ID[r].name).join(", ")}`;
     else if (!partsOk) blocked = "Missing parts";
     else if (!toolsOk) blocked = `Needs ${tools.filter((t) => !t.have).map((t) => itemName(t.id).toLowerCase()).join(", ")}`;
-    else if (state2.location.kind !== "home") blocked = "Go home to work on it";
-    else if (state2.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
+    else if (state3.location.kind !== "home") blocked = "Go home to work on it";
+    else if (state3.player.energy < MIN_WORK_ENERGY) blocked = `Too tired (Energy ${MIN_WORK_ENERGY}+)`;
     return {
-      built: built(state2, proj.id),
+      built: built(state3, proj.id),
       started,
       doneH,
       leftH: Math.max(0, proj.hours - doneH),
@@ -5297,79 +5297,79 @@
       canWork: !blocked
     };
   }
-  function wingSummary(state2) {
-    return Object.entries(WINGS).map(([id, w]) => {
+  function wingSummary(state3) {
+    return Object.entries(WINGS).map(([id, w2]) => {
       const list = PROJECTS.filter((p) => p.wing === id);
-      return { id, ...w, projects: list, built: list.filter((p) => built(state2, p.id)).length };
+      return { id, ...w2, projects: list, built: list.filter((p) => built(state3, p.id)).length };
     });
   }
-  function takeParts(state2, needs) {
+  function takeParts(state3, needs) {
     for (const [id, need] of Object.entries(needs)) {
       let left = need;
-      for (const bag of [state2.home.storage, state2.carried]) {
+      for (const bag of [state3.home.storage, state3.carried]) {
         const take = Math.min(left, bag[id] || 0);
         if (take > 0) addItem(bag, id, -take);
         left -= take;
       }
     }
   }
-  function workOnProject(state2, id) {
+  function workOnProject(state3, id) {
     const proj = PROJECT_BY_ID[id];
     if (!proj) return;
-    const h2 = base(state2);
-    const st = projectStatus(state2, proj);
+    const h3 = base(state3);
+    const st = projectStatus(state3, proj);
     if (!st.canWork) {
-      log(state2, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
+      log(state3, `You cannot work on "${proj.name}": ${st.blocked}.`, "warn");
       return;
     }
     if (!st.started) {
-      takeParts(state2, proj.needs);
-      h2.work[id] = 0;
-      log(state2, `You start a project: ${proj.name}. You lay out the parts.`);
+      takeParts(state3, proj.needs);
+      h3.work[id] = 0;
+      log(state3, `You start a project: ${proj.name}. You lay out the parts.`);
     }
     let hours = Math.min(WORK_BLOCK_H, st.leftH);
-    const t0 = state2.time;
-    const stopped = advanceTime(state2, Math.round(hours * 60), "heavy", { stopAtDanger: true });
-    if (state2.dead) return;
-    if (stopped) hours = Math.max(0, (state2.time - t0) / 60);
-    h2.work[id] += hours;
-    if (h2.work[id] >= proj.hours - 1e-9) {
-      delete h2.work[id];
-      h2.projects[id] = true;
-      finishProject(state2, proj);
+    const t0 = state3.time;
+    const stopped = advanceTime(state3, Math.round(hours * 60), "heavy", { stopAtDanger: true });
+    if (state3.dead) return;
+    if (stopped) hours = Math.max(0, (state3.time - t0) / 60);
+    h3.work[id] += hours;
+    if (h3.work[id] >= proj.hours - 1e-9) {
+      delete h3.work[id];
+      h3.projects[id] = true;
+      finishProject(state3, proj);
     } else {
-      log(state2, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h2.work[id]) * 60)} of work left.`);
+      log(state3, `You work on ${proj.name.toLowerCase()} for ${formatDuration(hours * 60)}. ${formatDuration((proj.hours - h3.work[id]) * 60)} of work left.`);
     }
   }
-  function finishProject(state2, proj) {
-    const h2 = state2.home;
-    const p = state2.player;
-    if (proj.id === "second_battery") h2.batteryMax = 27;
+  function finishProject(state3, proj) {
+    const h3 = state3.home;
+    const p = state3.player;
+    if (proj.id === "second_battery") h3.batteryMax = 27;
     let morale = 5;
     if (proj.id === "sealed_store") morale += 5;
     p.morale = Math.min(100, p.morale + morale);
-    log(state2, `Project done: ${proj.name}. ${proj.effect}`, "good");
+    log(state3, `Project done: ${proj.name}. ${proj.effect}`, "good");
   }
-  var fireHoursPerBundle = (state2) => built(state2, "wood_stove") ? 4 : 2;
-  var fireHeat = (state2) => built(state2, "wood_stove") ? 30 : 20;
-  var heatLossFactor = (state2) => built(state2, "insulate_living") ? 0.5 : 1;
-  var painPillHours = (state2) => built(state2, "med_cabinet") ? 9 : 6;
+  var fireHoursPerBundle = (state3) => built(state3, "wood_stove") ? 4 : 2;
+  var fireHeat = (state3) => built(state3, "wood_stove") ? 30 : 20;
+  var heatLossFactor = (state3) => built(state3, "insulate_living") ? 0.5 : 1;
+  var painPillHours = (state3) => built(state3, "med_cabinet") ? 9 : 6;
   var AUTO_FILTER_GAL_PER_DAY = 12;
   var SAFE_TANK_GAL = 40;
-  function autoFilterToday(state2) {
-    const h2 = state2.home;
-    if (!built(state2, "rain_barrels") || !built(state2, "filter_station")) return 0;
-    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h2.rawGal, SAFE_TANK_GAL - h2.safeGal));
+  function autoFilterToday(state3) {
+    const h3 = state3.home;
+    if (!built(state3, "rain_barrels") || !built(state3, "filter_station")) return 0;
+    return Math.max(0, Math.min(AUTO_FILTER_GAL_PER_DAY, h3.rawGal, SAFE_TANK_GAL - h3.safeGal));
   }
-  function runAutoFilter(state2) {
-    const g = autoFilterToday(state2);
+  function runAutoFilter(state3) {
+    const g = autoFilterToday(state3);
     if (g <= 0) return 0;
-    state2.home.rawGal -= g;
-    state2.home.safeGal += g;
+    state3.home.rawGal -= g;
+    state3.home.safeGal += g;
     return g;
   }
-  function foodItemsStored(state2) {
-    return Object.entries(state2.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q]) => n + q, 0);
+  function foodItemsStored(state3) {
+    return Object.entries(state3.home.storage).filter(([id]) => ITEMS[id] && ITEMS[id].kind === "food").reduce((n, [, q2]) => n + q2, 0);
   }
 
   // src/engine/legacy.js
@@ -5424,14 +5424,14 @@
       dogJoined: !!r.dogJoined
     };
   }
-  function addRun(record, state2) {
+  function addRun(record, state3) {
     const r = normalizeRecord(record);
-    r.totals.miles += state2.stats.miles || 0;
-    r.totals.places += (state2.stats.placesSearched || 0) + (state2.stats.housesSearched || 0);
-    const days = state2.dead ? state2.dead.days : 0;
+    r.totals.miles += state3.stats.miles || 0;
+    r.totals.places += (state3.stats.placesSearched || 0) + (state3.stats.housesSearched || 0);
+    const days = state3.dead ? state3.dead.days : 0;
     r.best.days = Math.max(r.best.days, days);
-    r.best.built = Math.max(r.best.built, builtCount(state2));
-    if (state2.dog && state2.dog.stage === "joined") r.dogJoined = true;
+    r.best.built = Math.max(r.best.built, builtCount(state3));
+    if (state3.dog && state3.dog.stage === "joined") r.dogJoined = true;
     return r;
   }
   function earnedIds(record) {
@@ -5442,20 +5442,20 @@
     const ok = earnedIds(record);
     return [...new Set(ids || [])].filter((k) => ok.includes(k)).slice(0, MAX_SLOTS);
   }
-  function applyLegacy(state2, ids) {
-    state2.player.legacy = Object.keys(LEGACY).filter((k) => (ids || []).includes(k)).slice(0, MAX_SLOTS);
-    const st = state2.home.storage;
+  function applyLegacy(state3, ids) {
+    state3.player.legacy = Object.keys(LEGACY).filter((k) => (ids || []).includes(k)).slice(0, MAX_SLOTS);
+    const st = state3.home.storage;
     const add = (id, n) => {
       st[id] = (st[id] || 0) + n;
     };
-    if (hasLegacy(state2, "long_haul")) add("canned_food", 3);
-    if (hasLegacy(state2, "handy")) {
+    if (hasLegacy(state3, "long_haul")) add("canned_food", 3);
+    if (hasLegacy(state3, "handy")) {
       add("hardware_parts", 1);
       add("pipe_fittings", 1);
     }
   }
-  function hasLegacy(state2, id) {
-    return !!(state2.player && Array.isArray(state2.player.legacy) && state2.player.legacy.includes(id));
+  function hasLegacy(state3, id) {
+    return !!(state3.player && Array.isArray(state3.player.legacy) && state3.player.legacy.includes(id));
   }
 
   // src/engine/background.js
@@ -5504,11 +5504,11 @@
     light_sleeper: { name: "Light sleeper", cost: -1, text: "Sleep gives 15% less energy." },
     asthmatic: { name: "Asthmatic", cost: -2, text: "Walking and hard work use 20% more energy." }
   };
-  function jobOf(state2) {
-    return state2.player && JOBS[state2.player.job] ? state2.player.job : null;
+  function jobOf(state3) {
+    return state3.player && JOBS[state3.player.job] ? state3.player.job : null;
   }
-  function hasTrait(state2, id) {
-    return !!(state2.player && Array.isArray(state2.player.traits) && state2.player.traits.includes(id));
+  function hasTrait(state3, id) {
+    return !!(state3.player && Array.isArray(state3.player.traits) && state3.player.traits.includes(id));
   }
   function pointsLeft(traits) {
     return FREE_POINTS - traits.reduce((n, t) => n + (TRAITS[t] ? TRAITS[t].cost : 0), 0);
@@ -5517,55 +5517,55 @@
     const out = [];
     for (const t of traits || []) {
       if (!TRAITS[t] || out.includes(t)) continue;
-      if ((TRAITS[t].not || []).some((x) => out.includes(x))) continue;
+      if ((TRAITS[t].not || []).some((x2) => out.includes(x2))) continue;
       out.push(t);
     }
     return pointsLeft(out) >= 0 ? out : [];
   }
-  function applyBackground(state2, job, traits) {
-    const p = state2.player;
+  function applyBackground(state3, job, traits) {
+    const p = state3.player;
     p.job = JOBS[job] ? job : null;
     p.traits = validTraits(traits);
     if (p.job) {
-      const J = JOBS[p.job];
-      if (!state2.skills) state2.skills = { xp: {}, books: [] };
-      for (const [k, lvl] of Object.entries(J.skills)) state2.skills.xp[k] = Math.max(state2.skills.xp[k] || 0, LEVEL_XP[lvl]);
-      const [id, n] = J.item;
-      state2.home.storage[id] = (state2.home.storage[id] || 0) + n;
+      const J2 = JOBS[p.job];
+      if (!state3.skills) state3.skills = { xp: {}, books: [] };
+      for (const [k, lvl] of Object.entries(J2.skills)) state3.skills.xp[k] = Math.max(state3.skills.xp[k] || 0, LEVEL_XP[lvl]);
+      const [id, n] = J2.item;
+      state3.home.storage[id] = (state3.home.storage[id] || 0) + n;
     }
-    if (p.traits.includes("dog_person")) state2.dog.arriveDay = 1;
+    if (p.traits.includes("dog_person")) state3.dog.arriveDay = 1;
   }
-  function xpFactor(state2) {
-    return hasTrait(state2, "fast_learner") ? 1.3 : hasTrait(state2, "slow_learner") ? 0.7 : 1;
+  function xpFactor(state3) {
+    return hasTrait(state3, "fast_learner") ? 1.3 : hasTrait(state3, "slow_learner") ? 0.7 : 1;
   }
-  function walkSpeedFactor(state2) {
-    return jobOf(state2) === "roofer" ? 0.9 : 1;
+  function walkSpeedFactor(state3) {
+    return jobOf(state3) === "roofer" ? 0.9 : 1;
   }
-  function searchJobFactor(state2) {
-    return (jobOf(state2) === "fishing_guide" ? 1.1 : 1) * (hasLegacy(state2, "sharp_eyes") ? 0.95 : 1);
+  function searchJobFactor(state3) {
+    return (jobOf(state3) === "fishing_guide" ? 1.1 : 1) * (hasLegacy(state3, "sharp_eyes") ? 0.95 : 1);
   }
-  function foodLossFactor(state2) {
-    return jobOf(state2) === "line_cook" ? 1.1 : 1;
+  function foodLossFactor(state3) {
+    return jobOf(state3) === "line_cook" ? 1.1 : 1;
   }
-  function sleepGainFactor(state2) {
-    return hasTrait(state2, "light_sleeper") ? 0.85 : 1;
+  function sleepGainFactor(state3) {
+    return hasTrait(state3, "light_sleeper") ? 0.85 : 1;
   }
-  function energyUseFactor(state2, mode) {
+  function energyUseFactor(state3, mode) {
     let f = 1;
-    if (mode === "walk" && jobOf(state2) === "tow_driver") f *= 1.15;
-    if (mode === "heavy" && jobOf(state2) === "nurse") f *= 1.15;
-    if (mode === "walk" && hasLegacy(state2, "road_legs")) f *= 0.95;
-    if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state2, "asthmatic")) f *= 1.2;
+    if (mode === "walk" && jobOf(state3) === "tow_driver") f *= 1.15;
+    if (mode === "heavy" && jobOf(state3) === "nurse") f *= 1.15;
+    if (mode === "walk" && hasLegacy(state3, "road_legs")) f *= 0.95;
+    if ((mode === "walk" || mode === "work" || mode === "heavy") && hasTrait(state3, "asthmatic")) f *= 1.2;
     return f;
   }
-  function dogBondBonus(state2) {
-    return (hasTrait(state2, "dog_person") ? 20 : 0) + (hasLegacy(state2, "old_friend") ? 10 : 0);
+  function dogBondBonus(state3) {
+    return (hasTrait(state3, "dog_person") ? 20 : 0) + (hasLegacy(state3, "old_friend") ? 10 : 0);
   }
-  function backgroundText(state2) {
-    const j = jobOf(state2);
-    const t = (state2.player.traits || []).filter((x) => TRAITS[x]).map((x) => TRAITS[x].name);
-    if (!j && !t.length) return "";
-    return [j ? JOBS[j].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
+  function backgroundText(state3) {
+    const j2 = jobOf(state3);
+    const t = (state3.player.traits || []).filter((x2) => TRAITS[x2]).map((x2) => TRAITS[x2].name);
+    if (!j2 && !t.length) return "";
+    return [j2 ? JOBS[j2].name : null, t.join(", ") || null].filter(Boolean).join(" \xB7 ");
   }
 
   // src/engine/activity.js
@@ -5576,7 +5576,7 @@
   var START_MINUTE = 9 * 60 + 5;
   var HOME = { lat: HOME_LAT, lon: HOME_LON };
   var MAP_RADIUS_MILES = 15;
-  var homeOf = (state2) => state2.homePos || HOME;
+  var homeOf = (state3) => state3.homePos || HOME;
   function randomStartPoint(rng = Math.random) {
     const r = 12 * Math.sqrt(rng());
     const a = rng() * 2 * Math.PI;
@@ -5588,7 +5588,7 @@
   function newGame(seed = Math.floor(Math.random() * 2 ** 31), opts = {}) {
     const homePos = opts.home ? { lat: +opts.home.lat, lon: +opts.home.lon } : { ...HOME };
     const r = mulberry32(hashString("setup" + seed));
-    const state2 = {
+    const state3 = {
       version: SAVE_VERSION,
       seed,
       rngState: seed,
@@ -5689,32 +5689,32 @@
       dead: null,
       pendingPrompt: null
     };
-    initWeather(state2);
-    initNewSystems(state2);
-    state2.systemVersions = systemVersions();
-    applyBackground(state2, opts.job, opts.traits);
-    applyLegacy(state2, opts.legacy);
-    if (opts.homeLabel) log(state2, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
-    log(state2, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
-    log(state2, "The house is cold and silent. Nobody comes when you call out.", "story");
-    log(state2, "Hint: drink, eat, and get the house warm before the first night.", "hint");
-    return state2;
+    initWeather(state3);
+    initNewSystems(state3);
+    state3.systemVersions = systemVersions();
+    applyBackground(state3, opts.job, opts.traits);
+    applyLegacy(state3, opts.legacy);
+    if (opts.homeLabel) log(state3, `This run starts in a different house: ${opts.homeLabel}. It is your home now.`, "story");
+    log(state3, "You wake up in a hospital bed in your own living room. The feeding pump beeps. Its bag is empty.", "story");
+    log(state3, "The house is cold and silent. Nobody comes when you call out.", "story");
+    log(state3, "Hint: drink, eat, and get the house warm before the first night.", "hint");
+    return state3;
   }
   var dayIndex = (t) => Math.floor(t / 1440);
   var minuteOfDay2 = (t) => (t % 1440 + 1440) % 1440;
   function formatClock(t) {
     const m = Math.floor(minuteOfDay2(t));
-    let h2 = Math.floor(m / 60);
+    let h3 = Math.floor(m / 60);
     const mm = String(m % 60).padStart(2, "0");
-    const ampm = h2 >= 12 ? "PM" : "AM";
-    h2 = h2 % 12 || 12;
-    return `${h2}:${mm} ${ampm}`;
+    const ampm = h3 >= 12 ? "PM" : "AM";
+    h3 = h3 % 12 || 12;
+    return `${h3}:${mm} ${ampm}`;
   }
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function calendar(t) {
-    const d = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
-    return { year: d.getUTCFullYear(), month: d.getUTCMonth(), date: d.getUTCDate(), weekday: d.getUTCDay() };
+    const d2 = new Date(Date.UTC(2026, 10, 24) + dayIndex(t) * 864e5);
+    return { year: d2.getUTCFullYear(), month: d2.getUTCMonth(), date: d2.getUTCDate(), weekday: d2.getUTCDay() };
   }
   function formatDate(t) {
     const c = calendar(t);
@@ -5722,55 +5722,55 @@
   }
   function formatDuration(min) {
     min = Math.round(min);
-    const h2 = Math.floor(min / 60);
+    const h3 = Math.floor(min / 60);
     const m = min % 60;
-    if (h2 && m) return `${h2} h ${m} min`;
-    if (h2) return `${h2} h`;
+    if (h3 && m) return `${h3} h ${m} min`;
+    if (h3) return `${h3} h`;
     return `${m} min`;
   }
   function addItem(bag, id, qty = 1) {
     bag[id] = Math.round(((bag[id] || 0) + qty) * 1e3) / 1e3;
     if (bag[id] <= 1e-4) delete bag[id];
   }
-  function has(state2, id) {
-    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  function has(state3, id) {
+    return (state3.carried[id] || 0) > 0 || state3.location.kind === "home" && (state3.home.storage[id] || 0) > 0;
   }
-  function hasLight(state2) {
-    return (state2.carried.flashlight || 0) > 0 && state2.player.lightHours > 0 && !state2.player.lightOff;
+  function hasLight(state3) {
+    return (state3.carried.flashlight || 0) > 0 && state3.player.lightHours > 0 && !state3.player.lightOff;
   }
-  function log(state2, text, kind = "info") {
-    const entry = { t: state2.time, text, kind };
-    state2.log.push(entry);
-    activity.line(state2, entry);
-    if (state2.log.length > 300) state2.log.splice(0, state2.log.length - 300);
-    journalNote(state2, text, kind);
+  function log(state3, text, kind = "info") {
+    const entry = { t: state3.time, text, kind };
+    state3.log.push(entry);
+    activity.line(state3, entry);
+    if (state3.log.length > 300) state3.log.splice(0, state3.log.length - 300);
+    journalNote(state3, text, kind);
   }
-  function journalNote(state2, text, kind) {
-    if (!state2.journal) state2.journal = [];
-    const day = dayIndex(state2.time);
-    let d = state2.journal[state2.journal.length - 1];
-    if (!d || d.day !== day) {
-      d = { day, places: [], taken: 0, searched: 0, events: [] };
-      state2.journal.push(d);
+  function journalNote(state3, text, kind) {
+    if (!state3.journal) state3.journal = [];
+    const day = dayIndex(state3.time);
+    let d2 = state3.journal[state3.journal.length - 1];
+    if (!d2 || d2.day !== day) {
+      d2 = { day, places: [], taken: 0, searched: 0, events: [] };
+      state3.journal.push(d2);
     }
     const arrive = /^You arrive at (.+)\.$/.exec(text) || /^You reach ([^.]+)\./.exec(text);
     if (arrive) {
-      if (!d.places.includes(arrive[1])) d.places.push(arrive[1]);
+      if (!d2.places.includes(arrive[1])) d2.places.push(arrive[1]);
       return;
     }
     if (/^You walk to a house/.test(text)) {
-      if (!d.places.includes("a house")) d.places.push("a house");
+      if (!d2.places.includes("a house")) d2.places.push("a house");
       return;
     }
     if (/^You take: /.test(text)) {
-      d.taken += 1;
+      d2.taken += 1;
       return;
     }
     if (/^You search the /.test(text)) {
-      d.searched = (d.searched || 0) + 1;
+      d2.searched = (d2.searched || 0) + 1;
       return;
     }
-    if ((kind === "danger" || kind === "good" || kind === "warn") && d.events.length < 8 && !d.events.includes(text)) d.events.push(text);
+    if ((kind === "danger" || kind === "good" || kind === "warn") && d2.events.length < 8 && !d2.events.includes(text)) d2.events.push(text);
   }
 
   // src/data/gridsize.js
@@ -5910,14 +5910,14 @@
   function tilesFor(bag, order = Object.keys(bag)) {
     const out = [];
     for (const id of order) {
-      let q = bag[id] || 0;
-      if (q <= 1e-9) continue;
+      let q2 = bag[id] || 0;
+      if (q2 <= 1e-9) continue;
       const s = sizeOf(id);
       let n = 0;
-      while (q > 1e-9) {
-        const take = Math.min(s.stack, q);
+      while (q2 > 1e-9) {
+        const take = Math.min(s.stack, q2);
         out.push({ key: `${id}#${n}`, id, q: Math.round(take * 1e3) / 1e3, w: s.w, h: s.h });
-        q -= take;
+        q2 -= take;
         n++;
         if (n > 60) break;
       }
@@ -5926,15 +5926,15 @@
   }
   function layoutGrid(tiles, cols, rows, saved = {}) {
     const occ = [];
-    const free = (x, y, w, h2) => {
-      if (x < 0 || y < 0 || x + w > cols) return false;
-      for (let j = y; j < y + h2; j++) for (let i = x; i < x + w; i++) if (occ[j]?.[i]) return false;
+    const free = (x2, y2, w2, h3) => {
+      if (x2 < 0 || y2 < 0 || x2 + w2 > cols) return false;
+      for (let j2 = y2; j2 < y2 + h3; j2++) for (let i = x2; i < x2 + w2; i++) if (occ[j2]?.[i]) return false;
       return true;
     };
-    const mark = (x, y, w, h2, key) => {
-      for (let j = y; j < y + h2; j++) {
-        occ[j] || (occ[j] = []);
-        for (let i = x; i < x + w; i++) occ[j][i] = key;
+    const mark = (x2, y2, w2, h3, key) => {
+      for (let j2 = y2; j2 < y2 + h3; j2++) {
+        occ[j2] || (occ[j2] = []);
+        for (let i = x2; i < x2 + w2; i++) occ[j2][i] = key;
       }
     };
     const placed = [];
@@ -5943,25 +5943,25 @@
       const s = saved[t.key];
       if (s) {
         const rot = !!s[2];
-        const w = rot ? t.h : t.w;
-        const h2 = rot ? t.w : t.h;
-        if (w <= cols && s[1] + h2 <= rows && free(s[0], s[1], w, h2)) {
-          mark(s[0], s[1], w, h2, t.key);
-          placed.push({ ...t, x: s[0], y: s[1], w, h: h2, rot });
+        const w2 = rot ? t.h : t.w;
+        const h3 = rot ? t.w : t.h;
+        if (w2 <= cols && s[1] + h3 <= rows && free(s[0], s[1], w2, h3)) {
+          mark(s[0], s[1], w2, h3, t.key);
+          placed.push({ ...t, x: s[0], y: s[1], w: w2, h: h3, rot });
           continue;
         }
       }
       rest2.push(t);
     }
-    const order = rest2.map((t, i) => [t, i]).sort((a, b) => b[0].w * b[0].h - a[0].w * a[0].h || a[1] - b[1]).map((e) => e[0]);
+    const order = rest2.map((t, i) => [t, i]).sort((a, b2) => b2[0].w * b2[0].h - a[0].w * a[0].h || a[1] - b2[1]).map((e) => e[0]);
     for (const t of order) {
       let spot = null;
-      for (let y = 0; !spot && y < rows + 400; y++) {
-        for (let x = 0; x < cols && !spot; x++) {
-          if (t.w <= cols && free(x, y, t.w, t.h) && (y + t.h <= rows || y >= rows)) spot = { x, y, w: t.w, h: t.h, rot: false };
-          else if (t.h <= cols && t.w !== t.h && free(x, y, t.h, t.w) && (y + t.w <= rows || y >= rows)) spot = { x, y, w: t.h, h: t.w, rot: true };
+      for (let y2 = 0; !spot && y2 < rows + 400; y2++) {
+        for (let x2 = 0; x2 < cols && !spot; x2++) {
+          if (t.w <= cols && free(x2, y2, t.w, t.h) && (y2 + t.h <= rows || y2 >= rows)) spot = { x: x2, y: y2, w: t.w, h: t.h, rot: false };
+          else if (t.h <= cols && t.w !== t.h && free(x2, y2, t.h, t.w) && (y2 + t.w <= rows || y2 >= rows)) spot = { x: x2, y: y2, w: t.h, h: t.w, rot: true };
         }
-        if (!spot && t.w > cols && t.h > cols && y >= rows) spot = { x: 0, y, w: Math.min(cols, t.w), h: t.h, rot: false };
+        if (!spot && t.w > cols && t.h > cols && y2 >= rows) spot = { x: 0, y: y2, w: Math.min(cols, t.w), h: t.h, rot: false };
       }
       if (!spot) continue;
       mark(spot.x, spot.y, spot.w, spot.h, t.key);
@@ -5971,34 +5971,34 @@
     const overflow = placed.filter((p) => p.y + p.h > rows).length;
     return { tiles: placed, cols, rows, height: Math.max(rows, used), overflow };
   }
-  function fitsAt(layout, key, x, y, w, h2) {
-    if (x < 0 || y < 0 || x + w > layout.cols || y + h2 > layout.rows) return false;
-    return !layout.tiles.some((t) => t.key !== key && x < t.x + t.w && t.x < x + w && y < t.y + t.h && t.y < y + h2);
+  function fitsAt(layout, key, x2, y2, w2, h3) {
+    if (x2 < 0 || y2 < 0 || x2 + w2 > layout.cols || y2 + h3 > layout.rows) return false;
+    return !layout.tiles.some((t) => t.key !== key && x2 < t.x + t.w && t.x < x2 + w2 && y2 < t.y + t.h && t.y < y2 + h3);
   }
-  var legacyPack = (state2) => state2.player?.worn?.back === void 0 && (state2.carried.backpack || 0) > 0;
-  function wearsPack(state2) {
-    return state2.player?.worn?.back === "backpack" || legacyPack(state2);
+  var legacyPack = (state3) => state3.player?.worn?.back === void 0 && (state3.carried.backpack || 0) > 0;
+  function wearsPack(state3) {
+    return state3.player?.worn?.back === "backpack" || legacyPack(state3);
   }
-  function gridBag(state2, bag = state2.carried) {
-    if (!legacyPack(state2)) return bag;
-    const b = { ...bag };
-    b.backpack = (b.backpack || 0) - 1;
-    if (b.backpack <= 0) delete b.backpack;
-    return b;
+  function gridBag(state3, bag = state3.carried) {
+    if (!legacyPack(state3)) return bag;
+    const b2 = { ...bag };
+    b2.backpack = (b2.backpack || 0) - 1;
+    if (b2.backpack <= 0) delete b2.backpack;
+    return b2;
   }
-  function packSize(state2, pack = wearsPack(state2)) {
+  function packSize(state3, pack = wearsPack(state3)) {
     return { cols: GRID_COLS, rows: packRows(pack) };
   }
-  function bagFits(state2, bag, pack) {
-    const { cols, rows } = packSize(state2, pack);
-    return layoutGrid(tilesFor(gridBag(state2, bag)), cols, rows).overflow === 0;
+  function bagFits(state3, bag, pack) {
+    const { cols, rows } = packSize(state3, pack);
+    return layoutGrid(tilesFor(gridBag(state3, bag)), cols, rows).overflow === 0;
   }
-  function roomFor(state2, id, want) {
+  function roomFor(state3, id, want) {
     if (!(want > 0)) return 0;
-    const bag = { ...state2.carried };
+    const bag = { ...state3.carried };
     const test = (n) => {
-      bag[id] = (state2.carried[id] || 0) + n;
-      return bagFits(state2, bag);
+      bag[id] = (state3.carried[id] || 0) + n;
+      return bagFits(state3, bag);
     };
     if (test(want)) return want;
     let lo = 0;
@@ -6011,26 +6011,26 @@
     }
     return lo;
   }
-  function packLayout(state2) {
-    const { cols, rows } = packSize(state2);
-    return layoutGrid(tilesFor(gridBag(state2)), cols, rows);
+  function packLayout(state3) {
+    const { cols, rows } = packSize(state3);
+    return layoutGrid(tilesFor(gridBag(state3)), cols, rows);
   }
-  function packUse(state2) {
-    const L = packLayout(state2);
-    const used = L.tiles.reduce((a, t) => a + t.w * t.h, 0);
-    return { used, total: L.cols * L.rows, over: L.overflow > 0 };
+  function packUse(state3) {
+    const L2 = packLayout(state3);
+    const used = L2.tiles.reduce((a, t) => a + t.w * t.h, 0);
+    return { used, total: L2.cols * L2.rows, over: L2.overflow > 0 };
   }
-  function canTakeOffPack(state2) {
-    const bag = { ...gridBag(state2), backpack: (gridBag(state2).backpack || 0) + 1 };
+  function canTakeOffPack(state3) {
+    const bag = { ...gridBag(state3), backpack: (gridBag(state3).backpack || 0) + 1 };
     return layoutGrid(tilesFor(bag), GRID_COLS, packRows(false)).overflow === 0;
   }
-  function pocketsFit(state2) {
-    return layoutGrid(tilesFor(gridBag(state2)), GRID_COLS, packRows(false)).overflow === 0;
+  function pocketsFit(state3) {
+    return layoutGrid(tilesFor(gridBag(state3)), GRID_COLS, packRows(false)).overflow === 0;
   }
 
   // src/engine/checks.js
-  function standardMods(state2, { outside = false } = {}) {
-    const p = state2.player;
+  function standardMods(state3, { outside = false } = {}) {
+    const p = state3.player;
     const mods = [];
     if (p.energy < 50 && p.energy >= 25) mods.push(["tired", -2]);
     if (p.water < 25) mods.push(["very thirsty", -2]);
@@ -6040,38 +6040,38 @@
     return mods;
   }
   var RAIN2 = ["rain", "heavy_rain", "windstorm", "ice_storm"];
-  function edges(state2, opts = {}) {
-    const p = state2.player;
+  function edges(state3, opts = {}) {
+    const p = state3.player;
     const adv = [...opts.adv || []];
     const dis = [...opts.dis || []];
-    if (opts.outside && !isNight(state2.time)) adv.push("daylight");
-    const d = state2.dog;
-    if (opts.outside && d && d.stage === "joined" && d.withPlayer && d.bond >= 50) adv.push(`${d.name || "dog"} helps`);
+    if (opts.outside && !isNight(state3.time)) adv.push("daylight");
+    const d2 = state3.dog;
+    if (opts.outside && d2 && d2.stage === "joined" && d2.withPlayer && d2.bond >= 50) adv.push(`${d2.name || "dog"} helps`);
     const limb = p.injuries.some((i) => i.type === "sprain" || i.type === "deep_cut");
     if (limb && p.painH <= 0) dis.push("injured");
-    if (opts.outside && state2.weather && RAIN2.includes(state2.weather.type)) dis.push("rain");
-    if (opts.outside && isNight(state2.time)) dis.push("night");
+    if (opts.outside && state3.weather && RAIN2.includes(state3.weather.type)) dis.push("rain");
+    if (opts.outside && isNight(state3.time)) dis.push("night");
     if (p.energy < 25) dis.push("very tired");
     const mode = adv.length && !dis.length ? "adv" : dis.length && !adv.length ? "dis" : "normal";
     return { mode, adv, dis };
   }
-  function check(state2, label, dc, extraMods = [], opts = {}) {
-    const mods = [...standardMods(state2, opts), ...extraMods];
-    const e = edges(state2, opts);
-    const a = randInt(state2, 1, 20);
-    const b = e.mode === "normal" ? a : randInt(state2, 1, 20);
-    const roll = e.mode === "adv" ? Math.max(a, b) : e.mode === "dis" ? Math.min(a, b) : a;
+  function check(state3, label, dc, extraMods = [], opts = {}) {
+    const mods = [...standardMods(state3, opts), ...extraMods];
+    const e = edges(state3, opts);
+    const a = randInt(state3, 1, 20);
+    const b2 = e.mode === "normal" ? a : randInt(state3, 1, 20);
+    const roll = e.mode === "adv" ? Math.max(a, b2) : e.mode === "dis" ? Math.min(a, b2) : a;
     const total = roll + mods.reduce((s, m) => s + m[1], 0);
     const success = roll === 20 ? true : roll === 1 ? false : total >= dc;
-    const modText = mods.map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"} ${Math.abs(v)} (${n})`).join("");
-    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b}]` : "";
+    const modText = mods.map(([n, v2]) => ` ${v2 >= 0 ? "+" : "\u2212"} ${Math.abs(v2)} (${n})`).join("");
+    const edgeText = e.mode === "adv" ? ` [adv.: ${e.adv.join(", ")}; ${a} and ${b2}]` : e.mode === "dis" ? ` [disadv.: ${e.dis.join(", ")}; ${a} and ${b2}]` : "";
     const note = roll === 20 ? " natural 20!" : roll === 1 ? " natural 1!" : "";
-    log(state2, `\u{1F3B2} ${label}: d20 ${roll}${edgeText}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
+    log(state3, `\u{1F3B2} ${label}: d20 ${roll}${edgeText}${modText} = ${total} vs DC ${dc} \u2192 ${success ? "SUCCESS" : "FAIL"}${note}`, success ? "roll-ok" : "roll-fail");
     return { roll, total, dc, success, mode: e.mode };
   }
-  function odds(state2, dc, extraMods = [], opts = {}) {
-    const mods = [...standardMods(state2, opts), ...extraMods];
-    const e = edges(state2, opts);
+  function odds(state3, dc, extraMods = [], opts = {}) {
+    const mods = [...standardMods(state3, opts), ...extraMods];
+    const e = edges(state3, opts);
     const sum = mods.reduce((s, m) => s + m[1], 0);
     let ok = 0;
     for (let roll = 1; roll <= 20; roll++) if (roll === 20 || roll !== 1 && roll + sum >= dc) ok += 1;
@@ -6080,22 +6080,22 @@
     return { dc, mods, sum, pct: Math.round(p * 100), mode: e.mode, adv: e.adv, dis: e.dis };
   }
   function oddsText(o) {
-    const top = [...o.mods].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-    const shown = top.slice(0, 3).map(([n, v]) => ` ${v >= 0 ? "+" : "\u2212"}${Math.abs(v)} ${n}`).join("");
+    const top = [...o.mods].sort((a, b2) => Math.abs(b2[1]) - Math.abs(a[1]));
+    const shown = top.slice(0, 3).map(([n, v2]) => ` ${v2 >= 0 ? "+" : "\u2212"}${Math.abs(v2)} ${n}`).join("");
     const more = top.length > 3 ? ` (+${top.length - 3} more)` : "";
     const edge = o.mode === "adv" ? ` adv. (${o.adv.join(", ")})` : o.mode === "dis" ? ` disadv. (${o.dis.join(", ")})` : "";
     return `d20${edge}${shown}${more} vs DC ${o.dc} \xB7 ${o.pct}%`;
   }
 
   // src/engine/loot.js
-  function placeState(state2, place) {
-    let ps = state2.places[place.id];
+  function placeState(state3, place) {
+    let ps = state3.places[place.id];
     if (!ps) {
-      const r = mulberry32(hashString(`${state2.seed}:${place.id}:init`));
+      const r = mulberry32(hashString(`${state3.seed}:${place.id}:init`));
       const cat = CATEGORIES[place.cat];
-      const big = BIG_BRANDS.some((b) => (place.name || "").includes(b));
+      const big = BIG_BRANDS.some((b2) => (place.name || "").includes(b2));
       const empty = r() < 0.2;
-      ps = state2.places[place.id] = {
+      ps = state3.places[place.id] = {
         zonesDone: 0,
         zones: cat.zones + (big ? 2 : 0),
         stock: Math.min(0.95, cat.stock * (big ? 1.25 : 1) * (empty ? 0.15 : 1)),
@@ -6109,12 +6109,12 @@
     return ps;
   }
   var SOAKS = /* @__PURE__ */ new Set(["book_first_aid", "book_repair", "book_cooking", "book_survival", "matches", "toilet_paper", "comfort", "paper_map"]);
-  function rollZone(state2, key, catId, stock, zone, extraRolls = 0) {
-    const r = mulberry32(hashString(`${state2.seed}:${key}:zone${zone}`));
+  function rollZone(state3, key, catId, stock, zone, extraRolls = 0) {
+    const r = mulberry32(hashString(`${state3.seed}:${key}:zone${zone}`));
     const cat = CATEGORIES[catId];
     const n = 2 + Math.floor(r() * 4) + extraRolls;
-    const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state2, "store_fridges", key);
-    const leaking = decayActive(state2, "roof_leaks", key);
+    const fridgesGone = cat.loot.some((e) => e.fridge) && decayActive(state3, "store_fridges", key);
+    const leaking = decayActive(state3, "roof_leaks", key);
     const found = {};
     for (let i = 0; i < n; i++) {
       if (r() >= stock) continue;
@@ -6128,180 +6128,180 @@
 
   // src/engine/travel.js
   var ROUTE_FACTOR = 1.25;
-  function straightMiles(a, b) {
-    const R = 3958.8;
+  function straightMiles(a, b2) {
+    const R3 = 3958.8;
     const toR = Math.PI / 180;
-    const dLat = (b.lat - a.lat) * toR;
-    const dLon = (b.lon - a.lon) * toR;
-    const h2 = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h2));
+    const dLat = (b2.lat - a.lat) * toR;
+    const dLon = (b2.lon - a.lon) * toR;
+    const h3 = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toR) * Math.cos(b2.lat * toR) * Math.sin(dLon / 2) ** 2;
+    return 2 * R3 * Math.asin(Math.sqrt(h3));
   }
-  var routeMiles = (a, b) => straightMiles(a, b) * ROUTE_FACTOR;
-  function walkSpeed(state2, t = state2.time) {
-    const p = state2.player;
+  var routeMiles = (a, b2) => straightMiles(a, b2) * ROUTE_FACTOR;
+  function walkSpeed(state3, t = state3.time) {
+    const p = state3.player;
     let mph = 3;
     const why = [];
-    const apply = (f, w) => {
+    const apply = (f, w2) => {
       mph *= f;
-      why.push(w);
+      why.push(w2);
     };
     if (p.weak) apply(0.7, "weak");
-    if (isNight(t) && !hasLight(state2)) apply(0.6, "dark, no light");
-    const wx = WEATHER_TYPES[state2.weather.type];
+    if (isNight(t) && !hasLight(state3)) apply(0.6, "dark, no light");
+    const wx = WEATHER_TYPES[state3.weather.type];
     if (wx?.speed) apply(wx.speed, wx.label.toLowerCase());
-    if (packUse(state2).over) apply(0.7, "pack over full");
-    const legF = injuryFactor(state2, "leg");
+    if (packUse(state3).over) apply(0.7, "pack over full");
+    const legF = injuryFactor(state3, "leg");
     if (legF < 1) apply(legF, "sprained ankle");
     if (p.warmth < 25) apply(0.8, "hypothermia");
     if (p.energy < 25) apply(0.7, "exhausted");
     if (p.health < 25) apply(0.7, "badly hurt");
-    if (walkSpeedFactor(state2) < 1) apply(walkSpeedFactor(state2), "bad knees");
+    if (walkSpeedFactor(state3) < 1) apply(walkSpeedFactor(state3), "bad knees");
     const og = overgrowthWalk(t);
     if (og < 0.99) apply(og, "overgrown streets");
-    for (const h2 of activeHazards(state2, t)) {
-      if (!h2.walk) continue;
-      if (h2.id === "feral_dogs" && dogWarns(state2)) apply(0.96, "loose dogs, your dog warns you early");
-      else apply(h2.walk, h2.label);
+    for (const h3 of activeHazards(state3, t)) {
+      if (!h3.walk) continue;
+      if (h3.id === "feral_dogs" && dogWarns(state3)) apply(0.96, "loose dogs, your dog warns you early");
+      else apply(h3.walk, h3.label);
     }
     return { mph, why };
   }
   var TREE_DETOUR = 1.3;
   var TREE_DETOUR_PHONE = 1.1;
-  function roadBlocked(state2, dest) {
-    return !!(dest && dest.id && decayActive(state2, "trees_on_roads", `road:${dest.id}`));
+  function roadBlocked(state3, dest) {
+    return !!(dest && dest.id && decayActive(state3, "trees_on_roads", `road:${dest.id}`));
   }
-  function tripMiles(state2, dest) {
-    const m = routeMiles(state2.pos, dest);
-    return roadBlocked(state2, dest) ? m * (phoneSignal(state2) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
+  function tripMiles(state3, dest) {
+    const m = routeMiles(state3.pos, dest);
+    return roadBlocked(state3, dest) ? m * (phoneSignal(state3) ? TREE_DETOUR_PHONE : TREE_DETOUR) : m;
   }
-  function phoneSignal(state2, pos = state2.pos) {
-    if (!has(state2, "phone")) return false;
+  function phoneSignal(state3, pos = state3.pos) {
+    if (!has(state3, "phone")) return false;
     const cell = `tower:${Math.round(pos.lat * 20)}:${Math.round(pos.lon * 20)}`;
-    return !decayActive(state2, "cell_towers", cell);
+    return !decayActive(state3, "cell_towers", cell);
   }
-  function estimateTrip(state2, dest) {
-    const miles = tripMiles(state2, dest);
-    const { mph, why } = walkSpeed(state2);
+  function estimateTrip(state3, dest) {
+    const miles = tripMiles(state3, dest);
+    const { mph, why } = walkSpeed(state3);
     const minutes = miles / mph * 60;
-    const energy = minutes / 60 * 8 * (state2.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state2, "walk");
+    const energy = minutes / 60 * 8 * (state3.player.warmth < 50 ? 1.5 : 1) * energyUseFactor(state3, "walk");
     return { miles, minutes, energy, mph, why };
   }
-  function lerp(a, b, f) {
-    return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f };
+  function lerp(a, b2, f) {
+    return { lat: a.lat + (b2.lat - a.lat) * f, lon: a.lon + (b2.lon - a.lon) * f };
   }
-  function travel(state2, dest, destLabel) {
-    const start2 = { ...state2.pos };
-    const total = tripMiles(state2, dest);
-    log(state2, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
-    if (roadBlocked(state2, dest)) {
+  function travel(state3, dest, destLabel) {
+    const start2 = { ...state3.pos };
+    const total = tripMiles(state3, dest);
+    log(state3, `You walk toward ${destLabel} (${total.toFixed(1)} mi).`, "travel");
+    if (roadBlocked(state3, dest)) {
       const key = `road:${dest.id}`;
-      const seen = hasChange(state2, key, "tree", "set");
-      if (!seen) recordChange(state2, key, { o: "tree", k: "set", v: { blocked: true } });
-      log(state2, phoneSignal(state2) ? "Your phone map shows the road ahead blocked by a fallen tree. You take the way around." : `${seen ? "The fallen tree still blocks the road." : "A big fallen tree lies across the road, with power lines tangled in it."} You go around by the side streets.`, "travel");
+      const seen = hasChange(state3, key, "tree", "set");
+      if (!seen) recordChange(state3, key, { o: "tree", k: "set", v: { blocked: true } });
+      log(state3, phoneSignal(state3) ? "Your phone map shows the road ahead blocked by a fallen tree. You take the way around." : `${seen ? "The fallen tree still blocks the road." : "A big fallen tree lies across the road, with power lines tangled in it."} You go around by the side streets.`, "travel");
     }
     let done = 0;
-    while (done < total - 1e-6 && !state2.dead) {
+    while (done < total - 1e-6 && !state3.dead) {
       const seg = Math.min(1, total - done);
-      const { mph } = walkSpeed(state2);
-      advanceTime(state2, seg / mph * 60, "walk");
+      const { mph } = walkSpeed(state3);
+      advanceTime(state3, seg / mph * 60, "walk");
       done += seg;
-      state2.stats.miles += seg;
-      state2.pos = lerp(start2, dest, done / total);
-      if (seg >= 0.5 && !state2.dead) roadEvent(state2);
-      if (!state2.dead && state2.player.energy <= 0) {
-        log(state2, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
-        advanceTime(state2, 180, "sleep");
+      state3.stats.miles += seg;
+      state3.pos = lerp(start2, dest, done / total);
+      if (seg >= 0.5 && !state3.dead) roadEvent(state3);
+      if (!state3.dead && state3.player.energy <= 0) {
+        log(state3, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
+        advanceTime(state3, 180, "sleep");
       }
     }
-    if (state2.dead) return false;
-    state2.pos = { ...dest };
+    if (state3.dead) return false;
+    state3.pos = { ...dest };
     const fromHome = straightMiles(HOME, dest);
-    if (fromHome > MAP_RADIUS_MILES) log(state2, "You are past the edge of the known area. There is nothing to search here.", "warn");
+    if (fromHome > MAP_RADIUS_MILES) log(state3, "You are past the edge of the known area. There is nothing to search here.", "warn");
     return true;
   }
-  function dogWithPlayer(state2) {
-    return state2.dog.stage === "joined" && state2.dog.withPlayer;
+  function dogWithPlayer(state3) {
+    return state3.dog.stage === "joined" && state3.dog.withPlayer;
   }
-  function loseRandomItem(state2, filter = () => true) {
-    const ids = Object.keys(state2.carried).filter((id2) => id2 !== "backpack" && filter(id2));
+  function loseRandomItem(state3, filter = () => true) {
+    const ids = Object.keys(state3.carried).filter((id2) => id2 !== "backpack" && filter(id2));
     if (!ids.length) return;
-    const id = ids[randInt(state2, 0, ids.length - 1)];
-    addItem(state2.carried, id, -1);
-    log(state2, `You lose: ${itemName(id)}.`, "warn");
+    const id = ids[randInt(state3, 0, ids.length - 1)];
+    addItem(state3.carried, id, -1);
+    log(state3, `You lose: ${itemName(id)}.`, "warn");
   }
-  function roadEvent(state2) {
-    let roll = randInt(state2, 1, 100);
-    if (isNight(state2.time)) roll += 10;
-    if (isBadWeather(state2)) roll += 10;
+  function roadEvent(state3) {
+    let roll = randInt(state3, 1, 100);
+    if (isNight(state3.time)) roll += 10;
+    if (isBadWeather(state3)) roll += 10;
     roll = Math.min(roll, 100);
     if (roll <= 80) return;
-    const dog = dogWithPlayer(state2);
-    const warn = dog && state2.dog.bond >= 40;
+    const dog = dogWithPlayer(state3);
+    const warn = dog && state3.dog.bond >= 40;
     const animalMods = [];
     if (warn) animalMods.push(["dog warned you", 4]);
     const out = { outside: true };
     if (roll <= 85) {
-      log(state2, "Broken glass and debris cover the road.");
-      if (!check(state2, "Step past the debris", 8, [], out).success) addInjury(state2, "small_cut");
+      log(state3, "Broken glass and debris cover the road.");
+      if (!check(state3, "Step past the debris", 8, [], out).success) addInjury(state3, "small_cut");
     } else if (roll <= 88) {
-      log(state2, "Water floods the street ahead.");
-      const r = check(state2, "Cross the flooded street", 12, [], out);
+      log(state3, "Water floods the street ahead.");
+      const r = check(state3, "Cross the flooded street", 12, [], out);
       if (!r.success) {
-        state2.player.wet = true;
-        log(state2, "You slip and fall in the cold water. You are wet.", "warn");
-        loseRandomItem(state2);
+        state3.player.wet = true;
+        log(state3, "You slip and fall in the cold water. You are wet.", "warn");
+        loseRandomItem(state3);
       }
     } else if (roll <= 91) {
-      log(state2, "A fallen tree and a downed line block the road.");
-      if (!check(state2, "Climb over the tree", 10, [], out).success) addInjury(state2, "sprain", { part: "ankle" });
+      log(state3, "A fallen tree and a downed line block the road.");
+      if (!check(state3, "Climb over the tree", 10, [], out).success) addInjury(state3, "sprain", { part: "ankle" });
     } else if (roll <= 95) {
-      log(state2, "A pack of loose dogs runs at you, barking.", "danger");
+      log(state3, "A pack of loose dogs runs at you, barking.", "danger");
       const mods = [...animalMods];
-      if (hasLight(state2) && isNight(state2.time)) mods.push(["light", 3]);
-      if (dog) mods.push([`${state2.dog.name} stands with you`, 3]);
-      if (!check(state2, "Scare off the dog pack", 13, mods, out).success) {
-        addInjury(state2, "bite");
+      if (hasLight(state3) && isNight(state3.time)) mods.push(["light", 3]);
+      if (dog) mods.push([`${state3.dog.name} stands with you`, 3]);
+      if (!check(state3, "Scare off the dog pack", 13, mods, out).success) {
+        addInjury(state3, "bite");
         if (dog) {
-          state2.dog.health -= 15;
-          log(state2, `${state2.dog.name} fights them off but is bitten (dog Health \u221215).`, "warn");
+          state3.dog.health -= 15;
+          log(state3, `${state3.dog.name} fights them off but is bitten (dog Health \u221215).`, "warn");
         }
-      } else log(state2, "The pack runs away.");
+      } else log(state3, "The pack runs away.");
     } else if (roll <= 99) {
-      log(state2, "Coyotes follow you along the road.", "danger");
-      if (!check(state2, "Make the coyotes go away", 11, animalMods, out).success) {
-        if (chance(state2, 0.5)) addInjury(state2, "bite");
+      log(state3, "Coyotes follow you along the road.", "danger");
+      if (!check(state3, "Make the coyotes go away", 11, animalMods, out).success) {
+        if (chance(state3, 0.5)) addInjury(state3, "bite");
         else {
-          log(state2, "A coyote runs off with some of your food.", "warn");
-          loseRandomItem(state2, (id) => ["canned_food", "snacks", "peanut_butter", "dry_food", "dog_food"].includes(id));
+          log(state3, "A coyote runs off with some of your food.", "warn");
+          loseRandomItem(state3, (id) => ["canned_food", "snacks", "peanut_butter", "dry_food", "dog_food"].includes(id));
         }
-      } else log(state2, "The coyotes go away.");
+      } else log(state3, "The coyotes go away.");
     } else {
-      const found = rollZone(state2, `road${state2.time}`, "house", 0.9, 0, 1);
+      const found = rollZone(state3, `road${state3.time}`, "house", 0.9, 0, 1);
       const names = [];
-      for (const [id, q] of Object.entries(found)) {
-        addItem(state2.carried, id, q);
-        names.push(`${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
+      for (const [id, q2] of Object.entries(found)) {
+        addItem(state3.carried, id, q2);
+        names.push(`${itemName(id)}${q2 > 1 ? " \xD7" + q2 : ""}`);
       }
-      log(state2, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
-      if (!wearsPack(state2)) {
-        putOn(state2.player, "backpack");
-        log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
+      log(state3, `You find an abandoned backpack by the road. Inside: ${names.join(", ") || "nothing useful"}.`, "good");
+      if (!wearsPack(state3)) {
+        putOn(state3.player, "backpack");
+        log(state3, "You put the backpack on. Your pack grid is much bigger now.", "good");
       }
     }
   }
-  function describeTrip(state2, est) {
+  function describeTrip(state3, est) {
     return `${est.miles.toFixed(1)} mi \xB7 about ${formatDuration(est.minutes)} \xB7 Energy \u2212${Math.round(est.energy)}`;
   }
 
   // src/engine/breakdown.js
-  function batteryHours(state2) {
-    return Math.max(3, Math.round(10 * (1 - 0.7 * decayShare(state2, "battery_drain"))));
+  function batteryHours(state3) {
+    return Math.max(3, Math.round(10 * (1 - 0.7 * decayShare(state3, "battery_drain"))));
   }
-  function medicineFactor(state2) {
-    return 1 - 0.3 * decayShare(state2, "old_medicine");
+  function medicineFactor(state3) {
+    return 1 - 0.3 * decayShare(state3, "old_medicine");
   }
-  function gasStartChance(state2) {
-    return 1 - 0.7 * decayShare(state2, "stale_gas");
+  function gasStartChance(state3) {
+    return 1 - 0.7 * decayShare(state3, "stale_gas");
   }
   var GEN_KWH_PER_GAL = 3;
 
@@ -6334,13 +6334,13 @@
     ["gloves", 3],
     ["tarp", 1.5]
   ];
-  function rollTable(state2) {
-    const total = TABLE.reduce((a, [, w]) => a + w, 0);
-    const n = chance(state2, 0.15) ? 0 : randInt(state2, 1, 3);
+  function rollTable(state3) {
+    const total = TABLE.reduce((a, [, w2]) => a + w2, 0);
+    const n = chance(state3, 0.15) ? 0 : randInt(state3, 1, 3);
     const out = [];
     for (let i = 0; i < n; i++) {
-      let x = randInt(state2, 0, 9999) / 1e4 * total;
-      const hit = TABLE.find(([, w]) => (x -= w) < 0) || TABLE[0];
+      let x2 = randInt(state3, 0, 9999) / 1e4 * total;
+      const hit = TABLE.find(([, w2]) => (x2 -= w2) < 0) || TABLE[0];
       out.push(hit[0]);
     }
     return out;
@@ -6353,97 +6353,97 @@
   var WIRE_MIN = 20;
   var CAR_BATTERY_KWH = 0.5;
   var MAX_CAR_BATTERIES = 4;
-  function carsOf(state2) {
-    if (!state2.cars || typeof state2.cars !== "object") state2.cars = {};
-    return state2.cars;
+  function carsOf(state3) {
+    if (!state3.cars || typeof state3.cars !== "object") state3.cars = {};
+    return state3.cars;
   }
-  function carHere(state2) {
-    const loc = state2.location;
-    return loc && loc.kind === "car" ? carsOf(state2)[loc.id] || null : null;
+  function carHere(state3) {
+    const loc = state3.location;
+    return loc && loc.kind === "car" ? carsOf(state3)[loc.id] || null : null;
   }
-  function goToCar(state2, id, lat, lon) {
+  function goToCar(state3, id, lat, lon) {
     if (!id || !Number.isFinite(lat) || !Number.isFinite(lon)) return false;
-    const cars = carsOf(state2);
+    const cars = carsOf(state3);
     if (!cars[id]) cars[id] = { lat, lon };
-    if (!travel(state2, { lat, lon }, "the car")) return false;
-    state2.location = { kind: "car", id };
-    log(state2, "You reach the abandoned car. Leaves and dust cover the glass.", "travel");
+    if (!travel(state3, { lat, lon }, "the car")) return false;
+    state3.location = { kind: "car", id };
+    log(state3, "You reach the abandoned car. Leaves and dust cover the glass.", "travel");
     return true;
   }
-  var whole = (state2, id) => (state2.carried[id] || 0) >= 1 || state2.location.kind === "home" && (state2.home.storage[id] || 0) >= 1;
-  var hasAny = (state2, ids) => ids.find((t) => whole(state2, t)) || null;
+  var whole = (state3, id) => (state3.carried[id] || 0) >= 1 || state3.location.kind === "home" && (state3.home.storage[id] || 0) >= 1;
+  var hasAny = (state3, ids) => ids.find((t) => whole(state3, t)) || null;
   var SIPHON_TOOLS = ["garden_hose", "pipe_fittings"];
   var WRENCH_TOOLS = ["toolkit", "multitool"];
-  function searchCar(state2) {
-    const c = carHere(state2);
+  function searchCar(state3) {
+    const c = carHere(state3);
     if (!c || c.searched) return;
-    if (advanceTime(state2, CAR_SEARCH_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    if (advanceTime(state3, CAR_SEARCH_MIN, "work", { stopAtDanger: true }) || state3.dead) return;
     c.searched = true;
-    const found = rollTable(state2);
-    for (const id of found) addItem(state2.carried, id, 1);
-    practice(state2, "scavenging", 1);
-    log(state2, found.length ? `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min): ${found.map((id) => ITEMS[id].name.toLowerCase()).join(", ")}.` : `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min). Nothing useful.`, found.length ? "good" : void 0);
+    const found = rollTable(state3);
+    for (const id of found) addItem(state3.carried, id, 1);
+    practice(state3, "scavenging", 1);
+    log(state3, found.length ? `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min): ${found.map((id) => ITEMS[id].name.toLowerCase()).join(", ")}.` : `You search the glovebox and the trunk (${CAR_SEARCH_MIN} min). Nothing useful.`, found.length ? "good" : void 0);
   }
-  function siphonGas(state2) {
-    const c = carHere(state2);
+  function siphonGas(state3) {
+    const c = carHere(state3);
     if (!c || c.siphoned) return;
-    if (!hasAny(state2, SIPHON_TOOLS)) {
-      log(state2, "You need a hose to siphon gas.");
+    if (!hasAny(state3, SIPHON_TOOLS)) {
+      log(state3, "You need a hose to siphon gas.");
       return;
     }
-    if (advanceTime(state2, SIPHON_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    if (advanceTime(state3, SIPHON_MIN, "work", { stopAtDanger: true }) || state3.dead) return;
     c.siphoned = true;
-    const gal = chance(state2, 0.35) ? 0 : randInt(state2, 1, 3);
+    const gal = chance(state3, 0.35) ? 0 : randInt(state3, 1, 3);
     if (!gal) {
-      log(state2, "You feed the hose into the tank. It is dry.");
+      log(state3, "You feed the hose into the tank. It is dry.");
       return;
     }
-    addItem(state2.carried, "gas_can", gal);
-    const stale = decayShare(state2, "stale_gas");
-    log(state2, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min).${stale > 0.3 ? " It smells sour. Old gas: it may not start an engine." : ""}`, "good");
+    addItem(state3.carried, "gas_can", gal);
+    const stale = decayShare(state3, "stale_gas");
+    log(state3, `You siphon ${gal} gal of gas into cans (${SIPHON_MIN} min).${stale > 0.3 ? " It smells sour. Old gas: it may not start an engine." : ""}`, "good");
   }
-  function takeCarBattery(state2) {
-    const c = carHere(state2);
+  function takeCarBattery(state3) {
+    const c = carHere(state3);
     if (!c || c.battery) return;
-    const tool = hasAny(state2, WRENCH_TOOLS);
+    const tool = hasAny(state3, WRENCH_TOOLS);
     if (!tool) {
-      log(state2, "You need a wrench (tool kit or multitool) to take the battery out.");
+      log(state3, "You need a wrench (tool kit or multitool) to take the battery out.");
       return;
     }
-    if (advanceTime(state2, BATTERY_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    if (advanceTime(state3, BATTERY_MIN, "work", { stopAtDanger: true }) || state3.dead) return;
     c.battery = true;
-    addItem(state2.carried, "car_battery", 1);
-    practice(state2, "tinkering", 2);
-    log(state2, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, "good");
+    addItem(state3.carried, "car_battery", 1);
+    practice(state3, "tinkering", 2);
+    log(state3, `You open the hood and take out the 12 V battery with your ${ITEMS[tool].name.toLowerCase()} (${BATTERY_MIN} min). It is heavy.`, "good");
   }
-  function stripCarWire(state2) {
-    const c = carHere(state2);
+  function stripCarWire(state3) {
+    const c = carHere(state3);
     if (!c || c.wire) return;
-    const tool = hasAny(state2, ["toolkit", "multitool", "knife"]);
+    const tool = hasAny(state3, ["toolkit", "multitool", "knife"]);
     if (!tool) {
-      log(state2, "You need a knife or a tool to cut the wire.");
+      log(state3, "You need a knife or a tool to cut the wire.");
       return;
     }
-    if (advanceTime(state2, WIRE_MIN, "work", { stopAtDanger: true }) || state2.dead) return;
+    if (advanceTime(state3, WIRE_MIN, "work", { stopAtDanger: true }) || state3.dead) return;
     c.wire = true;
-    addItem(state2.carried, "wiring", 0.5);
-    addItem(state2.carried, "hardware_parts", 0.25);
-    practice(state2, "tinkering", 2);
-    log(state2, `You pull wire from under the dash and take the mirror and its screws (${WIRE_MIN} min).`, "good");
+    addItem(state3.carried, "wiring", 0.5);
+    addItem(state3.carried, "hardware_parts", 0.25);
+    practice(state3, "tinkering", 2);
+    log(state3, `You pull wire from under the dash and take the mirror and its screws (${WIRE_MIN} min).`, "good");
   }
-  function addCarBattery(state2, bag) {
-    const h2 = state2.home;
-    h2.carBatteries = h2.carBatteries || 0;
+  function addCarBattery(state3, bag) {
+    const h3 = state3.home;
+    h3.carBatteries = h3.carBatteries || 0;
     if (!((bag.car_battery || 0) >= 1)) return;
-    if (h2.carBatteries >= MAX_CAR_BATTERIES) {
-      log(state2, "The bank has no room for more car batteries.");
+    if (h3.carBatteries >= MAX_CAR_BATTERIES) {
+      log(state3, "The bank has no room for more car batteries.");
       return;
     }
     addItem(bag, "car_battery", -1);
-    h2.carBatteries += 1;
-    h2.batteryMax += CAR_BATTERY_KWH;
-    advanceTime(state2, 30, "work");
-    log(state2, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h2.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
+    h3.carBatteries += 1;
+    h3.batteryMax += CAR_BATTERY_KWH;
+    advanceTime(state3, 30, "work");
+    log(state3, `You wire the car battery into the home battery bank (+${CAR_BATTERY_KWH} kWh of storage, ${h3.carBatteries} of ${MAX_CAR_BATTERIES}).`, "good");
   }
 
   // src/data/wild.js
@@ -6486,19 +6486,19 @@
   var PRESSURE_CATCH = 0.15;
   var WINTER_CATCH = 0.5;
   var FISH_CLEAN = 5;
-  function wildOf(state2) {
-    if (!state2.wild || typeof state2.wild !== "object") state2.wild = {};
-    const w = state2.wild;
-    w.scared || (w.scared = {});
-    w.snares || (w.snares = {});
-    w.pressure || (w.pressure = {});
-    return w;
+  function wildOf(state3) {
+    if (!state3.wild || typeof state3.wild !== "object") state3.wild = {};
+    const w2 = state3.wild;
+    w2.scared || (w2.scared = {});
+    w2.snares || (w2.snares = {});
+    w2.pressure || (w2.pressure = {});
+    return w2;
   }
-  var bags = (state2) => [state2.carried, state2.home.storage];
-  var hasAll = (state2, ids) => ids.every((id) => has(state2, id));
-  var hasKnife = (state2) => GEAR.clean.some((id) => has(state2, id));
-  function useOne(state2, id) {
-    const bag = (state2.carried[id] || 0) > 0 ? state2.carried : state2.home.storage;
+  var bags = (state3) => [state3.carried, state3.home.storage];
+  var hasAll = (state3, ids) => ids.every((id) => has(state3, id));
+  var hasKnife = (state3) => GEAR.clean.some((id) => has(state3, id));
+  function useOne(state3, id) {
+    const bag = (state3.carried[id] || 0) > 0 ? state3.carried : state3.home.storage;
     addItem(bag, id, -1);
   }
   function dawnOrDusk(t) {
@@ -6506,347 +6506,347 @@
     const s = sunFor(t);
     return Math.abs(m - s.rise) <= 90 || Math.abs(m - s.set) <= 90;
   }
-  function spotHere(state2) {
-    const loc = state2.location;
+  function spotHere(state3) {
+    const loc = state3.location;
     return loc && loc.kind === "wild" ? { id: loc.id, ...SPOTS[loc.id] } : null;
   }
-  function waterText(state2) {
-    const w = state2.weather || {};
-    const month = new Date(Date.UTC(2026, 10, 24) + Math.floor(state2.time / 1440) * 864e5).getUTCMonth();
-    if (w.type === "rain" || w.type === "heavy_rain" || w.type === "windstorm") return "The water is high and brown with rain.";
-    if (w.type === "snow" || w.low <= 28) return "Thin ice at the edges; the water is slow and dark.";
+  function waterText(state3) {
+    const w2 = state3.weather || {};
+    const month = new Date(Date.UTC(2026, 10, 24) + Math.floor(state3.time / 1440) * 864e5).getUTCMonth();
+    if (w2.type === "rain" || w2.type === "heavy_rain" || w2.type === "windstorm") return "The water is high and brown with rain.";
+    if (w2.type === "snow" || w2.low <= 28) return "Thin ice at the edges; the water is slow and dark.";
     if (month >= 6 && month <= 8) return "The water is low and clear. Fish hold in the shade.";
     if (month >= 3 && month <= 5) return "The water runs fast and green with spring melt.";
     return "The water runs cold and grey-green.";
   }
-  function goToSpot(state2, id) {
+  function goToSpot(state3, id) {
     const s = SPOTS[id];
     if (!s) {
-      log(state2, "No such place.");
+      log(state3, "No such place.");
       return false;
     }
-    if (!travel(state2, s, s.name)) return false;
-    state2.location = { kind: "wild", id };
-    log(state2, `You reach ${s.name}. ${s.kind === "fish" ? waterText(state2) : "Brush, tall grass and the edge of the trees."}`, "travel");
+    if (!travel(state3, s, s.name)) return false;
+    state3.location = { kind: "wild", id };
+    log(state3, `You reach ${s.name}. ${s.kind === "fish" ? waterText(state3) : "Brush, tall grass and the edge of the trees."}`, "travel");
     return true;
   }
-  function spotPressure(state2, id, t = state2.time) {
-    const e = state2.wild?.pressure?.[id];
+  function spotPressure(state3, id, t = state3.time) {
+    const e = state3.wild?.pressure?.[id];
     if (!e) return 0;
     return Math.max(0, e.p - (t - e.t) / 1440 * PRESSURE_RECOVER_PER_DAY);
   }
-  function catchFactor(state2, id) {
-    const month = calendar(state2.time).month;
+  function catchFactor(state3, id) {
+    const month = calendar(state3.time).month;
     const season = [11, 0, 1].includes(month) ? WINTER_CATCH : 1;
-    return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state2, id)) * season;
+    return Math.max(0.2, 1 - PRESSURE_CATCH * spotPressure(state3, id)) * season;
   }
-  function canFish(state2) {
-    const s = spotHere(state2);
+  function canFish(state3) {
+    const s = spotHere(state3);
     if (!s || s.kind !== "fish") return "Go to a river, creek or lake first";
-    if (!GEAR.fish.some((ids) => hasAll(state2, ids))) return "You need a fishing rod, or line and hooks";
+    if (!GEAR.fish.some((ids) => hasAll(state3, ids))) return "You need a fishing rod, or line and hooks";
     return null;
   }
-  function fishSetup(state2) {
-    const s = spotHere(state2) || {};
-    const month = calendar(state2.time).month;
+  function fishSetup(state3) {
+    const s = spotHere(state3) || {};
+    const month = calendar(state3.time).month;
     const mods = [];
     const adv = [];
     const dis = [];
-    const lvl = skillLevel(state2, "fishing");
+    const lvl = skillLevel(state3, "fishing");
     if (lvl) mods.push(["fishing skill", lvl]);
-    if (dawnOrDusk(state2.time)) mods.push(["dawn or dusk", 2]);
-    const run2 = (s.runs || []).find((x) => x.months.includes(month)) || null;
+    if (dawnOrDusk(state3.time)) mods.push(["dawn or dusk", 2]);
+    const run2 = (s.runs || []).find((x2) => x2.months.includes(month)) || null;
     if (run2) mods.push([`${run2.fish} run`, 3]);
     if ([11, 0, 1].includes(month)) mods.push(["cold water", -2]);
     if ((s.quality ?? 1) < 0.7) mods.push(["small creek", -2]);
-    if (!has(state2, "fishing_rod")) mods.push(["hand line", -1]);
-    const pr = Math.round(spotPressure(state2, s.id));
+    if (!has(state3, "fishing_rod")) mods.push(["hand line", -1]);
+    const pr = Math.round(spotPressure(state3, s.id));
     if (pr >= 2) mods.push(["fished out", -Math.min(4, pr - 1)]);
-    if ((state2.weather?.low ?? 40) <= 30) mods.push(["frozen ground, no worms", -2]);
+    if ((state3.weather?.low ?? 40) <= 30) mods.push(["frozen ground, no worms", -2]);
     return { mods, adv, dis, run: run2, spot: s };
   }
-  function fishOdds(state2) {
-    const f = fishSetup(state2);
-    return odds(state2, FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+  function fishOdds(state3) {
+    const f = fishSetup(state3);
+    return odds(state3, FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
   }
-  function fish(state2) {
-    const why = canFish(state2);
+  function fish(state3) {
+    const why = canFish(state3);
     if (why) {
-      log(state2, why + ".");
+      log(state3, why + ".");
       return { ok: false, fish: 0 };
     }
-    const f = fishSetup(state2);
-    log(state2, `You fish from the bank at ${f.spot.name} for two hours.`);
-    if (advanceTime(state2, FISH_MINUTES, "rest", { stopAtDanger: true }) || state2.dead) return { ok: false, fish: 0, stopped: !state2.dead };
-    const r = check(state2, "Fishing", FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
+    const f = fishSetup(state3);
+    log(state3, `You fish from the bank at ${f.spot.name} for two hours.`);
+    if (advanceTime(state3, FISH_MINUTES, "rest", { stopAtDanger: true }) || state3.dead) return { ok: false, fish: 0, stopped: !state3.dead };
+    const r = check(state3, "Fishing", FISH_DC, f.mods, { outside: true, adv: f.adv, dis: f.dis });
     let n = 0;
     let what = "";
     if (r.success) {
-      const k = catchFactor(state2, f.spot.id);
-      if (f.run && chance(state2, 0.5)) {
+      const k = catchFactor(state3, f.spot.id);
+      if (f.run && chance(state3, 0.5)) {
         n = f.run.n;
         what = f.run.fish;
       } else {
         const base2 = Math.min(3, 1 + Math.max(0, Math.floor((r.total - FISH_DC) / 6)));
-        n = Math.max(1, Math.floor(base2 * k + randInt(state2, 0, 99) / 100));
-        what = f.spot.fish[randInt(state2, 0, f.spot.fish.length - 1)];
+        n = Math.max(1, Math.floor(base2 * k + randInt(state3, 0, 99) / 100));
+        what = f.spot.fish[randInt(state3, 0, f.spot.fish.length - 1)];
       }
-      const clean = (hasKnife(state2) ? FISH_CLEAN : 15) * n;
-      advanceTime(state2, clean, "rest");
-      addFresh(state2, bags(state2), "fresh_fish", n, 0);
-      addItem(state2.carried, "fresh_fish", n);
-      log(state2, what === f.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state2) ? "" : ", slow with no knife"}).`, "good");
-    } else log(state2, "Nothing bites. You wind in the line.");
-    const w = wildOf(state2);
-    w.pressure[f.spot.id] = { p: spotPressure(state2, f.spot.id) + PRESSURE_PER_TRIP, t: state2.time };
-    practice(state2, "fishing", r.success ? 4 : 2);
+      const clean = (hasKnife(state3) ? FISH_CLEAN : 15) * n;
+      advanceTime(state3, clean, "rest");
+      addFresh(state3, bags(state3), "fresh_fish", n, 0);
+      addItem(state3.carried, "fresh_fish", n);
+      log(state3, what === f.run?.fish ? `A ${what}! It fights for a long time. You land it and clean it on the bank (${clean} min).` : `You catch ${n} ${what}. You clean ${n > 1 ? "them" : "it"} on the bank (${clean} min${hasKnife(state3) ? "" : ", slow with no knife"}).`, "good");
+    } else log(state3, "Nothing bites. You wind in the line.");
+    const w2 = wildOf(state3);
+    w2.pressure[f.spot.id] = { p: spotPressure(state3, f.spot.id) + PRESSURE_PER_TRIP, t: state3.time };
+    practice(state3, "fishing", r.success ? 4 : 2);
     return { ok: r.success, fish: n, what };
   }
-  var count = (state2, id) => (state2.carried[id] || 0) + (state2.home.storage[id] || 0);
-  function arrowsLeft(state2) {
-    return (state2.wild?.arrows || 0) + 6 * count(state2, "arrows");
+  var count = (state3, id) => (state3.carried[id] || 0) + (state3.home.storage[id] || 0);
+  function arrowsLeft(state3) {
+    return (state3.wild?.arrows || 0) + 6 * count(state3, "arrows");
   }
-  function roundsLeft(state2) {
-    return (state2.wild?.rounds || 0) + 20 * count(state2, "rifle_rounds");
+  function roundsLeft(state3) {
+    return (state3.wild?.rounds || 0) + 20 * count(state3, "rifle_rounds");
   }
-  var canBow = (state2) => has(state2, "bow") && arrowsLeft(state2) > 0;
-  var canRifle = (state2) => has(state2, "rifle") && roundsLeft(state2) > 0;
-  function huntMethods(state2) {
+  var canBow = (state3) => has(state3, "bow") && arrowsLeft(state3) > 0;
+  var canRifle = (state3) => has(state3, "rifle") && roundsLeft(state3) > 0;
+  function huntMethods(state3) {
     const m = [];
-    if (canBow(state2)) m.push("bow");
-    if (canRifle(state2)) m.push("rifle");
+    if (canBow(state3)) m.push("bow");
+    if (canRifle(state3)) m.push("rifle");
     return m;
   }
-  function canHunt(state2, method) {
-    const s = spotHere(state2);
+  function canHunt(state3, method) {
+    const s = spotHere(state3);
     if (!s || s.kind !== "hunt") return "Go to a park, wetland or the edge of the woods first";
-    if (method === "bow" && !canBow(state2)) return "You need a bow and arrows";
-    if (method === "rifle" && !canRifle(state2)) return "You need a rifle and rounds";
+    if (method === "bow" && !canBow(state3)) return "You need a bow and arrows";
+    if (method === "rifle" && !canRifle(state3)) return "You need a rifle and rounds";
     if (method !== "bow" && method !== "rifle") return "Hunt with a bow or a rifle";
     return null;
   }
-  function gameHere(state2) {
-    const s = spotHere(state2);
+  function gameHere(state3) {
+    const s = spotHere(state3);
     if (!s || !s.game) return [];
-    const month = calendar(state2.time).month;
-    return s.game.filter((id) => !GAME[id].months || GAME[id].months.includes(month)).map((id) => ({ id, ...GAME[id], w: GAME[id].w * (GAME[id].dawnDusk && dawnOrDusk(state2.time) ? 2 : 1) }));
+    const month = calendar(state3.time).month;
+    return s.game.filter((id) => !GAME[id].months || GAME[id].months.includes(month)).map((id) => ({ id, ...GAME[id], w: GAME[id].w * (GAME[id].dawnDusk && dawnOrDusk(state3.time) ? 2 : 1) }));
   }
-  function isScared(state2, spotId = state2.location?.id) {
-    const until = state2.wild?.scared?.[spotId];
-    return until != null && state2.time < until;
+  function isScared(state3, spotId = state3.location?.id) {
+    const until = state3.wild?.scared?.[spotId];
+    return until != null && state3.time < until;
   }
-  function findChance(state2) {
-    let p = 0.5 + animalCover(state2.time) * 0.3;
-    if (dawnOrDusk(state2.time)) p += 0.15;
-    if (isNight(state2.time)) p *= 0.3;
-    if (isScared(state2)) p *= 0.4;
-    if (!gameHere(state2).length) p = 0;
+  function findChance(state3) {
+    let p = 0.5 + animalCover(state3.time) * 0.3;
+    if (dawnOrDusk(state3.time)) p += 0.15;
+    if (isNight(state3.time)) p *= 0.3;
+    if (isScared(state3)) p *= 0.4;
+    if (!gameHere(state3).length) p = 0;
     return Math.min(0.95, p);
   }
-  function shotSetup(state2, method, g) {
+  function shotSetup(state3, method, g) {
     const mods = [];
     const adv = [];
     const dis = [];
-    const lvl = skillLevel(state2, "hunting");
+    const lvl = skillLevel(state3, "hunting");
     if (lvl) mods.push(["hunting skill", lvl]);
     if (method === "rifle") mods.push(["rifle", 3]);
-    if (animalCover(state2.time) > 0.6) mods.push(["thick brush", -1]);
-    if (g?.dawnDusk && dawnOrDusk(state2.time)) mods.push(["deer move at dawn", 1]);
-    if (isScared(state2)) dis.push("game is wary");
+    if (animalCover(state3.time) > 0.6) mods.push(["thick brush", -1]);
+    if (g?.dawnDusk && dawnOrDusk(state3.time)) mods.push(["deer move at dawn", 1]);
+    if (isScared(state3)) dis.push("game is wary");
     return { mods, adv, dis };
   }
-  function huntOdds(state2, method) {
-    const list = gameHere(state2);
-    const g = list.length ? list.reduce((a, b) => b.w > a.w ? b : a) : GAME.rabbit;
-    const s = shotSetup(state2, method, g);
-    return { find: Math.round(findChance(state2) * 100), animal: g.name, shot: odds(state2, g.dc, s.mods, { outside: true, adv: s.adv, dis: s.dis }) };
+  function huntOdds(state3, method) {
+    const list = gameHere(state3);
+    const g = list.length ? list.reduce((a, b2) => b2.w > a.w ? b2 : a) : GAME.rabbit;
+    const s = shotSetup(state3, method, g);
+    return { find: Math.round(findChance(state3) * 100), animal: g.name, shot: odds(state3, g.dc, s.mods, { outside: true, adv: s.adv, dis: s.dis }) };
   }
-  function spendShot(state2, method) {
-    const w = wildOf(state2);
+  function spendShot(state3, method) {
+    const w2 = wildOf(state3);
     if (method === "rifle") {
-      if (!(w.rounds > 0)) {
-        useOne(state2, "rifle_rounds");
-        w.rounds = 20;
+      if (!(w2.rounds > 0)) {
+        useOne(state3, "rifle_rounds");
+        w2.rounds = 20;
       }
-      w.rounds--;
-      w.scared[state2.location.id] = state2.time + SCARED_HOURS * 60;
+      w2.rounds--;
+      w2.scared[state3.location.id] = state3.time + SCARED_HOURS * 60;
     }
   }
-  function loseArrow(state2) {
-    const w = wildOf(state2);
-    if (!(w.arrows > 0)) {
-      useOne(state2, "arrows");
-      w.arrows = 6;
+  function loseArrow(state3) {
+    const w2 = wildOf(state3);
+    if (!(w2.arrows > 0)) {
+      useOne(state3, "arrows");
+      w2.arrows = 6;
     }
-    w.arrows--;
+    w2.arrows--;
   }
-  function takeMeat(state2, g, spoil = 0) {
-    const knife = hasKnife(state2);
+  function takeMeat(state3, g, spoil = 0) {
+    const knife = hasKnife(state3);
     const lb = knife ? g.meat : Math.max(1, Math.round(g.meat * 0.4));
     const min = g.clean * (knife ? 1 : 2);
-    advanceTime(state2, min, "work");
-    addFresh(state2, bags(state2), "raw_meat", lb, spoil);
-    addItem(state2.carried, "raw_meat", lb);
-    log(state2, `You clean the ${g.name} (${min} min${knife ? "" : ", hard work with no knife"}) and take ${lb} lb of meat.${lb >= 20 ? " It is a heavy load." : ""}`, "good");
+    advanceTime(state3, min, "work");
+    addFresh(state3, bags(state3), "raw_meat", lb, spoil);
+    addItem(state3.carried, "raw_meat", lb);
+    log(state3, `You clean the ${g.name} (${min} min${knife ? "" : ", hard work with no knife"}) and take ${lb} lb of meat.${lb >= 20 ? " It is a heavy load." : ""}`, "good");
     return lb;
   }
-  function hunt(state2, method) {
-    const why = canHunt(state2, method);
+  function hunt(state3, method) {
+    const why = canHunt(state3, method);
     if (why) {
-      log(state2, why + ".");
+      log(state3, why + ".");
       return { ok: false };
     }
-    const s = spotHere(state2);
-    log(state2, `You move slowly through ${s.name} with the ${method}, and wait.`);
-    const findP = findChance(state2);
-    if (advanceTime(state2, HUNT_MINUTES, "work", { stopAtDanger: true }) || state2.dead) return { ok: false, stopped: !state2.dead };
-    const list = gameHere(state2);
-    if (!list.length || !chance(state2, findP)) {
-      log(state2, isScared(state2) ? "Nothing moves. The game here is still wary after the shot." : "You see tracks and droppings, but no animal comes in range.");
-      practice(state2, "hunting", 1);
+    const s = spotHere(state3);
+    log(state3, `You move slowly through ${s.name} with the ${method}, and wait.`);
+    const findP = findChance(state3);
+    if (advanceTime(state3, HUNT_MINUTES, "work", { stopAtDanger: true }) || state3.dead) return { ok: false, stopped: !state3.dead };
+    const list = gameHere(state3);
+    if (!list.length || !chance(state3, findP)) {
+      log(state3, isScared(state3) ? "Nothing moves. The game here is still wary after the shot." : "You see tracks and droppings, but no animal comes in range.");
+      practice(state3, "hunting", 1);
       return { ok: false, seen: null };
     }
-    const total = list.reduce((a, b) => a + b.w, 0);
-    let x = randInt(state2, 0, 999) / 1e3 * total;
-    const g = list.find((e) => (x -= e.w) < 0) || list[0];
-    const sh = shotSetup(state2, method, g);
-    spendShot(state2, method);
-    const r = check(state2, `Shoot the ${g.name} (${method})`, g.dc, sh.mods, { outside: true, adv: sh.adv, dis: sh.dis });
-    if (method === "rifle") log(state2, "The shot cracks across the open ground. Every animal near here will be wary for a day.", "warn");
-    practice(state2, "hunting", r.success ? 5 : 3);
+    const total = list.reduce((a, b2) => a + b2.w, 0);
+    let x2 = randInt(state3, 0, 999) / 1e3 * total;
+    const g = list.find((e) => (x2 -= e.w) < 0) || list[0];
+    const sh = shotSetup(state3, method, g);
+    spendShot(state3, method);
+    const r = check(state3, `Shoot the ${g.name} (${method})`, g.dc, sh.mods, { outside: true, adv: sh.adv, dis: sh.dis });
+    if (method === "rifle") log(state3, "The shot cracks across the open ground. Every animal near here will be wary for a day.", "warn");
+    practice(state3, "hunting", r.success ? 5 : 3);
     if (!r.success) {
-      if (method === "bow" && chance(state2, 0.4)) {
-        loseArrow(state2);
-        log(state2, `You miss. The ${g.name} is gone, and so is the arrow.`);
-      } else log(state2, `You miss. The ${g.name} is gone.`);
+      if (method === "bow" && chance(state3, 0.4)) {
+        loseArrow(state3);
+        log(state3, `You miss. The ${g.name} is gone, and so is the arrow.`);
+      } else log(state3, `You miss. The ${g.name} is gone.`);
       return { ok: false, seen: g.id };
     }
-    const lb = takeMeat(state2, g);
+    const lb = takeMeat(state3, g);
     return { ok: true, seen: g.id, meat: lb };
   }
-  function canSetSnare(state2) {
-    const s = spotHere(state2);
+  function canSetSnare(state3) {
+    const s = spotHere(state3);
     if (!s || s.kind !== "hunt" || !s.game.includes("rabbit")) return "Snares need a place with rabbits";
-    if (!has(state2, "snare_wire")) return "You need snare wire";
-    if (wildOf(state2).snares[s.id] != null) return "Your snares are already set here";
+    if (!has(state3, "snare_wire")) return "You need snare wire";
+    if (wildOf(state3).snares[s.id] != null) return "Your snares are already set here";
     return null;
   }
-  function setSnare(state2) {
-    const why = canSetSnare(state2);
+  function setSnare(state3) {
+    const why = canSetSnare(state3);
     if (why) {
-      log(state2, why + ".");
+      log(state3, why + ".");
       return false;
     }
-    advanceTime(state2, SNARE_SET_MINUTES, "work");
-    wildOf(state2).snares[state2.location.id] = state2.time;
-    log(state2, "You set a line of wire snares on the rabbit runs at the edge of the brush. Come back tomorrow.");
-    practice(state2, "hunting", 1);
+    advanceTime(state3, SNARE_SET_MINUTES, "work");
+    wildOf(state3).snares[state3.location.id] = state3.time;
+    log(state3, "You set a line of wire snares on the rabbit runs at the edge of the brush. Come back tomorrow.");
+    practice(state3, "hunting", 1);
     return true;
   }
-  function checkSnare(state2) {
-    const s = spotHere(state2);
-    const w = wildOf(state2);
-    const set = s ? w.snares[s.id] : null;
+  function checkSnare(state3) {
+    const s = spotHere(state3);
+    const w2 = wildOf(state3);
+    const set = s ? w2.snares[s.id] : null;
     if (set == null) {
-      log(state2, "You have no snares here.");
+      log(state3, "You have no snares here.");
       return { ok: false };
     }
-    const hours = (state2.time - set) / 60;
+    const hours = (state3.time - set) / 60;
     if (hours < 12) {
-      log(state2, "Too soon. Give the snares a night.");
+      log(state3, "Too soon. Give the snares a night.");
       return { ok: false };
     }
-    advanceTime(state2, SNARE_CHECK_MINUTES, "work");
+    advanceTime(state3, SNARE_CHECK_MINUTES, "work");
     const days = Math.min(3, Math.max(1, Math.floor(hours / 24)));
-    const p = Math.min(0.8, 0.3 + 0.08 * skillLevel(state2, "hunting") + animalCover(state2.time) * 0.2);
+    const p = Math.min(0.8, 0.3 + 0.08 * skillLevel(state3, "hunting") + animalCover(state3.time) * 0.2);
     let caught = 0;
-    for (let i = 0; i < days; i++) if (chance(state2, p)) caught++;
-    w.snares[s.id] = state2.time;
-    practice(state2, "hunting", caught ? 3 : 1);
+    for (let i = 0; i < days; i++) if (chance(state3, p)) caught++;
+    w2.snares[s.id] = state3.time;
+    practice(state3, "hunting", caught ? 3 : 1);
     if (!caught) {
-      log(state2, "The snares are empty. One is pulled loose; you set it again.");
+      log(state3, "The snares are empty. One is pulled loose; you set it again.");
       return { ok: false, rabbits: 0 };
     }
-    log(state2, `${caught} rabbit${caught > 1 ? "s" : ""} in the snares.`, "good");
+    log(state3, `${caught} rabbit${caught > 1 ? "s" : ""} in the snares.`, "good");
     let lb = 0;
-    for (let i = 0; i < caught; i++) lb += takeMeat(state2, GAME.rabbit, Math.min(0.6, hours / 24 * 0.15));
+    for (let i = 0; i < caught; i++) lb += takeMeat(state3, GAME.rabbit, Math.min(0.6, hours / 24 * 0.15));
     return { ok: true, rabbits: caught, meat: lb };
   }
-  function takeUpSnare(state2) {
-    const s = spotHere(state2);
-    const w = wildOf(state2);
-    if (!s || w.snares[s.id] == null) return false;
-    delete w.snares[s.id];
-    log(state2, "You take up your snares.");
+  function takeUpSnare(state3) {
+    const s = spotHere(state3);
+    const w2 = wildOf(state3);
+    if (!s || w2.snares[s.id] == null) return false;
+    delete w2.snares[s.id];
+    log(state3, "You take up your snares.");
     return true;
   }
 
   // src/engine/actions.js
-  var tapRuns = (state2) => state2.home.tapWorks && !decayActive(state2, "water_pressure", "home");
+  var tapRuns = (state3) => state3.home.tapWorks && !decayActive(state3, "water_pressure", "home");
   var COOK_ORDER = () => [...Object.keys(ITEMS).filter((id) => isPerishable(id) && ITEMS[id].kind === "food"), "dry_food", "oatmeal", "canned_food"];
   var COOK_NEEDS_WATER = /* @__PURE__ */ new Set(["dry_food", "oatmeal"]);
-  var cookWater = (h2, carried = {}) => h2.safeGal >= 0.125 ? "safeGal" : h2.rawGal >= 0.125 ? "rawGal" : h2.tankGal >= 0.125 ? "tankGal" : (h2.storage.water_bottle || 0) >= 0.125 ? "storage" : (carried.water_bottle || 0) >= 0.125 ? "carried" : null;
-  function useCookWater(state2) {
-    const h2 = state2.home;
-    const w = cookWater(h2, state2.carried);
-    if (w === "storage") addItem(h2.storage, "water_bottle", -0.125);
-    else if (w === "carried") addItem(state2.carried, "water_bottle", -0.125);
-    else h2[w] -= 0.125;
+  var cookWater = (h3, carried = {}) => h3.safeGal >= 0.125 ? "safeGal" : h3.rawGal >= 0.125 ? "rawGal" : h3.tankGal >= 0.125 ? "tankGal" : (h3.storage.water_bottle || 0) >= 0.125 ? "storage" : (carried.water_bottle || 0) >= 0.125 ? "carried" : null;
+  function useCookWater(state3) {
+    const h3 = state3.home;
+    const w2 = cookWater(h3, state3.carried);
+    if (w2 === "storage") addItem(h3.storage, "water_bottle", -0.125);
+    else if (w2 === "carried") addItem(state3.carried, "water_bottle", -0.125);
+    else h3[w2] -= 0.125;
   }
-  function cookPick(state2) {
-    const h2 = state2.home;
-    const water = cookWater(h2, state2.carried);
-    return COOK_ORDER().find((f) => ((h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
+  function cookPick(state3) {
+    const h3 = state3.home;
+    const water = cookWater(h3, state3.carried);
+    return COOK_ORDER().find((f) => ((h3.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0) && (water || !COOK_NEEDS_WATER.has(f)));
   }
-  var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  var clamp3 = (v2, lo, hi) => Math.max(lo, Math.min(hi, v2));
   var SCAV_XP = 0.5;
-  function source2(state2, from) {
-    return from === "storage" ? state2.home.storage : from === "here" ? hereBag(state2) : state2.carried;
+  function source2(state3, from) {
+    return from === "storage" ? state3.home.storage : from === "here" ? hereBag(state3) : state3.carried;
   }
-  function hereBag(state2) {
-    const loc = state2.location;
-    if (loc.kind === "home") return state2.home.storage;
-    if (loc.kind === "place") return placeState(state2, getPlace(loc.id)).leftovers;
-    if (loc.kind === "house") return state2.houses[loc.id].leftovers;
+  function hereBag(state3) {
+    const loc = state3.location;
+    if (loc.kind === "home") return state3.home.storage;
+    if (loc.kind === "place") return placeState(state3, getPlace(loc.id)).leftovers;
+    if (loc.kind === "house") return state3.houses[loc.id].leftovers;
     return {};
   }
-  function locationLabel(state2) {
-    const loc = state2.location;
+  function locationLabel(state3) {
+    const loc = state3.location;
     if (loc.kind === "home") return "Home (Aloha)";
     if (loc.kind === "place") return getPlace(loc.id)?.name || "Unknown place";
     if (loc.kind === "house") return loc.label;
-    if (loc.kind === "wild") return spotHere(state2)?.name || "Outside";
+    if (loc.kind === "wild") return spotHere(state3)?.name || "Outside";
     if (loc.kind === "car") return "Abandoned car";
     if (loc.kind === "street") return "On the street";
     return "";
   }
-  function canHeat(state2, kwh) {
-    return state2.home.fireHours > 0 || built(state2, "rocket_stove") || state2.home.battery >= kwh;
+  function canHeat(state3, kwh) {
+    return state3.home.fireHours > 0 || built(state3, "rocket_stove") || state3.home.battery >= kwh;
   }
-  function useHeat(state2, kwh) {
-    if (state2.home.fireHours > 0) return "on the fire";
-    if (built(state2, "rocket_stove")) return "on the rocket stove";
-    state2.home.battery -= kwh;
+  function useHeat(state3, kwh) {
+    if (state3.home.fireHours > 0) return "on the fire";
+    if (built(state3, "rocket_stove")) return "on the rocket stove";
+    state3.home.battery -= kwh;
     return "on the electric hot plate";
   }
-  function seeBody(state2, text) {
-    const p = state2.player;
-    const day = dayIndex(state2.time);
-    log(state2, text, "story");
+  function seeBody(state3, text) {
+    const p = state3.player;
+    const day = dayIndex(state3.time);
+    log(state3, text, "story");
     if (p.bodySeenDay !== day) {
       p.bodySeenDay = day;
       p.morale = clamp3(p.morale - (day >= 30 ? 1 : 3), 0, 100);
     }
   }
-  function addFood(state2, points) {
-    const p = state2.player;
+  function addFood(state3, points) {
+    const p = state3.player;
     if (p.illness.stomachH > 0) points /= 2;
     p.food = clamp3(p.food + points, 0, 100);
   }
-  function addWater(state2, points) {
-    state2.player.water = clamp3(state2.player.water + points, 0, 100);
+  function addWater(state3, points) {
+    state3.player.water = clamp3(state3.player.water + points, 0, 100);
   }
-  function itemUses(state2, id) {
+  function itemUses(state3, id) {
     const it = ITEMS[id];
     if (!it) return [];
     const uses = [];
@@ -6855,632 +6855,632 @@
     if (it.kind === "med") uses.push({ verb: "med", label: "Use" });
     if (it.kind === "wear") uses.push({ verb: "wear", label: "Wear" });
     if (it.kind === "batteries") {
-      const noLamp = !has2(state2, "flashlight");
+      const noLamp = !has2(state3, "flashlight");
       uses.push({ verb: "batteries", label: "Put in flashlight", disabled: noLamp, note: noLamp ? "Needs a flashlight (you have none)" : void 0 });
     }
     if (it.kind === "comfort") uses.push({ verb: "comfort", label: "Use" });
     if (it.kind === "warm") uses.push({ verb: "warm", label: "Use" });
     if (it.kind === "book") {
-      const dark = environment(state2, "work").dark && !hasLight(state2);
+      const dark = environment(state3, "work").dark && !hasLight(state3);
       uses.push({
         verb: "read",
-        label: hasRead(state2, id) ? "Read again" : "Read",
+        label: hasRead(state3, id) ? "Read again" : "Read",
         disabled: dark,
         note: dark ? "Too dark: needs a light (flashlight with batteries, candle or lamp)" : `${READ_MINUTES / 60} h \xB7 ${SKILLS[it.skill].name}`
       });
     }
-    if (it.kind === "food" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
-    if (it.kind === "dogfood" && state2.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
-    if (id === "car_battery" && state2.location.kind === "home") {
-      const n = state2.home.carBatteries || 0;
+    if (it.kind === "food" && state3.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Give to dog" });
+    if (it.kind === "dogfood" && state3.dog.stage === "joined") uses.push({ verb: "feeddog", label: "Feed dog" });
+    if (id === "car_battery" && state3.location.kind === "home") {
+      const n = state3.home.carBatteries || 0;
       uses.push({ verb: "carbattery", label: "Wire into the home battery", note: `+0.5 kWh storage \xB7 ${n}/${MAX_CAR_BATTERIES}`, disabled: n >= MAX_CAR_BATTERIES });
     }
     const sv = SALVAGE[id];
     if (sv) {
-      const tool = salvageTool(state2, id);
-      uses.push({ verb: "salvage", label: "Take apart", note: tool ? `${salvageMinutes(state2, id)} min \xB7 ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")}`, disabled: !tool });
+      const tool = salvageTool(state3, id);
+      uses.push({ verb: "salvage", label: "Take apart", note: tool ? `${salvageMinutes(state3, id)} min \xB7 ${sv.what}` : `needs ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or ")}`, disabled: !tool });
     }
     return uses;
   }
-  function salvageTool(state2, id) {
+  function salvageTool(state3, id) {
     const sv = SALVAGE[id];
     if (!sv) return null;
     const order = ["toolkit", ...sv.tools.filter((t) => t !== "toolkit")];
-    return order.find((t) => sv.tools.includes(t) && has2(state2, t)) || null;
+    return order.find((t) => sv.tools.includes(t) && has2(state3, t)) || null;
   }
-  function salvageMinutes(state2, id) {
+  function salvageMinutes(state3, id) {
     const sv = SALVAGE[id];
-    const tool = salvageTool(state2, id);
-    const lvl = skillLevel(state2, "tinkering");
+    const tool = salvageTool(state3, id);
+    const lvl = skillLevel(state3, "tinkering");
     return Math.round(sv.min * (tool === "toolkit" ? 0.75 : 1) * (1 - 0.06 * lvl));
   }
-  function salvage(state2, id, bag) {
+  function salvage(state3, id, bag) {
     const sv = SALVAGE[id];
-    const tool = salvageTool(state2, id);
+    const tool = salvageTool(state3, id);
     if (!tool) {
-      log(state2, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or a ")} to take this apart.`);
+      log(state3, `You need a ${sv.tools.map((t) => itemName(t).toLowerCase()).join(" or a ")} to take this apart.`);
       return;
     }
-    const min = salvageMinutes(state2, id);
-    if (advanceTime(state2, min, "work", { stopAtDanger: true }) || state2.dead) return;
+    const min = salvageMinutes(state3, id);
+    if (advanceTime(state3, min, "work", { stopAtDanger: true }) || state3.dead) return;
     addItem(bag, id, -1);
-    for (const [pid, q] of Object.entries(sv.parts)) addItem(bag, pid, q);
-    practice(state2, "tinkering", 2);
-    log(state2, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q]) => partText(pid, q)).join(", ")}.`, "good");
+    for (const [pid, q2] of Object.entries(sv.parts)) addItem(bag, pid, q2);
+    practice(state3, "tinkering", 2);
+    log(state3, `You take apart the ${ITEMS[id].name.toLowerCase()} with your ${itemName(tool).toLowerCase()} (${min} min): ${Object.entries(sv.parts).map(([pid, q2]) => partText(pid, q2)).join(", ")}.`, "good");
   }
   var endDot = (t) => /[.!?]$/.test(t) ? t : `${t}.`;
   var plainName = (id) => ITEMS[id].name.replace(/\s*\([^)]*\)/g, "");
   var QTY_WORDS = { 0.25: "a quarter", 0.5: "half a", 0.75: "three quarters of a" };
-  function partText(pid, q) {
+  function partText(pid, q2) {
     const it = ITEMS[pid];
-    const w = QTY_WORDS[q];
-    return w ? `${w} ${it.unit} of ${it.name.toLowerCase()}` : `${q} ${it.unit} of ${it.name.toLowerCase()}`;
+    const w2 = QTY_WORDS[q2];
+    return w2 ? `${w2} ${it.unit} of ${it.name.toLowerCase()}` : `${q2} ${it.unit} of ${it.name.toLowerCase()}`;
   }
-  var sleepWhere = (state2) => sleepSpot(state2) !== "living" ? "in your bed" : state2.home.fireHours > 0 ? "by the fire" : "on the couch";
-  function useItem(state2, id, verb, from = "carried") {
-    const bag = source2(state2, from);
+  var sleepWhere = (state3) => sleepSpot(state3) !== "living" ? "in your bed" : state3.home.fireHours > 0 ? "by the fire" : "on the couch";
+  function useItem(state3, id, verb, from = "carried") {
+    const bag = source2(state3, from);
     const it = ITEMS[id];
     if (!bag[id] || !it) return;
-    const p = state2.player;
+    const p = state3.player;
     switch (verb) {
       case "eat": {
-        if (id === "canned_food" && chance(state2, 0.05)) {
+        if (id === "canned_food" && chance(state3, 0.05)) {
           addItem(bag, id, -1);
-          log(state2, "This can is swollen. The food is bad. You throw it away.", "warn");
-          advanceTime(state2, 2);
+          log(state3, "This can is swollen. The food is bad. You throw it away.", "warn");
+          advanceTime(state3, 2);
           return;
         }
-        const risk = eatRisk(state2, id);
+        const risk = eatRisk(state3, id);
         addItem(bag, id, -it.portion);
-        addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
-        if (it.water) addWater(state2, it.water);
-        log(state2, `You eat: ${plainName(id)}${it.portion < 1 ? " (one portion)" : ""}.`);
-        advanceTime(state2, 15);
-        if (risk > 0 && chance(state2, risk)) {
-          log(state2, "It tasted off. Your stomach turns.", "warn");
-          startStomachBug(state2);
+        addFood(state3, it.cal * it.portion / CAL_PER_FOOD_POINT);
+        if (it.water) addWater(state3, it.water);
+        log(state3, `You eat: ${plainName(id)}${it.portion < 1 ? " (one portion)" : ""}.`);
+        advanceTime(state3, 15);
+        if (risk > 0 && chance(state3, risk)) {
+          log(state3, "It tasted off. Your stomach turns.", "warn");
+          startStomachBug(state3);
         }
         return;
       }
       case "drink": {
         addItem(bag, id, -it.portion);
-        addWater(state2, it.water);
-        log(state2, `You drink: ${it.name}${it.portion < 1 ? " (1 quart)" : ""}.`);
-        advanceTime(state2, 5);
+        addWater(state3, it.water);
+        log(state3, `You drink: ${it.name}${it.portion < 1 ? " (1 quart)" : ""}.`);
+        advanceTime(state3, 5);
         return;
       }
       case "med":
-        return useMed(state2, id, bag);
+        return useMed(state3, id, bag);
       case "salvage":
-        return salvage(state2, id, bag);
+        return salvage(state3, id, bag);
       case "carbattery":
-        if (state2.location.kind !== "home") {
-          log(state2, "You can wire the car battery into the bank only at home.");
+        if (state3.location.kind !== "home") {
+          log(state3, "You can wire the car battery into the bank only at home.");
           return;
         }
-        return addCarBattery(state2, bag);
+        return addCarBattery(state3, bag);
       case "wear": {
         addItem(bag, id, -1);
         const old = putOn(p, id);
         if (old) addItem(bag, old, 1);
-        log(state2, old ? `You take off the ${itemName(old).toLowerCase()} and put on the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`);
-        advanceTime(state2, 3);
+        log(state3, old ? `You take off the ${itemName(old).toLowerCase()} and put on the ${it.name.toLowerCase()}.` : `You put on the ${it.name.toLowerCase()}.`);
+        advanceTime(state3, 3);
         return;
       }
       case "batteries": {
-        if (!has2(state2, "flashlight")) {
-          log(state2, "You need a flashlight first.");
+        if (!has2(state3, "flashlight")) {
+          log(state3, "You need a flashlight first.");
           return;
         }
         addItem(bag, id, -1);
-        p.lightHours = batteryHours(state2);
-        log(state2, p.lightHours >= 10 ? "You put new batteries in the flashlight (10 h of light)." : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
-        advanceTime(state2, 2);
+        p.lightHours = batteryHours(state3);
+        log(state3, p.lightHours >= 10 ? "You put new batteries in the flashlight (10 h of light)." : `You put new batteries in the flashlight. They are old stock and half drained (${p.lightHours} h of light).`);
+        advanceTime(state3, 2);
         return;
       }
       case "comfort": {
-        const day = dayIndex(state2.time);
+        const day = dayIndex(state3.time);
         if (p.lastComfortDay === day) {
-          log(state2, "You already did that today. It does not help again.");
+          log(state3, "You already did that today. It does not help again.");
           return;
         }
         p.lastComfortDay = day;
         p.morale = clamp3(p.morale + 5, 0, 100);
         if (it.portion) addItem(bag, id, -it.portion);
-        log(state2, it.comfortText || "You rest your mind for a while.", "good");
-        advanceTime(state2, 60);
+        log(state3, it.comfortText || "You rest your mind for a while.", "good");
+        advanceTime(state3, 60);
         return;
       }
       case "warm": {
         addItem(bag, id, -1);
         p.warmth = clamp3(p.warmth + it.warmth, 0, 100);
-        log(state2, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
-        advanceTime(state2, 1);
+        log(state3, `You open the ${it.name.toLowerCase()}. Warmth +${it.warmth}.`, "good");
+        advanceTime(state3, 1);
         return;
       }
       case "feeddog":
-        return feedDog(state2, id, bag);
+        return feedDog(state3, id, bag);
       case "read":
-        return readBook(state2, id);
+        return readBook(state3, id);
       default:
     }
   }
-  function has2(state2, id) {
-    return (state2.carried[id] || 0) > 0 || state2.location.kind === "home" && (state2.home.storage[id] || 0) > 0;
+  function has2(state3, id) {
+    return (state3.carried[id] || 0) > 0 || state3.location.kind === "home" && (state3.home.storage[id] || 0) > 0;
   }
-  function readBook(state2, id) {
+  function readBook(state3, id) {
     const it = ITEMS[id];
     if (!it || it.kind !== "book") return false;
-    const env = environment(state2, "work");
-    if (env.dark && !hasLight(state2)) {
-      log(state2, "It is too dark to read. Use a light.");
+    const env = environment(state3, "work");
+    if (env.dark && !hasLight(state3)) {
+      log(state3, "It is too dark to read. Use a light.");
       return false;
     }
-    const s = skillsOf(state2);
+    const s = skillsOf(state3);
     const first = !s.books.includes(id);
-    advanceTime(state2, READ_MINUTES);
-    if (state2.dead) return true;
+    advanceTime(state3, READ_MINUTES);
+    if (state3.dead) return true;
     if (first) {
       s.books.push(id);
-      log(state2, `You read the ${it.name.toLowerCase()} and take notes.`, "good");
-      practice(state2, it.skill, BOOK_XP, { book: true });
+      log(state3, `You read the ${it.name.toLowerCase()} and take notes.`, "good");
+      practice(state3, it.skill, BOOK_XP, { book: true });
     } else {
-      log(state2, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
-      state2.player.morale = clamp3(state2.player.morale + 2, 0, 100);
+      log(state3, `You read the ${it.name.toLowerCase()} again. You know it well now. It passes the time.`);
+      state3.player.morale = clamp3(state3.player.morale + 2, 0, 100);
     }
     return true;
   }
-  function useMed(state2, id, bag) {
-    const p = state2.player;
+  function useMed(state3, id, bag) {
+    const p = state3.player;
     const it = ITEMS[id];
     if (it.med === "bandage") {
       const order = ["deep_cut", "bite", "small_cut", "sprain"];
-      const open = p.injuries.filter((i) => !i.bandaged).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
+      const open = p.injuries.filter((i) => !i.bandaged).sort((a, b2) => order.indexOf(a.type) - order.indexOf(b2.type));
       if (!open.length) {
-        log(state2, "You have no wound that needs a bandage.");
+        log(state3, "You have no wound that needs a bandage.");
         return;
       }
       const inj = open[0];
       addItem(bag, id, -it.portion);
       inj.bandaged = true;
-      inj.healH *= bandageHealFactor(state2);
-      practice(state2, "first_aid", 3);
-      log(state2, `You clean and bandage the ${injuryName(inj).toLowerCase()}.`, "good");
-      advanceTime(state2, 15);
+      inj.healH *= bandageHealFactor(state3);
+      practice(state3, "first_aid", 3);
+      log(state3, `You clean and bandage the ${injuryName(inj).toLowerCase()}.`, "good");
+      advanceTime(state3, 15);
       return;
     }
     if (it.med === "antibiotics") {
       const inf = p.illness.infection;
       if (!inf) {
-        log(state2, "You have no infection. Keep the antibiotics for later.");
+        log(state3, "You have no infection. Keep the antibiotics for later.");
         return;
       }
       if (inf.abxH != null) {
-        log(state2, "You already take a course of antibiotics.");
+        log(state3, "You already take a course of antibiotics.");
         return;
       }
       addItem(bag, id, -1);
       inf.abxH = 0;
-      practice(state2, "first_aid", 2);
-      log(state2, "You start a 3-day course of antibiotics.", "good");
-      advanceTime(state2, 2);
+      practice(state3, "first_aid", 2);
+      log(state3, "You start a 3-day course of antibiotics.", "good");
+      advanceTime(state3, 2);
       return;
     }
     if (it.med === "pain") {
       addItem(bag, id, -it.portion);
-      p.painH = Math.max(1, Math.round(painPillHours(state2) * medicineFactor(state2)));
-      log(state2, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state2) < 0.95 ? " They are past their date and work less well." : ""}`);
-      advanceTime(state2, 2);
+      p.painH = Math.max(1, Math.round(painPillHours(state3) * medicineFactor(state3)));
+      log(state3, `You take pain pills. The pain is less for ${p.painH} hours.${medicineFactor(state3) < 0.95 ? " They are past their date and work less well." : ""}`);
+      advanceTime(state3, 2);
       return;
     }
     if (it.med === "ors") {
       if (p.illness.stomachH <= 0) {
-        log(state2, "You do not need this now.");
+        log(state3, "You do not need this now.");
         return;
       }
       addItem(bag, id, -1);
       p.illness.stomachH = Math.min(p.illness.stomachH, 24);
-      practice(state2, "first_aid", 2);
-      addWater(state2, WATER_PER_QUART / 2);
-      log(state2, "You drink the rehydration salts. You feel a little better.", "good");
-      advanceTime(state2, 5);
+      practice(state3, "first_aid", 2);
+      addWater(state3, WATER_PER_QUART / 2);
+      log(state3, "You drink the rehydration salts. You feel a little better.", "good");
+      advanceTime(state3, 5);
     }
   }
-  function takeItem(state2, id, qty) {
-    const bag = hereBag(state2);
+  function takeItem(state3, id, qty) {
+    const bag = hereBag(state3);
     const have = bag[id] || 0;
     if (!have) return;
-    if (wearPackFrom(state2, bag, id)) {
-      advanceTime(state2, 2);
+    if (wearPackFrom(state3, bag, id)) {
+      advanceTime(state3, 2);
       return;
     }
     let want = Math.min(qty ?? have, have);
     if (["part", "tool", "wear"].includes(ITEMS[id].kind)) want = Math.floor(want + 1e-9);
-    const n = roomFor(state2, id, want);
+    const n = roomFor(state3, id, want);
     if (n <= 0) {
-      log(state2, `No room in your pack for the ${itemName(id).toLowerCase()}.`, "warn");
+      log(state3, `No room in your pack for the ${itemName(id).toLowerCase()}.`, "warn");
       return;
     }
     addItem(bag, id, -n);
-    addItem(state2.carried, id, n);
-    advanceTime(state2, 1);
+    addItem(state3.carried, id, n);
+    advanceTime(state3, 1);
   }
-  function wearPackFrom(state2, bag, id) {
-    if (id !== "backpack" || wearsPack(state2) || !(bag[id] >= 1)) return false;
+  function wearPackFrom(state3, bag, id) {
+    if (id !== "backpack" || wearsPack(state3) || !(bag[id] >= 1)) return false;
     addItem(bag, id, -1);
-    putOn(state2.player, "backpack");
-    log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
+    putOn(state3.player, "backpack");
+    log(state3, "You put the backpack on. Your pack grid is much bigger now.", "good");
     return true;
   }
-  function takeAll(state2) {
-    const bag = hereBag(state2);
-    wearPackFrom(state2, bag, "backpack");
+  function takeAll(state3) {
+    const bag = hereBag(state3);
+    wearPackFrom(state3, bag, "backpack");
     const cells = (id) => {
-      const z = sizeOf(id);
-      return z.w * z.h / z.stack;
+      const z2 = sizeOf(id);
+      return z2.w * z2.h / z2.stack;
     };
-    const ids = Object.keys(bag).sort((a, b) => cells(a) - cells(b) || (a < b ? -1 : 1));
+    const ids = Object.keys(bag).sort((a, b2) => cells(a) - cells(b2) || (a < b2 ? -1 : 1));
     const took = [];
     let left = false;
     for (const id of ids) {
       const before = bag[id];
-      const n = roomFor(state2, id, before < 1 ? before : Math.floor(before));
+      const n = roomFor(state3, id, before < 1 ? before : Math.floor(before));
       if (n > 0) {
         addItem(bag, id, -n);
-        addItem(state2.carried, id, n);
+        addItem(state3.carried, id, n);
         took.push(itemName(id).toLowerCase());
       }
       if (bag[id]) left = true;
     }
-    if (took.length) log(state2, `You take: ${took.join(", ")}.`);
-    if (left) log(state2, "Your pack is full. Some items stay here.", "warn");
-    advanceTime(state2, 2);
+    if (took.length) log(state3, `You take: ${took.join(", ")}.`);
+    if (left) log(state3, "Your pack is full. Some items stay here.", "warn");
+    advanceTime(state3, 2);
   }
-  function dropItem(state2, id, qty) {
-    const have = state2.carried[id] || 0;
+  function dropItem(state3, id, qty) {
+    const have = state3.carried[id] || 0;
     if (!have) return;
-    if (id === "backpack" && state2.player.worn?.back !== "backpack" && !pocketsFit(state2)) {
-      log(state2, "Your things do not fit in your pockets. Take some out of the backpack first.", "warn");
+    if (id === "backpack" && state3.player.worn?.back !== "backpack" && !pocketsFit(state3)) {
+      log(state3, "Your things do not fit in your pockets. Take some out of the backpack first.", "warn");
       return;
     }
     const n = Math.min(qty ?? have, have);
-    addItem(state2.carried, id, -n);
-    addItem(hereBag(state2), id, n);
-    if (state2.location.kind !== "home") log(state2, `You leave the ${itemName(id).toLowerCase()} here.`);
-    advanceTime(state2, 1);
+    addItem(state3.carried, id, -n);
+    addItem(hereBag(state3), id, n);
+    if (state3.location.kind !== "home") log(state3, `You leave the ${itemName(id).toLowerCase()} here.`);
+    advanceTime(state3, 1);
   }
-  function storeAll(state2) {
-    for (const [id, q] of Object.entries(state2.carried)) {
+  function storeAll(state3) {
+    for (const [id, q2] of Object.entries(state3.carried)) {
       if (id === "backpack" || id === "flashlight") continue;
-      addItem(state2.carried, id, -q);
-      addItem(state2.home.storage, id, q);
+      addItem(state3.carried, id, -q2);
+      addItem(state3.home.storage, id, q2);
     }
-    log(state2, "You put your supplies away in the house.");
-    advanceTime(state2, 5);
+    log(state3, "You put your supplies away in the house.");
+    advanceTime(state3, 5);
   }
-  function rest(state2, hours) {
-    log(state2, `You rest for ${hours} h.`);
-    advanceTime(state2, hours * 60, "rest", { stopAtDanger: true, restPerHour: REST_ENERGY_PER_HOUR });
+  function rest(state3, hours) {
+    log(state3, `You rest for ${hours} h.`);
+    advanceTime(state3, hours * 60, "rest", { stopAtDanger: true, restPerHour: REST_ENERGY_PER_HOUR });
   }
-  function sleep(state2, hours) {
-    const k = state2.location.kind;
-    const where = k === "home" ? sleepWhere(state2) : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
-    log(state2, `You sleep ${where} for ${hours} h.`);
-    advanceTime(state2, hours * 60, "sleep");
-    if (!state2.dead) log(state2, "You wake up.");
+  function sleep(state3, hours) {
+    const k = state3.location.kind;
+    const where = k === "home" ? sleepWhere(state3) : k === "wild" ? "on the ground" : k === "car" ? "in the car" : "on the floor";
+    log(state3, `You sleep ${where} for ${hours} h.`);
+    advanceTime(state3, hours * 60, "sleep");
+    if (!state3.dead) log(state3, "You wake up.");
   }
-  function homeAction(state2, id) {
-    const h2 = state2.home;
-    const p = state2.player;
+  function homeAction(state3, id) {
+    const h3 = state3.home;
+    const p = state3.player;
     switch (id) {
       case "drink_tank":
-        h2.tankGal = Math.max(0, h2.tankGal - 0.25);
-        addWater(state2, WATER_PER_QUART);
-        log(state2, "You drain water from the water heater tank and drink a quart. It is clean.");
-        advanceTime(state2, 10);
+        h3.tankGal = Math.max(0, h3.tankGal - 0.25);
+        addWater(state3, WATER_PER_QUART);
+        log(state3, "You drain water from the water heater tank and drink a quart. It is clean.");
+        advanceTime(state3, 10);
         return;
       case "fill_jug": {
-        const fromSafe = h2.safeGal >= 1;
-        if (fromSafe) h2.safeGal -= 1;
-        else h2.tankGal -= 1;
-        addItem(state2.carried, "water_bottle", 1);
-        log(state2, `You fill a 1-gallon jug with clean water from the ${fromSafe ? "boiled water pot" : "water heater tank"}.`);
-        advanceTime(state2, 10);
+        const fromSafe = h3.safeGal >= 1;
+        if (fromSafe) h3.safeGal -= 1;
+        else h3.tankGal -= 1;
+        addItem(state3.carried, "water_bottle", 1);
+        log(state3, `You fill a 1-gallon jug with clean water from the ${fromSafe ? "boiled water pot" : "water heater tank"}.`);
+        advanceTime(state3, 10);
         return;
       }
       case "collect_tap":
-        if (!tapRuns(state2)) {
-          h2.tapWorks = false;
-          log(state2, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
+        if (!tapRuns(state3)) {
+          h3.tapWorks = false;
+          log(state3, "You open the tap. It coughs air, and then nothing. The water pressure is gone here.", "warn");
           return;
         }
-        h2.rawGal += 2;
-        log(state2, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
-        advanceTime(state2, 15);
-        practice(state2, "survival", 1);
+        h3.rawGal += 2;
+        log(state3, "The tap gives a weak flow. You fill two jugs (2 gal). This water is not safe to drink before you boil it.");
+        advanceTime(state3, 15);
+        practice(state3, "survival", 1);
         return;
       case "collect_toilet":
-        h2.rawGal += h2.toiletGal;
-        log(state2, `You take the water from the toilet tanks (${h2.toiletGal} gal). Boil it before you drink it.`);
-        h2.toiletGal = 0;
-        advanceTime(state2, 10);
+        h3.rawGal += h3.toiletGal;
+        log(state3, `You take the water from the toilet tanks (${h3.toiletGal} gal). Boil it before you drink it.`);
+        h3.toiletGal = 0;
+        advanceTime(state3, 10);
         return;
       case "drink_raw":
-        h2.rawGal = Math.max(0, h2.rawGal - 0.25);
-        addWater(state2, WATER_PER_QUART);
-        log(state2, "You drink a quart of water that you did not boil.", "warn");
-        advanceTime(state2, 5);
-        if (chance(state2, RAW_WATER_SICK * rawWaterRiskFactor(state2))) startStomachBug(state2);
+        h3.rawGal = Math.max(0, h3.rawGal - 0.25);
+        addWater(state3, WATER_PER_QUART);
+        log(state3, "You drink a quart of water that you did not boil.", "warn");
+        advanceTime(state3, 5);
+        if (chance(state3, RAW_WATER_SICK * rawWaterRiskFactor(state3))) startStomachBug(state3);
         return;
       case "boil": {
-        const how = useHeat(state2, 0.4);
-        const g = Math.min(1, h2.rawGal);
-        h2.rawGal -= g;
-        h2.safeGal += g;
-        log(state2, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
-        advanceTime(state2, Math.round(20 * boilTimeFactor(state2)));
-        practice(state2, "cooking", 2);
+        const how = useHeat(state3, 0.4);
+        const g = Math.min(1, h3.rawGal);
+        h3.rawGal -= g;
+        h3.safeGal += g;
+        log(state3, `You boil ${g} gal of water ${how}. It is safe to drink now.`);
+        advanceTime(state3, Math.round(20 * boilTimeFactor(state3)));
+        practice(state3, "cooking", 2);
         return;
       }
       case "purify": {
-        const bag = (state2.carried.water_tablets || 0) > 0 ? state2.carried : h2.storage;
-        const g = Math.min(1, h2.rawGal);
+        const bag = (state3.carried.water_tablets || 0) > 0 ? state3.carried : h3.storage;
+        const g = Math.min(1, h3.rawGal);
         addItem(bag, "water_tablets", -ITEMS.water_tablets.portion);
-        h2.rawGal -= g;
-        h2.safeGal += g;
-        log(state2, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
-        advanceTime(state2, 30);
-        practice(state2, "cooking", 1);
+        h3.rawGal -= g;
+        h3.safeGal += g;
+        log(state3, `You drop a tablet in ${g} gal of water and wait. It is safe to drink now.`);
+        advanceTime(state3, 30);
+        practice(state3, "cooking", 1);
         return;
       }
       case "filter_water": {
-        const g = Math.min(2, h2.rawGal);
-        h2.rawGal -= g;
-        h2.safeGal += g;
-        log(state2, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
-        advanceTime(state2, 10);
-        practice(state2, "survival", 1);
+        const g = Math.min(2, h3.rawGal);
+        h3.rawGal -= g;
+        h3.safeGal += g;
+        log(state3, `You run ${g.toFixed(1)} gal of water through the filter station. It is safe to drink now.`);
+        advanceTime(state3, 10);
+        practice(state3, "survival", 1);
         return;
       }
       case "drink_safe":
-        h2.safeGal = Math.max(0, h2.safeGal - 0.25);
-        addWater(state2, WATER_PER_QUART);
-        log(state2, "You drink a quart of boiled water.");
-        advanceTime(state2, 5);
+        h3.safeGal = Math.max(0, h3.safeGal - 0.25);
+        addWater(state3, WATER_PER_QUART);
+        log(state3, "You drink a quart of boiled water.");
+        advanceTime(state3, 5);
         return;
       case "cook": {
-        const food = cookPick(state2);
+        const food = cookPick(state3);
         if (!food) {
-          log(state2, "You have nothing you can cook now.");
+          log(state3, "You have nothing you can cook now.");
           return;
         }
-        const bag = (h2.storage[food] || 0) > 0 ? h2.storage : state2.carried;
+        const bag = (h3.storage[food] || 0) > 0 ? h3.storage : state3.carried;
         const it = ITEMS[food];
-        if (COOK_NEEDS_WATER.has(food)) useCookWater(state2);
-        const how = useHeat(state2, 0.5);
-        const risk = eatRisk(state2, food, true);
-        const stage = stageLabel(state2, food);
+        if (COOK_NEEDS_WATER.has(food)) useCookWater(state3);
+        const how = useHeat(state3, 0.5);
+        const risk = eatRisk(state3, food, true);
+        const stage = stageLabel(state3, food);
         addItem(bag, food, -it.portion);
-        addFood(state2, it.cal * it.portion / CAL_PER_FOOD_POINT);
+        addFood(state3, it.cal * it.portion / CAL_PER_FOOD_POINT);
         p.warmth = clamp3(p.warmth + 10, 0, 100);
-        p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state2), 0, 100);
+        p.morale = clamp3(p.morale + 5 + cookMoraleBonus(state3), 0, 100);
         p.warmFedH = WARM_FED_HOURS;
-        practice(state2, "cooking", 3);
-        log(state2, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
-        advanceTime(state2, 30);
-        if (risk > 0 && chance(state2, risk)) {
-          log(state2, "The food was bad. Your stomach turns.", "warn");
-          startStomachBug(state2);
+        practice(state3, "cooking", 3);
+        log(state3, `You cook a hot meal (${plainName(food).toLowerCase()}${stage && stage !== "Fresh" ? `, ${stage.toLowerCase()}` : ""}) ${how}. Warm and fed: you lose heat slower for ${WARM_FED_HOURS} h.`, "good");
+        advanceTime(state3, 30);
+        if (risk > 0 && chance(state3, risk)) {
+          log(state3, "The food was bad. Your stomach turns.", "warn");
+          startStomachBug(state3);
         }
         return;
       }
       case "add_wood": {
-        const bag = (h2.storage.firewood || 0) > 0 ? h2.storage : state2.carried;
+        const bag = (h3.storage.firewood || 0) > 0 ? h3.storage : state3.carried;
         addItem(bag, "firewood", -1);
-        const lit = h2.fireHours > 0;
-        const per = Math.round(fireHoursPerBundle(state2) * fireBonusFactor(state2) * 10) / 10;
-        const where = built(state2, "wood_stove") ? "wood stove" : "fireplace";
-        h2.fireHours += per;
-        log(state2, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
-        advanceTime(state2, lit ? 5 : 15);
-        practice(state2, "survival", lit ? 1 : 2);
+        const lit = h3.fireHours > 0;
+        const per = Math.round(fireHoursPerBundle(state3) * fireBonusFactor(state3) * 10) / 10;
+        const where = built(state3, "wood_stove") ? "wood stove" : "fireplace";
+        h3.fireHours += per;
+        log(state3, lit ? `You put more wood on the fire (+${per} h).` : `You light a fire in the ${where}. One bundle burns for about ${per} hours.`, "good");
+        advanceTime(state3, lit ? 5 : 15);
+        practice(state3, "survival", lit ? 1 : 2);
         return;
       }
       case "run_generator": {
-        const bag = (h2.storage.gas_can || 0) > 0 ? h2.storage : state2.carried;
-        if (advanceTime(state2, 120, "work", { stopAtDanger: true }) || state2.dead) return;
+        const bag = (h3.storage.gas_can || 0) > 0 ? h3.storage : state3.carried;
+        if (advanceTime(state3, 120, "work", { stopAtDanger: true }) || state3.dead) return;
         addItem(bag, "gas_can", -1);
-        if (!chance(state2, gasStartChance(state2))) {
-          log(state2, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
+        if (!chance(state3, gasStartChance(state3))) {
+          log(state3, "You pull the cord again and again. The old gas will not start the engine. That gallon is no good now.", "warn");
           p.morale = clamp3(p.morale - 2, 0, 100);
           return;
         }
-        const kwh = Math.min(GEN_KWH_PER_GAL, h2.batteryMax - h2.battery);
-        h2.battery += kwh;
-        log(state2, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
-        practice(state2, "tinkering", 1);
+        const kwh = Math.min(GEN_KWH_PER_GAL, h3.batteryMax - h3.battery);
+        h3.battery += kwh;
+        log(state3, `You run the generator outside the back door, away from the windows. The battery gets +${kwh.toFixed(1)} kWh.`, "good");
+        practice(state3, "tinkering", 1);
         return;
       }
       case "break_furniture":
-        if (advanceTime(state2, 60, "heavy", { stopAtDanger: true }) || state2.dead) return;
-        h2.furniture -= 1;
-        addItem(h2.storage, "firewood", 1);
-        log(state2, "You break up old furniture into firewood (+1 bundle). It is hard work.");
-        practice(state2, "tinkering", 2);
+        if (advanceTime(state3, 60, "heavy", { stopAtDanger: true }) || state3.dead) return;
+        h3.furniture -= 1;
+        addItem(h3.storage, "firewood", 1);
+        log(state3, "You break up old furniture into firewood (+1 bundle). It is hard work.");
+        practice(state3, "tinkering", 2);
         return;
       case "heater":
-        h2.heaterOn = !h2.heaterOn;
-        log(state2, h2.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
-        advanceTime(state2, 1);
+        h3.heaterOn = !h3.heaterOn;
+        log(state3, h3.heaterOn ? "You turn on the electric space heater. It uses the battery fast (1.5 kWh per hour)." : "You turn off the electric heater.");
+        advanceTime(state3, 1);
         return;
       case "dry_clothes":
         p.wet = false;
         p.wetness = 0;
         p.wetMinutes = 0;
         p.dryMinutes = 0;
-        log(state2, "You change into dry clothes and hang the wet ones up.");
-        advanceTime(state2, 10);
+        log(state3, "You change into dry clothes and hang the wet ones up.");
+        advanceTime(state3, 10);
         return;
       case "fridge":
-        h2.fridgeOpened = true;
+        h3.fridgeOpened = true;
         p.morale = clamp3(p.morale - 2, 0, 100);
-        log(state2, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
-        advanceTime(state2, 2);
+        log(state3, "You open the fridge. Everything inside is rotten. You close it fast.", "warn");
+        advanceTime(state3, 2);
         return;
       case "store_all":
-        return storeAll(state2);
+        return storeAll(state3);
       case "feed_stray":
-        return feedStray(state2);
+        return feedStray(state3);
       default:
     }
   }
-  function anyFood(state2) {
-    const all = { ...state2.home.storage };
-    for (const [k, v] of Object.entries(state2.carried)) all[k] = (all[k] || 0) + v;
+  function anyFood(state3) {
+    const all = { ...state3.home.storage };
+    for (const [k, v2] of Object.entries(state3.carried)) all[k] = (all[k] || 0) + v2;
     return ["dog_food", "canned_food", "snacks", "peanut_butter", "formula"].find((f) => (all[f] || 0) > 0);
   }
-  function feedStray(state2) {
-    const d = state2.dog;
-    const day = dayIndex(state2.time);
-    const food = anyFood(state2);
+  function feedStray(state3) {
+    const d2 = state3.dog;
+    const day = dayIndex(state3.time);
+    const food = anyFood(state3);
     if (!food) {
-      log(state2, "You have no food to give the dog.");
+      log(state3, "You have no food to give the dog.");
       return;
     }
-    const bag = (state2.home.storage[food] || 0) > 0 ? state2.home.storage : state2.carried;
+    const bag = (state3.home.storage[food] || 0) > 0 ? state3.home.storage : state3.carried;
     addItem(bag, food, -ITEMS[food].portion);
-    d.feedDays.push(day);
-    advanceTime(state2, 10);
-    const days = new Set(d.feedDays).size;
+    d2.feedDays.push(day);
+    advanceTime(state3, 10);
+    const days = new Set(d2.feedDays).size;
     if (days >= 3) {
-      d.stage = "joined";
-      d.food = 70;
-      d.bond = 30 + dogBondBonus(state2);
-      log(state2, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
-      state2.pendingPrompt = "name_dog";
+      d2.stage = "joined";
+      d2.food = 70;
+      d2.bond = 30 + dogBondBonus(state3);
+      log(state3, "The dog walks past you, into the house, and lies down near the fireplace. It stays.", "good");
+      state3.pendingPrompt = "name_dog";
     } else if (days === 1) {
-      log(state2, "You put food on the porch and go back inside. Later, the bowl is empty.", "story");
+      log(state3, "You put food on the porch and go back inside. Later, the bowl is empty.", "story");
     } else {
-      log(state2, "The dog eats while you watch from the door. It comes a little closer today.", "story");
+      log(state3, "The dog eats while you watch from the door. It comes a little closer today.", "story");
     }
   }
-  function feedDog(state2, id, bag) {
-    const d = state2.dog;
+  function feedDog(state3, id, bag) {
+    const d2 = state3.dog;
     const it = ITEMS[id];
     addItem(bag, id, -it.portion);
     const points = it.kind === "dogfood" ? 100 : it.cal * it.portion / 10;
-    d.food = clamp3(d.food + points, 0, 100);
-    d.bond = clamp3(d.bond + 1, 0, 100);
-    log(state2, `You feed ${d.name}.`);
-    advanceTime(state2, 5);
+    d2.food = clamp3(d2.food + points, 0, 100);
+    d2.bond = clamp3(d2.bond + 1, 0, 100);
+    log(state3, `You feed ${d2.name}.`);
+    advanceTime(state3, 5);
   }
-  function nameDog(state2, name) {
+  function nameDog(state3, name) {
     const clean = String(name || "").replace(/[^\p{L}\p{N} '\-]/gu, "").trim().slice(0, 20) || "Dog";
-    state2.dog.name = clean;
-    state2.pendingPrompt = null;
-    log(state2, `You call the dog ${clean}. ${clean} wags once.`, "good");
+    state3.dog.name = clean;
+    state3.pendingPrompt = null;
+    log(state3, `You call the dog ${clean}. ${clean} wags once.`, "good");
   }
-  function playWithDog(state2) {
-    const d = state2.dog;
-    const p = state2.player;
-    const day = dayIndex(state2.time);
+  function playWithDog(state3) {
+    const d2 = state3.dog;
+    const p = state3.player;
+    const day = dayIndex(state3.time);
     if (p.lastDogPlayDay === day) {
-      log(state2, `${d.name} is resting. You already played today.`);
+      log(state3, `${d2.name} is resting. You already played today.`);
       return;
     }
     p.lastDogPlayDay = day;
-    d.bond = clamp3(d.bond + 2, 0, 100);
+    d2.bond = clamp3(d2.bond + 2, 0, 100);
     p.morale = clamp3(p.morale + 3, 0, 100);
-    log(state2, `You play with ${d.name} for a while. For a moment, things feel normal.`, "good");
-    advanceTime(state2, 20);
+    log(state3, `You play with ${d2.name} for a while. For a moment, things feel normal.`, "good");
+    advanceTime(state3, 20);
   }
-  function toggleDogFollow(state2) {
-    const d = state2.dog;
-    d.withPlayer = !d.withPlayer;
-    log(state2, d.withPlayer ? `${d.name} will come with you.` : `${d.name} will stay home and guard the house.`);
+  function toggleDogFollow(state3) {
+    const d2 = state3.dog;
+    d2.withPlayer = !d2.withPlayer;
+    log(state3, d2.withPlayer ? `${d2.name} will come with you.` : `${d2.name} will stay home and guard the house.`);
   }
-  function enterPlace(state2, place) {
-    const ps = placeState(state2, place);
+  function enterPlace(state3, place) {
+    const ps = placeState(state3, place);
     const cat = CATEGORIES[place.cat];
     if (!ps.visited) {
       ps.visited = true;
-      state2.stats.placesSearched += 1;
-      log(state2, cat.entryText, "story");
-      if (ps.emptyHint) log(state2, "Most shelves here are already empty. People took a lot in the first weeks.");
-      if (cat.entryMorale) state2.player.morale = clamp3(state2.player.morale + cat.entryMorale, 0, 100);
+      state3.stats.placesSearched += 1;
+      log(state3, cat.entryText, "story");
+      if (ps.emptyHint) log(state3, "Most shelves here are already empty. People took a lot in the first weeks.");
+      if (cat.entryMorale) state3.player.morale = clamp3(state3.player.morale + cat.entryMorale, 0, 100);
     }
-    if (cat.bodies && chance(state2, 0.5)) seeBody(state2, "There are bodies here, under sheets and in the chairs. You do not look long.");
+    if (cat.bodies && chance(state3, 0.5)) seeBody(state3, "There are bodies here, under sheets and in the chairs. You do not look long.");
   }
-  function forceOpts(state2) {
-    return has2(state2, "toolkit") ? { adv: ["tool kit"] } : {};
+  function forceOpts(state3) {
+    return has2(state3, "toolkit") ? { adv: ["tool kit"] } : {};
   }
-  function forceEntry(state2) {
-    const place = getPlace(state2.location.id);
-    const ps = placeState(state2, place);
-    if (has2(state2, "pry_bar")) {
+  function forceEntry(state3) {
+    const place = getPlace(state3.location.id);
+    const ps = placeState(state3, place);
+    if (has2(state3, "pry_bar")) {
       ps.unlocked = true;
-      log(state2, "You open the locked door with the pry bar.");
-      advanceTime(state2, 5, "work");
+      log(state3, "You open the locked door with the pry bar.");
+      advanceTime(state3, 5, "work");
       return;
     }
-    state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
-    advanceTime(state2, 5, "heavy");
-    if (check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
+    state3.player.energy = clamp3(state3.player.energy - 5, 0, 100);
+    advanceTime(state3, 5, "heavy");
+    if (check(state3, "Kick open the locked door", 12, forceBonus(state3), forceOpts(state3)).success) {
       ps.unlocked = true;
-      log(state2, "The door breaks open.");
-      practice(state2, "tinkering", 4);
+      log(state3, "The door breaks open.");
+      practice(state3, "tinkering", 4);
     } else {
-      practice(state2, "tinkering", 2);
-      if (chance(state2, 0.3)) addInjury(state2, "sprain", { part: "ankle" });
+      practice(state3, "tinkering", 2);
+      if (chance(state3, 0.3)) addInjury(state3, "sprain", { part: "ankle" });
     }
   }
-  function openCounter(state2) {
-    const place = getPlace(state2.location.id);
-    const ps = placeState(state2, place);
+  function openCounter(state3) {
+    const place = getPlace(state3.location.id);
+    const ps = placeState(state3, place);
     const lz2 = CATEGORIES[place.cat].lockedZone;
-    if (has2(state2, "pry_bar")) {
+    if (has2(state3, "pry_bar")) {
       ps.counterOpen = true;
-      log(state2, `You open the ${lz2.name} gate with the pry bar.`);
-      advanceTime(state2, 5, "work");
+      log(state3, `You open the ${lz2.name} gate with the pry bar.`);
+      advanceTime(state3, 5, "work");
       return;
     }
-    advanceTime(state2, 10, "heavy");
-    if (check(state2, `Force the ${lz2.name} gate`, lz2.dc, forceBonus(state2), forceOpts(state2)).success) {
+    advanceTime(state3, 10, "heavy");
+    if (check(state3, `Force the ${lz2.name} gate`, lz2.dc, forceBonus(state3), forceOpts(state3)).success) {
       ps.counterOpen = true;
-      log(state2, "The gate bends open.");
-      practice(state2, "tinkering", 4);
+      log(state3, "The gate bends open.");
+      practice(state3, "tinkering", 4);
     } else {
-      practice(state2, "tinkering", 2);
-      if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+      practice(state3, "tinkering", 2);
+      if (chance(state3, 0.25)) addInjury(state3, "small_cut");
     }
   }
-  function searchMinutes(state2, base2, dark) {
-    const p = state2.player;
-    let m = base2 * searchTimeFactor(state2) * searchJobFactor(state2);
-    if (dark && !hasLight(state2)) m *= 2;
+  function searchMinutes(state3, base2, dark) {
+    const p = state3.player;
+    let m = base2 * searchTimeFactor(state3) * searchJobFactor(state3);
+    if (dark && !hasLight(state3)) m *= 2;
     if (p.water < 25) m *= 1.25;
-    m /= injuryFactor(state2, "hand");
+    m /= injuryFactor(state3, "hand");
     return m;
   }
-  function dogExtra(state2) {
-    return state2.dog.stage === "joined" && state2.dog.withPlayer && state2.dog.bond >= 50 ? 1 : 0;
+  function dogExtra(state3) {
+    return state3.dog.stage === "joined" && state3.dog.withPlayer && state3.dog.bond >= 50 ? 1 : 0;
   }
-  function zoneInjuryCheck(state2) {
+  function zoneInjuryCheck(state3) {
     let p = SEARCH_INJURY_CHANCE;
-    if (environment(state2, "work").dark && !hasLight(state2)) p *= 2;
-    if (state2.player.energy < 25) p *= 1.5;
-    if (chance(state2, p)) {
-      log(state2, "You slip on broken glass in the dark corner.", "warn");
-      addInjury(state2, chance(state2, 0.8) ? "small_cut" : "sprain");
+    if (environment(state3, "work").dark && !hasLight(state3)) p *= 2;
+    if (state3.player.energy < 25) p *= 1.5;
+    if (chance(state3, p)) {
+      log(state3, "You slip on broken glass in the dark corner.", "warn");
+      addInjury(state3, chance(state3, 0.8) ? "small_cut" : "sprain");
     }
   }
-  function reportFound(state2, found, where) {
-    const names = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? " \xD7" + q : ""}`);
-    if (names.length) log(state2, `You search the ${where}. You find: ${names.join(", ")}.`, "good");
-    else log(state2, `You search the ${where}. You find nothing useful.`);
+  function reportFound(state3, found, where) {
+    const names = Object.entries(found).map(([id, q2]) => `${itemName(id)}${q2 > 1 ? " \xD7" + q2 : ""}`);
+    if (names.length) log(state3, `You search the ${where}. You find: ${names.join(", ")}.`, "good");
+    else log(state3, `You search the ${where}. You find nothing useful.`);
   }
   function zonesDoneList(ps, countKey = "zonesDone", listKey = "doneList") {
-    if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_, i) => i);
+    if (!Array.isArray(ps[listKey])) ps[listKey] = Array.from({ length: ps[countKey] || 0 }, (_2, i) => i);
     return ps[listKey];
   }
   function nextZone(ps, counterIdx = -1) {
@@ -7492,15 +7492,15 @@
   function counterIndex(place, ps) {
     return CATEGORIES[place.cat].lockedZone ? ps.zones - 1 : -1;
   }
-  function zoneCtx(state2) {
-    const loc = state2.location;
+  function zoneCtx(state3) {
+    const loc = state3.location;
     if (loc.kind === "place") {
       const place = getPlace(loc.id);
-      const ps = placeState(state2, place);
+      const ps = placeState(state3, place);
       return { holder: ps, key: place.id, catId: place.cat, stock: ps.stock, zones: ps.zones, counterIdx: counterIndex(place, ps), house: false, place };
     }
     if (loc.kind === "house") {
-      const hs = state2.houses[loc.id];
+      const hs = state3.houses[loc.id];
       return { holder: hs, key: loc.id, catId: "house", stock: CATEGORIES.house.stock, zones: HOUSE_ROOMS.length, counterIdx: -1, house: true };
     }
     return null;
@@ -7515,27 +7515,27 @@
     if (ctx.house) ctx.holder.roomsDone = done.length;
     else ctx.holder.zonesDone = done.length;
   }
-  function zoneItemList(state2, ctx, zone) {
-    const h2 = ctx.holder;
-    if (!h2.zoneItems) h2.zoneItems = {};
-    if (!h2.taken) h2.taken = [];
-    if (!h2.zoneItems[zone]) {
-      const found = rollZone(state2, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state2));
+  function zoneItemList(state3, ctx, zone) {
+    const h3 = ctx.holder;
+    if (!h3.zoneItems) h3.zoneItems = {};
+    if (!h3.taken) h3.taken = [];
+    if (!h3.zoneItems[zone]) {
+      const found = rollZone(state3, ctx.key, ctx.catId, ctx.stock, zone, dogExtra(state3));
       if (zone === ctx.counterIdx) found.antibiotics = (found.antibiotics || 0) + (ctx.stock > 0.2 ? 1 : 0);
       const list = [];
-      for (const [item, q] of Object.entries(found)) for (let i = 0; i < q; i++) list.push({ pid: `z${zone}i${list.length}`, item });
-      h2.zoneItems[zone] = list;
+      for (const [item, q2] of Object.entries(found)) for (let i = 0; i < q2; i++) list.push({ pid: `z${zone}i${list.length}`, item });
+      h3.zoneItems[zone] = list;
     }
-    return h2.zoneItems[zone];
+    return h3.zoneItems[zone];
   }
-  function buildingItems(state2) {
-    const ctx = zoneCtx(state2);
+  function buildingItems(state3) {
+    const ctx = zoneCtx(state3);
     if (!ctx) return [];
     const done = doneListOf(ctx);
     const out = [];
-    for (let z = 0; z < ctx.zones; z++) {
-      if (done.includes(z) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z])) continue;
-      for (const it of zoneItemList(state2, ctx, z)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z });
+    for (let z2 = 0; z2 < ctx.zones; z2++) {
+      if (done.includes(z2) && !(ctx.holder.zoneItems && ctx.holder.zoneItems[z2])) continue;
+      for (const it of zoneItemList(state3, ctx, z2)) if (!ctx.holder.taken.includes(it.pid)) out.push({ ...it, zone: z2 });
     }
     return out;
   }
@@ -7543,85 +7543,85 @@
     const list = ctx.holder.zoneItems && ctx.holder.zoneItems[zone] || [];
     return list.filter((it) => !ctx.holder.taken.includes(it.pid));
   }
-  function touchZone(state2, ctx, zone) {
-    const h2 = ctx.holder;
-    if (!h2.touched) h2.touched = [];
-    if (h2.touched.includes(zone)) return;
-    h2.touched.push(zone);
-    zoneInjuryCheck(state2);
-    if (ctx.catId === "supermarket" && h2.touched.length === 1) {
-      state2.player.morale = clamp3(state2.player.morale - 3, 0, 100);
-      log(state2, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
+  function touchZone(state3, ctx, zone) {
+    const h3 = ctx.holder;
+    if (!h3.touched) h3.touched = [];
+    if (h3.touched.includes(zone)) return;
+    h3.touched.push(zone);
+    zoneInjuryCheck(state3);
+    if (ctx.catId === "supermarket" && h3.touched.length === 1) {
+      state3.player.morale = clamp3(state3.player.morale - 3, 0, 100);
+      log(state3, "The fresh food section is black and rotten. Rats run under the shelves.", "warn");
     }
   }
   var PICKUP_MINUTES = 1;
-  function pickUp(state2, pid) {
-    const ctx = zoneCtx(state2);
+  function pickUp(state3, pid) {
+    const ctx = zoneCtx(state3);
     if (!ctx) return false;
     const zone = Number(String(pid).slice(1).split("i")[0]);
     if (ctx.place && !ctx.holder.unlocked) return false;
     if (zone === ctx.counterIdx && !ctx.holder.counterOpen) {
-      log(state2, "It is behind the locked counter gate. Open the gate first.", "warn");
+      log(state3, "It is behind the locked counter gate. Open the gate first.", "warn");
       return false;
     }
-    const it = zoneItemList(state2, ctx, zone).find((x) => x.pid === pid);
+    const it = zoneItemList(state3, ctx, zone).find((x2) => x2.pid === pid);
     if (!it || ctx.holder.taken.includes(pid)) return false;
-    const wearIt = it.item === "backpack" && !wearsPack(state2);
-    if (!wearIt && roomFor(state2, it.item, 1) < 1) {
-      log(state2, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, "warn");
+    const wearIt = it.item === "backpack" && !wearsPack(state3);
+    if (!wearIt && roomFor(state3, it.item, 1) < 1) {
+      log(state3, `No room in your pack for the ${itemName(it.item).toLowerCase()}.`, "warn");
       return false;
     }
-    const env = environment(state2, "work");
-    advanceTime(state2, PICKUP_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
-    if (state2.dead) return true;
-    touchZone(state2, ctx, zone);
+    const env = environment(state3, "work");
+    advanceTime(state3, PICKUP_MINUTES * (env.dark && !hasLight(state3) ? 2 : 1), "work");
+    if (state3.dead) return true;
+    touchZone(state3, ctx, zone);
     ctx.holder.taken.push(pid);
     if (wearIt) {
-      putOn(state2.player, "backpack");
-      log(state2, "You put the backpack on. Your pack grid is much bigger now.", "good");
+      putOn(state3.player, "backpack");
+      log(state3, "You put the backpack on. Your pack grid is much bigger now.", "good");
     } else {
-      addItem(state2.carried, it.item, 1);
-      log(state2, `You take: ${itemName(it.item)}.`);
+      addItem(state3.carried, it.item, 1);
+      log(state3, `You take: ${itemName(it.item)}.`);
     }
-    practice(state2, "scavenging", SCAV_XP);
+    practice(state3, "scavenging", SCAV_XP);
     if (!zoneLeft(ctx, zone).length && !doneListOf(ctx).includes(zone)) {
       markZoneDone(ctx, zone);
-      state2.stats.zonesSearched += 1;
+      state3.stats.zonesSearched += 1;
     }
     return true;
   }
-  function seeZone(state2, zone) {
-    const ctx = zoneCtx(state2);
+  function seeZone(state3, zone) {
+    const ctx = zoneCtx(state3);
     if (!ctx || doneListOf(ctx).includes(zone)) return;
     if (zone === ctx.counterIdx && !ctx.holder.counterOpen) return;
-    zoneItemList(state2, ctx, zone);
+    zoneItemList(state3, ctx, zone);
     if (!zoneLeft(ctx, zone).length) {
       markZoneDone(ctx, zone);
-      state2.stats.zonesSearched += 1;
-      log(state2, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
+      state3.stats.zonesSearched += 1;
+      log(state3, `The ${ctx.house ? HOUSE_ROOMS[zone] : `${CATEGORIES[ctx.catId].zoneName} ${zone + 1}`} is empty. Nothing useful is left.`);
     }
   }
   var CONTAINER_MINUTES = 1;
-  function openContainer(state2, cid) {
-    const ctx = zoneCtx(state2);
+  function openContainer(state3, cid) {
+    const ctx = zoneCtx(state3);
     if (!ctx || typeof cid !== "string" || !/^c\d+$/.test(cid)) return false;
-    const h2 = ctx.holder;
-    h2.opened || (h2.opened = []);
-    if (h2.opened.includes(cid)) return false;
-    const env = environment(state2, "work");
-    advanceTime(state2, CONTAINER_MINUTES * (env.dark && !hasLight(state2) ? 2 : 1), "work");
-    if (state2.dead) return true;
-    h2.opened.push(cid);
-    log(state2, "You open it and look inside.");
-    practice(state2, "scavenging", SCAV_XP);
+    const h3 = ctx.holder;
+    h3.opened || (h3.opened = []);
+    if (h3.opened.includes(cid)) return false;
+    const env = environment(state3, "work");
+    advanceTime(state3, CONTAINER_MINUTES * (env.dark && !hasLight(state3) ? 2 : 1), "work");
+    if (state3.dead) return true;
+    h3.opened.push(cid);
+    log(state3, "You open it and look inside.");
+    practice(state3, "scavenging", SCAV_XP);
     return true;
   }
-  function openedContainers(state2) {
-    const ctx = zoneCtx(state2);
+  function openedContainers(state3) {
+    const ctx = zoneCtx(state3);
     return ctx ? (ctx.holder.opened || []).slice() : [];
   }
-  function searchZone(state2, index) {
-    const ctx = zoneCtx(state2);
+  function searchZone(state3, index) {
+    const ctx = zoneCtx(state3);
     if (!ctx || ctx.house) return false;
     const { holder: ps, place } = ctx;
     const cat = CATEGORIES[place.cat];
@@ -7632,44 +7632,44 @@
     if (!(zone >= 0 && zone < ps.zones) || done.includes(zone)) return false;
     const counterZone = zone === cIdx;
     if (counterZone && !ps.counterOpen) return false;
-    const env = environment(state2, "work");
-    advanceTime(state2, searchMinutes(state2, cat.zoneMinutes, env.dark), "work");
-    if (state2.dead) return true;
-    zoneItemList(state2, ctx, zone);
-    touchZone(state2, ctx, zone);
+    const env = environment(state3, "work");
+    advanceTime(state3, searchMinutes(state3, cat.zoneMinutes, env.dark), "work");
+    if (state3.dead) return true;
+    zoneItemList(state3, ctx, zone);
+    touchZone(state3, ctx, zone);
     const found = {};
     for (const it of zoneLeft(ctx, zone)) {
       ps.taken.push(it.pid);
       found[it.item] = (found[it.item] || 0) + 1;
     }
     markZoneDone(ctx, zone);
-    state2.stats.zonesSearched += 1;
-    for (const [id, q] of Object.entries(found)) addItem(ps.leftovers, id, q);
-    practice(state2, "scavenging", 2 * SCAV_XP);
-    reportFound(state2, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
-    state2.lastFound = found;
+    state3.stats.zonesSearched += 1;
+    for (const [id, q2] of Object.entries(found)) addItem(ps.leftovers, id, q2);
+    practice(state3, "scavenging", 2 * SCAV_XP);
+    reportFound(state3, found, counterZone ? lz(cat) : `${cat.zoneName} ${zone + 1} (${ps.zonesDone} of ${ps.zones} done)`);
+    state3.lastFound = found;
     return true;
   }
   var lz = (cat) => cat.lockedZone.name;
   var INSIDE_M_PER_MIN = 60;
-  function walkInside(state2, meters) {
+  function walkInside(state3, meters) {
     const m = Number(meters);
     if (!(m > 0)) return;
-    advanceTime(state2, m / INSIDE_M_PER_MIN, "work");
+    advanceTime(state3, m / INSIDE_M_PER_MIN, "work");
   }
-  function toggleFlashlight(state2) {
-    const p = state2.player;
-    if (!(state2.carried.flashlight || 0)) {
-      log(state2, "You have no flashlight.");
+  function toggleFlashlight(state3) {
+    const p = state3.player;
+    if (!(state3.carried.flashlight || 0)) {
+      log(state3, "You have no flashlight.");
       return;
     }
     p.lightOff = !p.lightOff;
-    if (!p.lightOff && p.lightHours <= 0) log(state2, "You switch on the flashlight. Nothing. The batteries are empty.", "warn");
-    else log(state2, p.lightOff ? "You switch off the flashlight to save the batteries." : "You switch on the flashlight.");
+    if (!p.lightOff && p.lightHours <= 0) log(state3, "You switch on the flashlight. Nothing. The batteries are empty.", "warn");
+    else log(state3, p.lightOff ? "You switch off the flashlight to save the batteries." : "You switch on the flashlight.");
   }
-  function quickChoice(state2, slot) {
-    const c = state2.carried;
-    const p = state2.player;
+  function quickChoice(state3, slot) {
+    const c = state3.carried;
+    const p = state3.player;
     const haveAny = (ids) => ids.find((id) => (c[id] || 0) > 0);
     if (slot === "med") {
       const open = p.injuries.some((i) => !i.bandaged);
@@ -7696,72 +7696,72 @@
     }
     return { why: "Nothing for this key yet." };
   }
-  function areaKey(state2) {
-    return state2.location.kind === "place" ? state2.location.id : "home";
+  function areaKey(state3) {
+    return state3.location.kind === "place" ? state3.location.id : "home";
   }
-  function nearbyHousesLeft(state2) {
-    return 12 - (state2.houseAreas[areaKey(state2)] || 0);
+  function nearbyHousesLeft(state3) {
+    return 12 - (state3.houseAreas[areaKey(state3)] || 0);
   }
-  function enterNearbyHouse(state2) {
-    const key = areaKey(state2);
-    const n = (state2.houseAreas[key] || 0) + 1;
-    state2.houseAreas[key] = n;
+  function enterNearbyHouse(state3) {
+    const key = areaKey(state3);
+    const n = (state3.houseAreas[key] || 0) + 1;
+    state3.houseAreas[key] = n;
     const id = `${key}#${n}`;
     const near = key === "home" ? "on your street" : `near ${getPlace(key)?.name || "here"}`;
     const label = `House ${n} ${near}`;
-    newHouse(state2, id);
-    const from = state2.pos;
-    const ang = randInt(state2, 0, 359) * Math.PI / 180;
-    const meters = randInt(state2, 80, 250);
+    newHouse(state3, id);
+    const from = state3.pos;
+    const ang = randInt(state3, 0, 359) * Math.PI / 180;
+    const meters = randInt(state3, 80, 250);
     const pos = {
       lat: from.lat + meters * Math.sin(ang) / 111320,
       lon: from.lon + meters * Math.cos(ang) / (111320 * Math.cos(from.lat * Math.PI / 180))
     };
-    enterHouse(state2, id, label, pos, { walkText: `You walk to a house ${near}`, newId: id });
+    enterHouse(state3, id, label, pos, { walkText: `You walk to a house ${near}`, newId: id });
   }
-  function newHouse(state2, id) {
-    const r = randInt(state2, 0, 999) / 1e3;
-    state2.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
-    return state2.houses[id];
+  function newHouse(state3, id) {
+    const r = randInt(state3, 0, 999) / 1e3;
+    state3.houses[id] = { roomsDone: 0, leftovers: {}, body: r < 0.6 };
+    return state3.houses[id];
   }
-  function enterHouse(state2, id, label, pos, opts = {}) {
-    const first = !state2.houses[id] || id === opts.newId;
-    const hs = state2.houses[id] || newHouse(state2, id);
-    const parent = { ...state2.location, pos: { ...state2.pos } };
+  function enterHouse(state3, id, label, pos, opts = {}) {
+    const first = !state3.houses[id] || id === opts.newId;
+    const hs = state3.houses[id] || newHouse(state3, id);
+    const parent = { ...state3.location, pos: { ...state3.pos } };
     if (pos) {
       hs.pos = { ...pos };
-      state2.pos = { ...pos };
+      state3.pos = { ...pos };
     }
-    advanceTime(state2, opts.walkMinutes ?? 5, "walk");
-    if (opts.walkText) log(state2, endDot(opts.walkText));
+    advanceTime(state3, opts.walkMinutes ?? 5, "walk");
+    if (opts.walkText) log(state3, endDot(opts.walkText));
     if (!first) {
-      state2.location = { kind: "house", id, label, parent };
-      log(state2, "You go back into the house.");
+      state3.location = { kind: "house", id, label, parent };
+      log(state3, "You go back into the house.");
       return;
     }
-    if (chance(state2, 0.7)) {
-      if (has2(state2, "pry_bar")) {
-        log(state2, "The door is locked. You open it with the pry bar.");
-        advanceTime(state2, 5, "work");
-      } else if (chance(state2, 0.1)) {
-        log(state2, "The door is locked, but you find a spare key under a flower pot.");
-        advanceTime(state2, 2);
+    if (chance(state3, 0.7)) {
+      if (has2(state3, "pry_bar")) {
+        log(state3, "The door is locked. You open it with the pry bar.");
+        advanceTime(state3, 5, "work");
+      } else if (chance(state3, 0.1)) {
+        log(state3, "The door is locked, but you find a spare key under a flower pot.");
+        advanceTime(state3, 2);
       } else {
-        state2.player.energy = clamp3(state2.player.energy - 5, 0, 100);
-        if (!check(state2, "Kick open the locked door", 12, forceBonus(state2), forceOpts(state2)).success) {
-          log(state2, "The door holds. You break a window and climb in.");
-          if (chance(state2, 0.25)) addInjury(state2, "small_cut");
+        state3.player.energy = clamp3(state3.player.energy - 5, 0, 100);
+        if (!check(state3, "Kick open the locked door", 12, forceBonus(state3), forceOpts(state3)).success) {
+          log(state3, "The door holds. You break a window and climb in.");
+          if (chance(state3, 0.25)) addInjury(state3, "small_cut");
         }
-        advanceTime(state2, 5, "heavy");
+        advanceTime(state3, 5, "heavy");
       }
     } else {
-      log(state2, "The door is not locked.");
+      log(state3, "The door is not locked.");
     }
-    state2.stats.housesSearched += 1;
-    state2.location = { kind: "house", id, label, parent };
-    const hn = state2.stats.housesSearched;
-    if (hs.body) seeBody(state2, BODY_LINES[hn % BODY_LINES.length]);
-    else log(state2, EMPTY_LINES[hn % EMPTY_LINES.length]);
+    state3.stats.housesSearched += 1;
+    state3.location = { kind: "house", id, label, parent };
+    const hn = state3.stats.housesSearched;
+    if (hs.body) seeBody(state3, BODY_LINES[hn % BODY_LINES.length]);
+    else log(state3, EMPTY_LINES[hn % EMPTY_LINES.length]);
   }
   var BODY_LINES = [
     "Someone is in the bedroom. You close the door.",
@@ -7775,126 +7775,126 @@
     "The rooms are cold and dark. The clocks have stopped.",
     "Toys lie on the floor. The house is empty."
   ];
-  function searchRoom(state2, index) {
-    const ctx = zoneCtx(state2);
+  function searchRoom(state3, index) {
+    const ctx = zoneCtx(state3);
     if (!ctx || !ctx.house) return false;
     const hs = ctx.holder;
     const done = doneListOf(ctx);
-    const room = index == null ? HOUSE_ROOMS.findIndex((_, i) => !done.includes(i)) : Number(index);
+    const room = index == null ? HOUSE_ROOMS.findIndex((_2, i) => !done.includes(i)) : Number(index);
     if (!(room >= 0 && room < HOUSE_ROOMS.length) || done.includes(room)) return false;
-    const env = environment(state2, "work");
-    advanceTime(state2, searchMinutes(state2, CATEGORIES.house.zoneMinutes, env.dark), "work");
-    if (state2.dead) return true;
-    zoneItemList(state2, ctx, room);
-    touchZone(state2, ctx, room);
+    const env = environment(state3, "work");
+    advanceTime(state3, searchMinutes(state3, CATEGORIES.house.zoneMinutes, env.dark), "work");
+    if (state3.dead) return true;
+    zoneItemList(state3, ctx, room);
+    touchZone(state3, ctx, room);
     const found = {};
     for (const it of zoneLeft(ctx, room)) {
       hs.taken.push(it.pid);
       found[it.item] = (found[it.item] || 0) + 1;
     }
     markZoneDone(ctx, room);
-    state2.stats.zonesSearched += 1;
-    for (const [id, q] of Object.entries(found)) addItem(hs.leftovers, id, q);
-    practice(state2, "scavenging", 2 * SCAV_XP);
-    reportFound(state2, found, HOUSE_ROOMS[room]);
-    state2.lastFound = found;
+    state3.stats.zonesSearched += 1;
+    for (const [id, q2] of Object.entries(found)) addItem(hs.leftovers, id, q2);
+    practice(state3, "scavenging", 2 * SCAV_XP);
+    reportFound(state3, found, HOUSE_ROOMS[room]);
+    state3.lastFound = found;
     return true;
   }
-  function leaveHouse(state2) {
-    const parent = state2.location.parent;
-    state2.location = { kind: parent.kind, ...parent.id ? { id: parent.id } : {} };
-    state2.pos = { ...parent.pos };
-    log(state2, "You walk back.");
-    advanceTime(state2, 5, "walk");
+  function leaveHouse(state3) {
+    const parent = state3.location.parent;
+    state3.location = { kind: parent.kind, ...parent.id ? { id: parent.id } : {} };
+    state3.pos = { ...parent.pos };
+    log(state3, "You walk back.");
+    advanceTime(state3, 5, "walk");
   }
-  function goToPlace(state2, placeId) {
+  function goToPlace(state3, placeId) {
     const place = getPlace(placeId);
     if (!place) return;
-    const ok = travel(state2, place, place.name);
+    const ok = travel(state3, place, place.name);
     if (!ok) return;
-    state2.location = { kind: "place", id: placeId };
-    log(state2, endDot(`You arrive at ${place.name}`), "travel");
-    enterPlace(state2, place);
+    state3.location = { kind: "place", id: placeId };
+    log(state3, endDot(`You arrive at ${place.name}`), "travel");
+    enterPlace(state3, place);
   }
-  function goHome(state2) {
-    const ok = travel(state2, homeOf(state2), "home");
+  function goHome(state3) {
+    const ok = travel(state3, homeOf(state3), "home");
     if (!ok) return;
-    state2.location = { kind: "home" };
-    log(state2, "You are home. You lock the door behind you.", "travel");
+    state3.location = { kind: "home" };
+    log(state3, "You are home. You lock the door behind you.", "travel");
   }
-  function listActions(state2) {
-    const loc = state2.location;
-    const p = state2.player;
-    const h2 = state2.home;
+  function listActions(state3) {
+    const loc = state3.location;
+    const p = state3.player;
+    const h3 = state3.home;
     const acts = [];
     const add = (id, label, opts = {}) => acts.push({ id, label, ...opts });
     if (loc.kind === "home") {
-      add("drink_tank", "Drink from the water heater tank", { disabled: h2.tankGal < 0.25 && "The tank is empty", note: `${h2.tankGal.toFixed(1)} gal left` });
-      if (h2.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h2.safeGal.toFixed(1)} gal` });
-      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h2.safeGal < 1 && h2.tankGal < 1 && "No clean water" });
-      if (tapRuns(state2)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
-      if (h2.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
-      if (h2.rawGal > 0) {
-        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state2, 0.4) && "Light a fire or charge the battery", note: `${h2.rawGal.toFixed(1)} gal unsafe` });
-        if (built(state2, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
-        if (has2(state2, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
+      add("drink_tank", "Drink from the water heater tank", { disabled: h3.tankGal < 0.25 && "The tank is empty", note: `${h3.tankGal.toFixed(1)} gal left` });
+      if (h3.safeGal >= 0.25) add("drink_safe", "Drink boiled water", { note: `${h3.safeGal.toFixed(1)} gal` });
+      add("fill_jug", "Fill a 1 gal jug to carry", { disabled: h3.safeGal < 1 && h3.tankGal < 1 && "No clean water" });
+      if (tapRuns(state3)) add("collect_tap", "Collect tap water (2 gal, unsafe)");
+      if (h3.toiletGal > 0) add("collect_toilet", "Take water from the toilet tanks");
+      if (h3.rawGal > 0) {
+        add("boil", "Boil 1 gal of water", { disabled: !canHeat(state3, 0.4) && "Light a fire or charge the battery", note: `${h3.rawGal.toFixed(1)} gal unsafe` });
+        if (built(state3, "filter_station")) add("filter_water", "Filter 2 gal of water (no fuel)", { note: "10 min" });
+        if (has2(state3, "water_tablets")) add("purify", "Purify 1 gal with a tablet (no fuel)", { note: "30 min" });
         add("drink_raw", "Drink water without boiling", { note: `${Math.round(RAW_WATER_SICK * 100)}% stomach bug`, risk: true });
       }
-      const fuel = (h2.storage.firewood || 0) + (state2.carried.firewood || 0);
-      add("add_wood", h2.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state2, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
-      if (has2(state2, "generator")) {
-        const gas = (h2.storage.gas_can || 0) + (state2.carried.gas_can || 0);
-        const startP = gasStartChance(state2);
-        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h2.batteryMax - h2.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
+      const fuel = (h3.storage.firewood || 0) + (state3.carried.firewood || 0);
+      add("add_wood", h3.fireHours > 0 ? "Add wood to the fire" : `Light a fire in the ${built(state3, "wood_stove") ? "wood stove" : "fireplace"}`, { disabled: fuel < 1 && "No firewood", note: `${fuel} bundles` });
+      if (has2(state3, "generator")) {
+        const gas = (h3.storage.gas_can || 0) + (state3.carried.gas_can || 0);
+        const startP = gasStartChance(state3);
+        add("run_generator", "Run the generator to charge the battery (2 h)", { disabled: gas < 1 && "No gas" || h3.batteryMax - h3.battery < 0.1 && "Battery is full", note: `${gas} gal${startP < 0.99 ? ` \xB7 old gas: ${Math.round(startP * 100)}% it starts` : ""}`, risk: startP < 0.99 });
       }
       add("walk_in", "Walk around your home (first person)", { note: "see what you built" });
       add("walk_out", "Step outside (3D streets)", { note: "walk the real streets near home" });
-      if (h2.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h2.furniture} left` });
-      add("heater", h2.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h2.heaterOn && h2.battery < 1 && "Battery too low" });
-      const cookId = cookPick(state2);
+      if (h3.furniture > 0) add("break_furniture", "Break furniture for firewood (1 h)", { note: `${h3.furniture} left` });
+      add("heater", h3.heaterOn ? "Turn off the electric heater" : "Turn on the electric heater", { disabled: !h3.heaterOn && h3.battery < 1 && "Battery too low" });
+      const cookId = cookPick(state3);
       const food = !!cookId;
-      const onlyDry = !food && COOK_ORDER().some((f) => (h2.storage[f] || 0) > 0 || (state2.carried[f] || 0) > 0);
-      const cr = cookId ? eatRisk(state2, cookId, true) : 0;
-      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: onlyDry && "Need water to cook" || !food && "No food to cook" || !canHeat(state2, 0.5) && "Light a fire or charge the battery" });
+      const onlyDry = !food && COOK_ORDER().some((f) => (h3.storage[f] || 0) > 0 || (state3.carried[f] || 0) > 0);
+      const cr = cookId ? eatRisk(state3, cookId, true) : 0;
+      add("cook", "Cook a hot meal", { note: cookId ? `${itemName(cookId).toLowerCase()}${cr ? ` \xB7 ${Math.round(cr * 100)}% food poisoning` : ""} \xB7 warm and fed ${WARM_FED_HOURS} h` : void 0, risk: cr > 0, disabled: onlyDry && "Need water to cook" || !food && "No food to cook" || !canHeat(state3, 0.5) && "Light a fire or charge the battery" });
       if (p.wet) add("dry_clothes", "Change into dry clothes");
-      if (!h2.fridgeOpened) add("fridge", "Open the fridge");
-      if (Object.keys(state2.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
-      if (state2.dog.stage === "visiting") {
-        const fedToday = state2.dog.feedDays.includes(dayIndex(state2.time));
-        const night = isNight(state2.time);
-        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" || !anyFood(state2) && "You have no food to give" });
+      if (!h3.fridgeOpened) add("fridge", "Open the fridge");
+      if (Object.keys(state3.carried).some((k) => k !== "backpack" && k !== "flashlight")) add("store_all", "Put away everything you carry");
+      if (state3.dog.stage === "visiting") {
+        const fedToday = state3.dog.feedDays.includes(dayIndex(state3.time));
+        const night = isNight(state3.time);
+        add("feed_stray", "Leave food outside for the dog", { disabled: fedToday && "You fed it today" || night && "The dog comes only in the day" || !anyFood(state3) && "You have no food to give" });
       }
-      add("house", "Search a house on your street", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
+      add("house", "Search a house on your street", { disabled: nearbyHousesLeft(state3) <= 0 && "No more houses near here" });
     }
     if (loc.kind === "place") {
       const place = getPlace(loc.id);
       const cat = CATEGORIES[place.cat];
-      const ps = placeState(state2, place);
-      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, 12, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 30% sprain`, risk: !has2(state2, "pry_bar") });
+      const ps = placeState(state3, place);
+      if (!ps.unlocked) add("force", "Force the locked door", { note: has2(state3, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state3, 12, forceBonus(state3), forceOpts(state3)))} \xB7 fail: 30% sprain`, risk: !has2(state3, "pry_bar") });
       else if (ps.zonesDone < ps.zones) {
         if (nextZone(ps, counterIndex(place, ps)) === counterIndex(place, ps) && !ps.counterOpen) {
-          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state2, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state2, cat.lockedZone.dc, forceBonus(state2), forceOpts(state2)))} \xB7 fail: 25% cut`, risk: !has2(state2, "pry_bar") });
+          add("counter", `Open the ${cat.lockedZone.name}`, { note: has2(state3, "pry_bar") ? "pry bar: sure to work" : `${oddsText(odds(state3, cat.lockedZone.dc, forceBonus(state3), forceOpts(state3)))} \xB7 fail: 25% cut`, risk: !has2(state3, "pry_bar") });
         } else {
-          const env = environment(state2, "work");
-          const min = searchMinutes(state2, cat.zoneMinutes, env.dark);
-          add("search", `Search the next ${cat.zoneName}`, { note: `${ps.zonesDone}/${ps.zones} done \xB7 ${formatDuration(min)}${env.dark && !hasLight(state2) ? " (dark, no light)" : ""}` });
+          const env = environment(state3, "work");
+          const min = searchMinutes(state3, cat.zoneMinutes, env.dark);
+          add("search", `Search the next ${cat.zoneName}`, { note: `${ps.zonesDone}/${ps.zones} done \xB7 ${formatDuration(min)}${env.dark && !hasLight(state3) ? " (dark, no light)" : ""}` });
         }
       } else add("search", "Nothing left to search", { disabled: "You searched all of it" });
       if (ps.unlocked) add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
-      add("house", "Search a house nearby", { disabled: nearbyHousesLeft(state2) <= 0 && "No more houses near here" });
+      add("house", "Search a house nearby", { disabled: nearbyHousesLeft(state3) <= 0 && "No more houses near here" });
       add("go_home", "Walk home");
     }
     if (loc.kind === "house") {
-      const hs = state2.houses[loc.id];
-      const nextRoom = HOUSE_ROOMS.findIndex((_, i) => !zonesDoneList(hs, "roomsDone", "doneList").includes(i));
+      const hs = state3.houses[loc.id];
+      const nextRoom = HOUSE_ROOMS.findIndex((_2, i) => !zonesDoneList(hs, "roomsDone", "doneList").includes(i));
       if (nextRoom >= 0) add("room", `Search the ${HOUSE_ROOMS[nextRoom]}`, { note: `${hs.roomsDone}/${HOUSE_ROOMS.length} rooms` });
       else add("room", "All rooms searched", { disabled: "Nothing left" });
       add("walk_in", "Walk inside (first person)", { note: "look for loot yourself" });
       add("leave_house", "Leave the house");
     }
     if (loc.kind === "car") {
-      const c = carHere(state2) || {};
-      const hasAny2 = (ids) => ids.some((t) => has2(state2, t));
+      const c = carHere(state3) || {};
+      const hasAny2 = (ids) => ids.some((t) => has2(state3, t));
       add("car_search", c.searched ? "Glovebox and trunk: searched" : `Search the glovebox and trunk (${CAR_SEARCH_MIN} min)`, { disabled: c.searched && "Done" });
       add("car_siphon", c.siphoned ? "Gas tank: done" : `Siphon gas (${SIPHON_MIN} min)`, { disabled: c.siphoned && "Done" || !hasAny2(SIPHON_TOOLS) && "You need a garden hose or pipe and fittings", note: c.siphoned ? void 0 : "many tanks are dry" });
       add("car_battery", c.battery ? "Battery: taken" : `Take the 12 V battery (${BATTERY_MIN} min, 35 lb)`, { disabled: c.battery && "Done" || !hasAny2(WRENCH_TOOLS) && "You need a tool kit or multitool", note: c.battery ? void 0 : "adds storage to the home battery" });
@@ -7907,163 +7907,163 @@
       add("go_home", "Walk home");
     }
     if (loc.kind === "wild") {
-      const spot = spotHere(state2);
+      const spot = spotHere(state3);
       if (spot?.kind === "fish") {
-        const why = canFish(state2);
-        add("fish", `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? void 0 : oddsText(fishOdds(state2)) });
+        const why = canFish(state3);
+        add("fish", `Fish from the bank (${FISH_MINUTES / 60} h)`, { disabled: why, note: why ? void 0 : oddsText(fishOdds(state3)) });
       }
       if (spot?.kind === "hunt") {
-        const methods = huntMethods(state2);
+        const methods = huntMethods(state3);
         if (!methods.length) add("hunt_bow", `Hunt (${HUNT_MINUTES / 60} h)`, { disabled: "You need a bow and arrows, or a rifle and rounds" });
         for (const m of methods) {
-          const o = huntOdds(state2, m);
-          const why = canHunt(state2, m);
-          add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game \xB7 ${o.shot.pct}% hit a ${o.animal}${m === "rifle" ? " \xB7 loud" : ""}${isScared(state2) ? " \xB7 game is wary" : ""}`, risk: m === "rifle" });
+          const o = huntOdds(state3, m);
+          const why = canHunt(state3, m);
+          add(`hunt_${m}`, `Hunt with the ${m} (${HUNT_MINUTES / 60} h)`, { disabled: why, note: `${o.find}% find game \xB7 ${o.shot.pct}% hit a ${o.animal}${m === "rifle" ? " \xB7 loud" : ""}${isScared(state3) ? " \xB7 game is wary" : ""}`, risk: m === "rifle" });
         }
-        const w = state2.wild?.snares?.[spot.id];
-        if (w != null) {
-          const hours = (state2.time - w) / 60;
+        const w2 = state3.wild?.snares?.[spot.id];
+        if (w2 != null) {
+          const hours = (state3.time - w2) / 60;
           add("check_snare", "Check your snares", { disabled: hours < 12 && `Set ${Math.floor(hours)} h ago: wait for 12 h`, note: `set ${Math.floor(hours)} h ago` });
           add("take_snare", "Take up your snares");
         } else if (spot.game?.includes("rabbit")) {
-          const why = canSetSnare(state2);
+          const why = canSetSnare(state3);
           add("set_snare", "Set snares for rabbits (30 min)", { disabled: why, note: why ? void 0 : "check after a night" });
         }
       }
       add("go_home", "Walk home");
     }
     add("rest", "Rest 1 hour");
-    add("sleep", state2.location.kind === "home" ? `Sleep ${sleepWhere(state2)}\u2026` : state2.location.kind === "wild" ? "Sleep here on the ground\u2026" : state2.location.kind === "car" ? "Sleep in the car\u2026" : state2.location.kind === "street" ? "Sleep here by a wall\u2026" : "Sleep here on the floor\u2026");
-    if (state2.dog.stage === "joined") {
-      add("play_dog", `Play with ${state2.dog.name}`);
-      if (state2.dog.sick) {
-        const why = canTreatDog(state2);
-        add("treat_dog", `Treat ${state2.dog.name} (antibiotics)`, { disabled: why, note: why ? void 0 : "1 course of antibiotics" });
+    add("sleep", state3.location.kind === "home" ? `Sleep ${sleepWhere(state3)}\u2026` : state3.location.kind === "wild" ? "Sleep here on the ground\u2026" : state3.location.kind === "car" ? "Sleep in the car\u2026" : state3.location.kind === "street" ? "Sleep here by a wall\u2026" : "Sleep here on the floor\u2026");
+    if (state3.dog.stage === "joined") {
+      add("play_dog", `Play with ${state3.dog.name}`);
+      if (state3.dog.sick) {
+        const why = canTreatDog(state3);
+        add("treat_dog", `Treat ${state3.dog.name} (antibiotics)`, { disabled: why, note: why ? void 0 : "1 course of antibiotics" });
       }
-      if (loc.kind === "home") add("dog_follow", state2.dog.withPlayer ? `${state2.dog.name}: stay home` : `${state2.dog.name}: come with me`);
+      if (loc.kind === "home") add("dog_follow", state3.dog.withPlayer ? `${state3.dog.name}: stay home` : `${state3.dog.name}: come with me`);
     }
     return acts;
   }
-  function takeOffSlot(state2, slot) {
-    if (slot === "back" && state2.player.worn?.back && !canTakeOffPack(state2)) {
-      log(state2, "Your things will not fit in your pockets. Put some down before you take off the backpack.", "warn");
+  function takeOffSlot(state3, slot) {
+    if (slot === "back" && state3.player.worn?.back && !canTakeOffPack(state3)) {
+      log(state3, "Your things will not fit in your pockets. Put some down before you take off the backpack.", "warn");
       return false;
     }
-    const old = takeOff(state2.player, slot);
+    const old = takeOff(state3.player, slot);
     if (!old) return false;
-    addItem(state2.carried, old, 1);
-    log(state2, `You take off the ${itemName(old).toLowerCase()}.`);
-    advanceTime(state2, 2);
+    addItem(state3.carried, old, 1);
+    log(state3, `You take off the ${itemName(old).toLowerCase()}.`);
+    advanceTime(state3, 2);
     return true;
   }
-  function doAction(state2, id, arg) {
-    if (state2.dead) return;
+  function doAction(state3, id, arg) {
+    if (state3.dead) return;
     switch (id) {
       case "rest":
-        return rest(state2, 1);
+        return rest(state3, 1);
       case "sleep":
-        return sleep(state2, Number(arg) || 8);
+        return sleep(state3, Number(arg) || 8);
       case "search":
-        return searchZone(state2, arg);
+        return searchZone(state3, arg);
       case "force":
-        return forceEntry(state2);
+        return forceEntry(state3);
       case "counter":
-        return openCounter(state2);
+        return openCounter(state3);
       case "house":
-        return enterNearbyHouse(state2);
+        return enterNearbyHouse(state3);
       case "room":
-        return searchRoom(state2, arg);
+        return searchRoom(state3, arg);
       case "walk_inside":
-        return walkInside(state2, arg);
+        return walkInside(state3, arg);
       // Garden and heat (engine garden.js and home.js rules; the time cost is here).
       case "garden_plant":
-        if (state2.location.kind === "home" && plant(state2, String(arg))) advanceTime(state2, 30, "work");
+        if (state3.location.kind === "home" && plant(state3, String(arg))) advanceTime(state3, 30, "work");
         return;
       case "garden_water":
-        if (state2.location.kind === "home" && waterGarden(state2) > 0) advanceTime(state2, 15, "work");
+        if (state3.location.kind === "home" && waterGarden(state3) > 0) advanceTime(state3, 15, "work");
         return;
       case "garden_harvest":
-        if (state2.location.kind === "home" && Object.keys(harvest(state2)).length) advanceTime(state2, 30, "work");
+        if (state3.location.kind === "home" && Object.keys(harvest(state3)).length) advanceTime(state3, 30, "work");
         return;
       case "sleep_spot":
-        if (setSleepSpot(state2, String(arg))) log(state2, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
+        if (setSleepSpot(state3, String(arg))) log(state3, arg === "living" ? "You will sleep by the fire." : "You will sleep in the bedroom.");
         return;
       case "board_window": {
-        if (state2.location.kind !== "home") return;
-        const bag = (state2.home.storage.scrap_wood || 0) > 0 ? state2.home.storage : (state2.carried.scrap_wood || 0) > 0 ? state2.carried : null;
+        if (state3.location.kind !== "home") return;
+        const bag = (state3.home.storage.scrap_wood || 0) > 0 ? state3.home.storage : (state3.carried.scrap_wood || 0) > 0 ? state3.carried : null;
         if (!bag) {
-          log(state2, "You need scrap wood to board up a window.");
+          log(state3, "You need scrap wood to board up a window.");
           return;
         }
-        if (!boardWindow(state2, String(arg))) return;
+        if (!boardWindow(state3, String(arg))) return;
         addItem(bag, "scrap_wood", -1);
-        log(state2, "You nail scrap wood over the broken window. Less cold gets in.", "good");
-        advanceTime(state2, 30, "work");
+        log(state3, "You nail scrap wood over the broken window. Less cold gets in.", "good");
+        advanceTime(state3, 30, "work");
         return;
       }
       case "door": {
         const [room, closed] = String(arg).split(":");
-        if (state2.location.kind === "home" && setDoor(state2, room, closed === "1")) {
-          log(state2, closed === "1" ? "You close the door." : "You open the door.");
-          advanceTime(state2, 1);
+        if (state3.location.kind === "home" && setDoor(state3, room, closed === "1")) {
+          log(state3, closed === "1" ? "You close the door." : "You open the door.");
+          advanceTime(state3, 1);
         }
         return;
       }
       case "flashlight":
-        return toggleFlashlight(state2);
+        return toggleFlashlight(state3);
       case "pickup":
-        return pickUp(state2, arg);
+        return pickUp(state3, arg);
       case "see_zone":
-        return seeZone(state2, Number(arg));
+        return seeZone(state3, Number(arg));
       case "open_container":
-        return openContainer(state2, String(arg));
+        return openContainer(state3, String(arg));
       case "take_off":
-        return takeOffSlot(state2, String(arg));
+        return takeOffSlot(state3, String(arg));
       case "leave_house":
-        return leaveHouse(state2);
+        return leaveHouse(state3);
       case "go_home":
-        return goHome(state2);
+        return goHome(state3);
       case "go_place":
-        return goToPlace(state2, arg);
+        return goToPlace(state3, arg);
       case "go_spot":
-        return goToSpot(state2, arg);
+        return goToSpot(state3, arg);
       case "treat_dog": {
-        const ok = treatDog(state2);
-        if (ok) advanceTime(state2, 10);
+        const ok = treatDog(state3);
+        if (ok) advanceTime(state3, 10);
         return;
       }
       case "go_car": {
         const [cid, la, lo] = String(arg).split("|");
-        return goToCar(state2, cid, Number(la), Number(lo));
+        return goToCar(state3, cid, Number(la), Number(lo));
       }
       case "car_search":
-        return searchCar(state2);
+        return searchCar(state3);
       case "car_siphon":
-        return siphonGas(state2);
+        return siphonGas(state3);
       case "car_battery":
-        return takeCarBattery(state2);
+        return takeCarBattery(state3);
       case "car_wire":
-        return stripCarWire(state2);
+        return stripCarWire(state3);
       case "fish":
-        return fish(state2);
+        return fish(state3);
       case "hunt_bow":
-        return hunt(state2, "bow");
+        return hunt(state3, "bow");
       case "hunt_rifle":
-        return hunt(state2, "rifle");
+        return hunt(state3, "rifle");
       case "set_snare":
-        return setSnare(state2);
+        return setSnare(state3);
       case "check_snare":
-        return checkSnare(state2);
+        return checkSnare(state3);
       case "take_snare":
-        return takeUpSnare(state2);
+        return takeUpSnare(state3);
       case "play_dog":
-        return playWithDog(state2);
+        return playWithDog(state3);
       case "dog_follow":
-        return toggleDogFollow(state2);
+        return toggleDogFollow(state3);
       case "build":
-        return workOnProject(state2, arg);
+        return workOnProject(state3, arg);
       default:
-        return homeAction(state2, id);
+        return homeAction(state3, id);
     }
   }
 
@@ -8098,23 +8098,23 @@
   function exposure(cat, key, plan) {
     const r = mulberry32(hashString(`exposed:${key}`));
     if (r() >= (EXPOSED_CHANCE[cat] ?? 0.1)) return null;
-    const { w, d } = plan.size;
-    if (r() < 0.6) return { kind: "window", x: (r() - 0.5) * w * 0.6, z: -0.2 };
-    return { kind: "roof", x: (r() - 0.5) * w * 0.4, z: -d * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
+    const { w: w2, d: d2 } = plan.size;
+    if (r() < 0.6) return { kind: "window", x: (r() - 0.5) * w2 * 0.6, z: -0.2 };
+    return { kind: "roof", x: (r() - 0.5) * w2 * 0.4, z: -d2 * (0.35 + r() * 0.4), w: 1.6 + r() * 1.4, d: 1.4 + r() * 1.2 };
   }
   function wallBox(x1, z1, x2, z2) {
     return { x: (x1 + x2) / 2, z: (z1 + z2) / 2, w: Math.max(T, Math.abs(x2 - x1)), d: Math.max(T, Math.abs(z2 - z1)) };
   }
-  function outerWalls(W, D) {
-    const h2 = W / 2;
+  function outerWalls(W, D3) {
+    const h3 = W / 2;
     return [
-      wallBox(-h2, 0, -1, 0),
-      wallBox(1, 0, h2, 0),
+      wallBox(-h3, 0, -1, 0),
+      wallBox(1, 0, h3, 0),
       // front, with door gap
-      wallBox(-h2, -D, h2, -D),
+      wallBox(-h3, -D3, h3, -D3),
       // back
-      wallBox(-h2, 0, -h2, -D),
-      wallBox(h2, 0, h2, -D)
+      wallBox(-h3, 0, -h3, -D3),
+      wallBox(h3, 0, h3, -D3)
       // sides
     ];
   }
@@ -8126,14 +8126,14 @@
     const SHELF = 1;
     const W = Math.max(8, aisles * AISLE + (aisles + 1) * SHELF + 6);
     const back = counter ? 5 : 3;
-    const D = cfg.front + cfg.len + back;
-    const plan = { kind: "hall", size: { w: W, d: D, h: cat === "convenience" || cat === "gas" ? 3 : 5 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const D3 = cfg.front + cfg.len + back;
+    const plan = { kind: "hall", size: { w: W, d: D3, h: cat === "convenience" || cat === "gas" ? 3 : 5 }, walls: outerWalls(W, D3), fixtures: [], spots: [], bodies: [], debris: [] };
     const rowZ = -(cfg.front + cfg.len / 2);
     const total = aisles * AISLE + (aisles + 1) * SHELF;
     const mid = Math.floor((aisles - 1) / 2);
-    let x = -(mid * (SHELF + AISLE) + SHELF + AISLE / 2);
+    let x2 = -(mid * (SHELF + AISLE) + SHELF + AISLE / 2);
     for (let i = 0; i <= aisles; i++) {
-      const cx = x + SHELF / 2;
+      const cx = x2 + SHELF / 2;
       const tipped = cat !== "gas" && cat !== "convenience" && r() < 0.08;
       plan.fixtures.push({ type: cfg.fixture, x: cx, z: rowZ, w: SHELF, d: cfg.len, h: cfg.fixture === "clothes" ? 1.5 : 2, leftZone: i - 1 >= 0 ? i - 1 : null, rightZone: i < aisles ? i : null, tipped, solid: true });
       if (cfg.fixture === "shelf" && !tipped) plan.fixtures.push({ type: "endcap", x: cx, z: rowZ + cfg.len / 2 + 0.28, w: SHELF, d: 0.55, h: 1.7, solid: true });
@@ -8141,7 +8141,7 @@
         const ax = cx + SHELF / 2 + AISLE / 2;
         plan.spots.push({ zone: i, x: ax, z: rowZ, label: `${CATEGORIES[cat].zoneName} ${i + 1}`, area: { x1: ax - AISLE / 2, x2: ax + AISLE / 2, z1: rowZ - cfg.len / 2 - 0.5, z2: rowZ + cfg.len / 2 + 0.5 } });
       }
-      x += SHELF + AISLE;
+      x2 += SHELF + AISLE;
     }
     const nReg = Math.max(1, Math.min(4, Math.floor(W / 6)));
     for (let i = 0; i < nReg; i++) {
@@ -8150,12 +8150,12 @@
       plan.fixtures.push({ type: "checkout", x: side * (2.6 + k * 2.6), z: -cfg.front / 2, w: 0.9, d: 2.2, h: 1, solid: true });
     }
     if (cat === "supermarket") {
-      plan.fixtures.push({ type: "coolers", x: 0, z: -D + 0.7, w: W - 2, d: 1, h: 2.1, solid: true });
+      plan.fixtures.push({ type: "coolers", x: 0, z: -D3 + 0.7, w: W - 2, d: 1, h: 2.1, solid: true });
       for (let i = 0; i < 3; i++) plan.debris.push({ kind: "cart", x: (r() - 0.5) * (W - 3), z: -1.5 - r() * (cfg.front - 2.5), rot: r() * 6.28 });
     }
     if (counter) {
       const lz2 = CATEGORIES[cat].lockedZone;
-      const cz = -D + 2.2;
+      const cz = -D3 + 2.2;
       plan.fixtures.push({ type: "rx_counter", x: 0, z: cz, w: W - 4, d: 0.9, h: 1.1, solid: true });
       plan.fixtures.push({ type: "gate", x: 0, z: cz + 0.6, w: W - 4, d: 0.1, h: 2.6, zone: zones - 1, solid: false });
       plan.spots.push({ zone: zones - 1, x: 0, z: cz + 1.4, label: lz2.name, counter: true });
@@ -8173,8 +8173,8 @@
     const rows = Math.ceil(zones / 2);
     const ENTRY = house ? 2.2 : 3.4;
     const W = HALLW + 2 * RW;
-    const D = ENTRY + rows * RD;
-    const plan = { kind: "rooms", size: { w: W, d: D, h: house ? 2.6 : 3 }, walls: outerWalls(W, D), fixtures: [], spots: [], bodies: [], debris: [] };
+    const D3 = ENTRY + rows * RD;
+    const plan = { kind: "rooms", size: { w: W, d: D3, h: house ? 2.6 : 3 }, walls: outerWalls(W, D3), fixtures: [], spots: [], bodies: [], debris: [] };
     const hx = HALLW / 2;
     const DOOR = 1.1;
     const names = house ? HOUSE_ROOMS : null;
@@ -8211,16 +8211,16 @@
     const wallX = xout - side * 0.55;
     const zMin = cz - RD / 2 + 0.15;
     const zMax = cz + RD / 2 - 0.15;
-    const hits = (x, z, w, d) => plan.fixtures.some((f) => f.zone === zone && f.solid && Math.abs(x - f.x) < (w + f.w) / 2 - 0.02 && Math.abs(z - f.z) < (d + f.d) / 2 - 0.02);
-    const put = (type, x, z, w, d, h2, extra = {}) => {
-      let zz = z;
-      if (hits(x, zz, w, d)) {
+    const hits = (x2, z2, w2, d2) => plan.fixtures.some((f) => f.zone === zone && f.solid && Math.abs(x2 - f.x) < (w2 + f.w) / 2 - 0.02 && Math.abs(z2 - f.z) < (d2 + f.d) / 2 - 0.02);
+    const put = (type, x2, z2, w2, d2, h3, extra = {}) => {
+      let zz = z2;
+      if (hits(x2, zz, w2, d2)) {
         const tries = [];
-        for (let k = 1; k <= 12; k++) tries.push(z + k * 0.25, z - k * 0.25);
-        zz = tries.find((t) => t - d / 2 >= zMin && t + d / 2 <= zMax && !hits(x, t, w, d));
+        for (let k = 1; k <= 12; k++) tries.push(z2 + k * 0.25, z2 - k * 0.25);
+        zz = tries.find((t) => t - d2 / 2 >= zMin && t + d2 / 2 <= zMax && !hits(x2, t, w2, d2));
         if (zz == null) return;
       }
-      plan.fixtures.push({ type, x, z: zz, w, d, h: h2, zone, solid: true, ...extra });
+      plan.fixtures.push({ type, x: x2, z: zz, w: w2, d: d2, h: h3, zone, solid: true, ...extra });
     };
     let items;
     if (cat === "house") items = HOUSE_FURNITURE[name] || ["cabinet"];
@@ -8249,14 +8249,14 @@
     }
   }
   function addDebris(plan, r) {
-    const { w, d } = plan.size;
-    const n = Math.round(w * d / (plan.kind === "hall" ? 10 : 7));
+    const { w: w2, d: d2 } = plan.size;
+    const n = Math.round(w2 * d2 / (plan.kind === "hall" ? 10 : 7));
     for (let i = 0; i < n; i++) {
-      const x = (r() - 0.5) * (w - 1);
-      const z = -0.8 - r() * (d - 1.6);
-      if (Math.abs(x) < 1.2 && z > -2.5) continue;
+      const x2 = (r() - 0.5) * (w2 - 1);
+      const z2 = -0.8 - r() * (d2 - 1.6);
+      if (Math.abs(x2) < 1.2 && z2 > -2.5) continue;
       const kind = r() < 0.5 ? "box" : r() < 0.6 ? "can" : "paper";
-      plan.debris.push({ kind, x, z, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
+      plan.debris.push({ kind, x: x2, z: z2, s: 0.15 + r() * 0.35, rot: r() * 6.28 });
     }
   }
   var HOME_PROJECT_SLOTS = {
@@ -8287,24 +8287,24 @@
       const side = sp.x > 0 ? 1 : -1;
       const xin = side > 0 ? a.x1 : a.x2;
       const cx = (a.x1 + a.x2) / 2;
-      let x;
-      let z;
+      let x2;
+      let z2;
       if (s.slot === "A" || s.slot === "B") {
-        x = xin + side * (s.w / 2 + 0.15);
+        x2 = xin + side * (s.w / 2 + 0.15);
         const gap = s.y ? 0.02 : 0.15;
-        z = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
+        z2 = s.slot === "A" ? a.z2 - s.d / 2 - gap : a.z1 + s.d / 2 + gap;
       } else if (s.slot === "W") {
-        x = cx + (s.dx || 0) * side;
-        z = a.z1 + s.d / 2 + 0.02;
+        x2 = cx + (s.dx || 0) * side;
+        z2 = a.z1 + s.d / 2 + 0.02;
       } else {
-        x = cx;
-        z = (a.z1 + a.z2) / 2;
+        x2 = cx;
+        z2 = (a.z1 + a.z2) / 2;
       }
       const isBuilt = !!built2(id);
       const flat = s.slot === "W" || s.slot === "C";
-      const f = { type: "proj", proj: id, built: isBuilt, x, z, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
+      const f = { type: "proj", proj: id, built: isBuilt, x: x2, z: z2, w: s.w, d: s.d, h: s.h, y: s.slot === "C" ? 2.45 : s.y || 0, zone: sp.zone, solid: isBuilt && !flat && !s.y };
       plan.fixtures.push(f);
-      plan.projects.push({ id, x, z, room: s.room, built: isBuilt, y: f.y, h: s.h });
+      plan.projects.push({ id, x: x2, z: z2, room: s.room, built: isBuilt, y: f.y, h: s.h });
     }
     const g = roomOf("garage");
     if (g) {
@@ -8318,41 +8318,41 @@
   var QUARTS_PER_GAL = 4;
   var HEATER_KW = 1.5;
   function addBag(bag, totals) {
-    for (const [id, q] of Object.entries(bag || {})) {
+    for (const [id, q2] of Object.entries(bag || {})) {
       const it = ITEMS[id];
-      if (!it || q <= 0) continue;
-      if (it.kind === "food" && it.cal) totals.cal += it.cal * q;
-      if (it.water) totals.water += it.water * (q / (it.portion || 1));
+      if (!it || q2 <= 0) continue;
+      if (it.kind === "food" && it.cal) totals.cal += it.cal * q2;
+      if (it.water) totals.water += it.water * (q2 / (it.portion || 1));
     }
   }
-  function stockSummary(state2) {
+  function stockSummary(state3) {
     const t = { cal: 0, water: 0 };
-    addBag(state2.carried, t);
-    addBag(state2.home.storage, t);
-    const h2 = state2.home;
-    t.water += (h2.tankGal + h2.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
+    addBag(state3.carried, t);
+    addBag(state3.home.storage, t);
+    const h3 = state3.home;
+    t.water += (h3.tankGal + h3.safeGal) * QUARTS_PER_GAL * WATER_PER_QUART;
     const foodDayPts = FOOD_LOSS_PER_HOUR * 24;
     const waterDayPts = WATER_LOSS_PER_HOUR * 24;
     return {
       foodDays: t.cal / CAL_PER_FOOD_POINT / foodDayPts,
       waterDays: t.water / waterDayPts,
-      rawGal: h2.rawGal
+      rawGal: h3.rawGal
     };
   }
-  function stockLine(state2) {
-    const s = stockSummary(state2);
-    const d = (x) => x < 1 ? `${Math.round(x * 24)} h` : `${x < 10 ? x.toFixed(1) : Math.round(x)} days`;
-    return `Food: ${d(s.foodDays)} \xB7 Water: ${d(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
+  function stockLine(state3) {
+    const s = stockSummary(state3);
+    const d2 = (x2) => x2 < 1 ? `${Math.round(x2 * 24)} h` : `${x2 < 10 ? x2.toFixed(1) : Math.round(x2)} days`;
+    return `Food: ${d2(s.foodDays)} \xB7 Water: ${d2(s.waterDays)}${s.rawGal >= 0.25 ? ` (+${s.rawGal.toFixed(1)} gal to boil)` : ""}`;
   }
-  function powerSummary(state2) {
-    const h2 = state2.home;
-    const inToday = solarToday(state2);
-    const outKw = h2.heaterOn ? HEATER_KW : 0;
+  function powerSummary(state3) {
+    const h3 = state3.home;
+    const inToday = solarToday(state3);
+    const outKw = h3.heaterOn ? HEATER_KW : 0;
     return {
       inToday,
       outKw,
-      hoursLeft: outKw > 0 ? h2.battery / outKw : null,
-      heaterHoursFull: h2.battery / HEATER_KW
+      hoursLeft: outKw > 0 ? h3.battery / outKw : null,
+      heaterHoursFull: h3.battery / HEATER_KW
     };
   }
 
@@ -8370,8 +8370,8 @@
     heat_wave: { cloud: 0, precip: "none", strength: 0, fog: 0.1, haze: "#f3d9a4" },
     smoke: { cloud: 0.4, precip: "none", strength: 0, fog: 0.5, haze: "#d9822b" }
   };
-  var clamp01 = (v) => Math.max(0, Math.min(1, v));
-  function sceneEnv(state2, t = state2.time) {
+  var clamp01 = (v2) => Math.max(0, Math.min(1, v2));
+  function sceneEnv(state3, t = state3.time) {
     const m = (t % 1440 + 1440) % 1440;
     const sun = sunFor(t);
     const rise = sun.rise;
@@ -8393,8 +8393,8 @@
     }
     const noon = (rise + set) / 2;
     const sunHeight = m <= rise || m >= set ? 0 : clamp01(Math.sin(Math.PI * (m - rise) / (set - rise)));
-    const w = state2.weather || { type: "clear", wind: 0 };
-    const look = WEATHER_LOOK[w.type] || WEATHER_LOOK.clear;
+    const w2 = state3.weather || { type: "clear", wind: 0 };
+    const look = WEATHER_LOOK[w2.type] || WEATHER_LOOK.clear;
     return {
       minuteOfDay: m,
       hour: m / 60,
@@ -8404,7 +8404,7 @@
       daylight,
       sunHeight,
       phase,
-      weather: w.type,
+      weather: w2.type,
       cloud: look.cloud,
       precip: look.precip,
       precipStrength: look.strength,
@@ -8413,8 +8413,8 @@
       // sky tint for smoke or heat (CSS color), or null
       ice: !!look.ice,
       // ice storm: glazed surfaces
-      windMph: w.wind || 0,
-      airF: Math.round(airTemp(state2, t)),
+      windMph: w2.wind || 0,
+      airF: Math.round(airTemp(state3, t)),
       season: seasonOf(t),
       outdoorLight: daylight * (1 - 0.6 * look.cloud)
     };
@@ -8432,19 +8432,19 @@
       return null;
     }
   }
-  function write(k, v) {
+  function write(k, v2) {
     try {
-      if (v == null) localStorage.removeItem(k);
-      else localStorage.setItem(k, v);
+      if (v2 == null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v2);
     } catch {
     }
   }
   function getQualityChoice() {
-    const v = read(KEY);
-    return QUALITY_CHOICES.includes(v) ? v : "auto";
+    const v2 = read(KEY);
+    return QUALITY_CHOICES.includes(v2) ? v2 : "auto";
   }
-  function setQualityChoice(v) {
-    write(KEY, QUALITY_CHOICES.includes(v) && v !== "auto" ? v : null);
+  function setQualityChoice(v2) {
+    write(KEY, QUALITY_CHOICES.includes(v2) && v2 !== "auto" ? v2 : null);
     write(AUTO_KEY, null);
   }
 
@@ -8514,11 +8514,11 @@
     sleep_spot: "drop"
   };
   var USE_SFX = { eat: "eat", drink: "drink", boil: "drink", wear: "drop" };
-  function sfxFor(kind, a, b) {
+  function sfxFor(kind, a, b2) {
     if (kind === "take") return "pickup";
     if (kind === "takeall") return "takeall";
     if (kind === "drop") return "drop";
-    if (kind === "use") return USE_SFX[b] || "click";
+    if (kind === "use") return USE_SFX[b2] || "click";
     if (kind === "action") return ACTION_SFX[a] || null;
     return null;
   }
@@ -8543,8 +8543,8 @@
   }
   var SOUND_DEFAULTS = { volume: 0.7, mute: false };
   function cleanSettings(s) {
-    const v = Number(s?.volume);
-    return { volume: Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : SOUND_DEFAULTS.volume, mute: !!s?.mute };
+    const v2 = Number(s?.volume);
+    return { volume: Number.isFinite(v2) ? Math.min(1, Math.max(0, v2)) : SOUND_DEFAULTS.volume, mute: !!s?.mute };
   }
 
   // src/ui/sound.js
@@ -8622,23 +8622,23 @@
     }
     const p = SFX[name];
     if (!p) return;
-    let v = variants[name];
-    if (!v) v = variants[name] = [];
-    if (v.length < 3) {
+    let v2 = variants[name];
+    if (!v2) v2 = variants[name] = [];
+    if (v2.length < 3) {
       const s = A.ZZFX.buildSamples(...p);
-      const b = A.ctx.createBuffer(1, s.length, A.ctx.sampleRate);
-      b.getChannelData(0).set(s);
-      v.push(b);
+      const b2 = A.ctx.createBuffer(1, s.length, A.ctx.sampleRate);
+      b2.getChannelData(0).set(s);
+      v2.push(b2);
     }
     const src = A.ctx.createBufferSource();
-    src.buffer = v[Math.floor(Math.random() * v.length)];
+    src.buffer = v2[Math.floor(Math.random() * v2.length)];
     const g = A.ctx.createGain();
     g.gain.value = 0.6 * gain;
     src.connect(g).connect(A.Howler.masterGain);
     src.start();
   }
-  function soundForAction(kind, a, b) {
-    const n = sfxFor(kind, a, b);
+  function soundForAction(kind, a, b2) {
+    const n = sfxFor(kind, a, b2);
     if (n) playSfx(n);
   }
   var hitTimer = null;
@@ -8648,12 +8648,12 @@
     if (!A) return;
     const lv = ambience(scene, where);
     for (const name of LOOPS) {
-      const L = A.loops[name];
+      const L2 = A.loops[name];
       const to = lv[name] || 0;
-      if (Math.abs(to - L.level) < 0.01) continue;
-      if (to > 0 && !L.howl.playing()) L.howl.play();
-      L.howl.fade(L.level, to, 1500);
-      L.level = to;
+      if (Math.abs(to - L2.level) < 0.01) continue;
+      if (to > 0 && !L2.howl.playing()) L2.howl.play();
+      L2.howl.fade(L2.level, to, 1500);
+      L2.level = to;
     }
     const every = rainHitEvery(scene, where.inside);
     clearTimeout(hitTimer);
@@ -8669,140 +8669,140 @@
     const sec = { rain: 6, wind: 8, fire: 6, hum: 2, crows: 12 }[name];
     const n = Math.round(rate * sec);
     const fade = Math.round(rate * 0.5);
-    const x = new Float32Array(n + fade);
+    const x2 = new Float32Array(n + fade);
     let r = 12345 + name.length * 77;
     const rnd = () => {
       r = r * 1103515245 + 12345 & 2147483647;
       return r / 2147483647;
     };
-    const L = x.length;
+    const L2 = x2.length;
     if (name === "rain") {
       let lp = 0;
-      for (let i = 0; i < L; i++) {
+      for (let i = 0; i < L2; i++) {
         lp += 0.45 * (rnd() * 2 - 1 - lp);
-        x[i] = lp * 0.45;
+        x2[i] = lp * 0.45;
       }
       for (let k = 0; k < sec * 40; k++) {
-        const at = Math.floor(rnd() * (L - 400));
+        const at = Math.floor(rnd() * (L2 - 400));
         const amp = 0.1 + rnd() * 0.2;
-        for (let j = 0; j < 300; j++) x[at + j] += (rnd() * 2 - 1) * amp * Math.exp(-j / 50);
+        for (let j2 = 0; j2 < 300; j2++) x2[at + j2] += (rnd() * 2 - 1) * amp * Math.exp(-j2 / 50);
       }
     } else if (name === "wind") {
-      let b = 0;
-      for (let i = 0; i < L; i++) {
-        b = 0.995 * b + 0.05 * (rnd() * 2 - 1);
+      let b2 = 0;
+      for (let i = 0; i < L2; i++) {
+        b2 = 0.995 * b2 + 0.05 * (rnd() * 2 - 1);
         const t = i / n;
         const gust = 0.45 + 0.3 * Math.sin(2 * Math.PI * t) + 0.2 * Math.sin(2 * Math.PI * 3 * t + 1);
-        x[i] = b * gust * 1.6;
+        x2[i] = b2 * gust * 1.6;
       }
     } else if (name === "fire") {
-      let b = 0;
-      for (let i = 0; i < L; i++) {
-        b = 0.99 * b + 0.03 * (rnd() * 2 - 1);
-        x[i] = b * 0.9;
+      let b2 = 0;
+      for (let i = 0; i < L2; i++) {
+        b2 = 0.99 * b2 + 0.03 * (rnd() * 2 - 1);
+        x2[i] = b2 * 0.9;
       }
       for (let k = 0; k < sec * 9; k++) {
-        const at = Math.floor(rnd() * (L - 900));
+        const at = Math.floor(rnd() * (L2 - 900));
         const amp = 0.15 + rnd() * 0.35;
-        for (let j = 0; j < 800; j++) x[at + j] += (rnd() * 2 - 1) * amp * Math.exp(-j / (40 + rnd() * 80));
+        for (let j2 = 0; j2 < 800; j2++) x2[at + j2] += (rnd() * 2 - 1) * amp * Math.exp(-j2 / (40 + rnd() * 80));
       }
     } else if (name === "hum") {
-      for (let i = 0; i < L; i++) {
+      for (let i = 0; i < L2; i++) {
         const t = i / rate;
-        x[i] = 0.35 * Math.sin(2 * Math.PI * 60 * t) + 0.18 * Math.sin(2 * Math.PI * 120 * t) + 0.06 * Math.sin(2 * Math.PI * 180 * t) + 0.01 * (rnd() * 2 - 1);
+        x2[i] = 0.35 * Math.sin(2 * Math.PI * 60 * t) + 0.18 * Math.sin(2 * Math.PI * 120 * t) + 0.06 * Math.sin(2 * Math.PI * 180 * t) + 0.01 * (rnd() * 2 - 1);
       }
     } else if (name === "crows") {
       const caw = [0.5, 0.1, 520, 0.02, 0.12, 0.12, 2, 3, -6, 0, 0, 0, 0, 0.8, 0, 0.15, 0, 0.6, 0.03, 0, 1600];
       for (const at of [0.8, 1.4, 6.5, 7, 7.5]) {
         const s = ZZFX2.buildSamples(...caw);
         const o = Math.floor(at * rate);
-        for (let j = 0; j < s.length && o + j < L; j++) x[o + j] += s[j] * 0.6;
+        for (let j2 = 0; j2 < s.length && o + j2 < L2; j2++) x2[o + j2] += s[j2] * 0.6;
       }
     }
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {
       if (i < fade) {
         const t = i / fade;
-        out[i] = x[i] * t + x[n + i] * (1 - t);
-      } else out[i] = x[i];
+        out[i] = x2[i] * t + x2[n + i] * (1 - t);
+      } else out[i] = x2[i];
     }
     for (let i = 0; i < n; i++) out[i] = Math.max(-1, Math.min(1, out[i]));
     return out;
   }
   function wavUrl(s, rate) {
     const buf = new ArrayBuffer(44 + s.length * 2);
-    const d = new DataView(buf);
+    const d2 = new DataView(buf);
     const str = (o, t) => {
-      for (let i = 0; i < t.length; i++) d.setUint8(o + i, t.charCodeAt(i));
+      for (let i = 0; i < t.length; i++) d2.setUint8(o + i, t.charCodeAt(i));
     };
     str(0, "RIFF");
-    d.setUint32(4, 36 + s.length * 2, true);
+    d2.setUint32(4, 36 + s.length * 2, true);
     str(8, "WAVE");
     str(12, "fmt ");
-    d.setUint32(16, 16, true);
-    d.setUint16(20, 1, true);
-    d.setUint16(22, 1, true);
-    d.setUint32(24, rate, true);
-    d.setUint32(28, rate * 2, true);
-    d.setUint16(32, 2, true);
-    d.setUint16(34, 16, true);
+    d2.setUint32(16, 16, true);
+    d2.setUint16(20, 1, true);
+    d2.setUint16(22, 1, true);
+    d2.setUint32(24, rate, true);
+    d2.setUint32(28, rate * 2, true);
+    d2.setUint16(32, 2, true);
+    d2.setUint16(34, 16, true);
     str(36, "data");
-    d.setUint32(40, s.length * 2, true);
-    for (let i = 0; i < s.length; i++) d.setInt16(44 + i * 2, Math.round(s[i] * 32767), true);
+    d2.setUint32(40, s.length * 2, true);
+    for (let i = 0; i < s.length; i++) d2.setInt16(44 + i * 2, Math.round(s[i] * 32767), true);
     return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
 
   // src/engine/preview.js
   var DAY_START = 300;
-  function weatherEffects(state2) {
-    const w = state2.weather;
-    const info = weatherInfo(state2);
-    const p = state2.player;
+  function weatherEffects(state3) {
+    const w2 = state3.weather;
+    const info = weatherInfo(state3);
+    const p = state3.player;
     const out = [];
-    if (w.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
+    if (w2.type === "snow") out.push({ id: "slow", text: "Walking is slower (snow).", level: "warn" });
     if (info.wetAfter) {
-      const perHour = wetGainPerHour(p, w.type, info.wetAfter);
+      const perHour = wetGainPerHour(p, w2.type, info.wetAfter);
       const toWet = perHour > 0 ? Math.max(0, (WET_LIMIT - (p.wetness || 0)) / perHour) * 60 : Infinity;
       if (perHour <= 0) out.push({ id: "wet", text: "You stay dry outside.", level: "ok" });
       else if (toWet === 0) out.push({ id: "wet", text: "You are wet already. Outside you get wetter.", level: "danger" });
       else out.push({ id: "wet", text: `Outside you are wet through after about ${formatDuration(toWet)}.`, level: toWet < 60 ? "warn" : "ok" });
     }
-    const env = environment(state2, "walk");
-    const chill = Math.round(feltTemp(state2, "walk", { ...env, wind: 0 }) - feltTemp(state2, "walk", env));
+    const env = environment(state3, "walk");
+    const chill = Math.round(feltTemp(state3, "walk", { ...env, wind: 0 }) - feltTemp(state3, "walk", env));
     if (chill >= 3) {
-      out.push({ id: "wind", text: `Wind ${w.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w.wind >= 30 ? "danger" : "warn" });
+      out.push({ id: "wind", text: `Wind ${w2.wind} mph: outside it feels ${chill} \xB0F colder.`, level: w2.wind >= 30 ? "danger" : "warn" });
     }
-    for (const h2 of activeHazards(state2)) {
-      const left = formatDuration(h2.endsAt - state2.time);
-      if (h2.walk) out.push({ id: `hz_${h2.id}`, text: `Walking is slower: ${h2.label} for about another ${left}.`, level: "warn" });
-      if (h2.colder) out.push({ id: `hz_${h2.id}`, text: `Cold snap: outside is ${h2.colder} \xB0F colder for about another ${left}.`, level: "danger" });
+    for (const h3 of activeHazards(state3)) {
+      const left = formatDuration(h3.endsAt - state3.time);
+      if (h3.walk) out.push({ id: `hz_${h3.id}`, text: `Walking is slower: ${h3.label} for about another ${left}.`, level: "warn" });
+      if (h3.colder) out.push({ id: `hz_${h3.id}`, text: `Cold snap: outside is ${h3.colder} \xB0F colder for about another ${left}.`, level: "danger" });
     }
     return out;
   }
   function nextDayStart(t) {
     return (gameDay(t) + 1) * 1440 + DAY_START;
   }
-  function weatherOutlook(state2, t = state2.time) {
-    const w = state2.weather;
+  function weatherOutlook(state3, t = state3.time) {
+    const w2 = state3.weather;
     const next2 = nextDayStart(t);
     return {
-      type: w.type,
-      label: WEATHER_TYPES[w.type].label,
-      airF: Math.round(airTemp(state2, t)),
-      windMph: w.wind,
-      highF: Math.round(w.high),
-      lowF: Math.round(w.low),
+      type: w2.type,
+      label: WEATHER_TYPES[w2.type].label,
+      airF: Math.round(airTemp(state3, t)),
+      windMph: w2.wind,
+      highF: Math.round(w2.high),
+      lowF: Math.round(w2.low),
       night: isNight(t),
-      effects: weatherEffects(state2),
+      effects: weatherEffects(state3),
       // The next weather change: the weather rolls once a day at 5 AM.
       // Tomorrow's low is known now (it is the end of today's temperature curve).
       // The low shown is the real low of the curve (with a cold snap, if one is on).
-      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w.nextLow - hazardColder(state2, next2)) }
+      next: { at: next2, atText: formatClock(next2), inMinutes: Math.round(next2 - t), lowF: Math.round(w2.nextLow - hazardColder(state3, next2)) }
     };
   }
-  function actionTiming(state2, minutes) {
-    const end = state2.time + minutes;
-    const next2 = nextDayStart(state2.time);
+  function actionTiming(state3, minutes) {
+    const end = state3.time + minutes;
+    const next2 = nextDayStart(state3.time);
     const crosses = end >= next2;
     return {
       minutes,
@@ -8813,60 +8813,60 @@
       dayStartText: crosses ? `The new day starts at ${formatClock(next2)}: the weather can change.` : null
     };
   }
-  function tripPreview(state2, dest) {
-    const trip = estimateTrip(state2, dest);
-    const timing = actionTiming(state2, trip.minutes);
+  function tripPreview(state3, dest) {
+    const trip = estimateTrip(state3, dest);
+    const timing = actionTiming(state3, trip.minutes);
     return {
       miles: trip.miles,
       minutes: trip.minutes,
       energy: trip.energy,
       mph: trip.mph,
       slowBecause: trip.why,
-      weather: weatherOutlook(state2),
+      weather: weatherOutlook(state3),
       darkOnArrival: isNight(timing.end),
       ...timing
     };
   }
 
   // src/engine/game.js
-  function perform(state2, kind, a, b, c) {
-    if (state2.dead) return;
-    activity.begin(state2, [kind, a, b].filter((v) => v != null && typeof v !== "object").join(":"));
+  function perform(state3, kind, a, b2, c) {
+    if (state3.dead) return;
+    activity.begin(state3, [kind, a, b2].filter((v2) => v2 != null && typeof v2 !== "object").join(":"));
     try {
-      run(state2, kind, a, b, c);
+      run(state3, kind, a, b2, c);
     } finally {
-      activity.end(state2);
+      activity.end(state3);
     }
   }
-  function run(state2, kind, a, b, c) {
+  function run(state3, kind, a, b2, c) {
     switch (kind) {
       case "action":
-        doAction(state2, a, b);
+        doAction(state3, a, b2);
         break;
       case "use":
-        useItem(state2, a, b, c);
+        useItem(state3, a, b2, c);
         break;
       case "take":
-        takeItem(state2, a, b);
+        takeItem(state3, a, b2);
         break;
       case "takeall":
-        takeAll(state2);
+        takeAll(state3);
         break;
       case "drop":
-        dropItem(state2, a, b);
+        dropItem(state3, a, b2);
         break;
       case "namedog":
-        nameDog(state2, a);
+        nameDog(state3, a);
         break;
       default:
     }
-    afterAction(state2);
+    afterAction(state3);
   }
-  function afterAction(state2) {
-    const p = state2.player;
-    if (!state2.dead && p.energy <= 0) {
-      log(state2, "You are too tired to stay awake. You fall asleep where you are.", "warn");
-      advanceTime(state2, 240, "sleep");
+  function afterAction(state3) {
+    const p = state3.player;
+    if (!state3.dead && p.energy <= 0) {
+      log(state3, "You are too tired to stay awake. You fall asleep where you are.", "warn");
+      advanceTime(state3, 240, "sleep");
     }
   }
 
@@ -8881,11 +8881,11 @@
       return null;
     }
   }
-  function saveGame(state2) {
+  function saveGame(state3) {
     const s = store();
     if (!s) return false;
     try {
-      s.setItem(KEY2, JSON.stringify(state2));
+      s.setItem(KEY2, JSON.stringify(state3));
       return true;
     } catch {
       return false;
@@ -8900,15 +8900,15 @@
     let raw;
     try {
       raw = s.getItem(KEY2);
-    } catch (err) {
-      problem = String(err);
+    } catch (err2) {
+      problem = String(err2);
       return null;
     }
     if (!raw) return null;
     try {
       return parseSave(raw);
-    } catch (err) {
-      problem = err?.message || String(err);
+    } catch (err2) {
+      problem = err2?.message || String(err2);
       try {
         s.setItem(UNREADABLE_KEY, raw);
         s.removeItem(KEY2);
@@ -8932,20 +8932,20 @@
     } catch {
     }
   }
-  function recordRun(state2) {
+  function recordRun(state3) {
     const s = store();
-    if (!s || !state2.dead) return [];
+    if (!s || !state3.dead) return [];
     let runs = [];
     try {
       runs = JSON.parse(s.getItem(RUNS_KEY) || "[]");
     } catch {
       runs = [];
     }
-    if (!runs.some((r) => r.seed === state2.seed && r.time === state2.dead.time)) {
-      runs.push({ seed: state2.seed, time: state2.dead.time, days: state2.dead.days, cause: state2.dead.cause, miles: Math.round(state2.stats.miles * 10) / 10, dog: state2.dog.name });
-      runs.sort((a, b) => b.days - a.days);
+    if (!runs.some((r) => r.seed === state3.seed && r.time === state3.dead.time)) {
+      runs.push({ seed: state3.seed, time: state3.dead.time, days: state3.dead.days, cause: state3.dead.cause, miles: Math.round(state3.stats.miles * 10) / 10, dog: state3.dog.name });
+      runs.sort((a, b2) => b2.days - a.days);
       runs = runs.slice(0, 10);
-      saveLegacy(addRun(loadLegacy(), state2));
+      saveLegacy(addRun(loadLegacy(), state3));
       try {
         s.setItem(RUNS_KEY, JSON.stringify(runs));
       } catch {
@@ -8989,36 +8989,36 @@
     const s = str.trim().toLowerCase();
     if (!COLOR_RE.test(s)) return null;
     if (s[0] === "#") {
-      let h2 = s.slice(1);
-      if (h2.length === 3 || h2.length === 4) h2 = [...h2].map((c) => c + c).join("");
-      if (h2.length !== 6 && h2.length !== 8) return null;
-      const n = (i) => parseInt(h2.slice(i, i + 2), 16);
-      return { r: n(0), g: n(2), b: n(4), a: h2.length === 8 ? n(6) / 255 : 1 };
+      let h3 = s.slice(1);
+      if (h3.length === 3 || h3.length === 4) h3 = [...h3].map((c) => c + c).join("");
+      if (h3.length !== 6 && h3.length !== 8) return null;
+      const n = (i) => parseInt(h3.slice(i, i + 2), 16);
+      return { r: n(0), g: n(2), b: n(4), a: h3.length === 8 ? n(6) / 255 : 1 };
     }
-    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v) => parseFloat(v));
+    const nums = s.slice(s.indexOf("(") + 1, -1).split(/[\s,/]+/).filter(Boolean).map((v2) => parseFloat(v2));
     if (nums.length < 3 || nums.some(Number.isNaN)) return null;
     const a = nums.length > 3 ? nums[3] : 1;
     if (s.startsWith("rgb")) return { r: nums[0], g: nums[1], b: nums[2], a };
     return { ...hslToRgb(nums[0], nums[1] / 100, nums[2] / 100), a };
   }
-  function hslToRgb(h2, s, l) {
-    h2 = (h2 % 360 + 360) % 360;
+  function hslToRgb(h3, s, l) {
+    h3 = (h3 % 360 + 360) % 360;
     const c = (1 - Math.abs(2 * l - 1)) * s;
-    const x = c * (1 - Math.abs(h2 / 60 % 2 - 1));
+    const x2 = c * (1 - Math.abs(h3 / 60 % 2 - 1));
     const m = l - c / 2;
-    const [r, g, b] = h2 < 60 ? [c, x, 0] : h2 < 120 ? [x, c, 0] : h2 < 180 ? [0, c, x] : h2 < 240 ? [0, x, c] : h2 < 300 ? [x, 0, c] : [c, 0, x];
-    return { r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 };
+    const [r, g, b2] = h3 < 60 ? [c, x2, 0] : h3 < 120 ? [x2, c, 0] : h3 < 180 ? [0, c, x2] : h3 < 240 ? [0, x2, c] : h3 < 300 ? [x2, 0, c] : [c, 0, x2];
+    return { r: (r + m) * 255, g: (g + m) * 255, b: (b2 + m) * 255 };
   }
-  function toCss({ r, g, b, a }) {
-    const k = (v) => Math.round(Math.max(0, Math.min(255, v)));
-    return `rgba(${k(r)},${k(g)},${k(b)},${Math.round(a * 1e3) / 1e3})`;
+  function toCss({ r, g, b: b2, a }) {
+    const k = (v2) => Math.round(Math.max(0, Math.min(255, v2)));
+    return `rgba(${k(r)},${k(g)},${k(b2)},${Math.round(a * 1e3) / 1e3})`;
   }
   var SNOW = { r: 222, g: 231, b: 238 };
   function coolColor(str, { desat = 0.45, toward = 0.15 } = {}) {
     const c = parseColor(str);
     if (!c) return str;
     const gray = 0.3 * c.r + 0.59 * c.g + 0.11 * c.b;
-    const mix2 = (v, t) => v + (t - v) * toward;
+    const mix2 = (v2, t) => v2 + (t - v2) * toward;
     return toCss({
       r: mix2(c.r + (gray - c.r) * desat, SNOW.r),
       g: mix2(c.g + (gray - c.g) * desat, SNOW.g),
@@ -9026,13 +9026,13 @@
       a: c.a
     });
   }
-  function coolValue(v) {
-    if (typeof v === "string") return coolColor(v);
-    if (Array.isArray(v)) return v.map(coolValue);
-    if (v && typeof v === "object" && Array.isArray(v.stops)) {
-      return { ...v, stops: v.stops.map(([z, c]) => [z, coolValue(c)]) };
+  function coolValue(v2) {
+    if (typeof v2 === "string") return coolColor(v2);
+    if (Array.isArray(v2)) return v2.map(coolValue);
+    if (v2 && typeof v2 === "object" && Array.isArray(v2.stops)) {
+      return { ...v2, stops: v2.stops.map(([z2, c]) => [z2, coolValue(c)]) };
     }
-    return v;
+    return v2;
   }
   var WINTER = [
     ["background", { "background-color": "#eaeff3" }],
@@ -9067,8 +9067,8 @@
       }
       const fixed = WINTER.find(([prefix]) => layer.id === prefix || layer.id.startsWith(prefix + "_") || layer.id.startsWith(prefix + "-")) || (layer["source-layer"] === "water" && layer.type === "fill" ? WINTER.find(([p]) => p === "water") : null);
       const road = roadPaint(layer.id);
-      for (const [k, v] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
-        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v;
+      for (const [k, v2] of Object.entries({ ...fixed ? fixed[1] : {}, ...road || {} })) {
+        if (k.split("-")[0] === layer.type.split("-")[0] || layer.type === "fill-extrusion" && k.startsWith("fill-extrusion")) paint[k] = v2;
       }
       if (layer.type === "raster") {
         paint["raster-saturation"] = -0.6;
@@ -9083,10 +9083,10 @@
     }
     return out;
   }
-  function mix(a, b, f) {
-    const x = parseColor(a);
-    const y = parseColor(b);
-    return toCss({ r: x.r + (y.r - x.r) * f, g: x.g + (y.g - x.g) * f, b: x.b + (y.b - x.b) * f, a: x.a + (y.a - x.a) * f });
+  function mix(a, b2, f) {
+    const x2 = parseColor(a);
+    const y2 = parseColor(b2);
+    return toCss({ r: x2.r + (y2.r - x2.r) * f, g: x2.g + (y2.g - x2.g) * f, b: x2.b + (y2.b - x2.b) * f, a: x2.a + (y2.a - x2.a) * f });
   }
   var SEASON_COLORS = {
     winter: ["#eaeff3", "#d6e2da", "#dbe5de", "rgba(170,196,180,0.65)", "rgba(212,221,229,0.55)", "#ffffff"],
@@ -9141,8 +9141,8 @@
   var CAR_STYLES = 4;
   function pointNear(rng, lat, lon, minM, maxM) {
     const a = rng() * Math.PI * 2;
-    const d = minM + rng() * (maxM - minM);
-    return [lon + Math.sin(a) * d / (111320 * Math.cos(lat * Math.PI / 180)), lat + Math.cos(a) * d / 111320];
+    const d2 = minM + rng() * (maxM - minM);
+    return [lon + Math.sin(a) * d2 / (111320 * Math.cos(lat * Math.PI / 180)), lat + Math.cos(a) * d2 / 111320];
   }
   function detailFeatures(places, home) {
     const features = [];
@@ -9176,136 +9176,136 @@
     const c = document.createElement("canvas");
     c.width = size * px;
     c.height = size * px;
-    const x = c.getContext("2d");
-    x.scale(px, px);
-    draw(x, size);
-    return { data: x.getImageData(0, 0, c.width, c.height), pixelRatio: px };
+    const x2 = c.getContext("2d");
+    x2.scale(px, px);
+    draw(x2, size);
+    return { data: x2.getImageData(0, 0, c.width, c.height), pixelRatio: px };
   }
-  function rrect(x, a, b, w, h2, r) {
-    x.beginPath();
-    x.moveTo(a + r, b);
-    x.arcTo(a + w, b, a + w, b + h2, r);
-    x.arcTo(a + w, b + h2, a, b + h2, r);
-    x.arcTo(a, b + h2, a, b, r);
-    x.arcTo(a, b, a + w, b, r);
-    x.closePath();
+  function rrect(x2, a, b2, w2, h3, r) {
+    x2.beginPath();
+    x2.moveTo(a + r, b2);
+    x2.arcTo(a + w2, b2, a + w2, b2 + h3, r);
+    x2.arcTo(a + w2, b2 + h3, a, b2 + h3, r);
+    x2.arcTo(a, b2 + h3, a, b2, r);
+    x2.arcTo(a, b2, a + w2, b2, r);
+    x2.closePath();
   }
   var CAR_COLORS = ["#7d8792", "#5b6b7c", "#8a5a52", "#c9cdd2"];
   function addDetailIcons(map) {
     const icons = {};
     CAR_COLORS.forEach((col, i) => {
-      icons[`ll-car-${i}`] = canvas(16, (x) => {
-        x.fillStyle = "rgba(10,20,30,0.25)";
-        rrect(x, 5, 1.5, 7, 14, 2.2);
-        x.fill();
-        x.fillStyle = col;
-        x.strokeStyle = "#26313c";
-        x.lineWidth = 0.8;
-        rrect(x, 4.5, 1, 7, 14, 2.2);
-        x.fill();
-        x.stroke();
-        x.fillStyle = "#2f3d4a";
-        rrect(x, 5.6, 3.6, 4.8, 2.6, 0.8);
-        x.fill();
-        rrect(x, 5.6, 10.6, 4.8, 2, 0.8);
-        x.fill();
+      icons[`ll-car-${i}`] = canvas(16, (x2) => {
+        x2.fillStyle = "rgba(10,20,30,0.25)";
+        rrect(x2, 5, 1.5, 7, 14, 2.2);
+        x2.fill();
+        x2.fillStyle = col;
+        x2.strokeStyle = "#26313c";
+        x2.lineWidth = 0.8;
+        rrect(x2, 4.5, 1, 7, 14, 2.2);
+        x2.fill();
+        x2.stroke();
+        x2.fillStyle = "#2f3d4a";
+        rrect(x2, 5.6, 3.6, 4.8, 2.6, 0.8);
+        x2.fill();
+        rrect(x2, 5.6, 10.6, 4.8, 2, 0.8);
+        x2.fill();
       });
     });
-    icons["ll-debris"] = canvas(14, (x) => {
-      x.fillStyle = "#8b939b";
-      x.strokeStyle = "#4b5560";
-      x.lineWidth = 0.6;
-      for (const [a, b, w] of [[2, 3, 4], [7, 2, 3], [4, 8, 5], [9, 7, 3]]) {
-        x.beginPath();
-        x.moveTo(a, b);
-        x.lineTo(a + w, b + 1);
-        x.lineTo(a + w - 1, b + w * 0.7);
-        x.lineTo(a + 0.5, b + w * 0.6);
-        x.closePath();
-        x.fill();
-        x.stroke();
+    icons["ll-debris"] = canvas(14, (x2) => {
+      x2.fillStyle = "#8b939b";
+      x2.strokeStyle = "#4b5560";
+      x2.lineWidth = 0.6;
+      for (const [a, b2, w2] of [[2, 3, 4], [7, 2, 3], [4, 8, 5], [9, 7, 3]]) {
+        x2.beginPath();
+        x2.moveTo(a, b2);
+        x2.lineTo(a + w2, b2 + 1);
+        x2.lineTo(a + w2 - 1, b2 + w2 * 0.7);
+        x2.lineTo(a + 0.5, b2 + w2 * 0.6);
+        x2.closePath();
+        x2.fill();
+        x2.stroke();
       }
     });
-    icons["ll-barricade"] = canvas(18, (x) => {
-      x.fillStyle = "#b7bcc1";
-      x.strokeStyle = "#4b5560";
-      x.lineWidth = 0.7;
-      rrect(x, 1, 6, 16, 6, 1);
-      x.fill();
-      x.stroke();
-      x.save();
-      x.beginPath();
-      rrect(x, 1, 6, 16, 6, 1);
-      x.clip();
-      x.fillStyle = "#c23a46";
+    icons["ll-barricade"] = canvas(18, (x2) => {
+      x2.fillStyle = "#b7bcc1";
+      x2.strokeStyle = "#4b5560";
+      x2.lineWidth = 0.7;
+      rrect(x2, 1, 6, 16, 6, 1);
+      x2.fill();
+      x2.stroke();
+      x2.save();
+      x2.beginPath();
+      rrect(x2, 1, 6, 16, 6, 1);
+      x2.clip();
+      x2.fillStyle = "#c23a46";
       for (let i = -6; i < 18; i += 4) {
-        x.beginPath();
-        x.moveTo(i, 12);
-        x.lineTo(i + 2, 12);
-        x.lineTo(i + 8, 6);
-        x.lineTo(i + 6, 6);
-        x.fill();
+        x2.beginPath();
+        x2.moveTo(i, 12);
+        x2.lineTo(i + 2, 12);
+        x2.lineTo(i + 8, 6);
+        x2.lineTo(i + 6, 6);
+        x2.fill();
       }
-      x.restore();
+      x2.restore();
     });
-    icons["ll-trash"] = canvas(14, (x) => {
-      x.strokeStyle = "#0b0f13";
-      x.lineWidth = 0.6;
-      for (const [a, b, r] of [[5, 8, 3.4], [9, 6, 3], [8, 10, 2.8]]) {
-        x.fillStyle = "#1d2329";
-        x.beginPath();
-        x.arc(a, b, r, 0, Math.PI * 2);
-        x.fill();
-        x.stroke();
-      }
-    });
-    icons["ll-sign"] = canvas(16, (x) => {
-      x.fillStyle = "#f1d046";
-      x.strokeStyle = "#1a1a1a";
-      x.lineWidth = 1.2;
-      rrect(x, 2, 2, 12, 12, 1);
-      x.fill();
-      x.stroke();
-      x.fillStyle = "#1a1a1a";
-      x.fillRect(7.1, 4.2, 1.8, 5.2);
-      x.fillRect(7.1, 10.4, 1.8, 1.8);
-    });
-    icons["ll-tent"] = canvas(18, (x) => {
-      x.fillStyle = "#f4f6f8";
-      x.strokeStyle = "#5a6672";
-      x.lineWidth = 0.8;
-      rrect(x, 2, 3, 14, 12, 1.5);
-      x.fill();
-      x.stroke();
-      x.strokeStyle = "#9aa6b2";
-      x.beginPath();
-      x.moveTo(9, 3);
-      x.lineTo(9, 15);
-      x.stroke();
-      x.fillStyle = "#2f7fb8";
-      x.fillRect(2.5, 8, 13, 2);
-    });
-    icons["ll-bush"] = canvas(14, (x) => {
-      x.fillStyle = "rgba(70,120,60,0.85)";
-      for (const [a, b, r] of [[5, 7, 3.5], [8.5, 5.5, 3.2], [9, 9, 3], [5.5, 10, 2.6]]) {
-        x.beginPath();
-        x.arc(a, b, r, 0, Math.PI * 2);
-        x.fill();
+    icons["ll-trash"] = canvas(14, (x2) => {
+      x2.strokeStyle = "#0b0f13";
+      x2.lineWidth = 0.6;
+      for (const [a, b2, r] of [[5, 8, 3.4], [9, 6, 3], [8, 10, 2.8]]) {
+        x2.fillStyle = "#1d2329";
+        x2.beginPath();
+        x2.arc(a, b2, r, 0, Math.PI * 2);
+        x2.fill();
+        x2.stroke();
       }
     });
-    icons["ll-tree"] = canvas(18, (x) => {
-      x.fillStyle = "rgba(20,40,20,0.2)";
-      x.beginPath();
-      x.arc(10, 10, 7, 0, Math.PI * 2);
-      x.fill();
-      x.fillStyle = "rgba(58,110,52,0.9)";
-      x.beginPath();
-      x.arc(9, 9, 6.5, 0, Math.PI * 2);
-      x.fill();
-      x.fillStyle = "rgba(96,150,80,0.9)";
-      x.beginPath();
-      x.arc(7.5, 7.5, 3, 0, Math.PI * 2);
-      x.fill();
+    icons["ll-sign"] = canvas(16, (x2) => {
+      x2.fillStyle = "#f1d046";
+      x2.strokeStyle = "#1a1a1a";
+      x2.lineWidth = 1.2;
+      rrect(x2, 2, 2, 12, 12, 1);
+      x2.fill();
+      x2.stroke();
+      x2.fillStyle = "#1a1a1a";
+      x2.fillRect(7.1, 4.2, 1.8, 5.2);
+      x2.fillRect(7.1, 10.4, 1.8, 1.8);
+    });
+    icons["ll-tent"] = canvas(18, (x2) => {
+      x2.fillStyle = "#f4f6f8";
+      x2.strokeStyle = "#5a6672";
+      x2.lineWidth = 0.8;
+      rrect(x2, 2, 3, 14, 12, 1.5);
+      x2.fill();
+      x2.stroke();
+      x2.strokeStyle = "#9aa6b2";
+      x2.beginPath();
+      x2.moveTo(9, 3);
+      x2.lineTo(9, 15);
+      x2.stroke();
+      x2.fillStyle = "#2f7fb8";
+      x2.fillRect(2.5, 8, 13, 2);
+    });
+    icons["ll-bush"] = canvas(14, (x2) => {
+      x2.fillStyle = "rgba(70,120,60,0.85)";
+      for (const [a, b2, r] of [[5, 7, 3.5], [8.5, 5.5, 3.2], [9, 9, 3], [5.5, 10, 2.6]]) {
+        x2.beginPath();
+        x2.arc(a, b2, r, 0, Math.PI * 2);
+        x2.fill();
+      }
+    });
+    icons["ll-tree"] = canvas(18, (x2) => {
+      x2.fillStyle = "rgba(20,40,20,0.2)";
+      x2.beginPath();
+      x2.arc(10, 10, 7, 0, Math.PI * 2);
+      x2.fill();
+      x2.fillStyle = "rgba(58,110,52,0.9)";
+      x2.beginPath();
+      x2.arc(9, 9, 6.5, 0, Math.PI * 2);
+      x2.fill();
+      x2.fillStyle = "rgba(96,150,80,0.9)";
+      x2.beginPath();
+      x2.arc(7.5, 7.5, 3, 0, Math.PI * 2);
+      x2.fill();
     });
     for (const [id, img] of Object.entries(icons)) {
       if (!map.hasImage(id)) map.addImage(id, img.data, { pixelRatio: img.pixelRatio });
@@ -9354,7 +9354,7 @@
       steps: [
         { id: "books_1", text: "Bring a book home", check: (s) => storedAny(s, BOOKS) >= 1 },
         { id: "books_4", text: "Have 4 books on the shelf at home", check: (s) => storedAny(s, BOOKS) >= 4 },
-        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b) => stored(s, b) >= 1) },
+        { id: "books_kinds", text: "Have one of each kind of book (first aid, repair, cooking, survival)", check: (s) => BOOKS.every((b2) => stored(s, b2) >= 1) },
         { id: "dry_room", text: "Insulate the living room to keep the shelf dry", check: (s) => built(s, "insulate_living") },
         { id: "books_more", text: "Bring home 6 more books after you choose this", check: (s, c) => booksAt(s) - c.since.books >= 6 }
       ],
@@ -9518,105 +9518,974 @@
   var CHANGE_GAP_DAYS = 30;
   var STEP_MORALE = 3;
   var byId2 = new Map(GOALS.map((g) => [g.id, g]));
-  function ensureGoals(state2) {
-    var _a;
-    const p = state2.player;
+  function ensureGoals(state3) {
+    var _a2;
+    const p = state3.player;
     if (!p.goals) p.goals = { picked: [], done: {}, changedDay: null, since: {} };
-    (_a = p.goals).since || (_a.since = {});
+    (_a2 = p.goals).since || (_a2.since = {});
     return p.goals;
   }
-  var boardOpen = (state2) => gameDay(state2.time) >= BOARD_OPENS_DAY;
-  function canChange(state2) {
-    const g = ensureGoals(state2);
-    return g.changedDay == null || gameDay(state2.time) - g.changedDay >= CHANGE_GAP_DAYS;
+  var boardOpen = (state3) => gameDay(state3.time) >= BOARD_OPENS_DAY;
+  function canChange(state3) {
+    const g = ensureGoals(state3);
+    return g.changedDay == null || gameDay(state3.time) - g.changedDay >= CHANGE_GAP_DAYS;
   }
-  function pickGoal(state2, id) {
-    var _a;
-    const g = ensureGoals(state2);
-    if (!boardOpen(state2)) return `The board opens on day ${BOARD_OPENS_DAY + 1}. First, stay alive.`;
+  function pickGoal(state3, id) {
+    var _a2;
+    const g = ensureGoals(state3);
+    if (!boardOpen(state3)) return `The board opens on day ${BOARD_OPENS_DAY + 1}. First, stay alive.`;
     if (!byId2.has(id)) return "Unknown goal.";
     if (g.picked.includes(id)) return "You already work on this.";
     if (g.picked.length >= MAX_GOALS) return `You can work on ${MAX_GOALS} goals at a time.`;
     g.picked.push(id);
-    (_a = g.done)[id] || (_a[id] = []);
-    g.since[id] = { day: gameDay(state2.time), ...goalCounters(state2) };
-    log(state2, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
-    checkGoals(state2);
+    (_a2 = g.done)[id] || (_a2[id] = []);
+    g.since[id] = { day: gameDay(state3.time), ...goalCounters(state3) };
+    log(state3, `You choose a goal: ${byId2.get(id).title}. ${byId2.get(id).why}`, "story");
+    checkGoals(state3);
     return null;
   }
-  function dropGoal(state2, id) {
-    const g = ensureGoals(state2);
+  function dropGoal(state3, id) {
+    const g = ensureGoals(state3);
     if (!g.picked.includes(id)) return "You do not work on this.";
-    if (!canChange(state2)) return `You can change a goal again in ${CHANGE_GAP_DAYS - (gameDay(state2.time) - g.changedDay)} days.`;
-    g.picked = g.picked.filter((x) => x !== id);
-    g.changedDay = gameDay(state2.time);
-    log(state2, `You put the goal aside: ${byId2.get(id).title}.`);
+    if (!canChange(state3)) return `You can change a goal again in ${CHANGE_GAP_DAYS - (gameDay(state3.time) - g.changedDay)} days.`;
+    g.picked = g.picked.filter((x2) => x2 !== id);
+    g.changedDay = gameDay(state3.time);
+    log(state3, `You put the goal aside: ${byId2.get(id).title}.`);
     return null;
   }
-  function checkGoals(state2) {
-    var _a;
-    const g = state2.player.goals;
-    if (!g || !g.picked.length || state2.dead) return [];
-    paintSign(state2);
+  function checkGoals(state3) {
+    var _a2;
+    const g = state3.player.goals;
+    if (!g || !g.picked.length || state3.dead) return [];
+    paintSign(state3);
     const now = [];
     for (const id of g.picked) {
       const goal = byId2.get(id);
       if (!goal) continue;
-      const done = (_a = g.done)[id] || (_a[id] = []);
-      const since = g.since?.[id] || { day: gameDay(state2.time), ...goalCounters(state2) };
-      const c = { days: gameDay(state2.time) - since.day, since };
+      const done = (_a2 = g.done)[id] || (_a2[id] = []);
+      const since = g.since?.[id] || { day: gameDay(state3.time), ...goalCounters(state3) };
+      const c = { days: gameDay(state3.time) - since.day, since };
       for (const st of goal.steps) {
         if (done.includes(st.id)) continue;
         let ok = false;
         try {
-          ok = !!st.check(state2, c);
+          ok = !!st.check(state3, c);
         } catch {
           ok = false;
         }
         if (!ok) continue;
         done.push(st.id);
-        state2.player.morale = Math.min(100, state2.player.morale + STEP_MORALE);
+        state3.player.morale = Math.min(100, state3.player.morale + STEP_MORALE);
         const all = done.length === goal.steps.length;
-        log(state2, all ? `${goal.title}: done. ${goal.epilogue.all}` : `${goal.title}: ${st.text} (step ${done.length} of ${goal.steps.length}).`, "good");
+        log(state3, all ? `${goal.title}: done. ${goal.epilogue.all}` : `${goal.title}: ${st.text} (step ${done.length} of ${goal.steps.length}).`, "good");
         now.push({ goal: id, step: st.id });
       }
     }
     return now;
   }
   var MAX_SIGNS = 40;
-  function legacyMarks(state2) {
-    const g = state2.player.goals;
+  function legacyMarks(state3) {
+    const g = state3.player.goals;
     const done = (id, step) => !!g?.done?.[id]?.includes(step);
     return {
-      litWindow: done("light_on_hill", "led") && isNight(state2.time) && (state2.home?.battery || 0) > 0.2,
+      litWindow: done("light_on_hill", "led") && isNight(state3.time) && (state3.home?.battery || 0) > 0.2,
       signs: g?.signs || [],
       capsule: done("time_capsule", "tc_bury")
     };
   }
-  function paintSign(state2) {
-    const g = state2.player.goals;
+  function paintSign(state3) {
+    const g = state3.player.goals;
     if (!g.picked.includes("message_wall") || !g.done.message_wall?.includes("mw_tools")) return;
-    const loc = state2.location;
+    const loc = state3.location;
     if (!loc || loc.kind !== "place") return;
     g.signs || (g.signs = []);
     if (g.signs.includes(loc.id) || g.signs.length >= MAX_SIGNS) return;
     g.signs.push(loc.id);
-    log(state2, "You paint a sign by the door: where to find water, and what is left here.", "story");
+    log(state3, "You paint a sign by the door: where to find water, and what is left here.", "story");
   }
-  function goalProgress(state2, id) {
+  function goalProgress(state3, id) {
     const goal = byId2.get(id);
-    const done = state2.player.goals?.done?.[id] || [];
+    const done = state3.player.goals?.done?.[id] || [];
     return { goal, done: done.length, total: goal.steps.length, steps: goal.steps.map((s) => ({ ...s, done: done.includes(s.id) })) };
   }
-  function epilogue(state2) {
-    const g = state2.player.goals;
+  function epilogue(state3) {
+    const g = state3.player.goals;
     if (!g) return [];
     const ids = [.../* @__PURE__ */ new Set([...g.picked, ...Object.keys(g.done).filter((k) => g.done[k].length)])];
     return ids.filter((id) => byId2.has(id)).map((id) => {
-      const { goal, done, total } = goalProgress(state2, id);
+      const { goal, done, total } = goalProgress(state3, id);
       const line = done === 0 ? goal.epilogue.none : done === total ? goal.epilogue.all : goal.epilogue.some;
       return { id, title: goal.title, kind: GOAL_KINDS[goal.kind].label, done, total, line };
     });
+  }
+
+  // node_modules/fflate/esm/browser.js
+  var u8 = Uint8Array;
+  var u16 = Uint16Array;
+  var i32 = Int32Array;
+  var fleb = new u8([
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    2,
+    2,
+    2,
+    2,
+    3,
+    3,
+    3,
+    3,
+    4,
+    4,
+    4,
+    4,
+    5,
+    5,
+    5,
+    5,
+    0,
+    /* unused */
+    0,
+    0,
+    /* impossible */
+    0
+  ]);
+  var fdeb = new u8([
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    4,
+    5,
+    5,
+    6,
+    6,
+    7,
+    7,
+    8,
+    8,
+    9,
+    9,
+    10,
+    10,
+    11,
+    11,
+    12,
+    12,
+    13,
+    13,
+    /* unused */
+    0,
+    0
+  ]);
+  var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+  var freb = function(eb, start2) {
+    var b2 = new u16(31);
+    for (var i = 0; i < 31; ++i) {
+      b2[i] = start2 += 1 << eb[i - 1];
+    }
+    var r = new i32(b2[30]);
+    for (var i = 1; i < 30; ++i) {
+      for (var j2 = b2[i]; j2 < b2[i + 1]; ++j2) {
+        r[j2] = j2 - b2[i] << 5 | i;
+      }
+    }
+    return { b: b2, r };
+  };
+  var _a = freb(fleb, 2);
+  var fl = _a.b;
+  var revfl = _a.r;
+  fl[28] = 258, revfl[258] = 28;
+  var _b = freb(fdeb, 0);
+  var fd = _b.b;
+  var revfd = _b.r;
+  var rev = new u16(32768);
+  for (i = 0; i < 32768; ++i) {
+    x2 = (i & 43690) >> 1 | (i & 21845) << 1;
+    x2 = (x2 & 52428) >> 2 | (x2 & 13107) << 2;
+    x2 = (x2 & 61680) >> 4 | (x2 & 3855) << 4;
+    rev[i] = ((x2 & 65280) >> 8 | (x2 & 255) << 8) >> 1;
+  }
+  var x2;
+  var i;
+  var hMap = function(cd, mb, r) {
+    var s = cd.length;
+    var i = 0;
+    var l = new u16(mb);
+    for (; i < s; ++i) {
+      if (cd[i])
+        ++l[cd[i] - 1];
+    }
+    var le = new u16(mb);
+    for (i = 1; i < mb; ++i) {
+      le[i] = le[i - 1] + l[i - 1] << 1;
+    }
+    var co;
+    if (r) {
+      co = new u16(1 << mb);
+      var rvb = 15 - mb;
+      for (i = 0; i < s; ++i) {
+        if (cd[i]) {
+          var sv = i << 4 | cd[i];
+          var r_1 = mb - cd[i];
+          var v2 = le[cd[i] - 1]++ << r_1;
+          for (var m = v2 | (1 << r_1) - 1; v2 <= m; ++v2) {
+            co[rev[v2] >> rvb] = sv;
+          }
+        }
+      }
+    } else {
+      co = new u16(s);
+      for (i = 0; i < s; ++i) {
+        if (cd[i]) {
+          co[i] = rev[le[cd[i] - 1]++] >> 15 - cd[i];
+        }
+      }
+    }
+    return co;
+  };
+  var flt = new u8(288);
+  for (i = 0; i < 144; ++i)
+    flt[i] = 8;
+  var i;
+  for (i = 144; i < 256; ++i)
+    flt[i] = 9;
+  var i;
+  for (i = 256; i < 280; ++i)
+    flt[i] = 7;
+  var i;
+  for (i = 280; i < 288; ++i)
+    flt[i] = 8;
+  var i;
+  var fdt = new u8(32);
+  for (i = 0; i < 32; ++i)
+    fdt[i] = 5;
+  var i;
+  var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+  var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
+  var max = function(a) {
+    var m = a[0];
+    for (var i = 1; i < a.length; ++i) {
+      if (a[i] > m)
+        m = a[i];
+    }
+    return m;
+  };
+  var bits = function(d2, p, m) {
+    var o = p / 8 | 0;
+    return (d2[o] | d2[o + 1] << 8) >> (p & 7) & m;
+  };
+  var bits16 = function(d2, p) {
+    var o = p / 8 | 0;
+    return (d2[o] | d2[o + 1] << 8 | d2[o + 2] << 16) >> (p & 7);
+  };
+  var shft = function(p) {
+    return (p + 7) / 8 | 0;
+  };
+  var slc = function(v2, s, e) {
+    if (s == null || s < 0)
+      s = 0;
+    if (e == null || e > v2.length)
+      e = v2.length;
+    return new u8(v2.subarray(s, e));
+  };
+  var ec = [
+    "unexpected EOF",
+    "invalid block type",
+    "invalid length/literal",
+    "invalid distance",
+    "stream finished",
+    "no stream handler",
+    ,
+    // determined by compression function
+    "no callback",
+    "invalid UTF-8 data",
+    "extra field too long",
+    "date not in range 1980-2099",
+    "filename too long",
+    "stream finishing",
+    "invalid zip data"
+    // determined by unknown compression method
+  ];
+  var err = function(ind, msg, nt) {
+    var e = new Error(msg || ec[ind]);
+    e.code = ind;
+    if (Error.captureStackTrace)
+      Error.captureStackTrace(e, err);
+    if (!nt)
+      throw e;
+    return e;
+  };
+  var inflt = function(dat, st, buf, dict) {
+    var sl = dat.length, dl = dict ? dict.length : 0;
+    if (!sl || st.f && !st.l)
+      return buf || new u8(0);
+    var noBuf = !buf;
+    var resize = noBuf || st.i != 2;
+    var noSt = st.i;
+    if (noBuf)
+      buf = new u8(sl * 3);
+    var cbuf = function(l2) {
+      var bl = buf.length;
+      if (l2 > bl) {
+        var nbuf = new u8(Math.max(bl * 2, l2));
+        nbuf.set(buf);
+        buf = nbuf;
+      }
+    };
+    var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
+    var tbts = sl * 8;
+    do {
+      if (!lm) {
+        final = bits(dat, pos, 1);
+        var type = bits(dat, pos + 1, 3);
+        pos += 3;
+        if (!type) {
+          var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t = s + l;
+          if (t > sl) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + l);
+          buf.set(dat.subarray(s, t), bt);
+          st.b = bt += l, st.p = pos = t * 8, st.f = final;
+          continue;
+        } else if (type == 1)
+          lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
+        else if (type == 2) {
+          var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
+          var tl = hLit + bits(dat, pos + 5, 31) + 1;
+          pos += 14;
+          var ldt = new u8(tl);
+          var clt = new u8(19);
+          for (var i = 0; i < hcLen; ++i) {
+            clt[clim[i]] = bits(dat, pos + i * 3, 7);
+          }
+          pos += hcLen * 3;
+          var clb = max(clt), clbmsk = (1 << clb) - 1;
+          var clm = hMap(clt, clb, 1);
+          for (var i = 0; i < tl; ) {
+            var r = clm[bits(dat, pos, clbmsk)];
+            pos += r & 15;
+            var s = r >> 4;
+            if (s < 16) {
+              ldt[i++] = s;
+            } else {
+              var c = 0, n = 0;
+              if (s == 16)
+                n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i - 1];
+              else if (s == 17)
+                n = 3 + bits(dat, pos, 7), pos += 3;
+              else if (s == 18)
+                n = 11 + bits(dat, pos, 127), pos += 7;
+              while (n--)
+                ldt[i++] = c;
+            }
+          }
+          var lt = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
+          lbt = max(lt);
+          dbt = max(dt);
+          lm = hMap(lt, lbt, 1);
+          dm = hMap(dt, dbt, 1);
+        } else
+          err(1);
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+      }
+      if (resize)
+        cbuf(bt + 131072);
+      var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
+      var lpos = pos;
+      for (; ; lpos = pos) {
+        var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
+        pos += c & 15;
+        if (pos > tbts) {
+          if (noSt)
+            err(0);
+          break;
+        }
+        if (!c)
+          err(2);
+        if (sym < 256)
+          buf[bt++] = sym;
+        else if (sym == 256) {
+          lpos = pos, lm = null;
+          break;
+        } else {
+          var add = sym - 254;
+          if (sym > 264) {
+            var i = sym - 257, b2 = fleb[i];
+            add = bits(dat, pos, (1 << b2) - 1) + fl[i];
+            pos += b2;
+          }
+          var d2 = dm[bits16(dat, pos) & dms], dsym = d2 >> 4;
+          if (!d2)
+            err(3);
+          pos += d2 & 15;
+          var dt = fd[dsym];
+          if (dsym > 3) {
+            var b2 = fdeb[dsym];
+            dt += bits16(dat, pos) & (1 << b2) - 1, pos += b2;
+          }
+          if (pos > tbts) {
+            if (noSt)
+              err(0);
+            break;
+          }
+          if (resize)
+            cbuf(bt + 131072);
+          var end = bt + add;
+          if (bt < dt) {
+            var shift = dl - dt, dend = Math.min(dt, end);
+            if (shift + bt < 0)
+              err(3);
+            for (; bt < dend; ++bt)
+              buf[bt] = dict[shift + bt];
+          }
+          for (; bt < end; ++bt)
+            buf[bt] = buf[bt - dt];
+        }
+      }
+      st.l = lm, st.p = lpos, st.b = bt, st.f = final;
+      if (lm)
+        final = 1, st.m = lbt, st.d = dm, st.n = dbt;
+    } while (!final);
+    return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
+  };
+  var et = /* @__PURE__ */ new u8(0);
+  var gzs = function(d2) {
+    if (d2[0] != 31 || d2[1] != 139 || d2[2] != 8)
+      err(6, "invalid gzip data");
+    var flg = d2[3];
+    var st = 10;
+    if (flg & 4)
+      st += (d2[10] | d2[11] << 8) + 2;
+    for (var zs = (flg >> 3 & 1) + (flg >> 4 & 1); zs > 0; zs -= !d2[st++])
+      ;
+    return st + (flg & 2);
+  };
+  var gzl = function(d2) {
+    var l = d2.length;
+    return (d2[l - 4] | d2[l - 3] << 8 | d2[l - 2] << 16 | d2[l - 1] << 24) >>> 0;
+  };
+  var zls = function(d2, dict) {
+    if ((d2[0] & 15) != 8 || d2[0] >> 4 > 7 || (d2[0] << 8 | d2[1]) % 31)
+      err(6, "invalid zlib data");
+    if ((d2[1] >> 5 & 1) == +!dict)
+      err(6, "invalid zlib data: " + (d2[1] & 32 ? "need" : "unexpected") + " dictionary");
+    return (d2[1] >> 3 & 4) + 2;
+  };
+  function inflateSync(data, opts) {
+    return inflt(data, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function gunzipSync(data, opts) {
+    var st = gzs(data);
+    if (st + 8 > data.length)
+      err(6, "invalid gzip data");
+    return inflt(data.subarray(st, -8), { i: 2 }, opts && opts.out || new u8(gzl(data)), opts && opts.dictionary);
+  }
+  function unzlibSync(data, opts) {
+    return inflt(data.subarray(zls(data, opts && opts.dictionary), -4), { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function decompressSync(data, opts) {
+    return data[0] == 31 && data[1] == 139 && data[2] == 8 ? gunzipSync(data, opts) : (data[0] & 15) != 8 || data[0] >> 4 > 7 || (data[0] << 8 | data[1]) % 31 ? inflateSync(data, opts) : unzlibSync(data, opts);
+  }
+  var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+  var tds = 0;
+  try {
+    td.decode(et, { stream: true });
+    tds = 1;
+  } catch (e) {
+  }
+
+  // node_modules/pmtiles/dist/esm/index.js
+  var j = Object.defineProperty;
+  var S = Math.pow;
+  var d = (o, t) => j(o, "name", { value: t, configurable: true });
+  var h2 = (o, t, e) => new Promise((r, n) => {
+    var s = (c) => {
+      try {
+        a(e.next(c));
+      } catch (l) {
+        n(l);
+      }
+    }, i = (c) => {
+      try {
+        a(e.throw(c));
+      } catch (l) {
+        n(l);
+      }
+    }, a = (c) => c.done ? r(c.value) : Promise.resolve(c.value).then(s, i);
+    a((e = e.apply(o, t)).next());
+  });
+  var re = d((o, t) => {
+    let e = false, r = "", n = L.GridLayer.extend({ createTile: d((s, i) => {
+      let a = document.createElement("img"), c = new AbortController(), l = c.signal;
+      return a.cancel = () => {
+        c.abort();
+      }, e || (o.getHeader().then((u) => {
+        u.tileType === 1 || u.tileType === 6 ? console.error("Error: archive contains vector tiles, but leafletRasterLayer is for displaying raster tiles. See https://github.com/protomaps/PMTiles/tree/main/js for details.") : u.tileType === 2 ? r = "image/png" : u.tileType === 3 ? r = "image/jpeg" : u.tileType === 4 ? r = "image/webp" : u.tileType === 5 && (r = "image/avif");
+      }), e = true), o.getZxy(s.z, s.x, s.y, l).then((u) => {
+        if (u) {
+          let m = new Blob([u.data], { type: r }), g = window.URL.createObjectURL(m);
+          a.src = g;
+        } else a.style.display = "none";
+        a.cancel = void 0, i(void 0, a);
+      }).catch((u) => {
+        if (u.name !== "AbortError") throw u;
+      }), a;
+    }, "createTile"), _removeTile: d(function(s) {
+      let i = this._tiles[s];
+      i && (i.el.cancel && i.el.cancel(), i.el.src && window.URL.revokeObjectURL(i.el.src), i.el.width = 0, i.el.height = 0, i.el.deleted = true, L.DomUtil.remove(i.el), delete this._tiles[s], this.fire("tileunload", { tile: i.el, coords: this._keyToTileCoords(s) }));
+    }, "_removeTile") });
+    return new n(t);
+  }, "leafletRasterLayer");
+  var z = d((o) => (t, e) => {
+    if (e instanceof AbortController) return o(t, e);
+    let r = new AbortController();
+    return o(t, r).then((n) => e(void 0, n.data, n.cacheControl || "", n.expires || ""), (n) => e(n)).catch((n) => e(n)), { cancel: d(() => r.abort(), "cancel") };
+  }, "v3compat");
+  var A2 = class A3 {
+    constructor(t) {
+      this.tilev4 = d((t2, e) => h2(this, null, function* () {
+        if (t2.type === "json") {
+          let g = t2.url.substr(10), p = this.tiles.get(g);
+          if (p || (p = new w(g), this.tiles.set(g, p)), this.metadata) {
+            let K = yield p.getTileJson(t2.url);
+            return e.signal.throwIfAborted(), { data: K };
+          }
+          let f = yield p.getHeader();
+          return e.signal.throwIfAborted(), (f.minLon >= f.maxLon || f.minLat >= f.maxLat) && console.error(`Bounds of PMTiles archive ${f.minLon},${f.minLat},${f.maxLon},${f.maxLat} are not valid.`), { data: { tiles: [`${t2.url}/{z}/{x}/{y}`], minzoom: f.minZoom, maxzoom: f.maxZoom, bounds: [f.minLon, f.minLat, f.maxLon, f.maxLat] } };
+        }
+        let r = new RegExp(/pmtiles:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/), n = t2.url.match(r);
+        if (!n) throw new Error("Invalid PMTiles protocol URL");
+        let s = n[1], i = this.tiles.get(s);
+        i || (i = new w(s), this.tiles.set(s, i));
+        let a = n[2], c = n[3], l = n[4], u = yield i == null ? void 0 : i.getZxy(+a, +c, +l, e.signal);
+        if (e.signal.throwIfAborted(), u) return { data: new Uint8Array(u.data), cacheControl: u.cacheControl, expires: u.expires };
+        let m = yield i.getHeader();
+        if (m.tileType === 1 || m.tileType === 6) {
+          if (this.errorOnMissingTile) throw new Error("Tile not found.");
+          return { data: new Uint8Array() };
+        }
+        return { data: null };
+      }), "tilev4");
+      this.tile = z(this.tilev4);
+      this.tiles = /* @__PURE__ */ new Map(), this.metadata = (t == null ? void 0 : t.metadata) || false, this.errorOnMissingTile = (t == null ? void 0 : t.errorOnMissingTile) || false;
+    }
+    add(t) {
+      this.tiles.set(t.source.getKey(), t);
+    }
+    get(t) {
+      return this.tiles.get(t);
+    }
+  };
+  d(A2, "Protocol");
+  var B = A2;
+  function b(o, t) {
+    return (t >>> 0) * 4294967296 + (o >>> 0);
+  }
+  d(b, "toNum");
+  function N(o, t) {
+    let e = t.buf, r = e[t.pos++], n = (r & 112) >> 4;
+    if (r < 128 || (r = e[t.pos++], n |= (r & 127) << 3, r < 128) || (r = e[t.pos++], n |= (r & 127) << 10, r < 128) || (r = e[t.pos++], n |= (r & 127) << 17, r < 128) || (r = e[t.pos++], n |= (r & 127) << 24, r < 128) || (r = e[t.pos++], n |= (r & 1) << 31, r < 128)) return b(o, n);
+    throw new Error("Expected varint not more than 10 bytes");
+  }
+  d(N, "readVarintRemainder");
+  function x(o) {
+    let t = o.buf, e = t[o.pos++], r = e & 127;
+    return e < 128 || (e = t[o.pos++], r |= (e & 127) << 7, e < 128) || (e = t[o.pos++], r |= (e & 127) << 14, e < 128) || (e = t[o.pos++], r |= (e & 127) << 21, e < 128) ? r : (e = t[o.pos], r |= (e & 15) << 28, N(r, o));
+  }
+  d(x, "readVarint");
+  function I(o, t, e, r, n) {
+    return n === 0 ? r !== 0 ? [o - 1 - e, o - 1 - t] : [e, t] : [t, e];
+  }
+  d(I, "rotate");
+  function q(o, t, e) {
+    if (o > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
+    if (t >= 1 << o || e >= 1 << o) throw new Error("tile x/y outside zoom level bounds");
+    let r = ((1 << o) * (1 << o) - 1) / 3, n = o - 1, [s, i] = [t, e];
+    for (let a = 1 << n; a > 0; a >>= 1) {
+      let c = s & a, l = i & a;
+      r += (3 * c ^ l) * (1 << n), [s, i] = I(a, s, i, c, l), n--;
+    }
+    return r;
+  }
+  d(q, "zxyToTileId");
+  function G(o) {
+    let t = 3 * o + 1;
+    return t < 4294967296 ? 31 - Math.clz32(t) : 63 - Math.clz32(t / 4294967296);
+  }
+  d(G, "tileIdToZ");
+  function ie(o) {
+    let t = G(o) >> 1;
+    if (t > 26) throw new Error("Tile zoom level exceeds max safe number limit (26)");
+    let e = ((1 << t) * (1 << t) - 1) / 3, r = o - e, n = 0, s = 0, i = 1 << t;
+    for (let a = 1; a < i; a <<= 1) {
+      let c = a & r / 2, l = a & (r ^ c);
+      [n, s] = I(a, n, s, c, l), r = r / 2, n += c, s += l;
+    }
+    return [t, n, s];
+  }
+  d(ie, "tileIdToZxy");
+  var J = ((s) => (s[s.Unknown = 0] = "Unknown", s[s.None = 1] = "None", s[s.Gzip = 2] = "Gzip", s[s.Brotli = 3] = "Brotli", s[s.Zstd = 4] = "Zstd", s))(J || {});
+  function P(o, t) {
+    return h2(this, null, function* () {
+      if (t === 1 || t === 0) return o;
+      if (t === 2) {
+        if (typeof globalThis.DecompressionStream == "undefined") return decompressSync(new Uint8Array(o));
+        let e = new Response(o).body;
+        if (!e) throw new Error("Failed to read response stream");
+        let r = e.pipeThrough(new globalThis.DecompressionStream("gzip"));
+        return new Response(r).arrayBuffer();
+      }
+      throw new Error("Compression method not supported");
+    });
+  }
+  d(P, "defaultDecompress");
+  var O = ((a) => (a[a.Unknown = 0] = "Unknown", a[a.Mvt = 1] = "Mvt", a[a.Png = 2] = "Png", a[a.Jpeg = 3] = "Jpeg", a[a.Webp = 4] = "Webp", a[a.Avif = 5] = "Avif", a[a.Mlt = 6] = "Mlt", a))(O || {});
+  function _(o) {
+    return o === 1 ? ".mvt" : o === 2 ? ".png" : o === 3 ? ".jpg" : o === 4 ? ".webp" : o === 5 ? ".avif" : o === 6 ? ".mlt" : "";
+  }
+  d(_, "tileTypeExt");
+  var Y = 127;
+  function Q(o, t) {
+    let e = 0, r = o.length - 1;
+    for (; e <= r; ) {
+      let n = r + e >> 1, s = t - o[n].tileId;
+      if (s > 0) e = n + 1;
+      else if (s < 0) r = n - 1;
+      else return o[n];
+    }
+    return r >= 0 && (o[r].runLength === 0 || t - o[r].tileId < o[r].runLength) ? o[r] : null;
+  }
+  d(Q, "findTile");
+  var T2 = class T3 {
+    constructor(t) {
+      this.file = t;
+    }
+    getKey() {
+      return this.file.name;
+    }
+    getBytes(t, e) {
+      return h2(this, null, function* () {
+        return { data: yield this.file.slice(t, t + e).arrayBuffer() };
+      });
+    }
+  };
+  d(T2, "FileSource");
+  var D = class D2 {
+    constructor(t, e = new Headers(), r = void 0) {
+      var a, c;
+      this.url = t, this.customHeaders = e, this.credentials = r, this.mustReload = false;
+      let n = "";
+      "navigator" in globalThis && (n = (c = (a = globalThis.navigator) == null ? void 0 : a.userAgent) != null ? c : "");
+      let s = n.indexOf("Windows") > -1, i = /Chrome|Chromium|Edg|OPR|Brave/.test(n);
+      this.chromeWindowsNoCache = false, s && i && (this.chromeWindowsNoCache = true);
+    }
+    getKey() {
+      return this.url;
+    }
+    setHeaders(t) {
+      this.customHeaders = t;
+    }
+    getBytes(t, e, r, n) {
+      return h2(this, null, function* () {
+        let s, i;
+        r ? i = r : (s = new AbortController(), i = s.signal);
+        let a = new Headers(this.customHeaders);
+        a.set("range", `bytes=${t}-${t + e - 1}`);
+        let c;
+        this.mustReload ? c = "reload" : this.chromeWindowsNoCache && (c = "no-store");
+        let l = yield fetch(this.url, { signal: i, cache: c, headers: a, credentials: this.credentials });
+        if (t === 0 && l.status === 416) {
+          let p = l.headers.get("Content-Range");
+          if (!p || !p.startsWith("bytes */")) throw new Error("Missing content-length on 416 response");
+          let f = +p.substr(8);
+          a.set("range", `bytes=0-${f - 1}`), l = yield fetch(this.url, { signal: i, cache: "reload", headers: a, credentials: this.credentials });
+        }
+        let u = l.headers.get("Etag");
+        if (u != null && u.startsWith("W/") && (u = null), l.status === 416 || n && u && u !== n) throw this.mustReload = true, new v(`Server returned non-matching ETag ${n} after one retry. Check browser extensions and servers for issues that may affect correct ETag headers.`);
+        if (l.status >= 300) throw new Error(`Bad response code: ${l.status}`);
+        let m = l.headers.get("Content-Length");
+        if (l.status === 200 && (!m || +m > e)) throw s && s.abort(), new Error("Server returned no content-length header or content-length exceeding request. Check that your storage backend supports HTTP Byte Serving.");
+        return { data: yield l.arrayBuffer(), etag: u || void 0, cacheControl: l.headers.get("Cache-Control") || void 0, expires: l.headers.get("Expires") || void 0 };
+      });
+    }
+  };
+  d(D, "FetchSource");
+  var E = D;
+  function y(o, t) {
+    let e = o.getUint32(t + 4, true), r = o.getUint32(t + 0, true);
+    return e * S(2, 32) + r;
+  }
+  d(y, "getUint64");
+  function X(o, t) {
+    let e = new DataView(o), r = e.getUint8(7);
+    if (r > 3) throw new Error(`Archive is spec version ${r} but this library supports up to spec version 3`);
+    return { specVersion: r, rootDirectoryOffset: y(e, 8), rootDirectoryLength: y(e, 16), jsonMetadataOffset: y(e, 24), jsonMetadataLength: y(e, 32), leafDirectoryOffset: y(e, 40), leafDirectoryLength: y(e, 48), tileDataOffset: y(e, 56), tileDataLength: y(e, 64), numAddressedTiles: y(e, 72), numTileEntries: y(e, 80), numTileContents: y(e, 88), clustered: e.getUint8(96) === 1, internalCompression: e.getUint8(97), tileCompression: e.getUint8(98), tileType: e.getUint8(99), minZoom: e.getUint8(100), maxZoom: e.getUint8(101), minLon: e.getInt32(102, true) / 1e7, minLat: e.getInt32(106, true) / 1e7, maxLon: e.getInt32(110, true) / 1e7, maxLat: e.getInt32(114, true) / 1e7, centerZoom: e.getUint8(118), centerLon: e.getInt32(119, true) / 1e7, centerLat: e.getInt32(123, true) / 1e7, etag: t };
+  }
+  d(X, "bytesToHeader");
+  function Z(o) {
+    let t = { buf: new Uint8Array(o), pos: 0 }, e = x(t), r = [], n = 0;
+    for (let s = 0; s < e; s++) {
+      let i = x(t);
+      r.push({ tileId: n + i, offset: 0, length: 0, runLength: 1 }), n += i;
+    }
+    for (let s = 0; s < e; s++) r[s].runLength = x(t);
+    for (let s = 0; s < e; s++) r[s].length = x(t);
+    for (let s = 0; s < e; s++) {
+      let i = x(t);
+      i === 0 && s > 0 ? r[s].offset = r[s - 1].offset + r[s - 1].length : r[s].offset = i - 1;
+    }
+    return r;
+  }
+  d(Z, "deserializeIndex");
+  var R = class R2 extends Error {
+  };
+  d(R, "EtagMismatch");
+  var v = R;
+  function V(o, t) {
+    return h2(this, null, function* () {
+      let e = yield o.getBytes(0, 16384);
+      if (new DataView(e.data).getUint16(0, true) !== 19792) throw new Error("Wrong magic number for PMTiles archive");
+      let n = e.data.slice(0, Y), s = X(n, e.etag), i = e.data.slice(s.rootDirectoryOffset, s.rootDirectoryOffset + s.rootDirectoryLength), a = `${o.getKey()}|${s.etag || ""}|${s.rootDirectoryOffset}|${s.rootDirectoryLength}`, c = Z(yield t(i, s.internalCompression));
+      return [s, [a, c.length, c]];
+    });
+  }
+  d(V, "getHeaderAndRoot");
+  function F(o, t, e, r, n, s) {
+    return h2(this, null, function* () {
+      let i = yield o.getBytes(e, r, s, n.etag), a = yield t(i.data, n.internalCompression), c = Z(a);
+      if (c.length === 0) throw new Error("Empty directory is invalid");
+      return c;
+    });
+  }
+  d(F, "getDirectory");
+  var U = class U2 {
+    constructor(t = 100, e = true, r = P) {
+      this.cache = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+    }
+    getHeader(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey(), r = this.cache.get(e);
+        if (r) return r.lastUsed = this.counter++, r.data;
+        let n = yield V(t, this.decompress);
+        return n[1] && this.cache.set(n[1][0], { lastUsed: this.counter++, data: n[1][2] }), this.cache.set(e, { lastUsed: this.counter++, data: n[0] }), this.prune(), n[0];
+      });
+    }
+    getDirectory(t, e, r, n, s) {
+      return h2(this, null, function* () {
+        let i = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i);
+        if (a) return a.lastUsed = this.counter++, a.data;
+        let c = yield F(t, this.decompress, e, r, n, s);
+        return this.cache.set(i, { lastUsed: this.counter++, data: c }), this.prune(), c;
+      });
+    }
+    prune() {
+      if (this.cache.size > this.maxCacheEntries) {
+        let t = 1 / 0, e;
+        this.cache.forEach((r, n) => {
+          r.lastUsed < t && (t = r.lastUsed, e = n);
+        }), e && this.cache.delete(e);
+      }
+    }
+    invalidate(t) {
+      return h2(this, null, function* () {
+        this.cache.delete(t.getKey());
+      });
+    }
+  };
+  d(U, "ResolvedValueCache");
+  var M = class M2 {
+    constructor(t = 100, e = true, r = P) {
+      this.cache = /* @__PURE__ */ new Map(), this.invalidations = /* @__PURE__ */ new Map(), this.pendingFetches = /* @__PURE__ */ new Map(), this.maxCacheEntries = t, this.counter = 1, this.decompress = r;
+    }
+    getHeader(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey(), r = this.cache.get(e);
+        if (r) return r.lastUsed = this.counter++, yield r.data;
+        let n = new Promise((s, i) => {
+          V(t, this.decompress).then((a) => {
+            a[1] && this.cache.set(a[1][0], { lastUsed: this.counter++, data: Promise.resolve(a[1][2]) }), s(a[0]), this.prune();
+          }).catch((a) => {
+            i(a);
+          });
+        });
+        return this.cache.set(e, { lastUsed: this.counter++, data: n }), n;
+      });
+    }
+    trackSignal(t, e, r) {
+      e.refs++, r.addEventListener("abort", () => {
+        --e.refs <= 0 && this.pendingFetches.get(t) === e && (e.controller.abort(), this.cache.delete(t), this.pendingFetches.delete(t));
+      }, { once: true });
+    }
+    getDirectory(t, e, r, n, s) {
+      return h2(this, null, function* () {
+        let i = `${t.getKey()}|${n.etag || ""}|${e}|${r}`, a = this.cache.get(i);
+        if (a) {
+          a.lastUsed = this.counter++;
+          let m = this.pendingFetches.get(i);
+          return m && this.trackSignal(i, m, s != null ? s : new AbortController().signal), yield a.data;
+        }
+        let c = new AbortController(), l = { controller: c, refs: 0 };
+        this.trackSignal(i, l, s != null ? s : new AbortController().signal), this.pendingFetches.set(i, l);
+        let u = new Promise((m, g) => {
+          F(t, this.decompress, e, r, n, c.signal).then((p) => {
+            this.pendingFetches.delete(i), m(p), this.prune();
+          }).catch((p) => {
+            g(p);
+          });
+        });
+        return this.cache.set(i, { lastUsed: this.counter++, data: u }), u;
+      });
+    }
+    prune() {
+      if (this.cache.size >= this.maxCacheEntries) {
+        let t = 1 / 0, e;
+        this.cache.forEach((r, n) => {
+          r.lastUsed < t && (t = r.lastUsed, e = n);
+        }), e && this.cache.delete(e);
+      }
+    }
+    invalidate(t) {
+      return h2(this, null, function* () {
+        let e = t.getKey();
+        if (this.invalidations.get(e)) return yield this.invalidations.get(e);
+        this.cache.delete(t.getKey());
+        let r = new Promise((n, s) => {
+          this.getHeader(t).then((i) => {
+            n(), this.invalidations.delete(e);
+          }).catch((i) => {
+            s(i);
+          });
+        });
+        this.invalidations.set(e, r);
+      });
+    }
+  };
+  d(M, "SharedPromiseCache");
+  var C = M;
+  var H = class H2 {
+    constructor(t, e, r) {
+      typeof t == "string" ? this.source = new E(t) : this.source = t, r ? this.decompress = r : this.decompress = P, e ? this.cache = e : this.cache = new C();
+    }
+    getHeader() {
+      return h2(this, null, function* () {
+        return yield this.cache.getHeader(this.source);
+      });
+    }
+    getZxyAttempt(t, e, r, n) {
+      return h2(this, null, function* () {
+        let s = q(t, e, r), i = yield this.cache.getHeader(this.source);
+        if (n == null || n.throwIfAborted(), t < i.minZoom || t > i.maxZoom) return;
+        let a = i.rootDirectoryOffset, c = i.rootDirectoryLength;
+        for (let l = 0; l <= 3; l++) {
+          let u = yield this.cache.getDirectory(this.source, a, c, i, n);
+          n == null || n.throwIfAborted();
+          let m = Q(u, s);
+          if (m) {
+            if (m.runLength > 0) {
+              let g = yield this.source.getBytes(i.tileDataOffset + m.offset, m.length, n, i.etag);
+              return { data: yield this.decompress(g.data, i.tileCompression), cacheControl: g.cacheControl, expires: g.expires };
+            }
+            a = i.leafDirectoryOffset + m.offset, c = m.length;
+          } else return;
+        }
+        throw new Error("Maximum directory depth exceeded");
+      });
+    }
+    getZxy(t, e, r, n) {
+      return h2(this, null, function* () {
+        try {
+          return yield this.getZxyAttempt(t, e, r, n);
+        } catch (s) {
+          if (s instanceof v) return this.cache.invalidate(this.source), yield this.getZxyAttempt(t, e, r, n);
+          throw s;
+        }
+      });
+    }
+    getMetadataAttempt() {
+      return h2(this, null, function* () {
+        let t = yield this.cache.getHeader(this.source), e = yield this.source.getBytes(t.jsonMetadataOffset, t.jsonMetadataLength, void 0, t.etag), r = yield this.decompress(e.data, t.internalCompression), n = new TextDecoder("utf-8");
+        return JSON.parse(n.decode(r));
+      });
+    }
+    getMetadata() {
+      return h2(this, null, function* () {
+        try {
+          return yield this.getMetadataAttempt();
+        } catch (t) {
+          if (t instanceof v) return this.cache.invalidate(this.source), yield this.getMetadataAttempt();
+          throw t;
+        }
+      });
+    }
+    getTileJson(t) {
+      return h2(this, null, function* () {
+        let e = yield this.getHeader(), r = yield this.getMetadata(), n = _(e.tileType);
+        return { tilejson: "3.0.0", scheme: "xyz", tiles: [`${t}/{z}/{x}/{y}${n}`], vector_layers: r.vector_layers, attribution: r.attribution, description: r.description, name: r.name, version: r.version, bounds: [e.minLon, e.minLat, e.maxLon, e.maxLat], center: [e.centerLon, e.centerLat, e.centerZoom], minzoom: e.minZoom, maxzoom: e.maxZoom };
+      });
+    }
+  };
+  d(H, "PMTiles");
+  var w = H;
+
+  // src/map/local-map.js
+  var DIR = "map/";
+  var protocol = null;
+  function absolutize(style, baseHref) {
+    const base2 = new URL(DIR, baseHref).href;
+    const abs = (u) => u.startsWith("./") ? base2 + u.slice(2) : u;
+    const s = JSON.parse(JSON.stringify(style));
+    if (s.sprite) s.sprite = abs(s.sprite);
+    if (s.glyphs) s.glyphs = abs(s.glyphs);
+    for (const src of Object.values(s.sources || {})) {
+      if (src.url && src.url.startsWith("pmtiles://./")) src.url = "pmtiles://" + base2 + src.url.slice("pmtiles://./".length);
+    }
+    return s;
+  }
+  async function localStyle(maplibregl, { timeoutMs = 5e3, baseHref = location.href } = {}) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), timeoutMs);
+      const res = await fetch(new URL(DIR + "style.json", baseHref), { signal: ctl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const style = absolutize(await res.json(), baseHref);
+      const url = style.sources.openmaptiles.url.slice("pmtiles://".length);
+      const file = new w(url);
+      await Promise.race([file.getHeader(), new Promise((_2, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs))]);
+      if (!protocol) {
+        protocol = new B();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+      }
+      protocol.add(file);
+      return style;
+    } catch {
+      return null;
+    }
   }
 
   // src/ui/map.js
@@ -9631,6 +10500,8 @@
     layers: [{ id: "bg", type: "background", paint: { "background-color": "#dfe6ec" } }]
   };
   async function pickStyle() {
+    const local = await localStyle(window.maplibregl);
+    if (local) return { style: winterizeStyle(local), online: true, local: true };
     for (const url of STYLE_URLS) {
       try {
         const ctl = new AbortController();
@@ -9797,8 +10668,8 @@
       new maplibregl.Marker({ element: el }).setLngLat([sp.lon, sp.lat]).addTo(map);
     }
     const signMarkers = /* @__PURE__ */ new Map();
-    function applyMarks(state2, list) {
-      const m = legacyMarks(state2);
+    function applyMarks(state3, list) {
+      const m = legacyMarks(state3);
       homeEl.classList.toggle("lit", m.litWindow);
       homeEl.classList.toggle("capsule", m.capsule);
       homeEl.title = ["Home", m.litWindow && "the window is lit", m.capsule && "a time capsule is buried here"].filter(Boolean).join(" \xB7 ");
@@ -9829,15 +10700,15 @@
     return {
       map,
       online,
-      update(state2, list) {
-        applySeason(state2.time);
-        map.getSource("places").setData(placesGeo(list, state2.places));
-        you.setLngLat([state2.pos.lon, state2.pos.lat]);
-        const h2 = state2.homePos || HOME;
-        homeMarker.setLngLat([h2.lon, h2.lat]);
-        youEl.classList.toggle("at-home", state2.location.kind === "home");
-        homeEl.classList.toggle("here", state2.location.kind === "home");
-        applyMarks(state2, list);
+      update(state3, list) {
+        applySeason(state3.time);
+        map.getSource("places").setData(placesGeo(list, state3.places));
+        you.setLngLat([state3.pos.lon, state3.pos.lat]);
+        const h3 = state3.homePos || HOME;
+        homeMarker.setLngLat([h3.lon, h3.lat]);
+        youEl.classList.toggle("at-home", state3.location.kind === "home");
+        homeEl.classList.toggle("here", state3.location.kind === "home");
+        applyMarks(state3, list);
       },
       flyTo(pos) {
         map.easeTo({ center: [pos.lon, pos.lat], duration: 800 });
@@ -9849,7 +10720,7 @@
       type: "FeatureCollection",
       features: list.map((p) => {
         const ps = placeStates[p.id];
-        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q) => q > 0);
+        const left = ps && ps.leftovers && Object.values(ps.leftovers).some((q2) => q2 > 0);
         const status = !ps || !ps.visited ? 0 : ps.zonesDone >= ps.zones && !left ? 2 : 1;
         return {
           type: "Feature",
@@ -9874,8 +10745,8 @@
     }
     return memo[which] || (memo[which] = {});
   }
-  function setPos(which, key, x, y, rot) {
-    savedPos(which)[key] = [x, y, rot ? 1 : 0];
+  function setPos(which, key, x2, y2, rot) {
+    savedPos(which)[key] = [x2, y2, rot ? 1 : 0];
     try {
       localStorage.setItem(LS2, JSON.stringify(memo));
     } catch {
@@ -9884,24 +10755,24 @@
   var esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   var KIND_ICON = { food: "\u{1F96B}", dogfood: "\u{1F9B4}", drink: "\u{1F4A7}", med: "\u271A", tool: "\u{1F527}", batteries: "\u{1F50B}", wear: "\u{1F9E5}", fuel: "\u26FD", part: "\u2699", junk: "\u2699", book: "\u{1F4D5}", misc: "\u25C6", comfort: "\u2665", warm: "\u2668" };
   function gridHtml(which, opts) {
-    const L = opts.layout;
-    const tiles = L.tiles.map((t) => {
+    const L2 = opts.layout;
+    const tiles = L2.tiles.map((t) => {
       const url = opts.icon?.(t.id);
       const img = url ? `<img src="${url}" alt="" draggable="false"${t.h >= t.w * 3 ? ' class="tall"' : t.w >= t.h * 3 ? ' class="wide"' : ""}>` : `<span class="ig">${KIND_ICON[opts.kind(t.id)] || "\u25C6"}</span>`;
-      const over = t.y + t.h > L.rows ? " over" : "";
+      const over = t.y + t.h > L2.rows ? " over" : "";
       const sel = opts.selected === `${which}:${t.key}` ? " sel" : "";
       const qty = opts.qtyText(t.q, t.id);
       return `<div class="itile k-${esc(opts.kind(t.id))}${over}${sel}" data-gw="${which}" data-gk="${esc(t.key)}" data-gid="${esc(t.id)}" data-gq="${t.q}"
       style="--x:${t.x};--y:${t.y};--w:${t.w};--h:${t.h}" title="${esc(opts.name(t.id))} \xB7 ${esc(qty)}">${img}
       <span class="in">${esc(opts.name(t.id))}</span>${qty ? `<b class="iq">${esc(qty)}</b>` : ""}</div>`;
     }).join("");
-    return `<div class="igrid igrid-${which}" data-grid="${which}" style="--cols:${L.cols};--rows:${L.height};--real:${L.rows}">
-    ${L.height > L.rows ? `<div class="ig-over" style="--top:${L.rows}"><span>Over the edge: no room</span></div>` : ""}${tiles}</div>`;
+    return `<div class="igrid igrid-${which}" data-grid="${which}" style="--cols:${L2.cols};--rows:${L2.height};--real:${L2.rows}">
+    ${L2.height > L2.rows ? `<div class="ig-over" style="--top:${L2.rows}"><span>Over the edge: no room</span></div>` : ""}${tiles}</div>`;
   }
-  var H = null;
+  var H3 = null;
   var bound = false;
-  function setGridHandlers(h2) {
-    H = h2;
+  function setGridHandlers(h3) {
+    H3 = h3;
     if (bound || typeof document === "undefined") return;
     bound = true;
     let drag = null;
@@ -9930,17 +10801,17 @@
     });
     const end = (e) => {
       if (!drag) return;
-      const d = drag;
+      const d2 = drag;
       drag = null;
       clearDrop();
-      if (!d.ghost) return;
+      if (!d2.ghost) return;
       justDragged = performance.now();
-      d.ghost.remove();
-      d.el.classList.remove("lifted");
-      const hit = dropTarget(e, d);
+      d2.ghost.remove();
+      d2.el.classList.remove("lifted");
+      const hit = dropTarget(e, d2);
       if (!hit) return;
-      if (hit.which === d.which) H?.move(d.which, d.key, hit.x, hit.y, hit.rot);
-      else H?.transfer(d.which, hit.which, d.id, d.q, hit);
+      if (hit.which === d2.which) H3?.move(d2.which, d2.key, hit.x, hit.y, hit.rot);
+      else H3?.transfer(d2.which, hit.which, d2.id, d2.q, hit);
     };
     document.addEventListener("pointerup", end);
     let justDragged = 0;
@@ -9948,7 +10819,7 @@
       const t = e.target.closest?.(".itile");
       if (!t || performance.now() - justDragged < 300) return;
       e.stopPropagation();
-      setTimeout(() => H?.select(t.dataset.gw, t.dataset.gk), 0);
+      setTimeout(() => H3?.select(t.dataset.gw, t.dataset.gk), 0);
     }, true);
     document.addEventListener("pointercancel", () => {
       if (drag?.ghost) drag.ghost.remove();
@@ -9967,8 +10838,8 @@
       e.preventDefault();
       e.stopPropagation();
     }, true);
-    function dropTarget(e, d) {
-      const g = d.ghost;
+    function dropTarget(e, d2) {
+      const g = d2.ghost;
       g.style.display = "none";
       const under = document.elementFromPoint(e.clientX, e.clientY);
       g.style.display = "";
@@ -9978,11 +10849,11 @@
       const r = grid.getBoundingClientRect();
       const cols = Number(grid.style.getPropertyValue("--cols"));
       const cell = r.width / cols;
-      const x = Math.round((e.clientX - d.ox - r.left) / cell);
-      const y = Math.round((e.clientY - d.oy - r.top) / cell);
-      const L = H?.layout?.(which);
-      const ok = L ? fitsAt(L, which === d.which ? d.key : null, x, y, d.w, d.h) : true;
-      return { which, x, y, rot: d.rot !== !!L?.tiles.find((t) => t.key === d.key)?.rot, ok, grid, cell };
+      const x2 = Math.round((e.clientX - d2.ox - r.left) / cell);
+      const y2 = Math.round((e.clientY - d2.oy - r.top) / cell);
+      const L2 = H3?.layout?.(which);
+      const ok = L2 ? fitsAt(L2, which === d2.which ? d2.key : null, x2, y2, d2.w, d2.h) : true;
+      return { which, x: x2, y: y2, rot: d2.rot !== !!L2?.tiles.find((t) => t.key === d2.key)?.rot, ok, grid, cell };
     }
     let mark = null;
     function showDrop(e) {
@@ -10005,8 +10876,8 @@
   var FX_KEY = "lastlight.fx";
   function fxEnabled() {
     try {
-      const v = localStorage.getItem(FX_KEY);
-      if (v !== null) return v === "1";
+      const v2 = localStorage.getItem(FX_KEY);
+      if (v2 !== null) return v2 === "1";
     } catch {
     }
     return !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -10039,11 +10910,11 @@
       canvas2.style.height = `${r.height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
-    function spawn(w, h2, anywhere) {
+    function spawn(w2, h3, anywhere) {
       const snow = kind === "snow" || kind === "leaves";
       return {
-        x: Math.random() * (w + 200) - 100,
-        y: anywhere ? Math.random() * h2 : -10,
+        x: Math.random() * (w2 + 200) - 100,
+        y: anywhere ? Math.random() * h3 : -10,
         r: kind === "leaves" ? 2.5 + Math.random() * 2.5 : snow ? 1.1 + Math.random() * 2.4 : 0.6 + Math.random() * 0.6,
         c: ["#b5652b", "#c9952f", "#8f4a2a", "#a8892f"][Math.floor(Math.random() * 4)],
         v: snow ? 0.4 + Math.random() * 0.9 : 7 + Math.random() * 5,
@@ -10052,12 +10923,12 @@
     }
     function frame() {
       raf = 0;
-      const w = canvas2.clientWidth;
-      const h2 = canvas2.clientHeight;
-      ctx.clearRect(0, 0, w, h2);
+      const w2 = canvas2.clientWidth;
+      const h3 = canvas2.clientHeight;
+      ctx.clearRect(0, 0, w2, h3);
       if (!enabled || kind === "none" || document.hidden) return;
-      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w * h2 / 6e5 + 0.3));
-      while (parts.length < want) parts.push(spawn(w, h2, true));
+      const want = Math.round((kind === "snow" ? 160 : kind === "leaves" ? 40 : 220) * strength * Math.min(1, w2 * h3 / 6e5 + 0.3));
+      while (parts.length < want) parts.push(spawn(w2, h3, true));
       if (parts.length > want) parts.length = want;
       const drift = wind / 12;
       if (kind === "snow") {
@@ -10068,7 +10939,7 @@
           s.p += 0.02;
           s.y += s.v;
           s.x += Math.sin(s.p) * 0.4 + drift;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.beginPath();
           ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
           ctx.fill();
@@ -10079,7 +10950,7 @@
           s.p += 0.05;
           s.y += s.v * 0.9;
           s.x += Math.sin(s.p) * 0.8 + drift * 1.5;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.save();
           ctx.translate(s.x, s.y);
           ctx.rotate(s.p);
@@ -10096,7 +10967,7 @@
         for (const s of parts) {
           s.y += s.v;
           s.x += drift * 3;
-          if (s.y > h2 + 5 || s.x < -110 || s.x > w + 110) Object.assign(s, spawn(w, h2, false));
+          if (s.y > h3 + 5 || s.x < -110 || s.x > w2 + 110) Object.assign(s, spawn(w2, h3, false));
           ctx.moveTo(s.x, s.y);
           ctx.lineTo(s.x + drift * 3, s.y + s.v * 1.6);
         }
@@ -10143,29 +11014,29 @@
   }
 
   // src/engine/diagnostics.js
-  function diagnostics(state2, { records = 20 } = {}) {
-    const w = state2.weather || {};
+  function diagnostics(state3, { records = 20 } = {}) {
+    const w2 = state3.weather || {};
     let saveBytes = null;
     try {
-      saveBytes = JSON.stringify(state2).length;
+      saveBytes = JSON.stringify(state3).length;
     } catch {
     }
     return {
-      day: dayIndex(state2.time) + 1,
-      time: state2.time,
+      day: dayIndex(state3.time) + 1,
+      time: state3.time,
       weather: {
-        type: w.type,
-        label: weatherInfo(state2)?.label || w.type,
-        high: Math.round(w.high),
-        low: Math.round(w.low),
-        wind: w.wind,
-        spell: w.spell ? { id: w.spell.id, daysLeft: w.spell.daysLeft } : null,
-        baseType: w.baseType || w.type
+        type: w2.type,
+        label: weatherInfo(state3)?.label || w2.type,
+        high: Math.round(w2.high),
+        low: Math.round(w2.low),
+        wind: w2.wind,
+        spell: w2.spell ? { id: w2.spell.id, daysLeft: w2.spell.daysLeft } : null,
+        baseType: w2.baseType || w2.type
       },
-      pacer: pacerInfo(state2),
-      decay: decayInfo(state2),
-      systems: gameSystems().list().map((s) => ({ id: s.id, order: s.order, version: s.version, saved: state2.systemVersions?.[s.id] ?? null, catchUp: s.catchUp || null })),
-      rng: { shared: state2.rngState, streams: { ...state2.rngStreams || {} } },
+      pacer: pacerInfo(state3),
+      decay: decayInfo(state3),
+      systems: gameSystems().list().map((s) => ({ id: s.id, order: s.order, version: s.version, saved: state3.systemVersions?.[s.id] ?? null, catchUp: s.catchUp || null })),
+      rng: { shared: state3.rngState, streams: { ...state3.rngStreams || {} } },
       saveBytes,
       deep: activity.isDeep(),
       activity: activity.records(records)
@@ -10194,58 +11065,58 @@
   var MAX_STEP_M = 250;
   var EVENT_EVERY_MILES = 0.5;
   var M_PER_DEG_LAT2 = 111320;
-  function metersBetween(a, b) {
-    const dz = (a.lat - b.lat) * M_PER_DEG_LAT2;
-    const dx = (a.lon - b.lon) * M_PER_DEG_LAT2 * Math.cos((a.lat + b.lat) / 2 * Math.PI / 180);
+  function metersBetween(a, b2) {
+    const dz = (a.lat - b2.lat) * M_PER_DEG_LAT2;
+    const dx = (a.lon - b2.lon) * M_PER_DEG_LAT2 * Math.cos((a.lat + b2.lat) / 2 * Math.PI / 180);
     return Math.hypot(dx, dz);
   }
-  function walkState(state2) {
-    if (!state2.streetWalk || typeof state2.streetWalk !== "object") state2.streetWalk = { m: 0, eventMiles: 0 };
-    return state2.streetWalk;
+  function walkState(state3) {
+    if (!state3.streetWalk || typeof state3.streetWalk !== "object") state3.streetWalk = { m: 0, eventMiles: 0 };
+    return state3.streetWalk;
   }
-  function enterStreet(state2) {
-    if (state2.dead) return null;
-    const cell = cellKeyAt(state2.pos);
-    state2.location = { kind: "street", cell };
-    walkState(state2);
+  function enterStreet(state3) {
+    if (state3.dead) return null;
+    const cell = cellKeyAt(state3.pos);
+    state3.location = { kind: "street", cell };
+    walkState(state3);
     return cell;
   }
-  function streetMove(state2, pos) {
-    if (state2.dead) return { ok: false, why: "dead" };
+  function streetMove(state3, pos) {
+    if (state3.dead) return { ok: false, why: "dead" };
     if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lon)) return { ok: false, why: "bad position" };
-    const d = metersBetween(state2.pos, pos);
-    if (d > MAX_STEP_M) return { ok: false, why: "too far in one step" };
-    const w = walkState(state2);
-    if (state2.location?.kind !== "street") enterStreet(state2);
-    state2.pos = { lat: pos.lat, lon: pos.lon };
-    state2.location.cell = cellKeyAt(state2.pos);
-    state2.stats.miles += d / M_PER_MILE;
-    w.m += d;
-    w.eventMiles += d / M_PER_MILE;
-    const mPerMin = walkSpeed(state2).mph * M_PER_MILE / 60;
-    const minutes = Math.floor(w.m / mPerMin);
+    const d2 = metersBetween(state3.pos, pos);
+    if (d2 > MAX_STEP_M) return { ok: false, why: "too far in one step" };
+    const w2 = walkState(state3);
+    if (state3.location?.kind !== "street") enterStreet(state3);
+    state3.pos = { lat: pos.lat, lon: pos.lon };
+    state3.location.cell = cellKeyAt(state3.pos);
+    state3.stats.miles += d2 / M_PER_MILE;
+    w2.m += d2;
+    w2.eventMiles += d2 / M_PER_MILE;
+    const mPerMin = walkSpeed(state3).mph * M_PER_MILE / 60;
+    const minutes = Math.floor(w2.m / mPerMin);
     if (minutes > 0) {
-      w.m -= minutes * mPerMin;
-      advanceTime(state2, minutes, "walk");
+      w2.m -= minutes * mPerMin;
+      advanceTime(state3, minutes, "walk");
     }
-    if (!state2.dead && w.eventMiles >= EVENT_EVERY_MILES) {
-      w.eventMiles -= EVENT_EVERY_MILES;
-      roadEvent(state2);
+    if (!state3.dead && w2.eventMiles >= EVENT_EVERY_MILES) {
+      w2.eventMiles -= EVENT_EVERY_MILES;
+      roadEvent(state3);
     }
-    if (!state2.dead && state2.player.energy <= 0) {
-      log(state2, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
-      advanceTime(state2, 180, "sleep");
+    if (!state3.dead && state3.player.energy <= 0) {
+      log(state3, "You are too tired to walk on. You sit down by a wall and sleep.", "warn");
+      advanceTime(state3, 180, "sleep");
     }
-    return { ok: !state2.dead, minutes, cell: state2.location.cell };
+    return { ok: !state3.dead, minutes, cell: state3.location.cell };
   }
   var DOOR_RANGE_M = 80;
-  function enterPlaceFromStreet(state2, placeId) {
+  function enterPlaceFromStreet(state3, placeId) {
     const place = getPlace(placeId);
     if (!place) return { ok: false, why: "no such place" };
-    if (metersBetween(state2.pos, place) > DOOR_RANGE_M) return { ok: false, why: "not at the door" };
-    state2.location = { kind: "place", id: placeId };
-    log(state2, `You arrive at ${place.name}.`.replace("..", "."), "travel");
-    enterPlace(state2, place);
+    if (metersBetween(state3.pos, place) > DOOR_RANGE_M) return { ok: false, why: "not at the door" };
+    state3.location = { kind: "place", id: placeId };
+    log(state3, `You arrive at ${place.name}.`.replace("..", "."), "travel");
+    enterPlace(state3, place);
     return { ok: true };
   }
 
@@ -10276,13 +11147,13 @@
     morale: { label: "Morale" }
   };
   function statRow(k, p, withEffect) {
-    const v = Math.round(p[k]);
-    const max = k === "energy" ? p.energyMax : 100;
+    const v2 = Math.round(p[k]);
+    const max2 = k === "energy" ? p.energyMax : 100;
     const st = statStage(k, p[k]);
     const cls = ["ok", "warn", "bad", "bad"][st.stage];
     return `<div class="stat ${cls}"><span class="sl">${STAT_INFO[k].label}</span>
-      <span class="bar"><i style="width:${v}%"></i>${max < 100 ? `<s style="left:${max}%"></s>` : ""}</span>
-      <span class="sv">${v}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc2(st.effect)}</span>` : ""}</div>`;
+      <span class="bar"><i style="width:${v2}%"></i>${max2 < 100 ? `<s style="left:${max2}%"></s>` : ""}</span>
+      <span class="sv">${v2}</span><span class="sw">${st.word}</span>${withEffect && st.effect ? `<span class="se">${esc2(st.effect)}</span>` : ""}</div>`;
   }
   function riskChips() {
     return risks(state).map((r) => ["risk", r.text]);
@@ -10318,10 +11189,10 @@
     if (state.dead) showDeath();
     else if (state.pendingPrompt === "name_dog") showNameDog();
   }
-  function act(kind, a, b, c) {
+  function act(kind, a, b2, c) {
     const wasDead = !!state.dead;
-    perform(state, kind, a, b, c);
-    soundForAction(kind, a, b);
+    perform(state, kind, a, b2, c);
+    soundForAction(kind, a, b2);
     afterAction2();
     if (!wasDead && state.dead) recordRun(state);
     commit();
@@ -10342,19 +11213,19 @@
   function updateSound() {
     const loc = state.location || {};
     const home = loc.kind === "home";
-    const h2 = state.home || {};
+    const h3 = state.home || {};
     const scene = sceneEnv(state);
     setAmbience(scene, {
       inside: home || document.body.classList.contains("inside-open"),
       home,
-      fire: (h2.fireHours || 0) > 0,
-      electric: !!h2.heaterOn || built(state, "led_lights") && scene.daylight < 0.3 && (h2.battery || 0) > 0.2
+      fire: (h3.fireHours || 0) > 0,
+      electric: !!h3.heaterOn || built(state, "led_lights") && scene.daylight < 0.3 && (h3.battery || 0) > 0.2
     });
   }
   function renderHud() {
     const t = state.time;
     const night = isNight(t);
-    const w = state.weather;
+    const w2 = state.weather;
     const p = state.player;
     const low = needWarnings(state).map((n) => n.word);
     const rk = risks(state).length;
@@ -10366,20 +11237,20 @@
     <span class="h-temp">${Math.round(airTemp(state, t))}\xB0F</span>
     ${low.length ? `<span class="h-alert">\u26A0 ${esc2(low.join(" \xB7 "))}</span>` : ""}${rk ? `<span class="h-risk">${rk} risk${rk > 1 ? "s" : ""}</span>` : ""}`;
     $("#hud").hidden = false;
-    if (fx) fx.update({ weather: w.type, night, windMph: w.wind, season: seasonOf(t) });
+    if (fx) fx.update({ weather: w2.type, night, windMph: w2.wind, season: seasonOf(t) });
   }
   function renderHeader() {
     const t = state.time;
     const sun = sunFor(t);
     const night = isNight(t);
     const air = Math.round(airTemp(state, t));
-    const w = state.weather;
+    const w2 = state.weather;
     const sunText = night ? `Sunrise ${formatClock(dayIndex(t) * 1440 + sun.rise)}` : `Sunset ${formatClock(dayIndex(t) * 1440 + sun.set)}`;
     $("#clock").innerHTML = `
     <div class="eyebrow">Status</div>
     <div class="day">Day ${dayIndex(t) + 1}</div>
     <div class="when">${formatDate(t)} \xB7 <b>${formatClock(t)}</b> ${night ? '<span class="badge night">Night</span>' : '<span class="badge day">Day</span>'}</div>
-    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc2(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w.wind} mph \xB7 ${sunText}</div>
+    <div class="wx">${SEASONS[seasonOf(t)].label} \xB7 ${esc2(weatherInfo(state).label)} \xB7 ${air}\xB0F outside \xB7 wind ${w2.wind} mph \xB7 ${sunText}</div>
     ${outlookHtml()}`;
   }
   function outlookHtml() {
@@ -10454,19 +11325,19 @@
   function showGoalBoard() {
     const g = ensureGoals(state);
     const groups = Object.entries(GOAL_KINDS).map(([kind, k]) => {
-      const items = GOALS.filter((x) => x.kind === kind).map((x) => {
-        const on = g.picked.includes(x.id);
-        const pr = goalProgress(state, x.id);
-        return `<div class="gb-goal"><div><b>${esc2(x.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc2(x.why)}</p></div>
-        <button data-goalpick="${x.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
+      const items = GOALS.filter((x2) => x2.kind === kind).map((x2) => {
+        const on = g.picked.includes(x2.id);
+        const pr = goalProgress(state, x2.id);
+        return `<div class="gb-goal"><div><b>${esc2(x2.title)}</b> <span class="hint">${pr.total} steps${pr.done ? `, ${pr.done} done` : ""}</span><p class="hint">${esc2(x2.why)}</p></div>
+        <button data-goalpick="${x2.id}" ${on || g.picked.length >= MAX_GOALS ? "disabled" : ""}>${on ? "Chosen" : "Choose"}</button></div>`;
       }).join("");
       return `<h4>${esc2(k.label)} <span class="hint">${esc2(k.hint)}</span></h4>${items}`;
     }).join("");
     modal(`<h3>Legacy</h3><p class="hint">Work on up to ${MAX_GOALS} goals. They give morale, not power. You can put a goal aside once per ${CHANGE_GAP_DAYS} days; steps done are kept.</p>
     <div class="gb">${groups}</div><div class="col"><button class="link" id="cancel">Close</button></div>`, (m) => {
       m.querySelector("#cancel").addEventListener("click", closeModal);
-      m.querySelectorAll("[data-goalpick]").forEach((b) => b.addEventListener("click", () => {
-        const why = pickGoal(state, b.dataset.goalpick);
+      m.querySelectorAll("[data-goalpick]").forEach((b2) => b2.addEventListener("click", () => {
+        const why = pickGoal(state, b2.dataset.goalpick);
         if (why) {
           alert(why);
           return;
@@ -10534,8 +11405,8 @@
     const hint = loc.kind !== "house" ? '<p class="hint">Tap a dot on the map to walk to a real place.</p>' : "";
     $("#location").innerHTML = `<div class="eyebrow">Location</div><h2>${esc2(locationLabel(state))}</h2><p class="sub">${esc2(sub)}</p><div class="acts">${acts}</div>${hint}`;
   }
-  function qtyText(q) {
-    return Number.isInteger(q) ? String(q) : q.toFixed(2).replace(/0$/, "");
+  function qtyText(q2) {
+    return Number.isInteger(q2) ? String(q2) : q2.toFixed(2).replace(/0$/, "");
   }
   function useButtons(id, from) {
     return itemUses(state, id).map((u) => `<button data-use="${id}" data-verb="${u.verb}" data-from="${from}"${u.disabled ? " disabled" : ""}${u.note ? ` title="${esc2(u.note)}"` : ""}>${esc2(u.label)}${u.verb === "salvage" && u.note ? ` <small>${esc2(u.note)}</small>` : ""}</button>${u.disabled && u.note && u.verb !== "salvage" ? `<small class="need">${esc2(u.note)}</small>` : ""}`).join("");
@@ -10556,7 +11427,7 @@
     return i < 0 ? KIND_GROUPS.length - 1 : i;
   }
   function sortedIds(bag) {
-    return Object.keys(bag).sort((a, b) => groupOf(a) - groupOf(b) || itemName(a).localeCompare(itemName(b)));
+    return Object.keys(bag).sort((a, b2) => groupOf(a) - groupOf(b2) || itemName(a).localeCompare(itemName(b2)));
   }
   var gridSel = null;
   var gridLayouts = {};
@@ -10569,13 +11440,13 @@
     const tiles = tilesFor(gb, sortedIds(gb));
     const cols = which === "pack" ? GRID_COLS : hereGridCols();
     const rows = which === "pack" ? packSize(state).rows : Math.max(4, Math.ceil(tiles.reduce((a, t) => a + t.w * t.h, 0) / cols));
-    let L = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
-    if (L.overflow) {
+    let L2 = layoutGrid(tiles, cols, rows, savedPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`));
+    if (L2.overflow) {
       const auto = layoutGrid(tiles, cols, rows);
-      if (auto.overflow < L.overflow) L = auto;
+      if (auto.overflow < L2.overflow) L2 = auto;
     }
-    gridLayouts[which] = L;
-    return L;
+    gridLayouts[which] = L2;
+    return L2;
   }
   function packText() {
     const u = packUse(state);
@@ -10604,7 +11475,7 @@
       layout: buildGrid(which),
       name: itemName,
       kind: (id) => ITEMS[id]?.kind || "misc",
-      qtyText: (q, id) => q === 1 && sizeOf(id).stack === 1 ? "" : qtyText(q),
+      qtyText: (q2, id) => q2 === 1 && sizeOf(id).stack === 1 ? "" : qtyText(q2),
       icon: iconUrl,
       selected: gridSel
     };
@@ -10623,7 +11494,7 @@
     const from = which === "pack" ? "carried" : "storage";
     const uses = which === "pack" || home ? useButtons(id, from) : "";
     const move = which === "pack" ? `<button data-drop="${id}">${home ? "Store" : "Drop"}</button>` : `<button class="primary" data-take="${id}">Take</button>`;
-    const w = Math.round(it.weight * bag[id] * 10) / 10;
+    const w2 = Math.round(it.weight * bag[id] * 10) / 10;
     return `<div class="isel${compact ? " compact" : ""}"><img class="isel-img" src="${iconUrl(id) || ""}" alt=""${iconUrl(id) ? "" : " hidden"}>
     <div><b>${esc2(it.name)}${freshTag(id)}</b><small>${qtyText(bag[id])} ${esc2(it.unit)} \xB7 ${sizeOf(id).w}\xD7${sizeOf(id).h} cells${which === "pack" ? "" : " \xB7 not yours yet"}</small></div>
     <div class="isel-b">${uses}${move}</div></div>`;
@@ -10636,14 +11507,14 @@
         gridSel = gridSel === k ? null : k;
         refreshGrids();
       },
-      move: (which, key, x, y, rot) => {
-        const L = gridLayouts[which];
-        const t = L?.tiles.find((v) => v.key === key);
+      move: (which, key, x2, y2, rot) => {
+        const L2 = gridLayouts[which];
+        const t = L2?.tiles.find((v2) => v2.key === key);
         if (!t) return;
-        const w = rot !== t.rot ? t.h : t.w;
-        const h2 = rot !== t.rot ? t.w : t.h;
-        if (!fitsAt(L, key, x, y, w, h2)) return;
-        setPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, key, x, y, rot);
+        const w2 = rot !== t.rot ? t.h : t.w;
+        const h3 = rot !== t.rot ? t.w : t.h;
+        if (!fitsAt(L2, key, x2, y2, w2, h3)) return;
+        setPos(which === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, key, x2, y2, rot);
         refreshGrids();
       },
       transfer: (from, to, id, qty, hit) => {
@@ -10651,9 +11522,9 @@
         if (from === "here" && to === "pack") act("take", id, qty);
         else if (from === "pack" && to === "here") act("drop", id, qty);
         else return;
-        const L = buildGrid(to);
-        const t = L.tiles.find((v) => v.id === id && v.key.endsWith("#0"));
-        if (t && hit && fitsAt(L, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, t.key, hit.x, hit.y, t.rot);
+        const L2 = buildGrid(to);
+        const t = L2.tiles.find((v2) => v2.id === id && v2.key.endsWith("#0"));
+        if (t && hit && fitsAt(L2, t.key, hit.x, hit.y, t.w, t.h)) setPos(to === "pack" ? "pack" : `here:${state.location.kind}:${state.location.id || ""}`, t.key, hit.x, hit.y, t.rot);
         gridSel = null;
         const said = state.log.slice(n0).map((e) => e.text).join(" ");
         insideToast?.(said);
@@ -10694,25 +11565,25 @@
     </div>`;
   }
   function renderHome() {
-    const h2 = state.home;
+    const h3 = state.home;
     const atHome = state.location.kind === "home";
-    const pct = Math.round(h2.battery / h2.batteryMax * 100);
+    const pct = Math.round(h3.battery / h3.batteryMax * 100);
     const pw = powerSummary(state);
-    const hrs = (x) => x >= 10 ? `${Math.round(x)} h` : `${x.toFixed(1)} h`;
+    const hrs = (x2) => x2 >= 10 ? `${Math.round(x2)} h` : `${x2.toFixed(1)} h`;
     $("#home").innerHTML = `
     <div class="eyebrow">Home base</div>
     <h3>House status ${atHome ? "" : "<small>(you are away)</small>"}</h3>
     <div class="grid">
-      <span>Inside temp</span><b>${Math.round(h2.indoorTemp)}\xB0F</b>
-      <span>Fire</span><b>${h2.fireHours > 0 ? `burning (${formatDuration(h2.fireHours * 60)})` : "out"}</b>
-      <span>Battery</span><b>${pct}% (${h2.battery.toFixed(1)} of ${h2.batteryMax} kWh)</b>
+      <span>Inside temp</span><b>${Math.round(h3.indoorTemp)}\xB0F</b>
+      <span>Fire</span><b>${h3.fireHours > 0 ? `burning (${formatDuration(h3.fireHours * 60)})` : "out"}</b>
+      <span>Battery</span><b>${pct}% (${h3.battery.toFixed(1)} of ${h3.batteryMax} kWh)</b>
       <span>Power in</span><b>Solar today ${pw.inToday.toFixed(1)} kWh (in daylight)</b>
       <span>Power out</span><b>${pw.outKw ? `Heater ${pw.outKw} kW \xB7 battery lasts ${hrs(pw.hoursLeft)}` : `Nothing on \xB7 heater would run ${hrs(pw.heaterHoursFull)}`}</b>
-      <span>Water heater tank</span><b>${h2.tankGal.toFixed(1)} gal (clean)</b>
-      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h2.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
-      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h2.rawGal.toFixed(1)} gal</b>
+      <span>Water heater tank</span><b>${h3.tankGal.toFixed(1)} gal (clean)</b>
+      <span>${built(state, "filter_station") ? "Clean water tank" : "Boiled water"}</span><b>${h3.safeGal.toFixed(1)} gal${built(state, "filter_station") ? ` of ${SAFE_TANK_GAL}` : ""}</b>
+      <span>${built(state, "rain_barrels") ? "Rain barrels (unsafe)" : "Unsafe water"}</span><b>${h3.rawGal.toFixed(1)} gal</b>
       ${built(state, "filter_station") ? `<span>Water chain</span><b>Runs by itself: tonight it filters ${autoFilterToday(state).toFixed(1)} gal (up to ${AUTO_FILTER_GAL_PER_DAY} a night)</b>` : ""}
-      <span>Kitchen tap</span><b>${h2.tapWorks ? "weak flow" : "stopped"}</b>
+      <span>Kitchen tap</span><b>${h3.tapWorks ? "weak flow" : "stopped"}</b>
     </div>
     ${renderHeat(atHome)}
     ${renderGarden(atHome)}
@@ -10720,18 +11591,18 @@
   }
   function renderBase() {
     const done = builtCount(state);
-    const wings = wingSummary(state).map((w) => {
-      const pips = w.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
-      const cards = w.projects.map(projectCard).join("");
-      return `<details class="wing" data-wing="${w.id}" ${openWings.has(w.id) ? "open" : ""}>
-      <summary><span class="wi">${w.icon}</span><span class="wn">${esc2(w.label)}</span><span class="pips">${pips}</span></summary>
-      <p class="hint">${esc2(w.blurb)}</p>${cards}</details>`;
+    const wings = wingSummary(state).map((w2) => {
+      const pips = w2.projects.map((p) => `<i class="${projectStatus(state, p).built ? "on" : ""}"></i>`).join("");
+      const cards = w2.projects.map(projectCard).join("");
+      return `<details class="wing" data-wing="${w2.id}" ${openWings.has(w2.id) ? "open" : ""}>
+      <summary><span class="wi">${w2.icon}</span><span class="wn">${esc2(w2.label)}</span><span class="pips">${pips}</span></summary>
+      <p class="hint">${esc2(w2.blurb)}</p>${cards}</details>`;
     }).join("");
     const need = {};
     for (const p of PROJECTS) {
       const st = projectStatus(state, p);
       if (st.built || st.started || st.missingReq.length) continue;
-      for (const x of st.parts) if (x.have < x.need) need[x.id] = Math.max(need[x.id] || 0, x.need - x.have);
+      for (const x2 of st.parts) if (x2.have < x2.need) need[x2.id] = Math.max(need[x2.id] || 0, x2.need - x2.have);
       for (const t of st.tools) if (!t.have) need[t.id] = 1;
     }
     const leftAt = (id) => {
@@ -10740,7 +11611,7 @@
       for (const hs of Object.values(state.houses || {})) if ((hs.leftovers?.[id] || 0) > 0) at.push(hs.label || "a house");
       return at.length ? ` \xB7 left at ${at.slice(0, 2).join(", ")}${at.length > 2 ? ` +${at.length - 2}` : ""}` : "";
     };
-    const list = Object.entries(need).map(([id, q]) => `<span class="chip">${esc2(itemName(id))} \xD7${q}${esc2(leftAt(id))}</span>`).join("");
+    const list = Object.entries(need).map(([id, q2]) => `<span class="chip">${esc2(itemName(id))} \xD7${q2}${esc2(leftAt(id))}</span>`).join("");
     return `<div class="base">
     <h3>Base projects <small>${done} / ${PROJECTS.length} built</small></h3>
     <div class="basebar"><i style="width:${done / PROJECTS.length * 100}%"></i></div>
@@ -10750,7 +11621,7 @@
   }
   function projectCard(p) {
     const st = projectStatus(state, p);
-    const parts = st.parts.map((x) => `<span class="chip ${st.started || x.have >= x.need ? "ok" : "bad"}">${esc2(itemName(x.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x.have, x.need))}/${x.need}`}</span>`).join("");
+    const parts = st.parts.map((x2) => `<span class="chip ${st.started || x2.have >= x2.need ? "ok" : "bad"}">${esc2(itemName(x2.id))} ${st.started ? "\u2713" : `${qtyText(Math.min(x2.have, x2.need))}/${x2.need}`}</span>`).join("");
     const tools = st.tools.map((t) => `<span class="chip ${t.have ? "ok" : "bad"}">\u{1F527} ${esc2(itemName(t.id))}</span>`).join("");
     let foot;
     if (st.built) foot = '<span class="built">\u2713 Built</span>';
@@ -10769,17 +11640,17 @@
   </div>`;
   }
   function renderDog() {
-    const d = state.dog;
+    const d2 = state.dog;
     let html = "";
-    if (d.stage === "joined") {
-      const bar = (label, v) => `<div class="stat ${v < 25 ? "bad" : v < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v)}%"></i></span><span class="sv">${Math.round(v)}</span><span class="sw"></span></div>`;
-      html = `<h3>${esc2(d.name)} <small>${d.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d.food)}${bar("Health", d.health)}${bar("Bond", d.bond)}
-      ${d.sick ? `<p class="warn-line">\u26A0 ${esc2(d.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
+    if (d2.stage === "joined") {
+      const bar = (label, v2) => `<div class="stat ${v2 < 25 ? "bad" : v2 < 50 ? "warn" : "ok"}"><span class="sl">${label}</span><span class="bar"><i style="width:${Math.round(v2)}%"></i></span><span class="sv">${Math.round(v2)}</span><span class="sw"></span></div>`;
+      html = `<h3>${esc2(d2.name)} <small>${d2.withPlayer ? "with you" : "at home"}</small></h3>${bar("Food", d2.food)}${bar("Health", d2.health)}${bar("Bond", d2.bond)}
+      ${d2.sick ? `<p class="warn-line">\u26A0 ${esc2(d2.name)} is sick: loses health each hour. Antibiotics cure it now (button under Location), or rest and food over about 4 days.</p>` : ""}
       <p class="hint">Bond 40+: warns of animals. 50+: finds extra items. 80+: sleeps next to you (warmer).</p>`;
-    } else if (d.stage === "visiting") {
+    } else if (d2.stage === "visiting") {
       html = '<h3>Stray dog</h3><p class="hint">A thin dog comes near the house in the day. Leave food outside on three different days.</p>';
-    } else if (d.stage === "dead") {
-      html = `<h3>${esc2(d.name || "The dog")}</h3><p class="hint">Gone.</p>`;
+    } else if (d2.stage === "dead") {
+      html = `<h3>${esc2(d2.name || "The dog")}</h3><p class="hint">Gone.</p>`;
     }
     $("#dog").innerHTML = html;
     $("#dog").hidden = !html;
@@ -10811,7 +11682,7 @@
       pos = p;
       const cat = CATEGORIES[p.cat];
       const ps = state.places[p.id];
-      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q) => a + (q > 0 ? q : 0), 0)) : 0;
+      const left = ps && ps.leftovers ? Math.round(Object.values(ps.leftovers).reduce((a, q2) => a + (q2 > 0 ? q2 : 0), 0)) : 0;
       const status = (!ps || !ps.visited ? "Not searched" : ps.zonesDone >= ps.zones ? "Searched all of it" : `Searched ${ps.zonesDone} of ${ps.zones} ${cat.zoneName}s`) + (left > 0 ? ` \xB7 items left here: ${left}` : ps && ps.visited && ps.zonesDone >= ps.zones ? ": nothing left" : "");
       const here = state.location.kind === "place" && state.location.id === id;
       const fromHome = straightMiles(homeOf(state), p).toFixed(1);
@@ -10895,11 +11766,11 @@
       });
     });
   }
-  function sleepPreview(h2) {
+  function sleepPreview(h3) {
     try {
       const copy = structuredClone(state);
       copy.log = [];
-      perform(copy, "action", "sleep", h2);
+      perform(copy, "action", "sleep", h3);
       const p = copy.player;
       return { food: p.food, water: p.water, warmth: p.warmth, dead: !!copy.dead };
     } catch {
@@ -10909,19 +11780,19 @@
   function showSleep() {
     const p = state.player;
     const prev = {};
-    const opts = [1, 2, 4, 6, 8, 10].map((h2) => {
-      const a = actionTiming(state, h2 * 60);
-      const f = prev[h2] = sleepPreview(h2);
+    const opts = [1, 2, 4, 6, 8, 10].map((h3) => {
+      const a = actionTiming(state, h3 * 60);
+      const f = prev[h3] = sleepPreview(h3);
       const low = f && (f.dead || f.water < 15 || f.food < 15 || f.warmth < 15);
       const warn = !f ? "" : f.dead ? " \xB7 you may not wake" : low ? ` \xB7 wake ${[f.water < 15 && "very thirsty", f.food < 15 && "starving", f.warmth < 15 && "freezing"].filter(Boolean).join(", ")}` : "";
-      return `<button data-hours="${h2}" class="${low ? "risky" : ""}" title="${esc2(a.dayStartText || "")}">${h2} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc2(warn)}</small></button>`;
+      return `<button data-hours="${h3}" class="${low ? "risky" : ""}" title="${esc2(a.dayStartText || "")}">${h3} h<small>until ${a.endText}${a.crossesDayStart ? " \u2600" : ""}${esc2(warn)}</small></button>`;
     }).join("");
     const need = [p.water < 40 && "Drink first: you are thirsty.", p.food < 40 && "Eat first: you are hungry.", p.warmth < 40 && "Get warm first: you are cold."].filter(Boolean);
     const now = `<p class="hint">Now: Food ${Math.round(p.food)} \xB7 Water ${Math.round(p.water)} \xB7 Warmth ${Math.round(p.warmth)} \xB7 Energy ${Math.round(p.energy)}</p>${need.length ? `<p class="warn-line">\u26A0 ${esc2(need.join(" "))}</p>` : ""}`;
     modal(`<h3>How long do you want to sleep?</h3>${now}<p class="hint">Sleep gives Energy. The fire does not burn while you sleep unless you add wood first. \u2600 = you wake after 5 AM, when the weather changes.</p><div class="row">${opts}</div><button class="link" id="cancel">Cancel</button>`, (m) => {
-      m.querySelectorAll("[data-hours]").forEach((b) => b.addEventListener("click", () => {
+      m.querySelectorAll("[data-hours]").forEach((b2) => b2.addEventListener("click", () => {
         closeModal();
-        act("action", "sleep", Number(b.dataset.hours));
+        act("action", "sleep", Number(b2.dataset.hours));
       }));
       m.querySelector("#cancel").addEventListener("click", closeModal);
     });
@@ -10946,10 +11817,10 @@
     return `<h3>What you leave behind</h3><ul class="epilogue">${ep.map((e) => `<li><b>${esc2(e.title)}</b> <span class="hint">${esc2(e.kind)} \xB7 ${e.done} of ${e.total} steps</span><br>${esc2(e.line)}</li>`).join("")}</ul>`;
   }
   function showDeath() {
-    const d = state.dead;
+    const d2 = state.dead;
     const runs = bestRuns().map((r) => `<li>${r.days} days \xB7 ${esc2(r.cause)}${r.dog ? ` \xB7 with ${esc2(r.dog)}` : ""}</li>`).join("");
     modal(`<h2>You died</h2>
-    <p>You lived ${d.days} day${d.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d.time)} at ${formatClock(d.time)}, of ${esc2(d.cause)}.</p>
+    <p>You lived ${d2.days} day${d2.days === 1 ? "" : "s"} after you woke up. You died on ${formatDate(d2.time)} at ${formatClock(d2.time)}, of ${esc2(d2.cause)}.</p>
     <div class="grid"><span>Miles walked</span><b>${state.stats.miles.toFixed(1)}</b><span>Places searched</span><b>${state.stats.placesSearched}</b>
     <span>Houses searched</span><b>${state.stats.housesSearched}</b><span>Dog</span><b>${state.dog.name ? esc2(state.dog.name) : "none"}</b></div>
     ${legacyEpilogueHtml()}
@@ -10965,8 +11836,8 @@
     </div>`;
   }
   function bindStartChoices(m) {
-    m.querySelectorAll("[data-start]").forEach((b) => b.addEventListener("click", () => {
-      const how = b.dataset.start;
+    m.querySelectorAll("[data-start]").forEach((b2) => b2.addEventListener("click", () => {
+      const how = b2.dataset.start;
       if (how === "home") return beginRun({});
       if (how === "random") {
         const home = randomStartPoint();
@@ -10979,9 +11850,9 @@
     let best = null;
     let bestD = Infinity;
     for (const p of allPlaces()) {
-      const d = straightMiles(pos, p);
-      if (d < bestD) {
-        bestD = d;
+      const d2 = straightMiles(pos, p);
+      if (d2 < bestD) {
+        bestD = d2;
         best = p;
       }
     }
@@ -10998,15 +11869,15 @@
     let legacy = earnedIds(rec).slice(0, MAX_SLOTS);
     const render2 = (m) => {
       const left = pointsLeft(traits);
-      const jobs = Object.entries(JOBS).map(([id, J]) => {
-        const sk = Object.entries(J.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
-        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc2(J.name)}</b><small>${esc2(J.text)}</small>
-        <small class="good">${esc2(sk)} \xB7 starts with ${esc2(itemName(J.item[0]).toLowerCase())}${J.item[1] > 1 ? ` \xD7${J.item[1]}` : ""}</small><small class="bad">${esc2(J.weakness)}</small></button>`;
+      const jobs = Object.entries(JOBS).map(([id, J2]) => {
+        const sk = Object.entries(J2.skills).map(([k, l]) => `${SKILLS[k].name} ${l}`).join(", ");
+        return `<button class="bg-job${id === job ? " on" : ""}" data-job="${id}"><b>${esc2(J2.name)}</b><small>${esc2(J2.text)}</small>
+        <small class="good">${esc2(sk)} \xB7 starts with ${esc2(itemName(J2.item[0]).toLowerCase())}${J2.item[1] > 1 ? ` \xD7${J2.item[1]}` : ""}</small><small class="bad">${esc2(J2.weakness)}</small></button>`;
       }).join("");
-      const tr = Object.entries(TRAITS).map(([id, T2]) => {
+      const tr = Object.entries(TRAITS).map(([id, T4]) => {
         const on = traits.includes(id);
-        const blocked = !on && ((T2.not || []).some((x) => traits.includes(x)) || pointsLeft([...traits, id]) < 0);
-        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc2(T2.name)}</b> <span class="${T2.cost > 0 ? "bad" : "good"}">${T2.cost > 0 ? `costs ${T2.cost}` : `gives ${-T2.cost}`}</span><small>${esc2(T2.text)}</small></button>`;
+        const blocked = !on && ((T4.not || []).some((x2) => traits.includes(x2)) || pointsLeft([...traits, id]) < 0);
+        return `<button class="bg-trait${on ? " on" : ""}" data-trait="${id}" ${blocked ? "disabled" : ""}><b>${esc2(T4.name)}</b> <span class="${T4.cost > 0 ? "bad" : "good"}">${T4.cost > 0 ? `costs ${T4.cost}` : `gives ${-T4.cost}`}</span><small>${esc2(T4.text)}</small></button>`;
       }).join("");
       m.querySelector(".box").innerHTML = `<h2>Who were you?</h2>
       <p class="hint">Your past job gives you some skill, one item at home and one weakness. No job is better than the others.</p>
@@ -11016,17 +11887,17 @@
       <div class="bg-traits">${tr}</div>
       ${legacyHtml()}
       <div class="row"><button class="primary" id="bgGo">Wake up</button></div>`;
-      m.querySelectorAll("[data-job]").forEach((b) => b.addEventListener("click", () => {
-        job = b.dataset.job;
+      m.querySelectorAll("[data-job]").forEach((b2) => b2.addEventListener("click", () => {
+        job = b2.dataset.job;
         render2(m);
       }));
-      m.querySelectorAll("[data-trait]").forEach((b) => b.addEventListener("click", () => {
-        const id = b.dataset.trait;
-        traits = traits.includes(id) ? traits.filter((x) => x !== id) : [...traits, id];
+      m.querySelectorAll("[data-trait]").forEach((b2) => b2.addEventListener("click", () => {
+        const id = b2.dataset.trait;
+        traits = traits.includes(id) ? traits.filter((x2) => x2 !== id) : [...traits, id];
         while (pointsLeft(traits) < 0) {
-          const good = traits.filter((x) => TRAITS[x].cost > 0);
+          const good = traits.filter((x2) => TRAITS[x2].cost > 0);
           if (!good.length) break;
-          traits = traits.filter((x) => x !== good[good.length - 1]);
+          traits = traits.filter((x2) => x2 !== good[good.length - 1]);
         }
         render2(m);
       }));
@@ -11036,9 +11907,9 @@
         saveLegacy(rec);
         render2(m);
       });
-      m.querySelectorAll("[data-legacy]").forEach((b) => b.addEventListener("click", () => {
-        const id = b.dataset.legacy;
-        legacy = legacy.includes(id) ? legacy.filter((x) => x !== id) : [...legacy, id].slice(0, MAX_SLOTS);
+      m.querySelectorAll("[data-legacy]").forEach((b2) => b2.addEventListener("click", () => {
+        const id = b2.dataset.legacy;
+        legacy = legacy.includes(id) ? legacy.filter((x2) => x2 !== id) : [...legacy, id].slice(0, MAX_SLOTS);
         render2(m);
       }));
       m.querySelector("#bgGo").addEventListener("click", () => {
@@ -11050,11 +11921,11 @@
     };
     const legacyHtml = () => {
       const earned = earnedIds(rec);
-      const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L]) => {
+      const list = rec.enabled ? `<p class="hint">Deeds over all your runs earn small bonuses. Turn on up to ${MAX_SLOTS}.</p><div class="bg-traits">${Object.entries(LEGACY).map(([id, L2]) => {
         const has3 = earned.includes(id);
         const on = has3 && legacy.includes(id);
-        const full = !on && legacy.filter((x) => earned.includes(x)).length >= MAX_SLOTS;
-        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc2(L.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc2(L.progress(rec))}</span><small>${esc2(L.deed)}</small><small class="good">${esc2(L.bonus)}</small></button>`;
+        const full = !on && legacy.filter((x2) => earned.includes(x2)).length >= MAX_SLOTS;
+        return `<button class="bg-trait${on ? " on" : ""}" data-legacy="${id}" ${!has3 || full ? "disabled" : ""}><b>${esc2(L2.name)}</b> <span class="${has3 ? "good" : ""}">${has3 ? "earned" : esc2(L2.progress(rec))}</span><small>${esc2(L2.deed)}</small><small class="good">${esc2(L2.bonus)}</small></button>`;
       }).join("")}</div>` : "";
       return `<h3>Carry-over bonuses <small>(game option)</small></h3>
       <label class="bg-opt"><input type="checkbox" id="legacyOn" ${rec.enabled ? "checked" : ""}> Use small bonuses earned in earlier runs</label>${list}`;
@@ -11103,13 +11974,13 @@
   function showStartChoices() {
     modal(startChoicesHtml(), bindStartChoices);
   }
-  function qualityHint(q) {
+  function qualityHint(q2) {
     return {
       auto: "Auto: set from your device, and lowered if the 3D view runs slow.",
       low: "Low: fastest. No shadows of the room, no light patches. For phones and old laptops.",
       medium: "Medium: reflections and light patches, simple shadows.",
       high: "High: soft shadows and all light effects. Needs a good graphics card."
-    }[q] + " It is used the next time you go inside.";
+    }[q2] + " It is used the next time you go inside.";
   }
   function showMenu() {
     modal(`<h3>Game</h3>
@@ -11118,7 +11989,7 @@
       <label class="toggle"><input type="checkbox" id="fxToggle" ${fx && fx.enabled ? "checked" : ""}> Weather effects on the map (snow, rain, fog, night)</label>
       <div class="qual-row" role="radiogroup" aria-label="3D quality">
         <span class="qual-label">3D quality</span>
-        ${QUALITY_CHOICES.map((q) => `<button type="button" class="qual${getQualityChoice() === q ? " on" : ""}" data-q="${q}" role="radio" aria-checked="${getQualityChoice() === q}">${QUALITY_LABELS[q]}</button>`).join("")}
+        ${QUALITY_CHOICES.map((q2) => `<button type="button" class="qual${getQualityChoice() === q2 ? " on" : ""}" data-q="${q2}" role="radio" aria-checked="${getQualityChoice() === q2}">${QUALITY_LABELS[q2]}</button>`).join("")}
       </div>
       <p class="hint" id="qualHint">${qualityHint(getQualityChoice())}</p>
       <div class="snd-row">
@@ -11138,14 +12009,14 @@
       m.querySelector("#sndMute").addEventListener("change", (e) => setSoundSettings({ mute: e.target.checked }));
       m.querySelector("#sndVol").addEventListener("input", (e) => setSoundSettings({ volume: Number(e.target.value) / 100 }));
       m.querySelector("#sndVol").addEventListener("change", () => playSfx("pickup"));
-      m.querySelectorAll("[data-q]").forEach((b) => b.addEventListener("click", () => {
-        setQualityChoice(b.dataset.q);
-        m.querySelectorAll("[data-q]").forEach((x) => {
-          const on = x === b;
-          x.classList.toggle("on", on);
-          x.setAttribute("aria-checked", on);
+      m.querySelectorAll("[data-q]").forEach((b2) => b2.addEventListener("click", () => {
+        setQualityChoice(b2.dataset.q);
+        m.querySelectorAll("[data-q]").forEach((x2) => {
+          const on = x2 === b2;
+          x2.classList.toggle("on", on);
+          x2.setAttribute("aria-checked", on);
         });
-        m.querySelector("#qualHint").textContent = qualityHint(b.dataset.q);
+        m.querySelector("#qualHint").textContent = qualityHint(b2.dataset.q);
       }));
       m.querySelector("#exp").addEventListener("click", () => {
         const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
@@ -11162,7 +12033,7 @@
           state = parseSave(await f.text());
           closeModal();
           commit(true);
-        } catch (err) {
+        } catch (err2) {
           alert("This file is not a Last Light save.");
         }
       });
@@ -11294,7 +12165,7 @@
         return ok ? `Game saved (Day ${dayIndex(state.time) + 1}, ${formatClock(state.time)}).` : "The game could not save in this browser.";
       },
       canQuickLoad: () => !!loadGame(),
-      isDone: (z) => zoneList().includes(z),
+      isDone: (z2) => zoneList().includes(z2),
       isCounterOpen: () => loc.kind === "place" ? placeState(state, getPlace(loc.id)).counterOpen : true,
       isDead: () => !!state.dead,
       // F3: engine diagnostics (systems, random streams, last actions with changed paths).
@@ -11332,11 +12203,11 @@
       items: () => buildingItems(state).map((it) => ({ ...it, name: itemName(it.item) })),
       onPickUp: (pid) => {
         const n0 = state.log.length;
-        const it = buildingItems(state).find((x) => x.pid === pid);
+        const it = buildingItems(state).find((x2) => x2.pid === pid);
         const wasDead = !!state.dead;
         perform(state, "action", "pickup", pid);
         if (!wasDead && state.dead) recordRun(state);
-        const ok = !buildingItems(state).some((x) => x.pid === pid);
+        const ok = !buildingItems(state).some((x2) => x2.pid === pid);
         if (ok) playSfx("pickup");
         saveGame(state);
         render();
@@ -11362,8 +12233,8 @@
         const def = ITEMS[it.item];
         const need = projectNeeds()[it.item];
         const bagFull = roomFor(state, it.item, 1) < 1;
-        const z = sizeOf(it.item);
-        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${z.w}\xD7${z.h}${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
+        const z2 = sizeOf(it.item);
+        return `<kbd>E</kbd> Take ${esc2(def.name)} <small>${z2.w}\xD7${z2.h}${bagFull ? ' \xB7 <span class="bad">pack too full</span>' : ""}</small>` + (need ? `<span class="need">Needed: ${esc2(need)}</span>` : "") + (SALVAGE[it.item] ? `<small class="more">Can be taken apart: ${esc2(SALVAGE[it.item].what)}</small>` : "") + (near > 1 ? `<small class="more">Hold ${touch ? "USE" : "E"}: take all ${near} in reach</small>` : "");
       },
       onSearch: (zone) => {
         const n0 = state.log.length;
@@ -11376,7 +12247,7 @@
         const found = state.lastFound || {};
         delete state.lastFound;
         commit();
-        const items = Object.entries(found).map(([id, q]) => `${itemName(id)}${q > 1 ? ` \xD7${q}` : ""}`);
+        const items = Object.entries(found).map(([id, q2]) => `${itemName(id)}${q2 > 1 ? ` \xD7${q2}` : ""}`);
         const label = plan.spots.find((s) => s.zone === zone)?.label || zoneName;
         const extra = lastLines(n0).join(" ");
         return {
@@ -11550,7 +12421,7 @@
     for (const p of PROJECTS) {
       const st = projectStatus(state, p);
       if (st.built || st.started || st.missingReq.length) continue;
-      for (const x of st.parts) if (x.have < x.need && !out[x.id]) out[x.id] = `${p.name} ${qtyText(Math.min(x.have, x.need))}/${x.need}`;
+      for (const x2 of st.parts) if (x2.have < x2.need && !out[x2.id]) out[x2.id] = `${p.name} ${qtyText(Math.min(x2.have, x2.need))}/${x2.need}`;
       for (const t of st.tools) if (!t.have && !out[t.id]) out[t.id] = `${p.name} (tool)`;
     }
     return out;
@@ -11558,14 +12429,14 @@
   function journalHtml(maxDays) {
     const days = (state.journal || []).slice(-maxDays).reverse();
     if (!days.length) return '<p class="hint">Nothing yet.</p>';
-    return days.map((d) => {
+    return days.map((d2) => {
       const parts = [];
-      if (d.places.length) parts.push(`You went to ${d.places.join(", ")}.`);
-      if (d.taken) parts.push(`You picked up ${d.taken} item${d.taken > 1 ? "s" : ""}.`);
-      if (d.searched) parts.push(`You searched ${d.searched} area${d.searched > 1 ? "s" : ""}.`);
-      if (!parts.length && !d.events.length) parts.push("You stayed close to home.");
-      const ev = d.events.map((t) => `<li>${esc2(t)}</li>`).join("");
-      return `<div class="jday"><b>Day ${d.day + 1} \xB7 ${esc2(formatDate(d.day * 1440))}</b><p>${esc2(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
+      if (d2.places.length) parts.push(`You went to ${d2.places.join(", ")}.`);
+      if (d2.taken) parts.push(`You picked up ${d2.taken} item${d2.taken > 1 ? "s" : ""}.`);
+      if (d2.searched) parts.push(`You searched ${d2.searched} area${d2.searched > 1 ? "s" : ""}.`);
+      if (!parts.length && !d2.events.length) parts.push("You stayed close to home.");
+      const ev = d2.events.map((t) => `<li>${esc2(t)}</li>`).join("");
+      return `<div class="jday"><b>Day ${d2.day + 1} \xB7 ${esc2(formatDate(d2.day * 1440))}</b><p>${esc2(parts.join(" "))}</p>${ev ? `<ul>${ev}</ul>` : ""}</div>`;
     }).join("");
   }
   function insidePanel(name) {
@@ -11605,77 +12476,77 @@
   }
   function bindEvents() {
     document.body.addEventListener("click", (e) => {
-      const b = e.target.closest("button");
-      if (!b || b.disabled || !state || b.closest("#modal") || b.closest(".maplibregl-popup")) return;
-      if (!b.isConnected) return;
-      if (b.closest("#inside")) {
-        if (b.dataset.take) act("take", b.dataset.take);
-        else if (b.dataset.drop) act("drop", b.dataset.drop);
+      const b2 = e.target.closest("button");
+      if (!b2 || b2.disabled || !state || b2.closest("#modal") || b2.closest(".maplibregl-popup")) return;
+      if (!b2.isConnected) return;
+      if (b2.closest("#inside")) {
+        if (b2.dataset.take) act("take", b2.dataset.take);
+        else if (b2.dataset.drop) act("drop", b2.dataset.drop);
         else return;
         gridSel = null;
         insideRefresh?.();
         return;
       }
-      if (b.dataset.act) {
-        if (b.dataset.act === "sleep") return showSleep();
-        if (b.dataset.act === "walk_in") return walkInside2();
-        if (b.dataset.act === "walk_out") return walkOutside();
-        act("action", b.dataset.act);
-      } else if (b.dataset.use && b.dataset.verb === "take_off") act("action", "take_off", b.dataset.use);
-      else if (b.dataset.use) act("use", b.dataset.use, b.dataset.verb, b.dataset.from);
-      else if (b.dataset.take) act("take", b.dataset.take);
-      else if (b.dataset.takeall) act("takeall");
-      else if (b.dataset.drop) act("drop", b.dataset.drop);
-      else if (b.dataset.build) act("action", "build", b.dataset.build);
-      else if (b.dataset.goalboard) showGoalBoard();
-      else if (b.dataset.garden) {
-        const [what, crop] = b.dataset.garden.split(":");
+      if (b2.dataset.act) {
+        if (b2.dataset.act === "sleep") return showSleep();
+        if (b2.dataset.act === "walk_in") return walkInside2();
+        if (b2.dataset.act === "walk_out") return walkOutside();
+        act("action", b2.dataset.act);
+      } else if (b2.dataset.use && b2.dataset.verb === "take_off") act("action", "take_off", b2.dataset.use);
+      else if (b2.dataset.use) act("use", b2.dataset.use, b2.dataset.verb, b2.dataset.from);
+      else if (b2.dataset.take) act("take", b2.dataset.take);
+      else if (b2.dataset.takeall) act("takeall");
+      else if (b2.dataset.drop) act("drop", b2.dataset.drop);
+      else if (b2.dataset.build) act("action", "build", b2.dataset.build);
+      else if (b2.dataset.goalboard) showGoalBoard();
+      else if (b2.dataset.garden) {
+        const [what, crop] = b2.dataset.garden.split(":");
         act("action", `garden_${what}`, crop);
-      } else if (b.dataset.sleepspot) act("action", "sleep_spot", b.dataset.sleepspot);
-      else if (b.dataset.board) act("action", "board_window", b.dataset.board);
-      else if (b.dataset.door) act("action", "door", b.dataset.door);
-      else if (b.dataset.goaldrop) {
-        const why = dropGoal(state, b.dataset.goaldrop);
+      } else if (b2.dataset.sleepspot) act("action", "sleep_spot", b2.dataset.sleepspot);
+      else if (b2.dataset.board) act("action", "board_window", b2.dataset.board);
+      else if (b2.dataset.door) act("action", "door", b2.dataset.door);
+      else if (b2.dataset.goaldrop) {
+        const why = dropGoal(state, b2.dataset.goaldrop);
         if (why) alert(why);
         else commit();
-      } else if (b.id === "menuBtn") showMenu();
-      else if (b.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
+      } else if (b2.id === "menuBtn") showMenu();
+      else if (b2.id === "centerBtn" && mapApi) mapApi.flyTo(state.pos);
     });
     document.body.addEventListener("toggle", (e) => {
-      const w = e.target.dataset && e.target.dataset.wing;
-      if (!w) return;
-      if (e.target.open) openWings.add(w);
-      else openWings.delete(w);
+      const w2 = e.target.dataset && e.target.dataset.wing;
+      if (!w2) return;
+      if (e.target.open) openWings.add(w2);
+      else openWings.delete(w2);
     }, true);
     window.addEventListener("beforeunload", () => {
       if (state) saveGame(state);
     });
   }
-  function diagText(state2) {
-    const d = diagnostics(state2, { records: 3 });
-    const w = d.weather;
-    const shares = Object.entries(d.decay.shares).filter(([, v]) => v > 0).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join("  ");
-    const streams = Object.entries(d.rng.streams).map(([k, v]) => `${k}:${(v >>> 0).toString(36)}`).join(" ");
+  function diagText(state3) {
+    const d2 = diagnostics(state3, { records: 3 });
+    const w2 = d2.weather;
+    const shares = Object.entries(d2.decay.shares).filter(([, v2]) => v2 > 0).map(([k, v2]) => `${k} ${Math.round(v2 * 100)}%`).join("  ");
+    const streams = Object.entries(d2.rng.streams).map(([k, v2]) => `${k}:${(v2 >>> 0).toString(36)}`).join(" ");
     return [
-      `day ${d.day}  ${w.label} ${w.low}-${w.high}\xB0F${w.spell ? `  spell ${w.spell.id} (${w.spell.daysLeft} d)` : ""}`,
-      `pacer: month ${d.pacer.month}  tension ${d.pacer.tension}  ${(d.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d.pacer.events}`,
-      `breakdown: ${shares || "none yet"}${d.decay.next ? `  next ${d.decay.next.id} ~day ${d.decay.next.day + 1}` : ""}`,
-      `systems: ${d.systems.map((x) => x.id).join(" ")}`,
-      `rng ${(d.rng.shared >>> 0).toString(36)}  ${streams}  save ${d.saveBytes == null ? "?" : `${(d.saveBytes / 1024).toFixed(0)} KB`}${d.deep ? "  deep log on" : ""}`,
-      ...d.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
+      `day ${d2.day}  ${w2.label} ${w2.low}-${w2.high}\xB0F${w2.spell ? `  spell ${w2.spell.id} (${w2.spell.daysLeft} d)` : ""}`,
+      `pacer: month ${d2.pacer.month}  tension ${d2.pacer.tension}  ${(d2.pacer.chancePerHour * 100).toFixed(1)}%/h  events ${d2.pacer.events}`,
+      `breakdown: ${shares || "none yet"}${d2.decay.next ? `  next ${d2.decay.next.id} ~day ${d2.decay.next.day + 1}` : ""}`,
+      `systems: ${d2.systems.map((x2) => x2.id).join(" ")}`,
+      `rng ${(d2.rng.shared >>> 0).toString(36)}  ${streams}  save ${d2.saveBytes == null ? "?" : `${(d2.saveBytes / 1024).toFixed(0)} KB`}${d2.deep ? "  deep log on" : ""}`,
+      ...d2.activity.slice(-3).flatMap((r) => activityText(r).split("\n").slice(0, 6))
     ];
   }
-  function homeProjectText(state2, id, long) {
+  function homeProjectText(state3, id, long) {
     if (id === "home_battery") {
-      const h2 = state2.home;
-      const txt = `${h2.battery.toFixed(1)} / ${h2.batteryMax} kWh \xB7 charged by the solar panels`;
+      const h3 = state3.home;
+      const txt = `${h3.battery.toFixed(1)} / ${h3.batteryMax} kWh \xB7 charged by the solar panels`;
       return long ? `Home battery: ${txt}.` : `Home battery <small>${txt}</small>`;
     }
     const proj = PROJECTS.find((p) => p.id === id);
     if (!proj) return "";
-    const st = projectStatus(state2, proj);
+    const st = projectStatus(state3, proj);
     if (st.built) return long ? `${proj.name}: built. ${proj.effect || ""}` : `${esc2(proj.name)} <small>built \xB7 ${esc2(proj.effect || "")}</small>`;
-    const parts = st.parts.map((x) => `${itemName(x.id).toLowerCase()} ${Math.min(x.have, x.need)}/${x.need}`).join(", ");
+    const parts = st.parts.map((x2) => `${itemName(x2.id).toLowerCase()} ${Math.min(x2.have, x2.need)}/${x2.need}`).join(", ");
     const tools = st.tools.length ? ` \xB7 tools: ${st.tools.map((t) => itemName(t.id).toLowerCase() + (t.have ? "" : " (missing)")).join(", ")}` : "";
     const req = st.missingReq.length ? ` \xB7 build first: ${st.missingReq.map((r) => PROJECTS.find((p) => p.id === r)?.name || r).join(", ")}` : "";
     if (long) return `${proj.name}: not built. Needs ${parts}${tools}${req}. ${proj.hours} h of work. Build it from the home panel.`;
@@ -11695,10 +12566,10 @@
       const board = r.brokenWindows > 0 ? `<button class="small" data-board="${r.id}" ${atHome ? "" : "disabled"} title="1 scrap wood, 30 min">Board up a window</button>` : "";
       const door = r.doorClosed == null ? "" : `<button class="small" data-door="${r.id}:${r.doorClosed ? 0 : 1}" ${atHome ? "" : "disabled"}>${r.doorClosed ? "Open door" : "Close door"}</button>`;
       const bed = r.id === "bedroom" || r.id === "living" ? hh.sleepSpot === r.id ? '<span class="chip ok">You sleep here</span>' : `<button class="small" data-sleepspot="${r.id}" ${atHome ? "" : "disabled"}>Sleep here</button>` : "";
-      const w = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
+      const w2 = Math.max(4, Math.min(100, (r.temp - 20) / 50 * 100));
       return `<div class="heat-row">
       <span class="hn">${esc2(r.label)}</span>
-      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w}%"></i></span>
+      <span class="hbar"><i class="${tcls(r.temp)}" style="width:${w2}%"></i></span>
       <b class="${tcls(r.temp)}">${Math.round(r.temp)}\xB0F</b>
       <small>${esc2(leaks.join(" \xB7 ") || "closed up")}${r.loss > 1.05 ? ` \xB7 draft \xD7${r.loss.toFixed(1)}` : ""}</small>
       <span class="hb">${board}${door}${bed}</span>
@@ -11712,37 +12583,37 @@
   }
   var MONTHS2 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function monthsText(list) {
-    const m = [...list].sort((a, b) => a - b);
+    const m = [...list].sort((a, b2) => a - b2);
     const runs = [];
-    for (const x of m) {
+    for (const x2 of m) {
       const r = runs[runs.length - 1];
-      if (r && x === r[1] + 1) r[1] = x;
-      else runs.push([x, x]);
+      if (r && x2 === r[1] + 1) r[1] = x2;
+      else runs.push([x2, x2]);
     }
-    return runs.map(([a, b]) => a === b ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b]}`).join(", ");
+    return runs.map(([a, b2]) => a === b2 ? MONTHS2[a] : `${MONTHS2[a]}\u2013${MONTHS2[b2]}`).join(", ");
   }
   function renderGarden(atHome) {
     const g = gardenInfo(state);
     if (!g.beds) return "";
     const beds = [];
     for (let i = 0; i < g.beds; i++) {
-      const b = g.planted[i];
-      if (!b) {
+      const b2 = g.planted[i];
+      if (!b2) {
         beds.push('<div class="bed empty"><span>Empty bed</span></div>');
         continue;
       }
-      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b.stage] || b.stage;
-      beds.push(`<div class="bed ${b.dead ? "dead" : b.ready ? "ready" : ""}"><b>${esc2(b.name)}</b> <span>${stage}</span>
-      <span class="hbar"><i class="ok" style="width:${b.growth}%"></i></span><small>${b.dead || b.ready ? "" : `${b.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b.crop].days * (100 - b.growth) / 100))} days left if warm \xB7 `}water ${b.water}%</small></div>`);
+      const stage = { seedling: "seedlings", growing: "growing", nearly: "nearly ready", ready: "ready to harvest", dead: "dead" }[b2.stage] || b2.stage;
+      beds.push(`<div class="bed ${b2.dead ? "dead" : b2.ready ? "ready" : ""}"><b>${esc2(b2.name)}</b> <span>${stage}</span>
+      <span class="hbar"><i class="ok" style="width:${b2.growth}%"></i></span><small>${b2.dead || b2.ready ? "" : `${b2.growth}% grown \xB7 about ${Math.max(1, Math.round(CROPS[b2.crop].days * (100 - b2.growth) / 100))} days left if warm \xB7 `}water ${b2.water}%</small></div>`);
     }
     const sow = g.canSow.map((id) => {
       const why = canPlant(state, id);
       return `<button class="small" data-garden="plant:${id}" ${atHome && !why ? "" : "disabled"} title="${esc2(why || "")}">Sow ${esc2(CROPS[id].name.toLowerCase())}</button>`;
     }).join("");
-    const any = g.planted.some((b) => !b.dead && !b.ready);
-    const ripe = g.planted.some((b) => b.ready);
+    const any = g.planted.some((b2) => !b2.dead && !b2.ready);
+    const ripe = g.planted.some((b2) => b2.ready);
     return `<div class="garden">
-    <h3>Garden <small>${g.planted.filter((b) => !b.dead).length} / ${g.beds} beds in use</small></h3>
+    <h3>Garden <small>${g.planted.filter((b2) => !b2.dead).length} / ${g.beds} beds in use</small></h3>
     <div class="beds">${beds.join("")}</div>
     <div class="row">
       ${any ? `<button class="small" data-garden="water" ${atHome ? "" : "disabled"}>Water the beds (15 min)</button>` : ""}
@@ -11754,7 +12625,34 @@
   </div>`;
   }
 
+  // src/dev/loader.js
+  var state2 = "off";
+  function load2() {
+    if (state2 !== "off") return;
+    state2 = "loading";
+    const s = document.createElement("script");
+    s.src = "devtools.js";
+    s.onload = () => {
+      state2 = "on";
+    };
+    s.onerror = () => {
+      state2 = "off";
+      console.warn("dev tools: devtools.js did not load");
+    };
+    document.head.appendChild(s);
+  }
+  function initDevLoader() {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(location.search).get("dev") === "1") load2();
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "F3" && e.code !== "Backquote") return;
+      if (state2 === "off") load2();
+      else if (state2 === "on" && window.LLDev) window.LLDev.toggle();
+    }, true);
+  }
+
   // src/main.js
+  initDevLoader();
   start();
 })();
 /*! Bundled license information:

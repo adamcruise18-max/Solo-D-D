@@ -1,0 +1,12 @@
+{
+ "_about": "Limits for each procedural 3D asset on Medium/High quality (FINE on). tris = triangles after baking, mats = draw calls after baking. Checked by test/asset-budget.test.js and tools/asset-detail.mjs --manifest. Raise a limit only with a measured reason (see art/art-direction-brief.md).",
+ "item":    { "tris": 2500,  "mats": 12, "parts": 80 },
+ "prop":    { "tris": 10000, "mats": 12, "parts": 200 },
+ "fixture": { "tris": 4000,  "mats": 6,  "parts": 140 },
+ "shelfFill": { "trisPerItem": 70, "farShare": 0.65 },
+ "views": {
+  "_about": "Whole-view limits from tools/asset-gallery/probe.mjs (browser). Medium quality.",
+  "room":   { "tris": 350000, "calls": 200 },
+  "street": { "tris": 500000, "calls": 300 }
+ }
+}
