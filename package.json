@@ -30,7 +30,10 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "howler": "^2.2.4",
     "pmtiles": "^4.5.0",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "three-mesh-bvh": "^0.10.0",
+    "zzfx": "^1.4.0"
   }
 }

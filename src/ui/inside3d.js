@@ -7,7 +7,8 @@ import {
   MeshStandardMaterial, MeshBasicMaterial, CanvasTexture, RepeatWrapping, SRGBColorSpace, DoubleSide,
   Vector3, Matrix4, BufferGeometry, Float32BufferAttribute, Group, LineSegments, EdgesGeometry, LineBasicMaterial, Raycaster, Plane, Vector2, Box3,
 } from 'three';
-import { collide, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { collideBoxes, nearestSpot, solidBoxes } from '../engine/interior.js';
+import { roomBVH, blockedBVH, boxesNear } from './roombvh.js';
 import { openStreets } from '../render/streets/view.js';
 import { snowFromScene } from '../render/streets/look.js';
 import { setupLook, surfaceFor, worldUV, pickQuality, grimeLevel } from './look3d.js';
@@ -1034,33 +1035,17 @@ export function openInside(opts) {
   }
   const REACH = 2.3;
   // True when a wall, shelf, counter or closed gate is between the eye and the item.
-  // Segment against each box (slab test). Walls have no height: they go to the ceiling.
+  // Walls have no height: they go to the ceiling.
+  // The boxes go in a BVH (three-mesh-bvh, src/ui/roombvh.js): one for the gate shut, one open.
+  const bvhs = {};
+  const roomR = () => { const k = opts.isCounterOpen() ? 'open' : 'shut'; return (bvhs[k] ||= roomBVH(solidBoxes(plan, { counter: k === 'open' }))); };
   function blocked(from, o) {
     const dx = o.x - from.x;
     const dy = o.y - from.y;
     const dz = o.z - from.z;
     // Stop 0.25 m short of the item: it may rest on a box top or on a shelf board edge.
     const END = Math.max(0, 1 - 0.25 / Math.max(0.25, Math.hypot(dx, dy, dz)));
-    for (const b of solidBoxes(plan, { counter: opts.isCounterOpen() })) {
-      const lo = [b.x - b.w / 2 + 0.02, 0, b.z - b.d / 2 + 0.02];
-      const hi = [b.x + b.w / 2 - 0.02, (b.h || 9) - 0.02, b.z + b.d / 2 - 0.02];
-      const p0 = [from.x, from.y, from.z];
-      const v = [dx, dy, dz];
-      let t0 = 0;
-      let t1 = END;
-      let hit = true;
-      for (let k = 0; k < 3 && hit; k++) {
-        if (Math.abs(v[k]) < 1e-9) { if (p0[k] < lo[k] || p0[k] > hi[k]) hit = false; continue; }
-        let a = (lo[k] - p0[k]) / v[k];
-        let c = (hi[k] - p0[k]) / v[k];
-        if (a > c) [a, c] = [c, a];
-        t0 = Math.max(t0, a);
-        t1 = Math.min(t1, c);
-        if (t0 > t1) hit = false;
-      }
-      if (hit) return true;
-    }
-    return false;
+    return blockedBVH(roomR(), from, o, END);
   }
   function itemsInReach(from) {
     const out = [];
@@ -1699,7 +1684,8 @@ export function openInside(opts) {
         const sp = moveSpeed({ stance, sprint, slowWalk }) * Math.min(1, len) / len;
         const sx = (mx * Math.cos(yaw) + mz * Math.sin(yaw)) * sp * dt;
         const sz = (-mx * Math.sin(yaw) + mz * Math.cos(yaw)) * sp * dt;
-        const next = collide(plan, pos.x + sx, pos.z + sz, 0.3, { counter: opts.isCounterOpen() });
+        // only the boxes near you (BVH query), in the same order: the same push as collide()
+        const next = collideBoxes(boxesNear(roomR(), pos.x + sx, pos.z + sz, 0.3 + 0.6), pos.x + sx, pos.z + sz, 0.3);
         // Do not walk out of the door: use the exit spot.
         next.z = Math.min(next.z, 0.2);
         const moved = Math.hypot(next.x - pos.x, next.z - pos.z);

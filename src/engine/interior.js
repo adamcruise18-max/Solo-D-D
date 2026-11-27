@@ -230,7 +230,10 @@ function addDebris(plan, r) {
 
 // Push a circle (player) out of all solid boxes. Returns the new position.
 export function collide(plan, x, z, radius = 0.3, open = {}) {
-  const boxes = solidBoxes(plan, open);
+  return collideBoxes(solidBoxes(plan, open), x, z, radius);
+}
+// The same push on a given list of boxes (the 3D view passes only the near ones: src/ui/roombvh.js).
+export function collideBoxes(boxes, x, z, radius = 0.3) {
   for (let pass = 0; pass < 2; pass++) {
     for (const b of boxes) {
       const hw = b.w / 2 + radius;

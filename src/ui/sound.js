@@ -1,7 +1,8 @@
 // Sound player (Adam, 2026-11-27). Effects: ZzFX (MIT) samples. Loops: noise made here,
 // played with howler.js (MIT) for loops and fades. Data and rules: src/data/sounds.js.
 // Browsers allow audio only after the player clicks or presses a key, so the audio code
-// loads on the first click (esbuild keeps the import lazy) and nothing plays before it.
+// starts on the first click and nothing plays before it. (esbuild puts zzfx and howler in
+// docs/game.js, but their code runs only at that first click.)
 import { SFX, LOOPS, sfxFor, ambience, rainHitEvery, SOUND_DEFAULTS, cleanSettings } from '../data/sounds.js';
 
 const LS = 'lastlight.sound.v1';
