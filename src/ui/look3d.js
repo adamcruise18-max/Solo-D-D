@@ -929,6 +929,7 @@ function blobTexture() {
   }
   g.putImageData(img, 0, 0);
   const t = new CanvasTexture(c);
+  t.userData.mask = true; // white/black alpha mask: color space does not matter
   TEX.blob = t;
   return t;
 }
@@ -951,6 +952,7 @@ function patchTexture() {
   }
   g.putImageData(img, 0, 0);
   const t = new CanvasTexture(c);
+  t.userData.mask = true; // white/black alpha mask: color space does not matter
   TEX.patch = t;
   return t;
 }
@@ -978,6 +980,7 @@ function haloTexture() {
   }
   g.putImageData(img, 0, 0);
   const t = new CanvasTexture(c);
+  t.userData.mask = true; // white/black alpha mask: color space does not matter
   TEX.halo = t;
   return t;
 }
